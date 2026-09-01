@@ -121,3 +121,130 @@
     justify-content: center;
   }
 }
+
+.matchup-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 15px;
+}
+
+.game-status {
+  text-transform: capitalize;
+}
+
+.live-team-score {
+  margin-top: 14px;
+  font-size: 48px;
+  font-weight: 950;
+  line-height: 1;
+}
+
+.matchup-details-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  padding-top: 20px;
+  border-top: 1px solid #29364d;
+}
+
+.matchup-detail {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  min-height: 74px;
+  padding: 14px;
+  background: rgba(15, 23, 42, 0.55);
+  border: 1px solid #29364d;
+  border-radius: 12px;
+}
+
+.matchup-detail-icon {
+  display: grid;
+  place-items: center;
+  color: #a3e635;
+}
+
+.matchup-detail small,
+.matchup-detail strong {
+  display: block;
+}
+
+.matchup-detail small {
+  margin-bottom: 4px;
+  color: #94a3b8;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.quarter-score-wrapper {
+  margin-top: 22px;
+}
+
+.quarter-score-wrapper h3 {
+  margin-bottom: 12px;
+}
+
+.quarter-score-table {
+  overflow: hidden;
+  border: 1px solid #29364d;
+  border-radius: 12px;
+}
+
+.quarter-score-row {
+  display: grid;
+  grid-template-columns: minmax(80px, 1.5fr) repeat(6, 1fr);
+  align-items: center;
+  min-width: 560px;
+  padding: 12px 14px;
+  border-top: 1px solid #29364d;
+  text-align: center;
+}
+
+.quarter-score-row:first-child {
+  border-top: 0;
+}
+
+.quarter-score-row > :first-child {
+  text-align: left;
+}
+
+.quarter-score-header {
+  color: #94a3b8;
+  background: rgba(15, 23, 42, 0.85);
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.quarter-score-empty {
+  margin-top: 22px;
+  padding: 16px;
+  color: #94a3b8;
+  background: rgba(15, 23, 42, 0.55);
+  border: 1px solid #29364d;
+  border-radius: 12px;
+  text-align: center;
+}
+
+@media (max-width: 780px) {
+  .matchup-toolbar {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .matchup-details-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .quarter-score-table {
+    overflow-x: auto;
+  }
+
+  .live-team-score {
+    font-size: 36px;
+  }
+}
