@@ -1,82 +1,49 @@
-import { useState } from "react";
+import { useState } from 'react'
+import Header from './components/Header.jsx'
+import Navigation from './components/Navigation.jsx'
+import Home from './pages/Home.jsx'
+import Schedule from './pages/Schedule.jsx'
+import Matchup from './pages/Matchup.jsx'
+import Teams from './pages/Teams.jsx'
+import Settings from './pages/Settings.jsx'
 
 export default function App() {
-  const [page, setPage] = useState("home");
+  const [page, setPage] = useState('home')
+  const [selectedGame, setSelectedGame] = useState(null)
+  const [favoriteTeam, setFavoriteTeam] = useState(
+    () => localStorage.getItem('favoriteTeam') || 'SF',
+  )
 
-  const buttonStyle = {
-    padding: "10px 16px",
-    border: "none",
-    borderRadius: "8px",
-    cursor: "pointer",
-    fontWeight: "bold",
-  };
+  function openMatchup(game) {
+    setSelectedGame(game)
+    setPage('matchup')
+  }
+
+  function saveFavoriteTeam(team) {
+    setFavoriteTeam(team)
+    localStorage.setItem('favoriteTeam', team)
+  }
 
   return (
-    <div
-      style={{
-        minHeight: "100vh",
-        background: "#07101f",
-        color: "white",
-        fontFamily: "Arial, sans-serif",
-      }}
-    >
-      <header
-        style={{
-          padding: "20px",
-          borderBottom: "1px solid #1e2d47",
-        }}
-      >
-        <h1>🏈 Fourth Down</h1>
-
-        <div style={{ display: "flex", gap: "10px", marginTop: "20px" }}>
-          <button style={buttonStyle} onClick={() => setPage("home")}>
-            Home
-          </button>
-
-          <button style={buttonStyle} onClick={() => setPage("schedule")}>
-            Schedule
-          </button>
-
-          <button style={buttonStyle} onClick={() => setPage("roster")}>
-            Roster
-          </button>
-
-          <button style={buttonStyle} onClick={() => setPage("stats")}>
-            Stats
-          </button>
-
-          <button style={buttonStyle} onClick={() => setPage("settings")}>
-            Settings
-          </button>
-        </div>
-      </header>
-
-      <main style={{ padding: "30px" }}>
-        {page === "home" && (
-          <>
-            <h2>Home</h2>
-            <p>Welcome to Fourth Down.</p>
-            <p>✅ Vercel Connected</p>
-            <p>✅ GitHub Connected</p>
-            <p>✅ BALLDONTLIE Connected</p>
-          </>
+    <div className="app-shell">
+      <Header onHome={() => setPage('home')} />
+      <Navigation page={page} onChange={setPage} />
+      <main className="content">
+        {page === 'home' && (
+          <Home favoriteTeam={favoriteTeam} onNavigate={setPage} />
         )}
-
-        {page === "schedule" && (
-          <>
-            <h2>Schedule</h2>
-            <p>Schedule screen coming next.</p>
-          </>
+        {page === 'schedule' && <Schedule onOpen={openMatchup} />}
+        {page === 'matchup' && (
+          <Matchup game={selectedGame} onBack={() => setPage('schedule')} />
         )}
-
-        {page === "roster" && (
-          <>
-            <h2>Roster</h2>
-            <p>Roster screen coming next.</p>
-          </>
+        {page === 'teams' && <Teams />}
+        {page === 'settings' && (
+          <Settings
+            favoriteTeam={favoriteTeam}
+            onSave={saveFavoriteTeam}
+          />
         )}
-
-        {page === "stats" && (
-          <>
-            <h2>Stats</h2>
-            <p>Stats screen coming next.</p>
+      </main>
+    </div>
+  )
+}
