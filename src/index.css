@@ -77,4 +77,47 @@
 }
 
 .refresh-button:disabled {
-  cursor
+  cursor: wait;
+  opacity: 0.6;
+}
+
+.schedule-status {
+  margin-bottom: 18px;
+  padding: 11px 14px;
+  color: #cbd5e1;
+  background: rgba(15, 23, 42, 0.72);
+  border: 1px solid #26344b;
+  border-radius: 10px;
+  font-size: 13px;
+}
+
+.schedule-error {
+  color: #fca5a5;
+  border-color: rgba(239, 68, 68, 0.4);
+  background: rgba(127, 29, 29, 0.18);
+}
+
+.spin {
+  animation: schedule-spin 0.8s linear infinite;
+}
+
+@keyframes schedule-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (max-width: 600px) {
+  .schedule-controls {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .schedule-controls select {
+    width: 100%;
+  }
+
+  .refresh-button {
+    justify-content: center;
+  }
+}
