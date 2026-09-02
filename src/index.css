@@ -1155,3 +1155,48 @@ body {
     height: 150px;
   }
 }
+
+/* Full Matchup page: away colours versus home colours */
+.matchup-page-themed { position: relative; isolation: isolate; }
+.matchup-page-away-watermark, .matchup-page-home-watermark { position: fixed; z-index: -1; top: 50%; width: min(42vw, 570px); height: min(42vw, 570px); transform: translateY(-40%); background-repeat: no-repeat; background-position: center; background-size: contain; opacity: .055; pointer-events: none; }
+.matchup-page-away-watermark { left: -120px; background-image: var(--away-watermark); }
+.matchup-page-home-watermark { right: -120px; background-image: var(--home-watermark); }
+.matchup-away-action { border-color: color-mix(in srgb, var(--away-secondary) 65%, white 10%); background: color-mix(in srgb, var(--away-primary) 48%, #111111); }
+.matchup-home-action { border-color: color-mix(in srgb, var(--home-secondary) 65%, white 10%); background: color-mix(in srgb, var(--home-primary) 48%, #111111); }
+.matchup-battle-card { position: relative; isolation: isolate; overflow: hidden; border-color: color-mix(in srgb, var(--away-secondary) 42%, var(--home-secondary) 58%); background: radial-gradient(circle at 12% 28%, color-mix(in srgb, var(--away-secondary) 45%, transparent), transparent 31%), radial-gradient(circle at 88% 28%, color-mix(in srgb, var(--home-secondary) 45%, transparent), transparent 31%), linear-gradient(103deg, color-mix(in srgb, var(--away-primary) 91%, #050505) 0%, color-mix(in srgb, var(--away-primary) 68%, #070707) 37%, #090909 49%, #090909 51%, color-mix(in srgb, var(--home-primary) 68%, #070707) 63%, color-mix(in srgb, var(--home-primary) 91%, #050505) 100%); box-shadow: -16px 26px 64px color-mix(in srgb, var(--away-primary) 30%, transparent), 16px 26px 64px color-mix(in srgb, var(--home-primary) 30%, transparent); }
+.matchup-battle-card::before, .matchup-battle-card::after { content: ""; position: absolute; z-index: -1; top: 85px; width: 430px; height: 430px; background-repeat: no-repeat; background-position: center; background-size: contain; opacity: .07; pointer-events: none; }
+.matchup-battle-card::before { left: -90px; background-image: var(--away-watermark); }
+.matchup-battle-card::after { right: -90px; background-image: var(--home-watermark); }
+.matchup-battle-meta { position: relative; z-index: 2; color: rgba(255,255,255,.82); border-color: rgba(255,255,255,.22); }
+.matchup-battle-row { position: relative; z-index: 2; min-height: 330px; }
+.battle-team h2 { color: #fff; text-shadow: 0 4px 16px rgba(0,0,0,.7); }
+.battle-team small { color: rgba(255,255,255,.78); }
+.battle-team-away .live-team-score { color: color-mix(in srgb, var(--away-secondary) 78%, white 22%); }
+.battle-team-home .live-team-score { color: color-mix(in srgb, var(--home-secondary) 78%, white 22%); }
+.battle-logo-stage { width: 184px; height: 184px; display: grid; place-items: center; border-radius: 40px; background: rgba(0,0,0,.28); box-shadow: inset 0 1px 0 rgba(255,255,255,.1), 0 24px 42px rgba(0,0,0,.38); backdrop-filter: blur(8px); }
+.battle-team-away .battle-logo-stage { border: 2px solid color-mix(in srgb, var(--away-secondary) 78%, white 10%); background: color-mix(in srgb, var(--away-primary) 42%, rgba(0,0,0,.34)); }
+.battle-team-home .battle-logo-stage { border: 2px solid color-mix(in srgb, var(--home-secondary) 78%, white 10%); background: color-mix(in srgb, var(--home-primary) 42%, rgba(0,0,0,.34)); }
+.battle-logo-stage .team-logo { filter: drop-shadow(0 17px 22px rgba(0,0,0,.55)); }
+.matchup-battle-versus { min-width: 124px; padding: 20px 14px; border: 1px solid rgba(255,255,255,.24); border-radius: 24px; background: rgba(4,4,4,.58); box-shadow: 0 20px 36px rgba(0,0,0,.42); backdrop-filter: blur(14px); }
+.matchup-battle-versus small { color: rgba(255,255,255,.64); }
+.matchup-battle-versus strong { color: #fff; text-shadow: 0 5px 18px rgba(0,0,0,.75); }
+.matchup-colour-details .matchup-detail { border-width: 1px; color: #fff; }
+.matchup-colour-details .away-detail { border-color: color-mix(in srgb, var(--away-secondary) 64%, white 8%); background: linear-gradient(135deg, color-mix(in srgb, var(--away-primary) 66%, #090909), color-mix(in srgb, var(--away-secondary) 19%, #080808)); }
+.matchup-colour-details .split-detail { border-color: color-mix(in srgb, var(--away-secondary) 45%, var(--home-secondary) 55%); background: linear-gradient(100deg, color-mix(in srgb, var(--away-primary) 48%, #090909), #090909 50%, color-mix(in srgb, var(--home-primary) 48%, #090909)); }
+.matchup-colour-details .home-detail { border-color: color-mix(in srgb, var(--home-secondary) 64%, white 8%); background: linear-gradient(135deg, color-mix(in srgb, var(--home-primary) 66%, #090909), color-mix(in srgb, var(--home-secondary) 19%, #080808)); }
+.matchup-colour-details .away-detail .matchup-detail-icon { color: var(--away-secondary); }
+.matchup-colour-details .home-detail .matchup-detail-icon { color: var(--home-secondary); }
+.matchup-colour-details .split-detail .matchup-detail-icon { color: #fff; }
+.matchup-split-panel { border-color: color-mix(in srgb, var(--away-secondary) 44%, var(--home-secondary) 56%); background: linear-gradient(100deg, color-mix(in srgb, var(--away-primary) 50%, #090909), #090909 50%, color-mix(in srgb, var(--home-primary) 50%, #090909)); }
+.matchup-quarter-table, .matchup-stats-table { border-color: color-mix(in srgb, var(--away-secondary) 44%, var(--home-secondary) 56%); }
+.matchup-quarter-away { background: linear-gradient(90deg, color-mix(in srgb, var(--away-primary) 70%, #090909), color-mix(in srgb, var(--away-secondary) 16%, #090909)); }
+.matchup-quarter-home { background: linear-gradient(90deg, color-mix(in srgb, var(--home-secondary) 16%, #090909), color-mix(in srgb, var(--home-primary) 70%, #090909)); }
+.matchup-team-statistics { border-top-color: color-mix(in srgb, var(--away-secondary) 45%, var(--home-secondary) 55%); }
+.matchup-team-statistics .eyebrow { background: linear-gradient(90deg, var(--away-secondary), var(--home-secondary)); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.matchup-team-statistics .refresh-button { border-color: var(--home-secondary); background: color-mix(in srgb, var(--home-primary) 48%, #111111); }
+.matchup-stats-table .team-statistics-header { background: linear-gradient(100deg, color-mix(in srgb, var(--away-primary) 68%, #090909), #090909 50%, color-mix(in srgb, var(--home-primary) 68%, #090909)); }
+.matchup-stat-row { background: linear-gradient(100deg, color-mix(in srgb, var(--away-primary) 48%, #090909), #090909 50%, color-mix(in srgb, var(--home-primary) 48%, #090909)); }
+.matchup-stat-row > strong:first-child { color: color-mix(in srgb, var(--away-secondary) 76%, white 24%); }
+.matchup-stat-row > strong:last-child { color: color-mix(in srgb, var(--home-secondary) 76%, white 24%); }
+.matchup-update-status { border-color: color-mix(in srgb, var(--away-secondary) 44%, var(--home-secondary) 56%); background: linear-gradient(100deg, color-mix(in srgb, var(--away-primary) 42%, #090909), color-mix(in srgb, var(--home-primary) 42%, #090909)); }
+@media (max-width: 700px) { .matchup-page-away-watermark, .matchup-page-home-watermark { width: 360px; height: 360px; opacity: .04; } .matchup-page-away-watermark { left: -170px; } .matchup-page-home-watermark { right: -170px; } .matchup-battle-row { min-height: 250px; } .battle-logo-stage { width: 112px; height: 112px; border-radius: 28px; } .battle-logo-stage .team-logo { width: 100px !important; height: 100px !important; } .matchup-battle-versus { min-width: 72px; padding: 13px 8px; } }
