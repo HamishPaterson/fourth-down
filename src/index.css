@@ -947,3 +947,211 @@ body {
     display: none;
   }
 }
+
+/* Schedule cards: away colours fade into home colours */
+.matchup-colour-card {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  min-height: 350px;
+  padding: 22px;
+  border-color: color-mix(in srgb, var(--away-secondary) 42%, var(--home-secondary) 58%);
+  background:
+    radial-gradient(
+      circle at 12% 48%,
+      color-mix(in srgb, var(--away-secondary) 42%, transparent),
+      transparent 31%
+    ),
+    radial-gradient(
+      circle at 88% 48%,
+      color-mix(in srgb, var(--home-secondary) 42%, transparent),
+      transparent 31%
+    ),
+    linear-gradient(
+      102deg,
+      color-mix(in srgb, var(--away-primary) 88%, #060606) 0%,
+      color-mix(in srgb, var(--away-primary) 66%, #080808) 34%,
+      #090909 49%,
+      #090909 51%,
+      color-mix(in srgb, var(--home-primary) 66%, #080808) 66%,
+      color-mix(in srgb, var(--home-primary) 88%, #060606) 100%
+    );
+  box-shadow:
+    -12px 20px 48px color-mix(in srgb, var(--away-primary) 25%, transparent),
+    12px 20px 48px color-mix(in srgb, var(--home-primary) 25%, transparent);
+}
+
+.matchup-colour-card::after {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  inset: 0;
+  background: linear-gradient(
+    180deg,
+    rgba(0,0,0,.08),
+    rgba(0,0,0,.03) 54%,
+    rgba(0,0,0,.3)
+  );
+  pointer-events: none;
+}
+
+.matchup-away-watermark,
+.matchup-home-watermark {
+  position: absolute;
+  z-index: -1;
+  top: 50%;
+  width: 210px;
+  height: 210px;
+  transform: translateY(-44%);
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: contain;
+  opacity: .08;
+  pointer-events: none;
+}
+
+.matchup-away-watermark {
+  left: -45px;
+  background-image: var(--away-watermark);
+}
+
+.matchup-home-watermark {
+  right: -45px;
+  background-image: var(--home-watermark);
+}
+
+.matchup-centre-line {
+  position: absolute;
+  z-index: -1;
+  top: 58px;
+  bottom: 58px;
+  left: 50%;
+  width: 1px;
+  transform: translateX(-50%);
+  background: linear-gradient(
+    180deg,
+    transparent,
+    rgba(255,255,255,.2) 20%,
+    rgba(255,255,255,.2) 80%,
+    transparent
+  );
+}
+
+.matchup-game-meta,
+.matchup-venue {
+  position: relative;
+  z-index: 2;
+  border-color: rgba(255,255,255,.2);
+  color: rgba(255,255,255,.82);
+}
+
+.matchup-teams-row {
+  position: relative;
+  z-index: 2;
+  min-height: 236px;
+}
+
+.matchup-team {
+  width: 40%;
+}
+
+.matchup-logo-stage {
+  width: 116px;
+  height: 116px;
+  display: grid;
+  place-items: center;
+  border: 1px solid rgba(255,255,255,.22);
+  border-radius: 28px;
+  background: rgba(0,0,0,.28);
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.08),
+    0 18px 34px rgba(0,0,0,.35);
+  backdrop-filter: blur(6px);
+}
+
+.matchup-team-away .matchup-logo-stage {
+  border-color: color-mix(in srgb, var(--away-secondary) 74%, white 12%);
+  background: color-mix(in srgb, var(--away-primary) 38%, rgba(0,0,0,.34));
+}
+
+.matchup-team-home .matchup-logo-stage {
+  border-color: color-mix(in srgb, var(--home-secondary) 74%, white 12%);
+  background: color-mix(in srgb, var(--home-primary) 38%, rgba(0,0,0,.34));
+}
+
+.matchup-logo-stage .team-logo {
+  filter: drop-shadow(0 13px 17px rgba(0,0,0,.5));
+}
+
+.matchup-team > strong {
+  max-width: 190px;
+  margin-top: 18px;
+  color: #ffffff;
+  font-size: 14px;
+  text-shadow: 0 3px 12px rgba(0,0,0,.65);
+}
+
+.matchup-versus {
+  min-width: 94px;
+  padding: 13px 10px;
+  border: 1px solid rgba(255,255,255,.2);
+  border-radius: 18px;
+  background: rgba(5,5,5,.5);
+  box-shadow: 0 14px 28px rgba(0,0,0,.34);
+  backdrop-filter: blur(12px);
+}
+
+.matchup-versus small {
+  color: rgba(255,255,255,.68);
+}
+
+.matchup-versus strong {
+  color: #ffffff;
+  text-shadow: 0 3px 12px rgba(0,0,0,.65);
+}
+
+.matchup-venue strong {
+  color: color-mix(in srgb, var(--home-secondary) 72%, white 28%);
+}
+
+.matchup-colour-card:hover {
+  transform: translateY(-4px) scale(1.006);
+  border-color: color-mix(in srgb, var(--away-secondary) 45%, var(--home-secondary) 55%);
+  box-shadow:
+    -16px 26px 58px color-mix(in srgb, var(--away-primary) 39%, transparent),
+    16px 26px 58px color-mix(in srgb, var(--home-primary) 39%, transparent);
+}
+
+@media (max-width: 620px) {
+  .matchup-colour-card {
+    min-height: 320px;
+    padding: 18px;
+  }
+
+  .matchup-teams-row {
+    min-height: 210px;
+    gap: 8px;
+  }
+
+  .matchup-logo-stage {
+    width: 88px;
+    height: 88px;
+    border-radius: 22px;
+  }
+
+  .matchup-logo-stage .team-logo {
+    width: 76px !important;
+    height: 76px !important;
+  }
+
+  .matchup-versus {
+    min-width: 66px;
+    padding: 10px 7px;
+  }
+
+  .matchup-away-watermark,
+  .matchup-home-watermark {
+    width: 150px;
+    height: 150px;
+  }
+}

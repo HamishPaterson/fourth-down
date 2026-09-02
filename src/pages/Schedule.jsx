@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { MapPin, RefreshCw } from "lucide-react";
 import { TEAM_NAMES } from "../data.js";
+import { getTeamTheme } from "../services/teamThemes.js";
 import TeamLogo from "../components/TeamLogo.jsx";
 
 const SEASON = 2026;
@@ -19,7 +20,6 @@ export default function Schedule({ onOpen }) {
       const response = await fetch(
         `/api/nfl/schedule?season=${SEASON}&week=${week}`
       );
-
       const body = await response.json();
 
       if (!response.ok) {
@@ -39,14 +39,11 @@ export default function Schedule({ onOpen }) {
         );
 
       setGames(mappedGames);
-
-      if (mappedGames.length === 0) {
-        setStatus(`No games returned for Week ${week}`);
-      } else {
-        setStatus(
-          `${mappedGames.length} games loaded for Week ${week}`
-        );
-      }
+      setStatus(
+        mappedGames.length === 0
+          ? `No games returned for Week ${week}`
+          : `${mappedGames.length} games loaded for Week ${week}`
+      );
     } catch (error) {
       console.error("Schedule loading failed", error);
       setGames([]);
@@ -65,39 +62,28 @@ export default function Schedule({ onOpen }) {
   }, [week]);
 
   return (
-    <section>
+    <section className="schedule-page">
       <div className="section-heading">
         <div>
-          <span className="eyebrow">
-            {SEASON} REGULAR SEASON
-          </span>
-
+          <span className="eyebrow">{SEASON} REGULAR SEASON</span>
           <h1>Week {week} schedule</h1>
         </div>
 
-        <span className="count-pill">
-          {games.length} games
-        </span>
+        <span className="count-pill">{games.length} games</span>
       </div>
 
       <div className="schedule-controls">
         <label>
           Week
-
           <select
             value={week}
-            onChange={(event) =>
-              setWeek(Number(event.target.value))
-            }
+            onChange={(event) => setWeek(Number(event.target.value))}
           >
             {Array.from({ length: 18 }, (_, index) => {
               const weekNumber = index + 1;
 
               return (
-                <option
-                  key={weekNumber}
-                  value={weekNumber}
-                >
+                <option key={weekNumber} value={weekNumber}>
                   Week {weekNumber}
                 </option>
               );
@@ -111,19 +97,14 @@ export default function Schedule({ onOpen }) {
           onClick={loadSchedule}
           disabled={loading}
         >
-          <RefreshCw
-            size={16}
-            className={loading ? "spin" : ""}
-          />
-
+          <RefreshCw size={16} className={loading ? "spin" : ""} />
           Refresh
         </button>
       </div>
 
       <div
         className={
-          status.toLowerCase().includes("failed") ||
-          status.toLowerCase().includes("error")
+          isErrorMessage(status)
             ? "schedule-status schedule-error"
             : "schedule-status"
         }
@@ -139,53 +120,15 @@ export default function Schedule({ onOpen }) {
       ) : games.length === 0 ? (
         <div className="card empty">
           <h2>No games available</h2>
-
-          <p>
-            BALLDONTLIE did not return any compatible games
-            for Week {week}.
-          </p>
-
-          <button
-            type="button"
-            className="primary"
-            onClick={loadSchedule}
-          >
+          <p>No compatible games were returned for Week {week}.</p>
+          <button type="button" className="primary" onClick={loadSchedule}>
             Try again
           </button>
         </div>
       ) : (
         <div className="game-grid">
           {games.map((game) => (
-            <button
-              type="button"
-              className="game-card card"
-              key={game.id}
-              onClick={() => onOpen(game)}
-            >
-              <div className="game-meta">
-                <span>Week {game.week}</span>
-                <span>{game.date}</span>
-              </div>
-
-              <div className="teams-row">
-                <Team code={game.away} />
-
-                <div className="versus">
-                  <small>{game.time}</small>
-                  <strong>VS</strong>
-                </div>
-
-                <Team code={game.home} />
-              </div>
-
-              <div className="venue">
-                <MapPin size={15} />
-
-                <span>{game.venue}</span>
-
-                <strong>View matchup</strong>
-              </div>
-            </button>
+            <GameCard key={game.id} game={game} onOpen={onOpen} />
           ))}
         </div>
       )}
@@ -193,31 +136,70 @@ export default function Schedule({ onOpen }) {
   );
 }
 
-function Team({ code }) {
-  return (
-    <div className="team">
-      <TeamLogo
-        team={code}
-        size={95}
-      />
+function GameCard({ game, onOpen }) {
+  const awayTheme = getTeamTheme(game.away);
+  const homeTheme = getTeamTheme(game.home);
 
-      <strong>
-        {TEAM_NAMES[code] || code}
-      </strong>
+  const matchupTheme = {
+    "--away-primary": awayTheme["--team-primary"],
+    "--away-secondary": awayTheme["--team-secondary"],
+    "--away-watermark": awayTheme["--team-watermark"],
+    "--home-primary": homeTheme["--team-primary"],
+    "--home-secondary": homeTheme["--team-secondary"],
+    "--home-watermark": homeTheme["--team-watermark"],
+  };
+
+  return (
+    <button
+      type="button"
+      className="game-card card matchup-colour-card"
+      style={matchupTheme}
+      onClick={() => onOpen(game)}
+    >
+      <span className="matchup-away-watermark" aria-hidden="true" />
+      <span className="matchup-home-watermark" aria-hidden="true" />
+      <span className="matchup-centre-line" aria-hidden="true" />
+
+      <div className="game-meta matchup-game-meta">
+        <span>Week {game.week}</span>
+        <span>{game.date}</span>
+      </div>
+
+      <div className="teams-row matchup-teams-row">
+        <Team code={game.away} side="away" />
+
+        <div className="versus matchup-versus">
+          <small>{game.time}</small>
+          <strong>VS</strong>
+        </div>
+
+        <Team code={game.home} side="home" />
+      </div>
+
+      <div className="venue matchup-venue">
+        <MapPin size={15} />
+        <span>{game.venue}</span>
+        <strong>View matchup</strong>
+      </div>
+    </button>
+  );
+}
+
+function Team({ code, side }) {
+  return (
+    <div className={`team matchup-team matchup-team-${side}`}>
+      <span className="matchup-logo-stage">
+        <TeamLogo team={code} size={95} />
+      </span>
+      <strong>{TEAM_NAMES[code] || code}</strong>
     </div>
   );
 }
 
 function mapGame(apiGame) {
   const kickoff = new Date(apiGame.date);
-
-  const away = normalizeTeamCode(
-    apiGame.visitor_team?.abbreviation
-  );
-
-  const home = normalizeTeamCode(
-    apiGame.home_team?.abbreviation
-  );
+  const away = normalizeTeamCode(apiGame.visitor_team?.abbreviation);
+  const home = normalizeTeamCode(apiGame.home_team?.abbreviation);
 
   return {
     id: String(apiGame.id),
@@ -225,7 +207,6 @@ function mapGame(apiGame) {
     away,
     home,
     sourceDate: apiGame.date,
-
     date: Number.isNaN(kickoff.getTime())
       ? "Date unavailable"
       : kickoff.toLocaleDateString(undefined, {
@@ -234,7 +215,6 @@ function mapGame(apiGame) {
           month: "short",
           year: "numeric",
         }),
-
     time: Number.isNaN(kickoff.getTime())
       ? "Time unavailable"
       : kickoff.toLocaleTimeString(undefined, {
@@ -242,36 +222,24 @@ function mapGame(apiGame) {
           minute: "2-digit",
           timeZoneName: "short",
         }),
-
     venue: apiGame.venue || "Venue unavailable",
     status: apiGame.status || "Scheduled",
-
-    awayScore:
-      apiGame.visitor_team_score ?? null,
-
-    homeScore:
-      apiGame.home_team_score ?? null,
-
-    completed: isCompleted(apiGame.status),
+    awayScore: apiGame.visitor_team_score ?? null,
+    homeScore: apiGame.home_team_score ?? null,
   };
 }
 
 function normalizeTeamCode(code) {
   const normalized = String(code || "").toUpperCase();
-
-  const aliases = {
-    WAS: "WSH",
-    LA: "LAR",
-  };
-
+  const aliases = { WAS: "WSH", LA: "LAR" };
   return aliases[normalized] || normalized;
 }
 
-function isCompleted(status) {
-  const normalized = String(status || "").toLowerCase();
-
+function isErrorMessage(message) {
+  const normalized = String(message || "").toLowerCase();
   return (
-    normalized.includes("final") ||
-    normalized.includes("completed")
+    normalized.includes("failed") ||
+    normalized.includes("error") ||
+    normalized.includes("invalid")
   );
 }
