@@ -1,18 +1,19 @@
-FOURTH DOWN NEUTRAL APP + TEAM COLOURS
+FOURTH DOWN FAVOURITE-TEAM THEME
 
-Replace only:
+Replace these four files:
 
 src/pages/Home.jsx
 src/pages/TeamDetail.jsx
+src/services/teamThemes.js
 src/index.css
 
-This restores the simple Home dashboard.
-The rest of the app remains black, white and grey.
-Team pages use a subtle 5-8% logo watermark and franchise colours for the hero, tabs, ratings and hover states.
+Home now uses the saved favourite team's logo, full team name, primary colour and secondary colour.
+Franchise pages use stronger team colour coverage across summary cards, information cards, ratings, roster tabs, position groups, player cards and inner metadata tiles.
+The subtle logo watermark remains.
 
 Then run:
 
 npm run build
 git add .
-git commit -m "Restore Home and add franchise team themes"
+git commit -m "Add favourite-team Home and stronger franchise themes"
 git push

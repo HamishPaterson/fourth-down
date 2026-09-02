@@ -410,3 +410,250 @@ body {
     opacity: .055;
   }
 }
+
+/* Favourite-team Home page */
+.home-favourite-page {
+  position: relative;
+  display: grid;
+  gap: 18px;
+}
+
+.favourite-hero {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(260px, .6fr);
+  min-height: 430px;
+  padding: 48px;
+  border-color: color-mix(in srgb, var(--team-primary) 72%, white 10%);
+  background:
+    radial-gradient(circle at 80% 45%, color-mix(in srgb, var(--team-secondary) 30%, transparent), transparent 30%),
+    linear-gradient(
+      120deg,
+      color-mix(in srgb, var(--team-primary) 58%, #080808),
+      #090909 62%,
+      color-mix(in srgb, var(--team-secondary) 22%, #080808)
+    );
+  box-shadow: 0 28px 80px color-mix(in srgb, var(--team-primary) 25%, transparent);
+}
+
+.favourite-hero::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background-image: var(--team-watermark);
+  background-repeat: no-repeat;
+  background-position: right -50px center;
+  background-size: min(52%, 480px);
+  opacity: .1;
+  pointer-events: none;
+}
+
+.favourite-hero-copy {
+  align-self: center;
+  position: relative;
+  z-index: 1;
+}
+
+.favourite-hero-copy .eyebrow {
+  color: var(--team-secondary);
+}
+
+.favourite-hero-copy h1 {
+  max-width: 720px;
+  margin: 12px 0 16px;
+  font-size: clamp(48px, 7vw, 78px);
+  line-height: .98;
+  letter-spacing: -.055em;
+}
+
+.favourite-hero-copy p {
+  max-width: 610px;
+  color: #d1d5db;
+  font-size: 16px;
+  line-height: 1.65;
+}
+
+.favourite-primary {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: #ffffff;
+  border: 1px solid color-mix(in srgb, var(--team-primary) 72%, white 16%);
+  background: var(--team-primary);
+  box-shadow: 0 10px 28px color-mix(in srgb, var(--team-primary) 38%, transparent);
+}
+
+.favourite-logo-stage {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  border-left: 1px solid color-mix(in srgb, var(--team-secondary) 35%, transparent);
+}
+
+.favourite-logo-stage .team-logo {
+  filter: drop-shadow(0 26px 32px rgba(0,0,0,.58));
+}
+
+.favourite-logo-stage > strong {
+  color: var(--team-secondary);
+  font-size: 27px;
+  letter-spacing: .18em;
+}
+
+.home-favourite-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 14px;
+}
+
+.home-favourite-tile {
+  width: 100%;
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 14px;
+  padding: 20px;
+  color: #ffffff;
+  text-align: left;
+  border-color: color-mix(in srgb, var(--team-primary) 52%, rgba(255,255,255,.14));
+  background:
+    linear-gradient(135deg, color-mix(in srgb, var(--team-primary) 24%, #111111), #090909 72%);
+}
+
+.home-favourite-tile > span {
+  width: 44px;
+  height: 44px;
+  display: grid;
+  place-items: center;
+  color: var(--team-secondary);
+  border: 1px solid color-mix(in srgb, var(--team-secondary) 45%, transparent);
+  border-radius: 13px;
+  background: color-mix(in srgb, var(--team-primary) 26%, transparent);
+}
+
+.home-favourite-tile strong,
+.home-favourite-tile small {
+  display: block;
+}
+
+.home-favourite-tile small {
+  margin-top: 5px;
+  color: #aeb7c3;
+  line-height: 1.45;
+}
+
+.home-favourite-tile:hover {
+  transform: translateY(-3px);
+  border-color: var(--team-secondary);
+  box-shadow: 0 20px 46px color-mix(in srgb, var(--team-primary) 28%, transparent);
+}
+
+/* Stronger franchise colour coverage */
+.team-detail-page .card,
+.team-detail-page .franchise-summary-card,
+.team-detail-page .team-information-card,
+.team-detail-page .ratings-card,
+.team-detail-page .position-group,
+.team-detail-page .player-card {
+  border-color: color-mix(in srgb, var(--team-primary) 58%, rgba(255,255,255,.14));
+  background:
+    linear-gradient(
+      145deg,
+      color-mix(in srgb, var(--team-primary) 24%, #151515),
+      color-mix(in srgb, var(--team-secondary) 9%, #080808)
+    );
+  box-shadow: 0 18px 44px color-mix(in srgb, var(--team-primary) 13%, transparent);
+}
+
+.team-detail-page .franchise-summary-card > span,
+.team-detail-page .matchup-detail-icon,
+.team-detail-page .team-info-row svg {
+  color: var(--team-secondary);
+}
+
+.team-detail-page .team-info-row {
+  border-top-color: color-mix(in srgb, var(--team-primary) 40%, rgba(255,255,255,.12));
+}
+
+.team-detail-page .rating-item,
+.team-detail-page .player-meta-grid > div {
+  border: 1px solid color-mix(in srgb, var(--team-primary) 48%, transparent);
+  background: color-mix(in srgb, var(--team-primary) 19%, #0a0a0a);
+}
+
+.team-detail-page .ratings-card {
+  background:
+    radial-gradient(circle at 88% 20%, color-mix(in srgb, var(--team-secondary) 20%, transparent), transparent 30%),
+    linear-gradient(145deg, color-mix(in srgb, var(--team-primary) 30%, #121212), #080808);
+}
+
+.team-detail-page .roster-tabs {
+  border-color: color-mix(in srgb, var(--team-primary) 62%, rgba(255,255,255,.14));
+  background: color-mix(in srgb, var(--team-primary) 18%, #090909);
+}
+
+.team-detail-page .roster-tab {
+  color: #d1d5db;
+  background: color-mix(in srgb, var(--team-primary) 12%, #111111);
+}
+
+.team-detail-page .roster-tab.active {
+  color: #ffffff;
+  border-color: var(--team-secondary);
+  background: linear-gradient(135deg, var(--team-primary), color-mix(in srgb, var(--team-secondary) 28%, var(--team-primary)));
+}
+
+.team-detail-page .position-group-header {
+  border-bottom: 1px solid color-mix(in srgb, var(--team-primary) 30%, transparent);
+  background: color-mix(in srgb, var(--team-primary) 18%, transparent);
+}
+
+.team-detail-page .player-card:hover,
+.team-detail-page .franchise-summary-card:hover,
+.team-detail-page .team-information-card:hover,
+.team-detail-page .rating-item:hover,
+.team-detail-page .position-group:hover {
+  border-color: var(--team-secondary);
+  box-shadow: 0 22px 50px color-mix(in srgb, var(--team-primary) 27%, transparent);
+}
+
+@media (max-width: 900px) {
+  .favourite-hero {
+    grid-template-columns: 1fr;
+    padding: 36px;
+  }
+
+  .favourite-logo-stage {
+    margin-top: 28px;
+    padding-top: 28px;
+    border-top: 1px solid color-mix(in srgb, var(--team-secondary) 35%, transparent);
+    border-left: 0;
+  }
+
+  .home-favourite-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 620px) {
+  .favourite-hero {
+    min-height: 0;
+    padding: 28px 22px;
+  }
+
+  .favourite-hero-copy h1 {
+    font-size: 46px;
+  }
+
+  .favourite-logo-stage .team-logo {
+    width: 150px !important;
+    height: 150px !important;
+  }
+}
