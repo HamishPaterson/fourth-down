@@ -124,7 +124,10 @@ export default function TeamDetail({ team, onBack }) {
   }
 
   return (
-    <section className="team-detail-page">
+    <section
+      className="team-detail-page"
+      style={{ "--team-watermark": `url("${getTeamLogoUrl(teamCode)}")` }}
+    >
       <div className="team-detail-toolbar">
         <button type="button" className="secondary" onClick={onBack}>
           ← Back to Teams
@@ -479,6 +482,47 @@ function formatExperience(value) {
   if (value === null || value === undefined) return "-";
   if (value === 0) return "Rookie";
   return `${value} yr${value === 1 ? "" : "s"}`;
+}
+
+
+const TEAM_LOGO_FILES = {
+  ARI: "cardinals.png",
+  ATL: "falcons.png",
+  BAL: "ravens.png",
+  BUF: "bills.png",
+  CAR: "panthers.png",
+  CHI: "bears.png",
+  CIN: "bengals.png",
+  CLE: "browns.png",
+  DAL: "cowboys.png",
+  DEN: "broncos.png",
+  DET: "lions.png",
+  GB: "packers.png",
+  HOU: "texans.png",
+  IND: "colts.png",
+  JAX: "jaguars.png",
+  KC: "chiefs.png",
+  LV: "raiders.png",
+  LAC: "chargers.png",
+  LAR: "rams.png",
+  MIA: "dolphins.png",
+  MIN: "vikings.png",
+  NE: "patriots.png",
+  NO: "saints.png",
+  NYG: "giants.png",
+  NYJ: "jets.png",
+  PHI: "eagles.png",
+  PIT: "steelers.png",
+  SF: "49ers.png",
+  SEA: "seahawks.png",
+  TB: "buccaneers.png",
+  TEN: "titans.png",
+  WSH: "commanders.png",
+};
+
+function getTeamLogoUrl(code) {
+  const filename = TEAM_LOGO_FILES[code];
+  return filename ? `/logos/${filename}` : "";
 }
 
 function normalizeTeamCode(code) {

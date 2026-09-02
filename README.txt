@@ -1,22 +1,17 @@
-FOURTH DOWN VISUAL OVERHAUL
+FOURTH DOWN MONOCHROME THEME
 
-Replace these files in your existing project:
+Replace these two files in your project:
 
-src/components/Header.jsx
-src/components/Navigation.jsx
-src/pages/Home.jsx
 src/pages/TeamDetail.jsx
 src/index.css
 
-This package is compatible with the current App.jsx props:
-- Header receives onHome
-- Navigation receives page and onChange
-- Home receives favoriteTeam and onNavigate
-- TeamDetail receives team and onBack
+The app becomes black, white and grey globally.
+A selected franchise page uses that team's local PNG logo as a large grayscale background watermark.
+The normal foreground team logo remains visible.
 
 Then run:
 
 npm run build
 git add .
-git commit -m "Apply Fourth Down premium visual overhaul"
+git commit -m "Apply monochrome theme with team logo backgrounds"
 git push
