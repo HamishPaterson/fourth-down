@@ -270,3 +270,17 @@
   color: #94a3b8;
   font-size: 11px;
 }
+
+.api-team {
+  width: 100%;
+  border: none;
+  cursor: pointer;
+  text-align: left;
+  background: rgba(15, 23, 42, 0.75);
+  transition: 0.2s ease;
+}
+
+.api-team:hover {
+  transform: translateY(-2px);
+  border-color: #4ade80;
+}

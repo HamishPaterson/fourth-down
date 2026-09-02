@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { getTeams } from "../services/nflApi.js";
 import TeamLogo from "../components/TeamLogo.jsx";
 
-export default function Teams() {
+export default function Teams({ onOpenTeam }) {
   const [teams, setTeams] = useState([]);
   const [status, setStatus] = useState("Loading NFL teams...");
 
@@ -29,7 +29,7 @@ export default function Teams() {
             LIVE BACKEND DATA
           </span>
 
-          <h1>NFL teams</h1>
+          <h1>NFL Teams</h1>
         </div>
 
         <span className="count-pill">
@@ -39,9 +39,11 @@ export default function Teams() {
 
       <div className="team-grid">
         {teams.map((team) => (
-          <div
+          <button
+            type="button"
             className="card api-team"
             key={team.id}
+            onClick={() => onOpenTeam(team)}
           >
             <TeamLogo
               team={team.abbreviation}
@@ -52,13 +54,13 @@ export default function Teams() {
               <strong>{team.full_name}</strong>
 
               <small>
-                {team.conference}{" "}
-                {team.division}
+                {team.conference} {team.division}
               </small>
             </div>
-          </div>
+          </button>
         ))}
       </div>
     </section>
   );
 }
+``
