@@ -1,4 +1,4 @@
-﻿:root {
+:root {
   font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   color: #f8fafc;
   background: #07101f;
@@ -1200,74 +1200,3 @@ body {
 .matchup-stat-row > strong:last-child { color: color-mix(in srgb, var(--home-secondary) 76%, white 24%); }
 .matchup-update-status { border-color: color-mix(in srgb, var(--away-secondary) 44%, var(--home-secondary) 56%); background: linear-gradient(100deg, color-mix(in srgb, var(--away-primary) 42%, #090909), color-mix(in srgb, var(--home-primary) 42%, #090909)); }
 @media (max-width: 700px) { .matchup-page-away-watermark, .matchup-page-home-watermark { width: 360px; height: 360px; opacity: .04; } .matchup-page-away-watermark { left: -170px; } .matchup-page-home-watermark { right: -170px; } .matchup-battle-row { min-height: 250px; } .battle-logo-stage { width: 112px; height: 112px; border-radius: 28px; } .battle-logo-stage .team-logo { width: 100px !important; height: 100px !important; } .matchup-battle-versus { min-width: 72px; padding: 13px 8px; } }
-
-/* Favourite-team navigation and header theme */
-.premium-header {
-  border-color: color-mix(in srgb, var(--team-secondary) 38%, rgba(255,255,255,.14));
-  background:
-    radial-gradient(circle at 10% 0%, color-mix(in srgb, var(--team-primary) 24%, transparent), transparent 38%),
-    linear-gradient(100deg, color-mix(in srgb, var(--team-primary) 25%, #0b0b0b), color-mix(in srgb, var(--team-secondary) 10%, #080808));
-  box-shadow: 0 16px 48px color-mix(in srgb, var(--team-primary) 18%, transparent);
-}
-
-.brand-mark {
-  color: #ffffff;
-  border: 1px solid var(--team-secondary);
-  background: linear-gradient(135deg, var(--team-primary), color-mix(in srgb, var(--team-secondary) 58%, var(--team-primary)));
-  box-shadow: 0 10px 28px color-mix(in srgb, var(--team-primary) 38%, transparent);
-}
-
-.brand small {
-  color: color-mix(in srgb, var(--team-secondary) 82%, white 18%);
-}
-
-.header-status-item {
-  border-color: color-mix(in srgb, var(--team-secondary) 35%, rgba(255,255,255,.14));
-  background: color-mix(in srgb, var(--team-primary) 21%, #111111);
-}
-
-.header-status-item svg {
-  color: var(--team-secondary);
-}
-
-.premium-nav {
-  border-color: color-mix(in srgb, var(--team-secondary) 48%, #333333);
-  background: linear-gradient(90deg, color-mix(in srgb, var(--team-primary) 35%, #090909), color-mix(in srgb, var(--team-secondary) 18%, #090909));
-  box-shadow: inset 0 1px 0 rgba(255,255,255,.06), 0 14px 34px color-mix(in srgb, var(--team-primary) 28%, transparent);
-}
-
-.premium-nav .nav-button {
-  color: #d1d5db;
-  border: 1px solid color-mix(in srgb, var(--team-primary) 38%, #242424);
-  background: color-mix(in srgb, var(--team-primary) 26%, #111111);
-  transition: color .18s ease, background .18s ease, border-color .18s ease, transform .18s ease, box-shadow .18s ease;
-}
-
-.premium-nav .nav-button svg {
-  color: color-mix(in srgb, var(--team-secondary) 78%, white 22%);
-}
-
-.premium-nav .nav-button:hover {
-  color: #ffffff;
-  border-color: var(--team-secondary);
-  background: linear-gradient(135deg, color-mix(in srgb, var(--team-primary) 58%, #111111), color-mix(in srgb, var(--team-secondary) 24%, #111111));
-  transform: translateY(-1px);
-  box-shadow: 0 8px 20px color-mix(in srgb, var(--team-primary) 26%, transparent);
-}
-
-.premium-nav .nav-button.active {
-  color: #ffffff;
-  border-color: var(--team-secondary);
-  background: linear-gradient(135deg, var(--team-primary), color-mix(in srgb, var(--team-secondary) 62%, var(--team-primary)));
-  box-shadow: inset 0 1px 0 rgba(255,255,255,.18), 0 9px 24px color-mix(in srgb, var(--team-primary) 44%, transparent);
-}
-
-.premium-nav .nav-button.active svg {
-  color: #ffffff;
-}
-
-@media (max-width: 620px) {
-  .premium-nav {
-    background: linear-gradient(90deg, color-mix(in srgb, var(--team-primary) 42%, #090909), color-mix(in srgb, var(--team-secondary) 22%, #090909));
-  }
-}
