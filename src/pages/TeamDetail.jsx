@@ -1,8 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   Activity,
-  ChevronDown,
-  ChevronUp,
   MapPin,
   RefreshCw,
   Shield,
@@ -11,25 +9,49 @@ import {
 } from "lucide-react";
 import TeamLogo from "../components/TeamLogo.jsx";
 
-const GROUP_ORDER = [
-  "Quarterbacks",
-  "Running Backs",
-  "Receivers",
-  "Tight Ends",
-  "Offensive Line",
-  "Defensive Line",
-  "Linebackers",
-  "Defensive Backs",
-  "Special Teams",
-  "Other",
-];
+const OFFENSE_POSITIONS = new Set([
+  "QB",
+  "RB",
+  "FB",
+  "WR",
+  "TE",
+  "C",
+  "G",
+  "OG",
+  "T",
+  "OT",
+  "OL",
+]);
+
+const DEFENSE_POSITIONS = new Set([
+  "DL",
+  "DE",
+  "DT",
+  "NT",
+  "LB",
+  "ILB",
+  "OLB",
+  "MLB",
+  "CB",
+  "DB",
+  "S",
+  "FS",
+  "SS",
+]);
+
+const SPECIAL_TEAMS_POSITIONS = new Set([
+  "K",
+  "P",
+  "LS",
+  "KR",
+  "PR",
+]);
 
 export default function TeamDetail({ team, onBack }) {
   const [rosterData, setRosterData] = useState(null);
   const [status, setStatus] = useState("Loading team roster...");
   const [loading, setLoading] = useState(false);
-  const [view, setView] = useState("starters");
-  const [expandedGroups, setExpandedGroups] = useState({});
+  const [view, setView] = useState("offense");
 
   const teamCode = normalizeTeamCode(team?.abbreviation);
 
@@ -71,6 +93,18 @@ export default function TeamDetail({ team, onBack }) {
   const starters = rosterData?.starters || [];
   const reserves = rosterData?.reserves || [];
   const groups = rosterData?.groups || {};
+
+  const offense = starters.filter((player) =>
+    OFFENSE_POSITIONS.has(normalizePosition(player.position))
+  );
+
+  const defense = starters.filter((player) =>
+    DEFENSE_POSITIONS.has(normalizePosition(player.position))
+  );
+
+  const specialTeams = starters.filter((player) =>
+    SPECIAL_TEAMS_POSITIONS.has(normalizePosition(player.position))
+  );
 
   const activeCount = useMemo(() => {
     const allPlayers = Object.values(groups).flat();
@@ -194,22 +228,28 @@ export default function TeamDetail({ team, onBack }) {
 
         <div className="roster-tabs" role="tablist" aria-label="Roster view">
           <RosterTab
-            active={view === "starters"}
-            onClick={() => setView("starters")}
+            active={view === "offense"}
+            onClick={() => setView("offense")}
           >
-            Starters ({starters.length})
+            Offense ({offense.length})
+          </RosterTab>
+          <RosterTab
+            active={view === "defense"}
+            onClick={() => setView("defense")}
+          >
+            Defense ({defense.length})
+          </RosterTab>
+          <RosterTab
+            active={view === "special-teams"}
+            onClick={() => setView("special-teams")}
+          >
+            Special Teams ({specialTeams.length})
           </RosterTab>
           <RosterTab
             active={view === "reserves"}
             onClick={() => setView("reserves")}
           >
             Reserves ({reserves.length})
-          </RosterTab>
-          <RosterTab
-            active={view === "positions"}
-            onClick={() => setView("positions")}
-          >
-            Position groups
           </RosterTab>
         </div>
       </div>
@@ -218,43 +258,101 @@ export default function TeamDetail({ team, onBack }) {
         <div className="card roster-empty">Loading roster...</div>
       ) : !rosterData ? (
         <div className="card roster-empty">{status}</div>
-      ) : view === "positions" ? (
-        <div className="position-groups">
-          {GROUP_ORDER.filter((groupName) => groups[groupName]?.length).map(
-            (groupName) => {
-              const isExpanded = expandedGroups[groupName] ?? true;
-              const players = groups[groupName];
-
-              return (
-                <div className="card position-group" key={groupName}>
-                  <button
-                    type="button"
-                    className="position-group-header"
-                    onClick={() =>
-                      setExpandedGroups((current) => ({
-                        ...current,
-                        [groupName]: !isExpanded,
-                      }))
-                    }
-                  >
-                    <span>
-                      <strong>{groupName}</strong>
-                      <small>{players.length} players</small>
-                    </span>
-                    {isExpanded ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
-                  </button>
-
-                  {isExpanded && <PlayerGrid players={players} />}
-                </div>
-              );
-            }
-          )}
-        </div>
       ) : (
-        <PlayerGrid players={view === "starters" ? starters : reserves} />
+        <RosterSection
+          title={getRosterTitle(view)}
+          players={getRosterPlayers({
+            view,
+            offense,
+            defense,
+            specialTeams,
+            reserves,
+          })}
+        />
       )}
     </section>
   );
+}
+
+function RosterSection({ title, players }) {
+  const groupedPlayers = groupPlayersByPosition(players);
+
+  if (!players.length) {
+    return (
+      <div className="card roster-empty">
+        No players available in {title.toLowerCase()}.
+      </div>
+    );
+  }
+
+  return (
+    <div className="position-groups">
+      {Object.entries(groupedPlayers).map(([position, positionPlayers]) => (
+        <div className="card position-group" key={position}>
+          <div className="position-group-header position-group-header-static">
+            <span>
+              <strong>{position}</strong>
+              <small>{positionPlayers.length} players</small>
+            </span>
+          </div>
+
+          <PlayerGrid players={positionPlayers} />
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function getRosterTitle(view) {
+  const titles = {
+    offense: "Offense",
+    defense: "Defense",
+    "special-teams": "Special Teams",
+    reserves: "Reserves",
+  };
+
+  return titles[view] || "Roster";
+}
+
+function getRosterPlayers({
+  view,
+  offense,
+  defense,
+  specialTeams,
+  reserves,
+}) {
+  if (view === "offense") return offense;
+  if (view === "defense") return defense;
+  if (view === "special-teams") return specialTeams;
+  return reserves;
+}
+
+function groupPlayersByPosition(players) {
+  return [...players]
+    .sort((first, second) => {
+      const firstPosition = normalizePosition(first.position);
+      const secondPosition = normalizePosition(second.position);
+      const positionDifference = firstPosition.localeCompare(secondPosition);
+
+      if (positionDifference !== 0) return positionDifference;
+
+      const firstDepth = first.depthChartOrder ?? 999;
+      const secondDepth = second.depthChartOrder ?? 999;
+
+      if (firstDepth !== secondDepth) return firstDepth - secondDepth;
+
+      return first.fullName.localeCompare(second.fullName);
+    })
+    .reduce((result, player) => {
+      const position = normalizePosition(player.position) || "Other";
+      result[position] ||= [];
+      result[position].push(player);
+      return result;
+    }, {});
+}
+
+function normalizePosition(position) {
+  return String(position || "").trim().toUpperCase();
 }
 
 function SummaryCard({ icon, label, value }) {
