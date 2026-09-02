@@ -1,0 +1,116 @@
+/* Fourth Down brand asset integration */
+.branded-header {
+  min-height: 82px;
+}
+
+.branded-lockup {
+  min-width: 0;
+  gap: 14px;
+}
+
+.brand-icon-shell {
+  width: 54px;
+  height: 54px;
+  flex: 0 0 54px;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  border: 1px solid rgba(116, 190, 20, .72);
+  border-radius: 15px;
+  background: #090909;
+  box-shadow: 0 10px 30px rgba(94, 168, 10, .25);
+}
+
+.fourth-down-header-icon {
+  width: 47px;
+  height: 47px;
+  display: block;
+  object-fit: contain;
+}
+
+.fourth-down-header-wordmark {
+  width: clamp(150px, 18vw, 235px);
+  max-height: 48px;
+  display: block;
+  object-fit: contain;
+  object-position: left center;
+}
+
+.home-brand-banner {
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 170px;
+  padding: 24px 34px;
+  border: 1px solid rgba(116, 190, 20, .34);
+  border-radius: 20px;
+  background:
+    radial-gradient(circle at 50% 0%, rgba(116, 190, 20, .12), transparent 48%),
+    linear-gradient(145deg, rgba(18,18,18,.97), rgba(5,5,5,.99));
+  box-shadow: 0 22px 60px rgba(0,0,0,.34);
+}
+
+.home-brand-banner::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(105deg, transparent 0 42%, rgba(255,255,255,.035) 48%, transparent 54% 100%);
+}
+
+.home-brand-logo {
+  position: relative;
+  z-index: 1;
+  width: min(520px, 82vw);
+  max-height: 128px;
+  display: block;
+  object-fit: contain;
+  filter: drop-shadow(0 14px 22px rgba(0,0,0,.52));
+}
+
+.branded-favourite-hero {
+  margin-top: 0;
+}
+
+@media (max-width: 700px) {
+  .branded-header {
+    min-height: 70px;
+  }
+
+  .brand-icon-shell {
+    width: 46px;
+    height: 46px;
+    flex-basis: 46px;
+    border-radius: 13px;
+  }
+
+  .fourth-down-header-icon {
+    width: 40px;
+    height: 40px;
+  }
+
+  .fourth-down-header-wordmark {
+    width: 145px;
+  }
+
+  .home-brand-banner {
+    min-height: 130px;
+    padding: 18px;
+  }
+
+  .home-brand-logo {
+    max-height: 96px;
+  }
+}
+
+@media (max-width: 430px) {
+  .fourth-down-header-wordmark {
+    width: 118px;
+  }
+
+  .header-status {
+    display: none;
+  }
+}

@@ -1,17 +1,29 @@
-FOURTH DOWN FAVOURITE-TEAM NAV INSTALLER
+FOURTH DOWN COMPLETE BRANDING UPDATE
 
+Included:
+- Transparent icon-only logo
+- Transparent dark-surface full logo
+- Transparent dark-surface wordmark
+- 32px favicon
+- 192px app/touch icon
+- 512px app icon
+- Complete replacement Header.jsx
+- Complete replacement Home.jsx
+- Branding CSS
+- Safe PowerShell installer
+
+INSTALL
 1. Extract this ZIP.
-2. Copy apply-favourite-nav.ps1 into:
+2. Open PowerShell in:
    C:\Users\HamishPaterson\fourth-down
-3. From PowerShell in that folder, run:
-   powershell -ExecutionPolicy Bypass -File .\apply-favourite-nav.ps1
+3. Run the installer from the extracted package, for example:
+   powershell -ExecutionPolicy Bypass -File "C:\path\to\fourth-down-branding-update\apply-branding.ps1"
 4. Build:
    npm run build
 5. Deploy:
    git add .
-   git commit -m "Theme navigation with favourite team colours"
+   git commit -m "Apply complete Fourth Down branding update"
    git push
 
-The script creates backups before changing anything.
-It writes a complete replacement src\index.css using your current working stylesheet plus the favourite-team navigation rules.
-It also adds getTeamTheme to App.jsx and places the favourite-team variables on app-shell, allowing the header and navigation to inherit them on every page.
+The installer creates branding-backup before changing files.
+The green Fourth Down brand remains fixed while favourite-team colours remain dynamic.

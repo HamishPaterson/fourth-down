@@ -9,7 +9,15 @@ export default function Home({ favoriteTeam, onNavigate }) {
 
   return (
     <section className="home-favourite-page" style={getTeamTheme(teamCode)}>
-      <div className="card favourite-hero">
+      <div className="home-brand-banner" aria-label="Fourth Down">
+        <img
+          src="/branding/fourth-down-logo.png"
+          alt="Fourth Down. Analyze. Insight. Win."
+          className="home-brand-logo"
+        />
+      </div>
+
+      <div className="card favourite-hero branded-favourite-hero">
         <div className="favourite-hero-copy">
           <span className="eyebrow">YOUR FAVOURITE TEAM</span>
           <h1>{teamName}</h1>
@@ -43,24 +51,9 @@ export default function Home({ favoriteTeam, onNavigate }) {
       </div>
 
       <div className="home-favourite-grid">
-        <HomeTile
-          icon={<Shield size={21} />}
-          title="Franchise hub"
-          detail={`${teamName} roster and team information`}
-          onClick={() => onNavigate("teams")}
-        />
-        <HomeTile
-          icon={<CalendarDays size={21} />}
-          title="Live schedule"
-          detail="Week-by-week NFL matchups"
-          onClick={() => onNavigate("schedule")}
-        />
-        <HomeTile
-          icon={<Users size={21} />}
-          title="Roster data"
-          detail="Offense, defense, special teams and reserves"
-          onClick={() => onNavigate("teams")}
-        />
+        <HomeTile icon={<Shield size={21} />} title="Franchise hub" detail={`${teamName} roster and team information`} onClick={() => onNavigate("teams")} />
+        <HomeTile icon={<CalendarDays size={21} />} title="Live schedule" detail="Week-by-week NFL matchups" onClick={() => onNavigate("schedule")} />
+        <HomeTile icon={<Users size={21} />} title="Roster data" detail="Offense, defense, special teams and reserves" onClick={() => onNavigate("teams")} />
       </div>
     </section>
   );
