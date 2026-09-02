@@ -1,16 +1,24 @@
-import { Target } from 'lucide-react'
+import { Radio, ShieldCheck } from "lucide-react";
 
 export default function Header({ onHome }) {
   return (
-    <header className="header">
-      <button className="brand" onClick={onHome} type="button">
-        <span className="brand-mark"><Target size={22} /></span>
+    <header className="header premium-header">
+      <button type="button" className="brand" onClick={onHome}>
+        <span className="brand-mark">4D</span>
         <span>
-          <strong>FOURTH DOWN</strong>
-          <small>NFL MATCHUP INTELLIGENCE</small>
+          <strong>Fourth Down</strong>
+          <small>NFL INTELLIGENCE</small>
         </span>
       </button>
-      <span className="live-pill">Vercel live</span>
+
+      <div className="header-status">
+        <span className="header-status-item">
+          <Radio size={14} /> Live data
+        </span>
+        <span className="header-status-item header-status-secure">
+          <ShieldCheck size={14} /> Vercel API
+        </span>
+      </div>
     </header>
-  )
+  );
 }

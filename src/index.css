@@ -215,3 +215,187 @@ h1, h2, p { margin-top: 0; }
   .schedule-controls select { width: 100%; }
   .refresh-button { justify-content: center; }
 }
+
+/* Fourth Down premium visual overhaul */
+:root {
+  --fd-accent: #b7ff3c;
+  --fd-accent-strong: #8fd414;
+  --fd-panel: rgba(12, 21, 38, 0.82);
+  --fd-panel-solid: #0d182a;
+  --fd-line: rgba(148, 163, 184, 0.16);
+  --fd-muted: #8ea0b8;
+}
+
+body {
+  background: #050b14;
+}
+
+.app-shell {
+  background:
+    radial-gradient(circle at 18% -10%, rgba(81, 126, 189, 0.22), transparent 34%),
+    radial-gradient(circle at 82% 0%, rgba(163, 230, 53, 0.08), transparent 28%),
+    linear-gradient(180deg, #08111f 0%, #050b14 100%);
+}
+
+.premium-header {
+  margin-top: 14px;
+  border: 1px solid var(--fd-line);
+  border-radius: 18px;
+  background: rgba(8, 17, 31, 0.74);
+  backdrop-filter: blur(18px);
+  box-shadow: 0 18px 70px rgba(0, 0, 0, 0.28);
+}
+
+.brand-mark {
+  width: 48px;
+  height: 48px;
+  border-radius: 15px;
+  background: linear-gradient(145deg, #c9ff65, #8fd414);
+  box-shadow: 0 10px 30px rgba(163, 230, 53, 0.25);
+  font-size: 14px;
+  font-weight: 950;
+  letter-spacing: -0.04em;
+}
+
+.brand strong { font-size: 17px; }
+.brand small { color: var(--fd-accent); }
+.header-status { display: flex; gap: 8px; }
+.header-status-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 10px;
+  color: #d7e2ee;
+  border: 1px solid var(--fd-line);
+  border-radius: 999px;
+  background: rgba(15, 26, 45, 0.75);
+  font-size: 11px;
+  font-weight: 800;
+}
+.header-status-item svg { color: var(--fd-accent); }
+
+.premium-nav {
+  width: fit-content;
+  padding: 6px;
+  border: 1px solid var(--fd-line);
+  border-radius: 14px;
+  background: rgba(9, 18, 32, 0.72);
+  backdrop-filter: blur(16px);
+}
+
+.premium-nav .nav-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 40px;
+  border-radius: 10px;
+}
+
+.premium-nav .nav-button.active {
+  box-shadow: 0 7px 20px rgba(163, 230, 53, 0.2);
+}
+
+.content { padding-top: 34px; }
+.card {
+  border-color: var(--fd-line);
+  background: linear-gradient(145deg, rgba(17, 30, 51, 0.88), rgba(8, 17, 31, 0.9));
+  box-shadow: 0 20px 60px rgba(0,0,0,.24);
+}
+
+.home-page { display: grid; gap: 18px; }
+.home-hero {
+  position: relative;
+  overflow: hidden;
+  display: grid;
+  grid-template-columns: minmax(0, 1.45fr) minmax(260px, .55fr);
+  min-height: 480px;
+  padding: 54px;
+}
+.home-hero::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(90deg, transparent 0 58%, rgba(163,230,53,.05) 58% 100%),
+    radial-gradient(circle at 82% 46%, rgba(163,230,53,.17), transparent 28%);
+}
+.home-hero-copy, .home-team-spotlight { position: relative; z-index: 1; }
+.home-hero h1 {
+  max-width: 720px;
+  margin: 14px 0 18px;
+  font-size: clamp(44px, 7vw, 76px);
+  line-height: .98;
+  letter-spacing: -.055em;
+}
+.home-hero h1 span { color: var(--fd-accent); }
+.home-hero p { max-width: 610px; color: #9cafc4; font-size: 17px; line-height: 1.65; }
+.home-primary { display: inline-flex; align-items: center; gap: 8px; }
+.home-team-spotlight {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  border-left: 1px solid var(--fd-line);
+}
+.home-team-spotlight > span { color: #91a4ba; font-size: 10px; font-weight: 900; letter-spacing: .18em; }
+.home-team-spotlight > strong { font-size: 28px; letter-spacing: .08em; }
+.home-feature-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
+.home-feature-card { padding: 22px; }
+.home-feature-card > span { width: 42px; height: 42px; display: grid; place-items: center; color: var(--fd-accent); border: 1px solid rgba(163,230,53,.2); border-radius: 13px; background: rgba(163,230,53,.07); }
+.home-feature-card h2 { margin: 18px 0 8px; font-size: 17px; }
+.home-feature-card p { margin: 0; color: #8799af; font-size: 13px; line-height: 1.55; }
+
+.section-heading h1, .roster-heading h2 { letter-spacing: -.035em; }
+.game-card, .api-team, .player-card, .franchise-summary-card, .rating-item { transition: transform .2s ease, border-color .2s ease, box-shadow .2s ease; }
+.game-card:hover, .api-team:hover, .player-card:hover {
+  transform: translateY(-3px);
+  border-color: rgba(183,255,60,.45);
+  box-shadow: 0 22px 50px rgba(0,0,0,.34);
+}
+
+.franchise-hero {
+  position: relative;
+  overflow: hidden;
+  min-height: 310px;
+  padding: 42px 48px;
+  background:
+    radial-gradient(circle at 18% 50%, color-mix(in srgb, var(--team-primary, #2563eb) 34%, transparent), transparent 34%),
+    linear-gradient(120deg, color-mix(in srgb, var(--team-primary, #2563eb) 38%, #07101f), #08111f 58%, color-mix(in srgb, var(--team-secondary, #a3e635) 18%, #07101f));
+}
+.franchise-hero::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(110deg, transparent 0 62%, rgba(255,255,255,.04) 62% 64%, transparent 64% 100%);
+}
+.franchise-hero .team-logo { position: relative; z-index: 1; filter: drop-shadow(0 22px 28px rgba(0,0,0,.48)); }
+.franchise-hero-copy { position: relative; z-index: 1; }
+.franchise-hero-copy h1 { letter-spacing: -.05em; }
+.franchise-summary-card, .team-information-card, .ratings-card { background: rgba(10, 21, 38, .82); }
+.rating-item strong { font-size: 32px; color: var(--fd-accent); }
+.roster-tabs { padding: 5px; border: 1px solid var(--fd-line); border-radius: 13px; background: rgba(8,17,31,.75); }
+.roster-tab { border: 0; }
+.position-group-header-static { cursor: default; }
+.player-card h3 { font-size: 17px; }
+.player-card .player-number { font-size: 15px; }
+
+@media (max-width: 900px) {
+  .home-hero { grid-template-columns: 1fr; padding: 36px; }
+  .home-team-spotlight { margin-top: 28px; padding-top: 28px; border-top: 1px solid var(--fd-line); border-left: 0; }
+  .home-feature-grid { grid-template-columns: repeat(2, 1fr); }
+}
+
+@media (max-width: 620px) {
+  .premium-header { margin: 8px 8px 0; }
+  .header-status-secure { display: none; }
+  .premium-nav { width: auto; margin-left: 8px; margin-right: 8px; }
+  .premium-nav .nav-button { justify-content: center; flex: 1; }
+  .premium-nav .nav-button span { display: none; }
+  .home-hero { min-height: 0; padding: 28px 22px; }
+  .home-hero h1 { font-size: 44px; }
+  .home-feature-grid { grid-template-columns: 1fr; }
+  .franchise-hero { padding: 32px 22px; }
+}
