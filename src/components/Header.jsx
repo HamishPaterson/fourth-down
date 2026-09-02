@@ -1,20 +1,19 @@
 export default function Header({ onHome }) {
   return (
-    <header className="header premium-header branded-header">
-      <button type="button" className="brand branded-lockup" onClick={onHome}>
-        <span className="brand-icon-shell">
+    <header className="header premium-header corrected-brand-header">
+      <button type="button" className="brand" onClick={onHome}>
+        <span className="corrected-brand-icon-shell">
           <img
-            src="/branding/fourth-down-icon.png"
+            src="/branding/fourth-down-header-icon.png"
             alt=""
-            className="fourth-down-header-icon"
+            className="corrected-brand-icon"
           />
         </span>
 
-        <img
-          src="/branding/fourth-down-wordmark.png"
-          alt="Fourth Down"
-          className="fourth-down-header-wordmark"
-        />
+        <span className="corrected-brand-copy">
+          <strong>Fourth Down</strong>
+          <small>ANALYZE. INSIGHT. WIN.</small>
+        </span>
       </button>
 
       <div className="header-status" aria-label="Data status">
