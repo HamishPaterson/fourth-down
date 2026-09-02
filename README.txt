@@ -1,19 +1,22 @@
-FOURTH DOWN FAVOURITE-TEAM THEME
+FOURTH DOWN DOMINANT TEAM COLOURS
 
-Replace these four files:
+Replace these five files:
 
 src/pages/Home.jsx
+src/pages/Teams.jsx
 src/pages/TeamDetail.jsx
 src/services/teamThemes.js
 src/index.css
 
-Home now uses the saved favourite team's logo, full team name, primary colour and secondary colour.
-Franchise pages use stronger team colour coverage across summary cards, information cards, ratings, roster tabs, position groups, player cards and inner metadata tiles.
-The subtle logo watermark remains.
+Changes:
+- Every team card on the Teams page uses its own primary and secondary colours.
+- Each team card includes a subtle team-logo watermark.
+- Favourite-team Home hero and supporting tiles use stronger team colours.
+- Franchise hero, summary cards, information cards, ratings, roster tabs, position groups, player cards, and player metadata use substantially stronger colour coverage.
 
 Then run:
 
 npm run build
 git add .
-git commit -m "Add favourite-team Home and stronger franchise themes"
+git commit -m "Increase team colours across Home Teams and franchise pages"
 git push

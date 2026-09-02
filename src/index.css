@@ -657,3 +657,293 @@ body {
     height: 150px !important;
   }
 }
+
+/* Dominant franchise colours */
+.teams-page .eyebrow {
+  color: #ffffff;
+}
+
+.team-colour-card {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  min-height: 126px;
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 18px;
+  padding: 21px 22px;
+  border: 1px solid color-mix(in srgb, var(--team-secondary) 62%, white 8%);
+  background:
+    radial-gradient(
+      circle at 88% 18%,
+      color-mix(in srgb, var(--team-secondary) 44%, transparent),
+      transparent 34%
+    ),
+    linear-gradient(
+      135deg,
+      color-mix(in srgb, var(--team-primary) 74%, #080808),
+      color-mix(in srgb, var(--team-primary) 46%, #080808) 58%,
+      color-mix(in srgb, var(--team-secondary) 25%, #080808)
+    );
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    0 18px 40px color-mix(in srgb, var(--team-primary) 24%, transparent);
+}
+
+.team-colour-card::after {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  inset: 0;
+  background: linear-gradient(90deg, rgba(0,0,0,.08), rgba(0,0,0,.34));
+  pointer-events: none;
+}
+
+.team-card-watermark {
+  position: absolute;
+  z-index: -1;
+  top: 50%;
+  right: -22px;
+  width: 132px;
+  height: 132px;
+  transform: translateY(-50%);
+  background-image: var(--team-watermark);
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: contain;
+  opacity: .14;
+  filter: saturate(.9);
+  pointer-events: none;
+}
+
+.team-card-logo {
+  width: 88px;
+  height: 88px;
+  display: grid;
+  place-items: center;
+  border: 1px solid color-mix(in srgb, var(--team-secondary) 58%, white 12%);
+  border-radius: 22px;
+  background: rgba(0, 0, 0, .28);
+  box-shadow: 0 14px 26px rgba(0, 0, 0, .3);
+}
+
+.team-card-logo .team-logo {
+  filter: drop-shadow(0 10px 13px rgba(0, 0, 0, .42));
+}
+
+.team-card-copy {
+  min-width: 0;
+}
+
+.team-card-copy strong,
+.team-card-copy small {
+  display: block;
+}
+
+.team-card-copy strong {
+  color: #ffffff;
+  font-size: 16px;
+  text-shadow: 0 2px 10px rgba(0, 0, 0, .45);
+}
+
+.team-card-copy small {
+  margin-top: 6px;
+  color: color-mix(in srgb, var(--team-secondary) 68%, white 32%);
+  font-size: 11px;
+  font-weight: 850;
+  letter-spacing: .05em;
+}
+
+.team-card-arrow {
+  position: relative;
+  z-index: 1;
+  color: var(--team-secondary);
+  filter: drop-shadow(0 2px 6px rgba(0,0,0,.45));
+}
+
+.team-colour-card:hover {
+  transform: translateY(-4px) scale(1.008);
+  border-color: var(--team-secondary);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, .12),
+    0 24px 54px color-mix(in srgb, var(--team-primary) 48%, transparent);
+}
+
+/* Increase colour coverage on the favourite-team Home */
+.favourite-hero {
+  border-color: color-mix(in srgb, var(--team-secondary) 76%, white 8%);
+  background:
+    radial-gradient(
+      circle at 80% 45%,
+      color-mix(in srgb, var(--team-secondary) 52%, transparent),
+      transparent 34%
+    ),
+    linear-gradient(
+      120deg,
+      color-mix(in srgb, var(--team-primary) 82%, #080808),
+      color-mix(in srgb, var(--team-primary) 58%, #080808) 60%,
+      color-mix(in srgb, var(--team-secondary) 38%, #080808)
+    );
+  box-shadow: 0 30px 86px color-mix(in srgb, var(--team-primary) 42%, transparent);
+}
+
+.home-favourite-tile {
+  border-color: color-mix(in srgb, var(--team-secondary) 62%, white 8%);
+  background:
+    radial-gradient(
+      circle at 92% 10%,
+      color-mix(in srgb, var(--team-secondary) 30%, transparent),
+      transparent 34%
+    ),
+    linear-gradient(
+      135deg,
+      color-mix(in srgb, var(--team-primary) 58%, #101010),
+      color-mix(in srgb, var(--team-primary) 30%, #080808)
+    );
+  box-shadow: 0 18px 42px color-mix(in srgb, var(--team-primary) 25%, transparent);
+}
+
+.home-favourite-tile > span {
+  color: color-mix(in srgb, var(--team-secondary) 80%, white 20%);
+  border-color: var(--team-secondary);
+  background: color-mix(in srgb, var(--team-primary) 62%, rgba(0,0,0,.2));
+}
+
+/* Increase colour coverage throughout franchise pages */
+.team-detail-page::before {
+  opacity: .09;
+}
+
+.franchise-hero {
+  border-color: color-mix(in srgb, var(--team-secondary) 72%, white 8%);
+  background:
+    radial-gradient(
+      circle at 76% 42%,
+      color-mix(in srgb, var(--team-secondary) 44%, transparent),
+      transparent 34%
+    ),
+    linear-gradient(
+      120deg,
+      color-mix(in srgb, var(--team-primary) 86%, #070707),
+      color-mix(in srgb, var(--team-primary) 62%, #070707) 56%,
+      color-mix(in srgb, var(--team-secondary) 38%, #070707)
+    );
+  box-shadow: 0 28px 78px color-mix(in srgb, var(--team-primary) 40%, transparent);
+}
+
+.team-detail-page .card,
+.team-detail-page .franchise-summary-card,
+.team-detail-page .team-information-card,
+.team-detail-page .ratings-card,
+.team-detail-page .position-group,
+.team-detail-page .player-card {
+  border-color: color-mix(in srgb, var(--team-secondary) 48%, var(--team-primary) 52%);
+  background:
+    radial-gradient(
+      circle at 95% 0%,
+      color-mix(in srgb, var(--team-secondary) 30%, transparent),
+      transparent 35%
+    ),
+    linear-gradient(
+      145deg,
+      color-mix(in srgb, var(--team-primary) 56%, #121212),
+      color-mix(in srgb, var(--team-primary) 32%, #080808) 68%,
+      color-mix(in srgb, var(--team-secondary) 18%, #080808)
+    );
+  box-shadow: 0 20px 48px color-mix(in srgb, var(--team-primary) 24%, transparent);
+}
+
+.team-detail-page .franchise-summary-card > span {
+  width: 42px;
+  height: 42px;
+  display: grid;
+  place-items: center;
+  color: #ffffff;
+  border: 1px solid color-mix(in srgb, var(--team-secondary) 70%, white 10%);
+  border-radius: 13px;
+  background: color-mix(in srgb, var(--team-secondary) 38%, transparent);
+}
+
+.team-detail-page .rating-item,
+.team-detail-page .player-meta-grid > div {
+  border-color: color-mix(in srgb, var(--team-secondary) 54%, var(--team-primary) 46%);
+  background:
+    linear-gradient(
+      145deg,
+      color-mix(in srgb, var(--team-primary) 66%, #101010),
+      color-mix(in srgb, var(--team-secondary) 24%, #090909)
+    );
+}
+
+.team-detail-page .ratings-card {
+  background:
+    radial-gradient(
+      circle at 86% 22%,
+      color-mix(in srgb, var(--team-secondary) 50%, transparent),
+      transparent 34%
+    ),
+    linear-gradient(
+      145deg,
+      color-mix(in srgb, var(--team-primary) 70%, #101010),
+      color-mix(in srgb, var(--team-primary) 38%, #080808)
+    );
+}
+
+.team-detail-page .roster-tabs {
+  border-color: var(--team-secondary);
+  background:
+    linear-gradient(
+      135deg,
+      color-mix(in srgb, var(--team-primary) 66%, #090909),
+      color-mix(in srgb, var(--team-secondary) 20%, #090909)
+    );
+  box-shadow: 0 14px 34px color-mix(in srgb, var(--team-primary) 28%, transparent);
+}
+
+.team-detail-page .roster-tab {
+  color: #ffffff;
+  background: color-mix(in srgb, var(--team-primary) 42%, #111111);
+}
+
+.team-detail-page .roster-tab.active {
+  border: 1px solid var(--team-secondary);
+  background:
+    linear-gradient(
+      135deg,
+      var(--team-primary),
+      color-mix(in srgb, var(--team-secondary) 52%, var(--team-primary))
+    );
+  box-shadow: 0 8px 22px color-mix(in srgb, var(--team-secondary) 28%, transparent);
+}
+
+.team-detail-page .position-group-header {
+  background:
+    linear-gradient(
+      90deg,
+      color-mix(in srgb, var(--team-primary) 62%, transparent),
+      color-mix(in srgb, var(--team-secondary) 20%, transparent)
+    );
+}
+
+.team-detail-page .player-injury {
+  color: #ffffff;
+  border: 1px solid color-mix(in srgb, var(--team-secondary) 60%, transparent);
+  background: color-mix(in srgb, var(--team-secondary) 26%, rgba(0,0,0,.35));
+}
+
+@media (max-width: 620px) {
+  .team-colour-card {
+    min-height: 112px;
+    grid-template-columns: auto 1fr;
+  }
+
+  .team-card-logo {
+    width: 76px;
+    height: 76px;
+  }
+
+  .team-card-arrow {
+    display: none;
+  }
+}
