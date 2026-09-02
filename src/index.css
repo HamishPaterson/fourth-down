@@ -216,11 +216,11 @@ h1, h2, p { margin-top: 0; }
   .refresh-button { justify-content: center; }
 }
 
-/* Fourth Down monochrome theme */
+/* Neutral app theme with franchise-specific team pages */
 :root {
   --fd-accent: #ffffff;
   --fd-accent-strong: #d4d4d4;
-  --fd-panel: rgba(12, 12, 12, 0.9);
+  --fd-panel: rgba(14, 14, 14, 0.92);
   --fd-panel-solid: #101010;
   --fd-line: rgba(255, 255, 255, 0.14);
   --fd-muted: #9ca3af;
@@ -235,7 +235,7 @@ body {
 
 .app-shell {
   background:
-    radial-gradient(circle at 50% -20%, rgba(255, 255, 255, 0.07), transparent 34%),
+    radial-gradient(circle at 50% -20%, rgba(255,255,255,.06), transparent 34%),
     linear-gradient(180deg, #080808 0%, #000000 100%);
 }
 
@@ -245,48 +245,26 @@ body {
 .franchise-summary-card,
 .team-information-card,
 .ratings-card {
-  border-color: rgba(255, 255, 255, 0.14);
-  background: linear-gradient(145deg, rgba(20, 20, 20, 0.94), rgba(7, 7, 7, 0.96));
+  border-color: rgba(255,255,255,.14);
+  background: linear-gradient(145deg, rgba(20,20,20,.95), rgba(7,7,7,.97));
 }
 
-.brand-mark {
-  color: #000000;
-  background: #ffffff;
-  box-shadow: 0 10px 30px rgba(255, 255, 255, 0.13);
-}
-
-.brand small,
-.eyebrow,
-.team-data-status,
-.player-number,
-.venue strong,
-.matchup-detail-icon,
-.matchup-info svg,
-.matchup-info small,
-.status-card span,
-.success,
-.rating-item strong {
-  color: #ffffff;
-}
-
-.header-status-item svg {
-  color: #ffffff;
-}
-
+.brand-mark,
 .nav-button.active,
-.roster-tab.active,
 .primary {
   color: #000000;
   border-color: #ffffff;
   background: #ffffff;
-  box-shadow: 0 7px 20px rgba(255, 255, 255, 0.12);
+  box-shadow: 0 8px 24px rgba(255,255,255,.12);
 }
 
-.nav-button:hover,
-.secondary:hover,
-.roster-tab:hover {
+.brand small,
+.eyebrow,
+.venue strong,
+.matchup-detail-icon,
+.status-card span,
+.success {
   color: #ffffff;
-  background: #252525;
 }
 
 .secondary,
@@ -294,33 +272,40 @@ body {
 .schedule-controls select,
 .settings-card select {
   color: #ffffff;
-  border-color: rgba(255, 255, 255, 0.18);
+  border-color: rgba(255,255,255,.18);
   background: #151515;
 }
 
-.home-hero::before {
-  background:
-    linear-gradient(90deg, transparent 0 58%, rgba(255,255,255,.025) 58% 100%),
-    radial-gradient(circle at 82% 46%, rgba(255,255,255,.08), transparent 30%);
-}
-
-.home-hero h1 span {
+.nav-button:hover,
+.secondary:hover {
   color: #ffffff;
-}
-
-.home-feature-card > span {
-  color: #ffffff;
-  border-color: rgba(255,255,255,.16);
-  background: rgba(255,255,255,.045);
+  background: #252525;
 }
 
 .game-card:hover,
 .api-team:hover,
 .player-card:hover {
-  border-color: rgba(255,255,255,.45);
+  border-color: rgba(255,255,255,.46);
   box-shadow: 0 22px 50px rgba(0,0,0,.55);
 }
 
+/* Restore the simple Home dashboard */
+.hero {
+  background:
+    radial-gradient(circle at 84% 24%, rgba(255,255,255,.06), transparent 28%),
+    linear-gradient(145deg, rgba(22,22,22,.96), rgba(7,7,7,.98));
+}
+
+.hero h1 {
+  color: #ffffff;
+  letter-spacing: -.05em;
+}
+
+.status-card {
+  background: linear-gradient(145deg, rgba(18,18,18,.96), rgba(8,8,8,.98));
+}
+
+/* Franchise page: subtle logo watermark plus team colours */
 .team-detail-page {
   position: relative;
   isolation: isolate;
@@ -331,69 +316,97 @@ body {
   position: fixed;
   z-index: -1;
   top: 50%;
-  right: clamp(-170px, -7vw, -60px);
-  width: min(58vw, 760px);
-  height: min(58vw, 760px);
+  right: clamp(-160px, -7vw, -60px);
+  width: min(56vw, 730px);
+  height: min(56vw, 730px);
   transform: translateY(-42%);
   background-image: var(--team-watermark);
   background-repeat: no-repeat;
   background-position: center;
   background-size: contain;
-  opacity: 0.075;
-  filter: grayscale(1) contrast(1.08);
+  opacity: .065;
   pointer-events: none;
 }
 
 .franchise-hero {
+  position: relative;
+  overflow: hidden;
+  min-height: 310px;
   background:
-    linear-gradient(110deg, rgba(22,22,22,.96), rgba(5,5,5,.9)),
-    #080808;
+    radial-gradient(circle at 18% 50%, color-mix(in srgb, var(--team-primary) 38%, transparent), transparent 36%),
+    linear-gradient(
+      120deg,
+      color-mix(in srgb, var(--team-primary) 38%, #070707),
+      #090909 58%,
+      color-mix(in srgb, var(--team-secondary) 18%, #070707)
+    );
+  border-color: color-mix(in srgb, var(--team-primary) 48%, rgba(255,255,255,.14));
 }
 
 .franchise-hero::after {
+  content: "";
+  position: absolute;
+  inset: 0;
   background-image: var(--team-watermark);
   background-repeat: no-repeat;
   background-position: right -30px center;
-  background-size: min(48%, 430px);
-  opacity: 0.1;
-  filter: grayscale(1);
+  background-size: min(46%, 410px);
+  opacity: .075;
+  pointer-events: none;
+}
+
+.franchise-hero .team-logo,
+.franchise-hero-copy {
+  position: relative;
+  z-index: 1;
 }
 
 .franchise-hero .team-logo {
-  filter: drop-shadow(0 22px 28px rgba(0,0,0,.7));
+  filter: drop-shadow(0 22px 28px rgba(0,0,0,.68));
 }
 
-.player-status.active {
+.team-detail-page .eyebrow,
+.team-detail-page .team-data-status,
+.team-detail-page .player-number,
+.team-detail-page .rating-item strong {
+  color: var(--team-secondary);
+}
+
+.team-detail-page .primary,
+.team-detail-page .roster-tab.active {
   color: #ffffff;
+  border-color: var(--team-primary);
+  background: var(--team-primary);
+  box-shadow: 0 8px 24px color-mix(in srgb, var(--team-primary) 32%, transparent);
 }
 
-.player-status,
-.player-injury {
-  color: #d4d4d4;
+.team-detail-page .secondary:hover,
+.team-detail-page .roster-tab:hover {
+  border-color: var(--team-primary);
 }
 
-.rating-item,
-.player-meta-grid > div,
-.matchup-detail,
-.schedule-status,
-.team-statistics-empty,
-.quarter-score-empty {
-  border-color: rgba(255,255,255,.12);
-  background: rgba(255,255,255,.035);
+.team-detail-page .franchise-summary-card:hover,
+.team-detail-page .player-card:hover,
+.team-detail-page .rating-item:hover {
+  border-color: color-mix(in srgb, var(--team-primary) 62%, white 8%);
+}
+
+.team-detail-page .player-status.active {
+  color: var(--team-secondary);
 }
 
 @media (max-width: 700px) {
   .team-detail-page::before {
-    top: 34%;
-    right: -120px;
-    width: 520px;
-    height: 520px;
-    opacity: 0.055;
+    top: 36%;
+    right: -130px;
+    width: 500px;
+    height: 500px;
+    opacity: .05;
   }
 
   .franchise-hero::after {
     background-position: center;
-    background-size: 78%;
-    opacity: 0.06;
+    background-size: 76%;
+    opacity: .055;
   }
 }
