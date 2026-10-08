@@ -1915,5 +1915,3 @@ body {
 .best-bet-highlight-longshot > small { color:#ffad5c; }
 .best-bets-market-note { margin:8px 0 12px; padding:10px 12px; border:1px solid rgba(255,196,100,.26); border-radius:10px; background:rgba(92,54,0,.2); color:#ffd79d; font-size:10px; line-height:1.4; }
 @media (max-width:520px) { .best-bet-highlights { grid-template-columns:1fr; } .best-bet-highlight > strong { white-space:normal; } }
-/* Restored rich Matchup prediction analysis */
-.matchup-prediction{margin-top:22px;padding:22px;border:1px solid color-mix(in srgb,var(--away-secondary) 44%,var(--home-secondary) 56%);border-radius:16px}.matchup-prediction .team-statistics-heading{margin-bottom:0}.matchup-prediction .team-statistics-heading h3{margin:5px 0 0}.prediction-explanation-card,.prediction-comparison-card{margin-top:18px}@media(max-width:700px){.matchup-prediction{padding:16px}.prediction-summary{flex-direction:column;text-align:center}.prediction-scoreline{padding:15px 10px}.prediction-comparison-card .team-statistics-row,.matchup-prediction .team-statistics-row{grid-template-columns:72px minmax(110px,1fr) 72px;padding:11px 8px}}

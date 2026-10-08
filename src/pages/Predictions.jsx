@@ -4,10 +4,11 @@ import TeamLogo from "../components/TeamLogo.jsx";
 import { TEAM_NAMES } from "../data.js";
 import { getTeamTheme } from "../services/teamThemes.js";
 import {
+  hasMigratedSharedLedger,
+  migrateLocalPredictionLedger,
   readPredictionLedger,
   refreshPredictionLedger,
   savePredictionSnapshot,
-  saveAuthoritativePredictionSnapshot,
   isCurrentCompletePrediction,
   CURRENT_MODEL_KEY,
   CURRENT_MODEL_VERSION,
@@ -115,21 +116,39 @@ export default function Predictions({ onOpen }) {
             ? oddsResult.value
             : [];
 
-        // Do not paint device-local prediction rows. Fetch the shared ledger first
-        // so every device starts from the exact same authoritative snapshots.
-        let ledger = [];
+        let ledger = readPredictionLedger();
+
+        const initialRows = games.map((game) => {
+          const saved = findLedgerRow(ledger, game);
+          if (saved) {
+            return enrichSavedPredictionWithCurrentMarket(saved, game, oddsEvents);
+          }
+
+          return buildMarketFallback(
+            game,
+            oddsEvents,
+            new Error("Full model is loading")
+          );
+        });
 
         if (active) {
-          setRows([]);
-          setStatus(`Loading shared Week ${week} predictions...`);
+          setRows(initialRows);
+          setStatus(`Calculating ${games.length} Week ${week} predictions...`);
+        }
+
+        if (!hasMigratedSharedLedger()) {
+          void migrateLocalPredictionLedger().catch((sharedError) => {
+            console.warn("Initial shared-ledger migration failed", sharedError);
+          });
         }
 
         try {
-          ledger = await refreshPredictionLedger({
+          await refreshPredictionLedger({
             season: SEASON,
             week,
             signal: controller.signal,
           });
+          ledger = readPredictionLedger();
 
           if (active) {
             const sharedRows = games.map((game) => {
@@ -139,15 +158,15 @@ export default function Predictions({ onOpen }) {
                 : buildMarketFallback(
                     game,
                     oddsEvents,
-                    new Error("Shared prediction is being created")
+                    new Error("Full model is loading")
                   );
             });
             setRows(sharedRows);
           }
         } catch (sharedError) {
-          if (sharedError?.name === "AbortError") throw sharedError;
-          console.warn("Shared prediction sync failed", sharedError);
-          ledger = [];
+          if (sharedError?.name !== "AbortError") {
+            console.warn("Shared prediction sync failed; local cache retained", sharedError);
+          }
         }
 
         const scheduleRows = await mapWithConcurrency(
@@ -163,52 +182,13 @@ export default function Predictions({ onOpen }) {
               kickoffTime > 0 &&
               Date.now() >= kickoffTime;
 
-            // The shared snapshot is the single authoritative score prediction.
-            // Never regenerate a saved matchup on an individual device.
-            if (hasSavedPrediction(saved)) {
-              const savedBestBets =
-                saved?.bestBets ||
-                saved?.dataQuality?.bestBetsPayload ||
-                null;
-              const savedRecommendations = savedBestBets?.recommendations || [];
-              const savedScorerSelection = String(
-                savedBestBets?.anytimeTdScorer?.selection || ""
-              ).toLowerCase();
-              const scorerNeedsRefresh =
-                !savedScorerSelection ||
-                savedScorerSelection.includes("no eligible scorer") ||
-                savedScorerSelection.includes("scorer data unavailable");
-
-              // Refresh only the betting layer when recommendations are empty or
-              // the stored scorer is unavailable. Never replace the shared score.
-              if (!gameHasStarted && (savedRecommendations.length === 0 || scorerNeedsRefresh)) {
-                try {
-                  const refreshed = await buildFullPredictionRow(
-                    game,
-                    oddsEvents,
-                    controller.signal
-                  );
-                  const withRefreshedBets = {
-                    ...saved,
-                    bestBets: refreshed.bestBets,
-                    dataQuality: {
-                      ...(saved.dataQuality || {}),
-                      bestBets: refreshed.bestBets,
-                      bestBetsPayload: refreshed.bestBets,
-                    },
-                    kickoff: game.sourceDate || saved.kickoff,
-                  };
-                  savePredictionSnapshot(withRefreshedBets);
-                  return enrichSavedPredictionWithCurrentMarket(
-                    withRefreshedBets,
-                    game,
-                    oddsEvents
-                  );
-                } catch (betError) {
-                  console.warn(`Best Bets refresh failed for ${game.away} at ${game.home}`, betError);
-                }
-              }
-
+            if (
+              hasSavedPrediction(saved) &&
+              (
+                gameHasStarted ||
+                (isCurrentCompletePrediction(saved) && hasClearPlayerPropLabels(saved))
+              )
+            ) {
               return {
                 ...enrichSavedPredictionWithCurrentMarket(saved, game, oddsEvents),
                 kickoff: game.sourceDate || saved.kickoff,
@@ -221,21 +201,13 @@ export default function Predictions({ onOpen }) {
                 oddsEvents,
                 controller.signal
               );
-              const authoritative = await saveAuthoritativePredictionSnapshot(
-                generated,
-                { signal: controller.signal }
-              );
-              const displayed = enrichSavedPredictionWithCurrentMarket(
-                authoritative,
-                game,
-                oddsEvents
-              );
+              savePredictionSnapshot(generated);
               if (active) {
                 setRows((currentRows) =>
-                  mergePredictionRows([displayed], currentRows)
+                  mergePredictionRows([generated], currentRows)
                 );
               }
-              return displayed;
+              return generated;
             } catch (error) {
               console.error(
                 `Full prediction generation failed for ${game.away} at ${game.home}`,
@@ -509,7 +481,12 @@ function buildMarketFallback(game, oddsEvents, error) {
   const market = getMarketExpectedScores(oddsEvent);
   const awayScore = market.away;
   const homeScore = market.home;
-  const winner = getOddsmakerPick(oddsEvent, game, market);
+  const winner =
+    awayScore === null || homeScore === null || awayScore === homeScore
+      ? null
+      : awayScore > homeScore
+        ? game.away
+        : game.home;
 
   return {
     id: `${Number(game.week) || 0}:${game.away}:${game.home}:${game.sourceDate || "unknown"}`,
@@ -744,10 +721,7 @@ function PredictionCard({ prediction, onOpen }) {
             fontWeight: 800,
             cursor: "pointer",
           }}
-          onClick={() => onOpen({
-            ...prediction.game,
-            authoritativePrediction: prediction,
-          })}
+          onClick={() => onOpen(prediction.game)}
         >
           Open matchup
         </button>
@@ -834,6 +808,7 @@ function buildDisplayHighlights(bestBets) {
     ...(bestBets?.recommendations || []),
     stored.mostLikely,
     stored.bestValue,
+    stored.longshot,
   ].filter(Boolean);
   const unique = [];
   const seen = new Set();
@@ -844,7 +819,7 @@ function buildDisplayHighlights(bestBets) {
       unique.push(bet);
     }
   }
-  if (!unique.length) return { mostLikely: null, bestValue: null };
+  if (!unique.length) return { mostLikely: null, bestValue: null, longshot: null };
 
   const playerBets = unique.filter((bet) => bet.category !== "Game");
   const likelyPool = playerBets.length ? playerBets : unique;
@@ -855,14 +830,28 @@ function buildDisplayHighlights(bestBets) {
   const bestValue = [...afterLikely].sort(
     (a, b) => Number(b.expectedValue || 0) - Number(a.expectedValue || 0)
   )[0] || mostLikely;
+  const afterValue = unique.filter((bet) => bet !== mostLikely && bet !== bestValue);
+  const longshot = [...afterValue].sort((a, b) => {
+    const aFive = Number(a.decimalOdds || 0) >= 5 ? 1 : 0;
+    const bFive = Number(b.decimalOdds || 0) >= 5 ? 1 : 0;
+    return bFive - aFive || Number(b.decimalOdds || 0) - Number(a.decimalOdds || 0);
+  })[0] || bestValue || mostLikely;
 
   return {
     mostLikely: { ...mostLikely, highlightExplanation: "Highest model probability among the available markets" },
     bestValue: {
       ...bestValue,
       highlightExplanation: bestValue === mostLikely
-        ? "Only available qualified selection"
+        ? "Only available selection, reused so Best Value is never empty"
         : "Highest estimated value among the remaining available markets",
+    },
+    longshot: {
+      ...longshot,
+      highlightExplanation: longshot === bestValue || longshot === mostLikely
+        ? "Best available fallback, reused so Longshot is never empty"
+        : Number(longshot.decimalOdds) >= 5
+          ? "Highest-priced separate selection at $5.00 or higher"
+          : "Highest-priced separate selection available",
     },
   };
 }
@@ -925,9 +914,10 @@ function BestBetHighlights({ highlights, awayCode, homeCode }) {
   const items = [
     ["Most likely", highlights?.mostLikely],
     ["Best value", highlights?.bestValue],
+    ["Longshot", highlights?.longshot],
   ];
   return (
-    <div className="best-bet-highlights" style={{ gridTemplateColumns: "repeat(2, minmax(0, 1fr))" }}>
+    <div className="best-bet-highlights">
       {items.map(([label, bet]) => (
         <div className={`best-bet-highlight best-bet-highlight-${label.toLowerCase().replace(/\s+/g, "-")}`} key={label} style={bet ? getBetTeamStyle(bet, awayCode, homeCode) : undefined}>
           <small>{label}</small>
@@ -936,11 +926,16 @@ function BestBetHighlights({ highlights, awayCode, homeCode }) {
               <strong>{formatFullPlayerSelection(bet.selection)}</strong>
               <span>{formatAustralianOdds(bet.decimalOdds, bet.price)} · {formatPercent(bet.modelProbability)} model chance</span>
               <p>{bet.highlightExplanation}</p>
+              {label === "Longshot" && Number(bet.decimalOdds) < 5 && (
+                <em style={{ display: "block", marginTop: "5px", color: "#ffd166", fontSize: "9px" }}>
+                  Fallback: below the preferred $5.00 threshold
+                </em>
+              )}
             </>
           ) : (
             <>
               <strong>None qualified</strong>
-              <span>No qualifying selection</span>
+              <span>{label === "Longshot" ? "No separate market priced at $5.00 or higher was returned for this game" : "No qualifying selection"}</span>
             </>
           )}
         </div>
@@ -1447,7 +1442,13 @@ function enrichSavedPredictionWithCurrentMarket(saved, game, oddsEvents) {
   const oddsEvent = findOddsForGame(oddsEvents, game);
   const market = getMarketExpectedScores(oddsEvent);
   const hasMarket = market.away !== null && market.home !== null;
-  const oddsPick = getOddsmakerPick(oddsEvent, game, market) || saved.oddsPick || null;
+  const oddsPick = hasMarket
+    ? market.away > market.home
+      ? game.away
+      : market.home > market.away
+        ? game.home
+        : null
+    : saved.oddsPick || null;
   const storedWeather =
     saved?.game?.weather ||
     saved?.dataQuality?.weather ||
@@ -1768,40 +1769,6 @@ function mapScheduleGame(apiGame) {
     scheduleContext: apiGame?.scheduleContext || null,
     weather: apiGame?.weather || null,
   };
-}
-
-function getOddsmakerPick(event, game, market = getMarketExpectedScores(event)) {
-  if (market.away !== null && market.home !== null && market.away !== market.home) {
-    return market.away > market.home ? game.away : game.home;
-  }
-
-  const prices = [];
-  for (const bookmaker of event?.bookmakers || []) {
-    const moneyline = bookmaker?.markets?.find((item) => item.key === "h2h");
-    const away = moneyline?.outcomes?.find(
-      (outcome) => normalizeName(outcome.name) === normalizeName(event.away_team)
-    );
-    const home = moneyline?.outcomes?.find(
-      (outcome) => normalizeName(outcome.name) === normalizeName(event.home_team)
-    );
-    const awayProbability = impliedMarketProbability(away?.price);
-    const homeProbability = impliedMarketProbability(home?.price);
-    if (awayProbability !== null && homeProbability !== null) {
-      prices.push({ away: awayProbability, home: homeProbability });
-    }
-  }
-
-  if (!prices.length) return null;
-  const awayAverage = prices.reduce((sum, row) => sum + row.away, 0) / prices.length;
-  const homeAverage = prices.reduce((sum, row) => sum + row.home, 0) / prices.length;
-  if (awayAverage === homeAverage) return null;
-  return awayAverage > homeAverage ? game.away : game.home;
-}
-
-function impliedMarketProbability(price) {
-  const value = Number(price);
-  if (!Number.isFinite(value) || value === 0) return null;
-  return value > 0 ? 100 / (value + 100) : Math.abs(value) / (Math.abs(value) + 100);
 }
 
 function getMarketExpectedScores(event) {

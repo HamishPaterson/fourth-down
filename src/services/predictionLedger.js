@@ -4,9 +4,9 @@ import {
   saveSharedPredictionSnapshots,
 } from "./sharedPredictionLedger.js";
 
-const LEDGER_KEY = "fourth-down:prediction-ledger:v3-shared-only";
-export const CURRENT_MODEL_VERSION = 12;
-export const CURRENT_MODEL_KEY = "full-v12-data-only-predictions";
+const LEDGER_KEY = "fourth-down:prediction-ledger:v1";
+export const CURRENT_MODEL_VERSION = 11;
+export const CURRENT_MODEL_KEY = "full-v11-week5-data-gap-audit";
 const WEEK_ONE_BACKFILL = [
   result("2026-W1-SEA-NE", "SEA", "NE", 13, 10, "SEA"),
   result("2026-W1-LAR-SF", "LAR", "SF", 7, 27, "LAR"),
@@ -88,10 +88,9 @@ export function isCurrentCompletePrediction(row) {
   const modelVersion = row?.modelVersion ?? row?.dataQuality?.modelVersion;
   const modelKey = row?.modelKey ?? row?.dataQuality?.modelKey;
   const predictionPayload = row?.predictionPayload ?? row?.dataQuality?.predictionPayload;
-
-  // Prediction identity must not depend on odds or Best Bets availability.
-  // Otherwise two devices can recalculate the same matchup from different
-  // market responses and overwrite the shared team scores.
+  const bestBets = row?.bestBets ?? row?.dataQuality?.bestBetsPayload;
+  const hasAssessedMarkets =
+    !row?.oddsPick || Number(bestBets?.assessed) > 0;
   return Boolean(
     row &&
     Number(modelVersion) === CURRENT_MODEL_VERSION &&
@@ -102,6 +101,8 @@ export function isCurrentCompletePrediction(row) {
     hasNumber(row.fourthDownAwayWinProbability) &&
     hasNumber(row.fourthDownHomeWinProbability) &&
     predictionPayload &&
+    bestBets &&
+    hasAssessedMarkets &&
     row.dataQuality
   );
 }
@@ -111,61 +112,8 @@ export function getPredictionPayload(row) {
 }
 
 export function findPredictionSnapshot(rows, week, awayCode, homeCode) {
-  const requestedAway = normaliseTeam(awayCode);
-  const requestedHome = normaliseTeam(homeCode);
-  const key = ledgerMatchupKey({ season: 2026, week, awayCode: requestedAway, homeCode: requestedHome });
-  const snapshot = (rows || []).find((row) => ledgerMatchupKey(row) === key) || null;
-  return snapshot ? orientSnapshotToMatchup(snapshot, requestedAway, requestedHome) : null;
-}
-
-function orientSnapshotToMatchup(snapshot, requestedAway, requestedHome) {
-  const storedAway = normaliseTeam(snapshot?.awayCode);
-  const storedHome = normaliseTeam(snapshot?.homeCode);
-
-  if (storedAway === requestedAway && storedHome === requestedHome) {
-    return snapshot;
-  }
-
-  if (storedAway !== requestedHome || storedHome !== requestedAway) {
-    return snapshot;
-  }
-
-  const predictionPayload = swapPredictionPayload(snapshot.predictionPayload ?? snapshot?.dataQuality?.predictionPayload);
-  const dataQuality = snapshot?.dataQuality
-    ? {
-        ...snapshot.dataQuality,
-        predictionPayload: snapshot.dataQuality.predictionPayload
-          ? swapPredictionPayload(snapshot.dataQuality.predictionPayload)
-          : snapshot.dataQuality.predictionPayload,
-      }
-    : snapshot?.dataQuality;
-
-  return {
-    ...snapshot,
-    awayCode: requestedAway,
-    homeCode: requestedHome,
-    fourthDownAwayScore: snapshot.fourthDownHomeScore,
-    fourthDownHomeScore: snapshot.fourthDownAwayScore,
-    fourthDownAwayWinProbability: snapshot.fourthDownHomeWinProbability,
-    fourthDownHomeWinProbability: snapshot.fourthDownAwayWinProbability,
-    actualAwayScore: snapshot.actualHomeScore,
-    actualHomeScore: snapshot.actualAwayScore,
-    predictionPayload,
-    dataQuality,
-  };
-}
-
-function swapPredictionPayload(payload) {
-  if (!payload || typeof payload !== "object") return payload;
-  return {
-    ...payload,
-    away: payload.home,
-    home: payload.away,
-    awayCode: payload.homeCode ?? payload.home?.code,
-    homeCode: payload.awayCode ?? payload.away?.code,
-    awayWinProbability: payload.homeWinProbability,
-    homeWinProbability: payload.awayWinProbability,
-  };
+  const key = ledgerMatchupKey({ season: 2026, week, awayCode, homeCode });
+  return (rows || []).find((row) => ledgerMatchupKey(row) === key) || null;
 }
 
 function hasNumber(value) {
@@ -196,45 +144,18 @@ export function savePredictionSnapshot(snapshot) {
   const existing = index >= 0 ? rows[index] : null;
   const existingIsFinal = hasFinalResult(existing);
 
-  const existingHasPrediction = Boolean(
-    existing &&
-    hasNumber(existing.fourthDownAwayScore) &&
-    hasNumber(existing.fourthDownHomeScore) &&
-    hasNumber(existing.fourthDownAwayWinProbability) &&
-    hasNumber(existing.fourthDownHomeWinProbability) &&
-    existing.fourthDownPick
-  );
-
   const next = existingIsFinal
     ? { ...normalised, ...existing }
     : {
         ...existing,
         ...normalised,
-        ...(existingHasPrediction
-          ? {
-              fourthDownPick: existing.fourthDownPick,
-              fourthDownAwayScore: existing.fourthDownAwayScore,
-              fourthDownHomeScore: existing.fourthDownHomeScore,
-              fourthDownAwayWinProbability: existing.fourthDownAwayWinProbability,
-              fourthDownHomeWinProbability: existing.fourthDownHomeWinProbability,
-              fourthDownWinnerProbability: existing.fourthDownWinnerProbability,
-              projectedTie: existing.projectedTie,
-              continuousMargin: existing.continuousMargin,
-              confidenceScore: existing.confidenceScore,
-              confidenceLabel: existing.confidenceLabel,
-              predictionPayload: existing.predictionPayload,
-              modelVersion: existing.modelVersion,
-              modelKey: existing.modelKey,
-              snapshotAt: existing.snapshotAt,
-            }
-          : {}),
         actualAwayScore: existing?.actualAwayScore ?? null,
         actualHomeScore: existing?.actualHomeScore ?? null,
         actualWinner: existing?.actualWinner ?? null,
         fourthDownCorrect: existing?.fourthDownCorrect ?? null,
         oddsCorrect: existing?.oddsCorrect ?? null,
         gradedAt: existing?.gradedAt ?? null,
-        snapshotAt: existing?.snapshotAt || normalised.snapshotAt || new Date().toISOString(),
+        snapshotAt: existing?.snapshotAt || new Date().toISOString(),
       };
 
   if (index >= 0) rows[index] = next;
@@ -242,33 +163,6 @@ export function savePredictionSnapshot(snapshot) {
 
   writeStoredRows(rows);
   persistSnapshots([next]);
-}
-
-export async function saveAuthoritativePredictionSnapshot(snapshot, options = {}) {
-  if (!snapshot || typeof window === "undefined") return snapshot || null;
-
-  const normalised = normaliseSnapshot(snapshot);
-  await saveSharedPredictionSnapshots([normalised], options);
-
-  const sharedRows = dedupeRows(
-    (await fetchSharedPredictionLedger({
-      season: normalised.season,
-      week: normalised.week,
-      signal: options.signal,
-    })).map((row) => ({ ...row, shared: true }))
-  );
-
-  if (sharedRows.length) {
-    writeStoredRows(sharedRows, { dispatch: false });
-    window.dispatchEvent(new Event("fourth-down-ledger-updated"));
-  }
-
-  return findPredictionSnapshot(
-    sharedRows,
-    normalised.week,
-    normalised.awayCode,
-    normalised.homeCode
-  ) || normalised;
 }
 
 export function saveGradedPrediction(row) {

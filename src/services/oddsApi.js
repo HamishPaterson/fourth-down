@@ -1,4 +1,4 @@
-const ODDS_CACHE_KEY = "fourth-down:nfl-odds-v2";
+const ODDS_CACHE_KEY = "fourth-down:nfl-odds";
 const ODDS_CACHE_TTL_MS = 5 * 60 * 1000;
 
 let memoryCache = null;
@@ -129,51 +129,19 @@ export function clearNflOddsCache() {
 
 export function findOddsForGame(events, game) {
   if (!Array.isArray(events) || !game) return null;
+  const awayCode = resolveTeamCode(game.away || game.awayCode || game.awayName);
+  const homeCode = resolveTeamCode(game.home || game.homeCode || game.homeName);
 
-  const awayCode = resolveTeamCode(
-    game.away || game.awayCode || game.awayName || game.away_team || game.awayTeam
+  const direct = events.find((event) =>
+    resolveTeamCode(event?.away_team_code || event?.away_code || event?.away_team) === awayCode &&
+    resolveTeamCode(event?.home_team_code || event?.home_code || event?.home_team) === homeCode
   );
-  const homeCode = resolveTeamCode(
-    game.home || game.homeCode || game.homeName || game.home_team || game.homeTeam
-  );
+  if (direct) return direct;
 
-  const matching = events.filter((event) => {
-    const eventAway = resolveTeamCode(
-      event?.away_team_code || event?.away_code || event?.away_team || event?.awayTeam
-    );
-    const eventHome = resolveTeamCode(
-      event?.home_team_code || event?.home_code || event?.home_team || event?.homeTeam
-    );
-    return (
-      (eventAway === awayCode && eventHome === homeCode) ||
-      (eventAway === homeCode && eventHome === awayCode)
-    );
-  });
-
-  if (!matching.length) return null;
-  if (matching.length === 1) return matching[0];
-
-  const kickoff = Date.parse(
-    game.sourceDate || game.date || game.kickoff || game.commence_time || ""
-  );
-  if (!Number.isFinite(kickoff)) {
-    return [...matching].sort((a, b) => countEventMarkets(b) - countEventMarkets(a))[0];
-  }
-
-  return [...matching].sort((a, b) => {
-    const aTime = Date.parse(a?.commence_time || "");
-    const bTime = Date.parse(b?.commence_time || "");
-    const aDistance = Number.isFinite(aTime) ? Math.abs(aTime - kickoff) : Number.MAX_SAFE_INTEGER;
-    const bDistance = Number.isFinite(bTime) ? Math.abs(bTime - kickoff) : Number.MAX_SAFE_INTEGER;
-    return aDistance - bDistance || countEventMarkets(b) - countEventMarkets(a);
-  })[0];
-}
-
-function countEventMarkets(event) {
-  return (event?.bookmakers || []).reduce(
-    (total, bookmaker) => total + (bookmaker?.markets || []).length,
-    0
-  );
+  return events.find((event) =>
+    resolveTeamCode(event?.away_team_code || event?.away_code || event?.away_team) === homeCode &&
+    resolveTeamCode(event?.home_team_code || event?.home_code || event?.home_team) === awayCode
+  ) || null;
 }
 
 function resolveTeamCode(value) {
