@@ -9,6 +9,8 @@ import {
 } from "lucide-react";
 import TeamLogo from "../components/TeamLogo.jsx";
 import { getTeamTheme } from "../services/teamThemes.js";
+import { getTeamRatings } from "../services/teamRatings.js";
+import { getPlayerRating } from "../services/playerRatings.js";
 
 const OFFENSE_POSITIONS = new Set([
   "QB",
@@ -48,6 +50,45 @@ const SPECIAL_TEAMS_POSITIONS = new Set([
   "PR",
 ]);
 
+const TEAM_INFO = {
+  ARI: { headCoach: "Mike LaFleur", homeField: "State Farm Stadium" },
+  ATL: { headCoach: "Kevin Stefanski", homeField: "Mercedes-Benz Stadium" },
+  BAL: { headCoach: "Jesse Minter", homeField: "M&T Bank Stadium" },
+  BUF: { headCoach: "Joe Brady", homeField: "Highmark Stadium" },
+  CAR: { headCoach: "Dave Canales", homeField: "Bank of America Stadium" },
+  CHI: { headCoach: "Ben Johnson", homeField: "Soldier Field" },
+  CIN: { headCoach: "Zac Taylor", homeField: "Paycor Stadium" },
+  CLE: { headCoach: "Todd Monken", homeField: "Huntington Bank Field" },
+  DAL: { headCoach: "Brian Schottenheimer", homeField: "AT&T Stadium" },
+  DEN: { headCoach: "Sean Payton", homeField: "Empower Field at Mile High" },
+  DET: { headCoach: "Dan Campbell", homeField: "Ford Field" },
+  GB: { headCoach: "Matt LaFleur", homeField: "Lambeau Field" },
+  HOU: { headCoach: "DeMeco Ryans", homeField: "NRG Stadium" },
+  IND: { headCoach: "Shane Steichen", homeField: "Lucas Oil Stadium" },
+  JAX: { headCoach: "Liam Coen", homeField: "EverBank Stadium" },
+  KC: { headCoach: "Andy Reid", homeField: "GEHA Field at Arrowhead Stadium" },
+  LV: { headCoach: "Klint Kubiak", homeField: "Allegiant Stadium" },
+  LAC: { headCoach: "Jim Harbaugh", homeField: "SoFi Stadium" },
+  LAR: { headCoach: "Sean McVay", homeField: "SoFi Stadium" },
+  MIA: { headCoach: "Jeff Hafley", homeField: "Hard Rock Stadium" },
+  MIN: { headCoach: "Kevin O'Connell", homeField: "U.S. Bank Stadium" },
+  NE: { headCoach: "Mike Vrabel", homeField: "Gillette Stadium" },
+  NO: { headCoach: "Kellen Moore", homeField: "Caesars Superdome" },
+  NYG: { headCoach: "John Harbaugh", homeField: "MetLife Stadium" },
+  NYJ: { headCoach: "Aaron Glenn", homeField: "MetLife Stadium" },
+  PHI: { headCoach: "Nick Sirianni", homeField: "Lincoln Financial Field" },
+  PIT: { headCoach: "Mike McCarthy", homeField: "Acrisure Stadium" },
+  SF: { headCoach: "Kyle Shanahan", homeField: "Levi's Stadium" },
+  SEA: { headCoach: "Mike Macdonald", homeField: "Lumen Field" },
+  TB: { headCoach: "Todd Bowles", homeField: "Raymond James Stadium" },
+  TEN: { headCoach: "Robert Saleh", homeField: "Nissan Stadium" },
+  WSH: { headCoach: "Dan Quinn", homeField: "Northwest Stadium" },
+};
+
+function getTeamInfo(code) {
+  return TEAM_INFO[code] || {};
+}
+
 export default function TeamDetail({ team, onBack }) {
   const [rosterData, setRosterData] = useState(null);
   const [status, setStatus] = useState("Loading team roster...");
@@ -55,6 +96,8 @@ export default function TeamDetail({ team, onBack }) {
   const [view, setView] = useState("offense");
 
   const teamCode = normalizeTeamCode(team?.abbreviation);
+const ratings = getTeamRatings(teamCode);
+const teamInfo = getTeamInfo(teamCode);
 
   async function loadRoster() {
     if (!teamCode) return;
@@ -91,13 +134,35 @@ export default function TeamDetail({ team, onBack }) {
     loadRoster();
   }, [teamCode]);
 
-  const starters = rosterData?.starters || [];
-  const reserves = rosterData?.reserves || [];
-  const groups = rosterData?.groups || {};
+  const starters = Array.isArray(rosterData?.starters) ? rosterData.starters : [];
+  const reserves = Array.isArray(rosterData?.reserves) ? rosterData.reserves : [];
+  const groups = rosterData?.groups && typeof rosterData.groups === "object"
+    ? rosterData.groups
+    : {};
+const offensiveLine =
+  groups["Offensive Line"] || [];
 
-  const offense = starters.filter((player) =>
-    OFFENSE_POSITIONS.has(normalizePosition(player.position))
-  );
+ const offensiveSkillStarters =
+  starters.filter((player) => {
+    const position =
+      normalizePosition(
+        player.position
+      );
+
+    return (
+      OFFENSE_POSITIONS.has(
+        position
+      ) &&
+      !isOffensiveLinePosition(
+        position
+      )
+    );
+  });
+
+const offense = deduplicatePlayers([
+  ...offensiveSkillStarters,
+  ...offensiveLine,
+]);
 
   const defense = starters.filter((player) =>
     DEFENSE_POSITIONS.has(normalizePosition(player.position))
@@ -108,8 +173,10 @@ export default function TeamDetail({ team, onBack }) {
   );
 
   const activeCount = useMemo(() => {
-    const allPlayers = Object.values(groups).flat();
-    return allPlayers.filter((player) => player.active).length;
+    const allPlayers = Object.values(groups).flatMap((group) =>
+      Array.isArray(group) ? group : []
+    );
+    return allPlayers.filter((player) => player?.active).length;
   }, [groups]);
 
   if (!team) {
@@ -185,10 +252,10 @@ export default function TeamDetail({ team, onBack }) {
         <div className="card team-information-card">
           <span className="eyebrow">TEAM INFORMATION</span>
           <h2>Franchise details</h2>
-          <InfoRow label="Head coach" value="Not connected" />
+          <InfoRow label="Head coach" value={teamInfo.headCoach} />
           <InfoRow
             label="Home field"
-            value="Not connected"
+            value={teamInfo.homeField}
             icon={<MapPin size={15} />}
           />
           <InfoRow label="Conference" value={team.conference} />
@@ -215,9 +282,10 @@ export default function TeamDetail({ team, onBack }) {
         </div>
 
         <div className="ratings-grid">
-          <Rating label="Overall" value={null} />
-          <Rating label="Offence" value={null} />
-          <Rating label="Defence" value={null} />
+          <Rating label="OVR" value={ratings.overall} />
+<Rating label="OFF" value={ratings.offense} />
+<Rating label="DEF" value={ratings.defense} />
+
           <Rating label="Avg passing yards" value={null} suffix=" yds" />
           <Rating label="Avg rushing yards" value={null} suffix=" yds" />
           <Rating label="Win percentage" value={null} suffix="%" />
@@ -272,13 +340,14 @@ export default function TeamDetail({ team, onBack }) {
             specialTeams,
             reserves,
           })}
+          teamCode={teamCode}
         />
       )}
     </section>
   );
 }
 
-function RosterSection({ title, players }) {
+function RosterSection({ title, players, teamCode }) {
   const groupedPlayers = groupPlayersByPosition(players);
 
   if (!players.length) {
@@ -300,7 +369,7 @@ function RosterSection({ title, players }) {
             </span>
           </div>
 
-          <PlayerGrid players={positionPlayers} />
+          <PlayerGrid players={positionPlayers} teamCode={teamCode} />
         </div>
       ))}
     </div>
@@ -332,27 +401,63 @@ function getRosterPlayers({
 }
 
 function groupPlayersByPosition(players) {
-  return [...players]
+  const positionOrder = [
+    "QB", "RB", "FB", "WR", "TE",
+    "LT", "LG", "C", "RG", "RT", "G", "OG", "T", "OT", "OL",
+    "DE", "DT", "NT", "EDGE", "LB", "ILB", "OLB", "MLB",
+    "CB", "FS", "SS", "S", "DB", "K", "P", "LS", "KR", "PR",
+  ];
+
+  const rank = (position) => {
+    const index = positionOrder.indexOf(position);
+    return index === -1 ? positionOrder.length : index;
+  };
+
+  return [...(Array.isArray(players) ? players.filter(Boolean) : [])]
     .sort((first, second) => {
-      const firstPosition = normalizePosition(first.position);
-      const secondPosition = normalizePosition(second.position);
-      const positionDifference = firstPosition.localeCompare(secondPosition);
+      const positionDifference =
+        rank(normalizePosition(first?.position)) -
+        rank(normalizePosition(second?.position));
 
       if (positionDifference !== 0) return positionDifference;
 
-      const firstDepth = first.depthChartOrder ?? 999;
-      const secondDepth = second.depthChartOrder ?? 999;
+      const depthDifference =
+        (first?.depthChartOrder ?? 999) -
+        (second?.depthChartOrder ?? 999);
 
-      if (firstDepth !== secondDepth) return firstDepth - secondDepth;
+      if (depthDifference !== 0) return depthDifference;
 
-      return first.fullName.localeCompare(second.fullName);
+      return String(first?.fullName || first?.name || "").localeCompare(
+        String(second?.fullName || second?.name || "")
+      );
     })
     .reduce((result, player) => {
-      const position = normalizePosition(player.position) || "Other";
+      const position = normalizePosition(player?.position) || "Other";
       result[position] ||= [];
       result[position].push(player);
       return result;
     }, {});
+}
+
+function isOffensiveLinePosition(position) {
+  return ["LT", "LG", "C", "RG", "RT", "G", "OG", "T", "OT", "OL"].includes(
+    normalizePosition(position)
+  );
+}
+
+function deduplicatePlayers(players) {
+  const unique = new Map();
+
+  for (const player of Array.isArray(players) ? players : []) {
+    if (!player) continue;
+    const key = String(
+      player.id || player.player_id ||
+      `${player.fullName || player.name || "unknown"}-${player.position || ""}`
+    );
+    if (!unique.has(key)) unique.set(key, player);
+  }
+
+  return [...unique.values()];
 }
 
 function normalizePosition(position) {
@@ -406,7 +511,7 @@ function RosterTab({ active, onClick, children }) {
   );
 }
 
-function PlayerGrid({ players }) {
+function PlayerGrid({ players, teamCode }) {
   if (!players.length) {
     return <div className="card roster-empty">No players available in this view.</div>;
   }
@@ -414,13 +519,14 @@ function PlayerGrid({ players }) {
   return (
     <div className="player-grid">
       {players.map((player) => (
-        <PlayerCard key={player.id} player={player} />
+        <PlayerCard key={player.id} player={player} teamCode={teamCode} />
       ))}
     </div>
   );
 }
 
-function PlayerCard({ player }) {
+function PlayerCard({ player, teamCode }) {
+  const maddenRating = getPlayerRating(player, teamCode);
   return (
     <article className="card player-card">
       <div className="player-card-header">
@@ -432,7 +538,12 @@ function PlayerCard({ player }) {
         </span>
       </div>
 
-      <h3>{player.fullName}</h3>
+      <div className="player-name-row">
+        <h3>{player.fullName}</h3>
+        <span className="player-overall" title="Madden overall rating">
+          {maddenRating ? `${maddenRating.overall} OVR` : "NR"}
+        </span>
+      </div>
       <p>
         {player.position}
         {player.depthChartOrder !== null

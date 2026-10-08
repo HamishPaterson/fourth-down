@@ -1,24 +1,23 @@
+import { Radio, ShieldCheck } from "lucide-react";
+
 export default function Header({ onHome }) {
   return (
-    <header className="header premium-header corrected-brand-header">
+    <header className="header premium-header">
       <button type="button" className="brand" onClick={onHome}>
-        <span className="corrected-brand-icon-shell">
-          <img
-            src="/branding/fourth-down-header-icon.png"
-            alt=""
-            className="corrected-brand-icon"
-          />
-        </span>
-
-        <span className="corrected-brand-copy">
+        <span className="brand-mark">4D</span>
+        <span>
           <strong>Fourth Down</strong>
-          <small>ANALYZE. INSIGHT. WIN.</small>
+          <small>NFL INTELLIGENCE</small>
         </span>
       </button>
 
-      <div className="header-status" aria-label="Data status">
-        <span className="header-status-item">Live data</span>
-        <span className="header-status-item header-status-secure">Vercel API</span>
+      <div className="header-status">
+        <span className="header-status-item">
+          <Radio size={14} /> Live data
+        </span>
+        <span className="header-status-item header-status-secure">
+          <ShieldCheck size={14} /> Vercel API
+        </span>
       </div>
     </header>
   );
