@@ -1,6 +1,5 @@
 import { createClient } from "@supabase/supabase-js";
 import NFLVERSE_PLAYER_METRICS from "../../data/nflverse-player-metrics.js";
-import NFLVERSE_TEAM_METRICS from "../../data/nflverse-team-metrics.js";
 
 const STATS_URL =
   "https://api.balldontlie.io/nfl/v1/stats";
@@ -24,9 +23,6 @@ const TEAM_ALIASES = {
 export default async function handler(req, res) {
   if (String(req.query?.action || "").toLowerCase() === "player-metrics") {
     return handlePlayerMetrics(req, res);
-  }
-  if (String(req.query?.action || "").toLowerCase() === "team-metrics") {
-    return handleTeamMetrics(req, res);
   }
   if (String(req.query?.action || "").toLowerCase() === "predictions") {
     return handlePredictionLedger(req, res);
@@ -240,65 +236,6 @@ export default async function handler(req, res) {
       details: "NFL statistics request failed",
     });
   }
-}
-
-function handleTeamMetrics(req, res) {
-  if (req.method !== "GET") return res.status(405).json({ error: "Method not allowed" });
-  const away = normalizeTeamCode(req.query?.away);
-  const home = normalizeTeamCode(req.query?.home);
-  const season = Number(req.query?.season);
-  const requestedWeek = Number(req.query?.week);
-  if (!away || !home || !Number.isInteger(season) || !Number.isInteger(requestedWeek)) {
-    return res.status(400).json({ error: "season, week, away and home are required" });
-  }
-  const availableWeeks = Object.keys(NFLVERSE_TEAM_METRICS?.metricsByWeek || {})
-    .map(Number).filter((value) => Number.isFinite(value) && value <= requestedWeek)
-    .sort((a, b) => b - a);
-  const metricWeek = availableWeeks[0];
-  const weekMetrics = NFLVERSE_TEAM_METRICS?.metricsByWeek?.[metricWeek] || {};
-  const awayMetrics = weekMetrics[away] || null;
-  const homeMetrics = weekMetrics[home] || null;
-  if (!awayMetrics || !homeMetrics) {
-    return res.status(404).json({ error: `nflverse team metrics are unavailable for ${away} at ${home}` });
-  }
-  const awayExpected = expectedPointsFromTeamMetrics(awayMetrics, homeMetrics);
-  const homeExpected = expectedPointsFromTeamMetrics(homeMetrics, awayMetrics);
-  const awayGames = Number(awayMetrics.games) || 0;
-  const homeGames = Number(homeMetrics.games) || 0;
-  const reliability = Math.max(0, Math.min(1, Math.min(
-    Number(awayMetrics.sampleReliability) || awayGames / 4,
-    Number(homeMetrics.sampleReliability) || homeGames / 4
-  )));
-  return res.status(200).json({
-    available: true,
-    source: NFLVERSE_TEAM_METRICS?.source || "nflverse/nflfastR",
-    generatedAt: NFLVERSE_TEAM_METRICS?.generatedAt || null,
-    season, requestedWeek, metricWeek,
-    away: awayMetrics, home: homeMetrics,
-    modelLayers: {
-      scoringBaseline: {
-        active: true,
-        source: "nflverse current-season team metrics",
-        awayExpected, homeExpected,
-        gamesUsed: { away: awayGames, home: homeGames },
-        sampleReliability: reliability,
-        reasons: [`Current-season nflverse metrics through Week ${metricWeek}: ${awayGames} ${away} games and ${homeGames} ${home} games`],
-      },
-    },
-  });
-}
-
-function expectedPointsFromTeamMetrics(offense, defense) {
-  const offenseEpa = Number(offense?.epaPerPlay) || 0;
-  const defenseEpa = Number(defense?.defensiveEpaPerPlay) || 0;
-  const scoringDriveRate = Number(offense?.scoringDriveRate);
-  const redZoneRate = Number(offense?.redZoneTouchdownRate);
-  const successRate = Number(offense?.successRate);
-  const value = 21.5 + offenseEpa * 12 + defenseEpa * 8 +
-    (Number.isFinite(scoringDriveRate) ? (scoringDriveRate - 0.36) * 10 : 0) +
-    (Number.isFinite(redZoneRate) ? (redZoneRate - 0.52) * 5 : 0) +
-    (Number.isFinite(successRate) ? (successRate - 0.45) * 6 : 0);
-  return Math.round(Math.max(10, Math.min(38, value)) * 1000) / 1000;
 }
 
 function handlePlayerMetrics(req, res) {
@@ -1729,6 +1666,7 @@ async function saveSnapshots(supabase, request, response) {
     : body?.snapshot
       ? [body.snapshot]
       : [];
+
   if (!supplied.length) {
     return response.status(400).json({ error: "No prediction snapshots supplied" });
   }
@@ -1736,9 +1674,13 @@ async function saveSnapshots(supabase, request, response) {
   const valid = supplied
     .map(normaliseSnapshot)
     .filter((snapshot) =>
-      snapshot.season && snapshot.week && snapshot.awayCode &&
-      snapshot.homeCode && snapshot.kickoff
+      snapshot.season &&
+      snapshot.week &&
+      snapshot.awayCode &&
+      snapshot.homeCode &&
+      snapshot.kickoff
     );
+
   if (!valid.length) {
     return response.status(400).json({ error: "No valid prediction snapshots supplied" });
   }
@@ -1747,7 +1689,7 @@ async function saveSnapshots(supabase, request, response) {
   const rejected = [];
 
   for (const incoming of valid) {
-    const { data: existing, error: readError } = await supabase
+    const { data: existing, error: existingError } = await supabase
       .from("prediction_snapshots")
       .select("*")
       .eq("season", incoming.season)
@@ -1756,57 +1698,58 @@ async function saveSnapshots(supabase, request, response) {
       .eq("home_code", incoming.homeCode)
       .maybeSingle();
 
-    if (readError) {
-      rejected.push({ gameKey: incoming.gameKey, reason: readError.message });
+    if (existingError) {
+      rejected.push({ gameKey: incoming.gameKey, reason: existingError.message });
       continue;
     }
 
-    if (existing) {
-      const existingSnapshot = databaseToSnapshot(existing);
-      const merged = hasPrediction(existingSnapshot) && !hasFinalResult(incoming)
-        ? mergeBettingEnhancements(existingSnapshot, incoming)
-        : mergeSnapshots(existingSnapshot, incoming);
-      const row = snapshotToDatabase(merged, existing.id);
-      const { data, error } = await supabase
-        .from("prediction_snapshots")
-        .update(row)
-        .eq("id", existing.id)
-        .select("*")
-        .single();
-      if (error) rejected.push({ gameKey: incoming.gameKey, reason: error.message });
-      else saved.push(databaseToSnapshot(data));
+    const now = Date.now();
+    const kickoffTime = new Date(incoming.kickoff).getTime();
+    const existingSnapshot = existing ? databaseToSnapshot(existing) : null;
+    const existingFrozen = Boolean(existing?.frozen_at) ||
+      (Number.isFinite(kickoffTime) && now >= kickoffTime && hasPrediction(existingSnapshot));
+
+    const incomingHasFinal = hasFinalResult(incoming);
+    const existingHasFinal = hasFinalResult(existingSnapshot);
+
+    // The first complete official prediction becomes the shared source of truth.
+    // Other devices may calculate locally, but they cannot replace an existing
+    // official score before kickoff. Final results can still be added later.
+    if (hasPrediction(existingSnapshot) && !incomingHasFinal) {
+      saved.push(existingSnapshot);
       continue;
     }
 
-    // Insert, do not upsert. The unique matchup constraint makes the first
-    // completed prediction the canonical source when two devices race.
-    const insertRow = snapshotToDatabase(incoming);
+    if (existingFrozen && !incomingHasFinal && hasPrediction(existingSnapshot)) {
+      saved.push(existingSnapshot);
+      continue;
+    }
+
+    let merged = mergeSnapshots(existingSnapshot, incoming);
+
+    if (existingHasFinal && !incomingHasFinal) {
+      merged = mergeSnapshots(incoming, existingSnapshot);
+    }
+
+    if (Number.isFinite(kickoffTime) && now >= kickoffTime && hasPrediction(merged)) {
+      merged.savedBeforeKickoff = true;
+      merged.frozenAt = existing?.frozen_at || incoming.frozenAt || incoming.snapshotAt || incoming.kickoff;
+    }
+
+    const databaseRow = snapshotToDatabase(merged, existing?.id);
     const { data, error } = await supabase
       .from("prediction_snapshots")
-      .insert(insertRow)
+      .upsert(databaseRow, {
+        onConflict: "season,week,away_code,home_code",
+      })
       .select("*")
       .single();
 
-    if (!error) {
+    if (error) {
+      rejected.push({ gameKey: incoming.gameKey, reason: error.message });
+    } else {
       saved.push(databaseToSnapshot(data));
-      continue;
     }
-
-    if (String(error.code || "") === "23505") {
-      const { data: canonical, error: canonicalError } = await supabase
-        .from("prediction_snapshots")
-        .select("*")
-        .eq("season", incoming.season)
-        .eq("week", incoming.week)
-        .eq("away_code", incoming.awayCode)
-        .eq("home_code", incoming.homeCode)
-        .single();
-      if (canonicalError) rejected.push({ gameKey: incoming.gameKey, reason: canonicalError.message });
-      else saved.push(databaseToSnapshot(canonical));
-      continue;
-    }
-
-    rejected.push({ gameKey: incoming.gameKey, reason: error.message });
   }
 
   return response.status(rejected.length && !saved.length ? 500 : 200).json({
@@ -1814,50 +1757,6 @@ async function saveSnapshots(supabase, request, response) {
     rejected,
     count: saved.length,
   });
-}
-
-function mergeBettingEnhancements(existing, incoming) {
-  const incomingBestBets = incoming?.bestBets ||
-    incoming?.dataQuality?.bestBetsPayload ||
-    (typeof incoming?.dataQuality?.bestBets === "object" ? incoming.dataQuality.bestBets : null);
-  const existingBestBets = existing?.bestBets ||
-    existing?.dataQuality?.bestBetsPayload ||
-    (typeof existing?.dataQuality?.bestBets === "object" ? existing.dataQuality.bestBets : null);
-  const bestBets = incomingBestBets || existingBestBets || null;
-
-  return {
-    ...existing,
-    oddsPick: incoming.oddsPick ?? existing.oddsPick,
-    marketAwayScore: incoming.marketAwayScore ?? existing.marketAwayScore,
-    marketHomeScore: incoming.marketHomeScore ?? existing.marketHomeScore,
-    marketGameTotal: incoming.marketGameTotal ?? existing.marketGameTotal,
-    marketSpread: incoming.marketSpread ?? existing.marketSpread,
-    bestBets,
-    playerProjections: incoming.playerProjections || existing.playerProjections || null,
-    dataQuality: {
-      ...(existing.dataQuality || {}),
-      ...(incoming.dataQuality || {}),
-      predictionPayload: existing.predictionPayload || existing?.dataQuality?.predictionPayload,
-      bestBets,
-      bestBetsPayload: bestBets,
-    },
-    game: incoming.game || existing.game || null,
-    // These are immutable once the canonical prediction exists.
-    fourthDownPick: existing.fourthDownPick,
-    fourthDownAwayScore: existing.fourthDownAwayScore,
-    fourthDownHomeScore: existing.fourthDownHomeScore,
-    fourthDownAwayWinProbability: existing.fourthDownAwayWinProbability,
-    fourthDownHomeWinProbability: existing.fourthDownHomeWinProbability,
-    fourthDownWinnerProbability: existing.fourthDownWinnerProbability,
-    projectedTie: existing.projectedTie,
-    continuousMargin: existing.continuousMargin,
-    confidenceScore: existing.confidenceScore,
-    confidenceLabel: existing.confidenceLabel,
-    predictionPayload: existing.predictionPayload,
-    modelVersion: existing.modelVersion,
-    modelKey: existing.modelKey,
-    snapshotAt: existing.snapshotAt,
-  };
 }
 
 async function gradeSnapshots(supabase, request, response) {

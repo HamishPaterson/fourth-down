@@ -6,12 +6,8 @@ const MIN_PROP_EV = 0.03;
 
 export function buildBestBets({ game, prediction, playerProjections, oddsEvent, dataQuality }) {
   const markets = flattenMarkets(oddsEvent);
-  const coreDataReady = Boolean(
-    prediction &&
-    Number.isFinite(Number(prediction?.away?.expectedPoints ?? prediction?.away?.score)) &&
-    Number.isFinite(Number(prediction?.home?.expectedPoints ?? prediction?.home?.score)) &&
-    markets.length > 0
-  );
+  const coreDataReady = ["playByPlay", "teamForm", "personnel"]
+    .every((key) => dataQuality?.[key] !== false);
   const marketDiagnostics = {
     bookmakerCount: Array.isArray(oddsEvent?.bookmakers) ? oddsEvent.bookmakers.length : 0,
     marketCount: markets.length,
@@ -25,40 +21,19 @@ export function buildBestBets({ game, prediction, playerProjections, oddsEvent, 
     ...playerBets.recommendations,
   ]);
 
-  const gameCandidates = allCandidates
+  const qualifiedGameBets = allCandidates
     .filter(() => coreDataReady)
-    .filter((bet) => bet.category === "Game");
-  const strictGameBets = gameCandidates
-    .filter((bet) => bet.edge >= MIN_GAME_EDGE && bet.expectedValue >= MIN_GAME_EV);
-  const qualifiedGameBets = strictGameBets.length
-    ? strictGameBets
-    : gameCandidates.filter((bet) => bet.edge > 0 && bet.expectedValue > 0);
-
-  const playerCandidates = selectUniquePlayerProps(
-    allCandidates.filter((bet) => bet.category !== "Game")
-  );
-  const strictPlayerBets = playerCandidates
-    .filter((bet) => coreDataReady && bet.edge >= MIN_PROP_EDGE && bet.expectedValue >= MIN_PROP_EV);
-  const qualifiedPlayerBets = (strictPlayerBets.length
-    ? strictPlayerBets
-    : playerCandidates.filter((bet) => coreDataReady && bet.edge > 0 && bet.expectedValue > 0)
-  ).sort((a, b) => b.score - a.score);
-
-  const fallbackPlayerBets = selectUniquePlayerProps(
-    allCandidates.filter((bet) => bet.category !== "Game")
-  ).sort((a, b) => b.score - a.score);
-  const fallbackGameBets = allCandidates
     .filter((bet) => bet.category === "Game")
+    .filter((bet) => bet.edge >= MIN_GAME_EDGE && bet.expectedValue >= MIN_GAME_EV);
+
+  const qualifiedPlayerBets = selectUniquePlayerProps(
+    allCandidates.filter((bet) => bet.category !== "Game")
+  )
+    .filter((bet) => coreDataReady && bet.edge >= MIN_PROP_EDGE && bet.expectedValue >= MIN_PROP_EV)
     .sort((a, b) => b.score - a.score);
 
-  const selectedPlayerBets = selectDiversePlayerProps(
-    qualifiedPlayerBets.length ? qualifiedPlayerBets : fallbackPlayerBets,
-    6
-  );
-  const selectedGameBets = selectDiverseGameBets(
-    qualifiedGameBets.length ? qualifiedGameBets : fallbackGameBets,
-    2
-  );
+  const selectedPlayerBets = selectDiversePlayerProps(qualifiedPlayerBets, 6);
+  const selectedGameBets = selectDiverseGameBets(qualifiedGameBets, 1);
 
   // Player markets are deliberately placed first. Game markets are capped at
   // one recommendation, preventing moneyline, spread and total from
@@ -170,13 +145,7 @@ function selectAnytimeTdScorer({ playerProjections, markets, playerBetCandidates
         player.dataQuality ?? player.quality ?? player.dataQualityScore
       ),
     }))
-    .filter((row) =>
-      row.playerName &&
-      Number.isFinite(row.probability) &&
-      row.probability > 0 &&
-      row.probability < 0.95 &&
-      hasTouchdownProjection(row.player)
-    )
+    .filter((row) => row.playerName && Number.isFinite(row.probability))
     .sort((a, b) =>
       b.probability * b.roleConfidence * b.dataQuality -
       a.probability * a.roleConfidence * a.dataQuality
@@ -227,76 +196,6 @@ function selectAnytimeTdScorer({ playerProjections, markets, playerBetCandidates
   }
 
   if (!topPlayer) {
-    const marketScorer = markets
-      .filter((market) => market.marketKey === "player_anytime_td")
-      .filter((market) => market.playerName && Number.isFinite(Number(market.price)))
-      .sort((a, b) => impliedProbability(b.price) - impliedProbability(a.price))[0] || null;
-
-    if (marketScorer) {
-      const displayName = resolveFullPlayerName(marketScorer.playerName) || marketScorer.playerName;
-      const marketProbability = impliedProbability(marketScorer.price);
-      return {
-        source: "priced-market",
-        title: "Anytime TD scorer",
-        selection: `${displayName} anytime TD`,
-        modelProbability: round4(marketProbability),
-        marketProbability: round4(marketProbability),
-        price: marketScorer.price,
-        decimalOdds: round3(americanToDecimal(marketScorer.price)),
-        sportsbook: marketScorer.sportsbook,
-        confidenceScore: round4(marketProbability),
-        confidenceLevel: confidenceLabel(marketProbability),
-        explanation: `${displayName} has the shortest available anytime touchdown price for this matchup.`,
-        risk: "Market-backed selection used because the projection feed did not return a matching touchdown projection.",
-      };
-    }
-
-  
-    const pricedTdScorer = markets
-      .filter((market) => market.marketKey === "player_anytime_td")
-      .filter((market) => market.playerName && Number.isFinite(Number(market.price)))
-      .sort((a, b) => impliedProbability(b.price) - impliedProbability(a.price))[0] || null;
-
-    if (pricedTdScorer) {
-      const displayName = resolveFullPlayerName(pricedTdScorer.playerName) || pricedTdScorer.playerName;
-      const probability = impliedProbability(pricedTdScorer.price);
-      return {
-        source: "priced-market",
-        title: "Anytime TD scorer",
-        selection: `${displayName} anytime TD`,
-        modelProbability: round4(probability),
-        marketProbability: round4(probability),
-        price: pricedTdScorer.price,
-        decimalOdds: round3(americanToDecimal(pricedTdScorer.price)),
-        sportsbook: pricedTdScorer.sportsbook,
-        confidenceScore: round4(probability),
-        confidenceLevel: confidenceLabel(probability),
-        explanation: `${displayName} is the shortest-priced available anytime touchdown scorer for this game.`,
-        risk: "Touchdowns are high-variance events.",
-      };
-    }
-
-    const skillPlayer = markets
-      .filter((market) => isPlayerMarket(market.marketKey) && market.playerName)
-      .filter((market) => !looksLikeQuarterbackName(market.playerName, playerProjections))
-      .filter((market) => Number.isFinite(Number(market.price)))
-      .sort((a, b) => impliedProbability(b.price) - impliedProbability(a.price))[0] || null;
-
-    if (skillPlayer) {
-      const displayName = resolveFullPlayerName(skillPlayer.playerName) || skillPlayer.playerName;
-      return {
-        source: "model-role-pick",
-        title: "Anytime TD scorer",
-        selection: `${displayName} anytime TD`,
-        modelProbability: 0.2,
-        decimalOdds: null,
-        confidenceScore: 0.35,
-        confidenceLevel: "Cautious",
-        explanation: `${displayName} is the highest-involvement non-quarterback player available in the matchup data.`,
-        risk: "No dedicated anytime touchdown price was returned; this is a role-based model pick.",
-      };
-    }
-
     return {
       source: "unavailable",
       title: "Anytime TD scorer",
@@ -304,8 +203,8 @@ function selectAnytimeTdScorer({ playerProjections, markets, playerBetCandidates
       modelProbability: 0,
       decimalOdds: null,
       confidenceLevel: "Cautious",
-      explanation: "No eligible non-quarterback player was available for this matchup.",
-      risk: "No player-level data was available.",
+      explanation: "Player touchdown projections were not available for this matchup.",
+      risk: "No player-level touchdown projection was available.",
     };
   }
 
@@ -334,24 +233,6 @@ function selectAnytimeTdScorer({ playerProjections, markets, playerBetCandidates
       `Selected because this is the highest touchdown probability among the projected players for this matchup.`,
     risk: "No matched bookmaker price is available, so expected value cannot be calculated.",
   };
-}
-
-function looksLikeQuarterbackName(playerName, playerProjections) {
-  const players = collectProjectedPlayers(playerProjections);
-  const match = players.find((player) => namesMatch(getPlayerName(player), playerName));
-  return String(match?.position || match?.pos || "").toUpperCase() === "QB";
-}
-
-function hasTouchdownProjection(player) {
-  return [
-    "anytimeTouchdownProbability", "anytime_touchdown_probability",
-    "touchdownProbability", "touchdown_probability",
-    "tdProbability", "td_probability",
-    "anytimeTdProbability", "anytime_td_probability",
-  ].some((key) => {
-    const value = Number(player?.[key]);
-    return Number.isFinite(value) && value > 0 && value < 0.95;
-  });
 }
 
 function formatDecimalOdds(value) {
@@ -456,18 +337,6 @@ function resolvePlayerDisplayName(player, providerName) {
     player?.name,
     player?.playerName,
     player?.player_name,
-    (typeof player?.player === "string" ? player.player : null),
-    player?.player?.fullName,
-    player?.player?.full_name,
-    player?.player?.displayName,
-    player?.player?.display_name,
-    player?.player?.name,
-    (typeof player?.athlete === "string" ? player.athlete : null),
-    player?.athlete?.fullName,
-    player?.athlete?.full_name,
-    player?.athlete?.displayName,
-    player?.athlete?.display_name,
-    player?.athlete?.name,
     providerName,
   ]
     .map((value) => canonicalPlayerName(value))
@@ -517,14 +386,16 @@ function buildPlayerBets(playerProjections, markets) {
   for (const market of markets) {
     const config = fields[market.marketKey];
     if (!config || !market.playerName) continue;
-    const player = findProjectedPlayer(players, market);
+    const player = players.find((item) =>
+      namesMatch(canonicalPlayerName(getPlayerName(item)), canonicalPlayerName(market.playerName))
+    );
     if (!player) continue;
     const displayName = resolvePlayerDisplayName(player, market.playerName);
     if (!isPlausiblePlayerPropLine(market.marketKey, market.point)) continue;
     matchedPlayerMarkets += 1;
     const roleConfidence = normaliseConfidence(player.roleConfidence ?? player.confidence ?? player.role?.confidence);
     const quality = normaliseConfidence(player.dataQuality ?? player.quality ?? player.dataQualityScore);
-    if (roleConfidence < 0.35 || quality < 0.25) continue;
+    if (roleConfidence < 0.55 || quality < 0.5) continue;
     assessed += 1;
     const [field, deviation, marketLabel, unitLabel] = config;
     const projection = findMetric(player, field);
@@ -579,27 +450,6 @@ function buildPlayerBets(playerProjections, markets) {
 }
 
 
-function findProjectedPlayer(players, market) {
-  const providerId = String(market?.playerId || "").trim();
-  if (providerId) {
-    const byId = players.find((player) =>
-      [player?.playerId, player?.gsisId, player?.player_id, player?.gsis_id]
-        .some((value) => value && String(value) === providerId)
-    );
-    if (byId) return byId;
-  }
-
-  const providerName = canonicalPlayerName(market?.playerName);
-  const providerTeam = normalizeTeam(market?.team || market?.teamCode || market?.teamAbbreviation);
-  const matches = players.filter((player) =>
-    namesMatch(canonicalPlayerName(getPlayerName(player)), providerName)
-  );
-  if (matches.length <= 1) return matches[0] || null;
-  return matches.find((player) =>
-    !providerTeam || normalizeTeam(player?.team || player?.teamCode) === providerTeam
-  ) || matches[0];
-}
-
 function isPlausiblePlayerPropLine(marketKey, point) {
   if (marketKey === "player_anytime_td") return true;
   const line = Number(point);
@@ -636,8 +486,6 @@ function collectProjectedPlayers(value) {
       "passingYards", "passing_yards", "rushingYards", "rushing_yards",
       "receivingYards", "receiving_yards", "receptions", "targets",
       "anytimeTouchdownProbability", "anytime_touchdown_probability",
-      "touchdownProbability", "touchdown_probability", "tdProbability", "td_probability",
-      "anytimeTdProbability", "anytime_td_probability",
     ].some((key) => Number.isFinite(Number(node[key])));
     if (name && hasProjection) {
       const key = normalize(name);
@@ -651,14 +499,14 @@ function collectProjectedPlayers(value) {
 
 function getPlayerName(player) {
   return (
-    player?.fullName || player?.full_name || player?.displayName || player?.display_name ||
-    player?.name || player?.playerName || player?.player_name ||
-    (typeof player?.player === "string" ? player.player : null) ||
-    player?.player?.fullName || player?.player?.full_name || player?.player?.displayName ||
-    player?.player?.display_name || player?.player?.name ||
-    (typeof player?.athlete === "string" ? player.athlete : null) ||
-    player?.athlete?.fullName || player?.athlete?.full_name || player?.athlete?.displayName ||
-    player?.athlete?.display_name || player?.athlete?.name || ""
+    player?.fullName ||
+    player?.full_name ||
+    player?.displayName ||
+    player?.display_name ||
+    player?.name ||
+    player?.playerName ||
+    player?.player_name ||
+    ""
   );
 }
 function findMetric(player, field) {
@@ -672,7 +520,7 @@ function findMetric(player, field) {
     receivingYards: ["receivingYards", "receiving_yards", "recYards"],
     receptions: ["receptions", "catches"],
     rushingReceivingYards: ["rushingReceivingYards", "rushing_receiving_yards", "combinedYards"],
-    anytimeTouchdownProbability: ["anytimeTouchdownProbability", "anytime_touchdown_probability", "touchdownProbability", "touchdown_probability", "tdProbability", "td_probability", "anytimeTdProbability", "anytime_td_probability"],
+    anytimeTouchdownProbability: ["anytimeTouchdownProbability", "anytime_touchdown_probability", "touchdownProbability"],
   };
   for (const key of aliases[field] || [field]) {
     const value = Number(player?.[key]);
@@ -827,16 +675,6 @@ function comparePropOffer(first, second) {
   return firstScore - secondScore;
 }
 
-function betIdentity(bet) {
-  if (!bet) return "";
-  return [
-    String(bet.category || ""),
-    String(bet.market || ""),
-    String(bet.selection || ""),
-    String(bet.sportsbook || ""),
-  ].join(":").toLowerCase();
-}
-
 function betCandidateKey(bet) {
   if (bet.category === "Game") {
     return ["game", bet.market, bet.selection].join(":");
@@ -873,6 +711,15 @@ function selectHighlights(recommendations, allCandidates) {
       .filter((bet) => !used.has(betIdentity(bet)))
       .sort((a, b) => b.expectedValue - a.expectedValue)[0] || null;
 
+  if (bestValue) used.add(betIdentity(bestValue));
+  const remaining = [...offered].filter((bet) => !used.has(betIdentity(bet)));
+  const pricedLongshots = remaining
+    .filter((bet) => bet.decimalOdds >= 5)
+    .sort((a, b) => b.expectedValue - a.expectedValue || b.decimalOdds - a.decimalOdds);
+  const fallbackLongshots = remaining
+    .sort((a, b) => b.decimalOdds - a.decimalOdds || b.expectedValue - a.expectedValue);
+  const longshot = pricedLongshots[0] || fallbackLongshots[0] || null;
+  const longshotMeetsPrice = Boolean(longshot && longshot.decimalOdds >= 5);
 
   return {
     mostLikely: highlight(
@@ -885,7 +732,23 @@ function selectHighlights(recommendations, allCandidates) {
       "Best value",
       "Highest estimated value after excluding Most likely, prioritising a different player market"
     ),
+    longshot: longshot
+      ? {
+          ...highlight(
+            longshot,
+            "Longshot",
+            longshotMeetsPrice
+              ? "Highest-value separate selection priced at $5.00 or higher"
+              : "Highest-priced separate selection available because no $5.00 market was returned"
+          ),
+          meetsLongshotPrice: longshotMeetsPrice,
+        }
+      : null,
   };
+}
+
+function betIdentity(bet) {
+  return [bet?.market, bet?.selection, bet?.sportsbook].join(":");
 }
 
 function highlight(bet, label, explanation) { return bet ? { ...bet, highlightLabel: label, highlightExplanation: explanation } : null; }

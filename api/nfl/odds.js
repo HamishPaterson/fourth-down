@@ -321,42 +321,29 @@ async function fetchMarket(
 }
 
 function getDataRows(body) {
-  if (Array.isArray(body)) return body;
-
-  const directCandidates = [
-    body?.data,
-    body?.odds,
-    body?.results,
-    body?.items,
-    body?.records,
-    body?.data?.odds,
-    body?.data?.results,
-    body?.data?.items,
-    body?.data?.records,
-    body?.response?.data,
-    body?.response?.odds,
-  ];
-  for (const candidate of directCandidates) {
-    if (Array.isArray(candidate)) return candidate;
+  if (Array.isArray(body)) {
+    return body;
   }
 
-  // SharpAPI can wrap rows one level deeper depending on endpoint/version.
-  for (const value of Object.values(body || {})) {
-    if (!value || typeof value !== "object") continue;
-    for (const nested of Object.values(value)) {
-      if (Array.isArray(nested) && nested.some(looksLikeOddsRow)) return nested;
-    }
+  if (Array.isArray(body?.data)) {
+    return body.data;
   }
+
+  if (Array.isArray(body?.odds)) {
+    return body.odds;
+  }
+
+  if (Array.isArray(body?.results)) {
+    return body.results;
+  }
+
+  if (Array.isArray(body?.items)) {
+    return body.items;
+  }
+
   return [];
 }
 
-function looksLikeOddsRow(row) {
-  return Boolean(
-    row && typeof row === "object" &&
-    (row.event_id || row.event?.id || row.game_id) &&
-    (row.market_type || row.market || row.market_key || row.market?.key)
-  );
-}
 
 function ensurePublishedFallbacks(events) {
   const completeEvents = Array.isArray(events) ? [...events] : [];
@@ -467,58 +454,69 @@ function getMarketPeriod(row) {
 
 function buildEvents(rows) {
   const eventMap = new Map();
+
   for (const row of rows) {
-    if (!isUsableRow(row)) continue;
+    if (!isUsableRow(row)) {
+      continue;
+    }
+
+    const eventId = String(
+      row.event_id
+    );
 
     const homeTeam = getTeamName(
-      row.home_team || row.event?.home_team || row.event?.home || row.home
+      row.home_team
     );
+
     const awayTeam = getTeamName(
-      row.away_team || row.event?.away_team || row.event?.away || row.away
+      row.away_team
     );
-    const startTime = row.event_start_time || row.commence_time || row.event?.start_time || null;
-    const providerEventId = row.event_id || row.event?.id || row.game_id || null;
-    const eventId = matchupIdentity(homeTeam, awayTeam, startTime, providerEventId);
-    if (!eventId || !homeTeam || !awayTeam) continue;
+
+    if (
+      !eventId ||
+      !homeTeam ||
+      !awayTeam
+    ) {
+      continue;
+    }
 
     if (!eventMap.has(eventId)) {
       eventMap.set(eventId, {
         id: eventId,
-        provider_event_ids: [],
-        sport_key: "americanfootball_nfl",
+        sport_key:
+          "americanfootball_nfl",
         sport_title: "NFL",
-        commence_time: startTime,
+        commence_time:
+          row.event_start_time || null,
         home_team: homeTeam,
         away_team: awayTeam,
         bookmakers: [],
       });
     }
 
-    const event = eventMap.get(eventId);
-    if (providerEventId && !event.provider_event_ids.includes(String(providerEventId))) {
-      event.provider_event_ids.push(String(providerEventId));
-    }
-    addOddsRow(event, row);
+    addOddsRow(
+      eventMap.get(eventId),
+      row
+    );
   }
 
   return [...eventMap.values()]
     .map(cleanEvent)
-    .filter((event) => event.bookmakers.length > 0)
-    .sort((first, second) =>
-      new Date(first.commence_time || 0).getTime() -
-      new Date(second.commence_time || 0).getTime()
-    );
-}
+    .filter(
+      (event) =>
+        event.bookmakers.length > 0
+    )
+    .sort((first, second) => {
+      const firstTime = new Date(
+        first.commence_time || 0
+      ).getTime();
 
-function matchupIdentity(homeTeam, awayTeam, startTime, providerEventId) {
-  const home = normalizeName(homeTeam);
-  const away = normalizeName(awayTeam);
-  const timestamp = Date.parse(startTime || "");
-  if (home && away) {
-    const day = Number.isFinite(timestamp) ? new Date(timestamp).toISOString().slice(0, 10) : "no-date";
-    return `${away}-${home}-${day}`;
-  }
-  return String(providerEventId || "");
+      const secondTime = new Date(
+        second.commence_time || 0
+      ).getTime();
+
+      return firstTime - secondTime;
+    });
 }
 
 function isUsableRow(row) {
@@ -688,8 +686,7 @@ function getMarketKey(marketType) {
   const hasPlayer = compact.includes("player") || compact.includes("athlete") || compact.includes("anytime");
   const hasYards = compact.includes("yard") || compact.includes("yds");
   if (compact.includes("anytime") && (compact.includes("td") || compact.includes("touchdown"))) return "player_anytime_td";
-  if (["touchdownscorer", "anytimetdscorer", "toscoreatouchdown", "playertdscorer", "scoreranytime", "anytimetouchdownscorer", "playertoScoreatouchdown".toLowerCase()].includes(compact)) return "player_anytime_td";
-  if ((compact.includes("touchdownscorer") || compact.includes("toscore")) && !compact.includes("first") && !compact.includes("last")) return "player_anytime_td";
+  if (["touchdownscorer", "anytimetdscorer", "toscoreatouchdown", "playertdscorer"].includes(compact)) return "player_anytime_td";
   if (hasPlayer && compact.includes("touchdown") && !compact.includes("passing")) return "player_anytime_td";
   if (hasPlayer && compact.includes("passing") && compact.includes("touchdown")) return "player_pass_tds";
   if (hasPlayer && compact.includes("passing") && hasYards) return "player_pass_yds";

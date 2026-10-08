@@ -19,7 +19,6 @@ import {
 import TeamLogo from "../components/TeamLogo.jsx";
 import BettingOdds from "../components/BettingOdds.jsx";
 import MatchupPrediction from "../components/MatchupPrediction.jsx";
-import { refreshPredictionLedger, findPredictionSnapshot } from "../services/predictionLedger.js";
 
 export default function Matchup({ game, onBack }) {
   const [liveGame, setLiveGame] = useState(null);
@@ -31,7 +30,6 @@ export default function Matchup({ game, onBack }) {
   const [oddsStatus, setOddsStatus] = useState("");
   const [oddsLoading, setOddsLoading] = useState(false);
   const [weather, setWeather] = useState(null);
-  const [sharedPrediction, setSharedPrediction] = useState(game?.authoritativePrediction || null);
 
   async function loadGame() {
     if (!game?.id) return;
@@ -113,18 +111,6 @@ export default function Matchup({ game, onBack }) {
     loadGame();
     loadOdds();
   }, [game?.id]);
-  useEffect(() => {
-    setSharedPrediction(game?.authoritativePrediction || null);
-    if (!game?.week || !game?.away || !game?.home) return undefined;
-    const controller = new AbortController();
-    refreshPredictionLedger({ season: 2026, week: Number(game.week), signal: controller.signal })
-      .then((rows) => {
-        const snapshot = findPredictionSnapshot(rows, Number(game.week), game.away, game.home);
-        if (snapshot) setSharedPrediction(snapshot);
-      })
-      .catch((error) => { if (error?.name !== "AbortError") console.warn("Shared matchup prediction unavailable", error); });
-    return () => controller.abort();
-  }, [game?.week, game?.away, game?.home, game?.authoritativePrediction]);
 
   if (!game) {
     return (
@@ -354,7 +340,6 @@ export default function Matchup({ game, onBack }) {
         )}
 
         <MatchupPrediction
-          prediction={sharedPrediction}
           awayCode={awayCode}
           homeCode={homeCode}
           kickoff={validKickoff ? kickoff.toISOString() : null}

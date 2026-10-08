@@ -5,8 +5,8 @@ import { getTeamQbr } from "./teamRatings.js";
 import { getStadiumWeather } from "./weatherApi.js";
 import { buildBestBets } from "./bestBetsService.js";
 
-export const FULL_MODEL_VERSION = 12;
-export const FULL_MODEL_KEY = "full-v12-data-only-predictions";
+export const FULL_MODEL_VERSION = 11;
+export const FULL_MODEL_KEY = "full-v11-week5-data-gap-audit";
 const cache = new Map();
 const pending = new Map();
 const CACHE_MS = 5 * 60 * 1000;
@@ -16,7 +16,8 @@ export async function getFullGamePrediction(game, oddsEvent, options = {}) {
   const week = Number(game.week || options.week || 1);
   const away = normalizeCode(game.away);
   const home = normalizeCode(game.home);
-  const key = `${season}:${week}:${away}:${home}:${FULL_MODEL_KEY}`;
+  const oddsFingerprint = createOddsFingerprint(oddsEvent);
+  const key = `${season}:${week}:${away}:${home}:${FULL_MODEL_KEY}:${oddsFingerprint}`;
   const cached = cache.get(key);
 
   if (!options.forceRefresh && cached && Date.now() - cached.savedAt < CACHE_MS) {
@@ -141,7 +142,7 @@ async function createPrediction({ game, oddsEvent, season, week, away, home, sig
   const prediction = predictMatchup(away, home, {
     kickoff: gameWithWeather.sourceDate,
     weather: gameWithWeather.weather || null,
-    market: null,
+    market: oddsEvent,
     week,
     homeSplit: homeStanding
       ? { home: homeStanding.home, road: homeStanding.road }
