@@ -1,8 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { getDisplayLockCycle, getLockCycle, resolveDisplayWeekContext, resolveLockWeekContext } from "./weeklyMulti.js";
-import { createWeeklyMultiLockHandler } from "../api/weekly-multi/lock.js";
-import { createWeeklyMultiCurrentHandler } from "../api/weekly-multi/current.js";
+import { readFileSync } from "node:fs";
+import { createWeeklyMultiCurrentHandler, createWeeklyMultiLockHandler, getDisplayLockCycle, getLockCycle, resolveDisplayWeekContext, resolveLockWeekContext } from "./weeklyMulti.js";
+import { createScheduleHandler } from "../api/nfl/schedule.js";
 
 const THURSDAY = Date.UTC(2026, 9, 8, 0, 0, 0);
 const DAY = 24 * 60 * 60 * 1000;
@@ -64,6 +64,73 @@ function createLockClient({ existing = null, predictions = [] } = {}) {
   };
   return { client, calls, get insertedRecord() { return insertedRecord; } };
 }
+
+function createCurrentEntry(overrides = {}) {
+  return createScheduleHandler({ currentHandler: createWeeklyMultiCurrentHandler(overrides) });
+}
+
+function createLockEntry(overrides = {}) {
+  return createScheduleHandler({ lockHandler: createWeeklyMultiLockHandler(overrides) });
+}
+
+test("schedule entry preserves existing schedule behavior without weeklyMultiMode", async () => {
+  const originalApiKey = process.env.BALLDONTLIE_API_KEY;
+  delete process.env.BALLDONTLIE_API_KEY;
+  const handler = createScheduleHandler({
+    currentHandler: async () => assert.fail("current handler must not run without the mode parameter"),
+    lockHandler: async () => assert.fail("lock handler must not run without the mode parameter"),
+  });
+  const res = response();
+  try {
+    await handler({ method: "GET", query: { season: 2026, week: 5 } }, res);
+    assert.equal(res.statusCode, 500);
+    assert.deepEqual(res.body, { error: "BALLDONTLIE_API_KEY is not configured" });
+  } finally {
+    if (originalApiKey === undefined) delete process.env.BALLDONTLIE_API_KEY;
+    else process.env.BALLDONTLIE_API_KEY = originalApiKey;
+  }
+});
+
+test("lock-mode dispatch passes the GET request and Authorization header through unchanged", async () => {
+  const request = {
+    method: "GET",
+    query: { weeklyMultiMode: "lock" },
+    headers: { authorization: "Bearer test-only-forwarded-token" },
+  };
+  let received;
+  const handler = createScheduleHandler({
+    lockHandler: async (req, res) => {
+      received = req;
+      return res.status(200).json({ status: "dispatched" });
+    },
+  });
+  const res = response();
+  await handler(request, res);
+  assert.strictEqual(received, request);
+  assert.equal(received.headers.authorization, "Bearer test-only-forwarded-token");
+  assert.equal(res.statusCode, 200);
+});
+
+test("unknown weeklyMultiMode values cannot fall through to the schedule route", async () => {
+  const handler = createScheduleHandler({
+    currentHandler: async () => assert.fail("unknown mode must not invoke current"),
+    lockHandler: async () => assert.fail("unknown mode must not invoke lock"),
+    scheduleHandler: async () => assert.fail("unknown mode must not invoke schedule"),
+  });
+  const res = response();
+  await handler({ method: "GET", query: { weeklyMultiMode: "unexpected" } }, res);
+  assert.equal(res.statusCode, 404);
+  assert.deepEqual(res.body, { error: "Unknown weekly multi mode" });
+});
+
+test("Vercel rewrites preserve both Weekly Best Multi URLs and exactly one lock cron", () => {
+  const config = JSON.parse(readFileSync(new URL("../vercel.json", import.meta.url), "utf8"));
+  assert.deepEqual(config.rewrites, [
+    { source: "/api/weekly-multi/current", destination: "/api/nfl/schedule?weeklyMultiMode=current" },
+    { source: "/api/weekly-multi/lock", destination: "/api/nfl/schedule?weeklyMultiMode=lock" },
+  ]);
+  assert.deepEqual(config.crons, [{ path: "/api/weekly-multi/lock", schedule: "0 1 * * *" }]);
+});
 
 test("lock and display cycles follow UTC Thursday and Wednesday boundaries", () => {
   const cases = [
@@ -191,13 +258,13 @@ test("offseason and schedule API failure return not ready without writing", asyn
     ];
     for (const item of cases) {
       let clientCalls = 0;
-      const handler = createWeeklyMultiLockHandler({
+      const handler = createLockEntry({
         getNow: () => date(0, 0, 30),
         resolveContext: (now, options) => resolveLockWeekContext(now, { ...options, fetchGames: item.fetchGames }),
         createClient: () => { clientCalls += 1; throw new Error("must not create a client"); },
       });
       const res = response();
-      await handler({ method: "GET", headers: { authorization: "Bearer expected-secret" }, query: {} }, res);
+      await handler({ method: "GET", headers: { authorization: "Bearer expected-secret" }, query: { weeklyMultiMode: "lock" } }, res);
       assert.equal(res.statusCode, 200, item.name);
       assert.equal(res.body.status, "not ready", item.name);
       assert.equal(clientCalls, 0, item.name);
@@ -235,7 +302,7 @@ test("lock resolver returns not yet locked before Thursday without fetching sche
 test("lock route rejects absent and incorrect CRON_SECRET before accessing dependencies", async () => {
   const originalSecret = process.env.CRON_SECRET;
   let dependencyCalls = 0;
-  const handler = createWeeklyMultiLockHandler({
+  const handler = createLockEntry({
     resolveContext: async () => { dependencyCalls += 1; throw new Error("should not resolve"); },
     createClient: () => { dependencyCalls += 1; throw new Error("should not create client"); },
   });
@@ -244,11 +311,11 @@ test("lock route rejects absent and incorrect CRON_SECRET before accessing depen
   try {
     delete process.env.CRON_SECRET;
     const missing = response();
-    await handler({ method: "POST", headers: { authorization: "Bearer anything" }, query: {} }, missing);
+    await handler({ method: "POST", headers: { authorization: "Bearer anything" }, query: { weeklyMultiMode: "lock" } }, missing);
     assert.equal(missing.statusCode, 401);
     process.env.CRON_SECRET = "expected-secret";
     const wrong = response();
-    await handler({ method: "GET", headers: { authorization: "Bearer wrong-secret" }, query: {} }, wrong);
+    await handler({ method: "GET", headers: { authorization: "Bearer wrong-secret" }, query: { weeklyMultiMode: "lock" } }, wrong);
     assert.equal(wrong.statusCode, 401);
     assert.equal(dependencyCalls, 0);
   } finally {
@@ -266,13 +333,13 @@ test("read route returns the saved multi for the schedule-backed display week", 
     eq(column, value) { calls.push(["eq", column, value]); return this; },
     async maybeSingle() { return { data: record, error: null }; },
   };
-  const handler = createWeeklyMultiCurrentHandler({
+  const handler = createCurrentEntry({
     getNow: () => date(0, 0, 30),
     fetchGames: async () => schedule,
     createClient: () => ({ from(table) { calls.push(["from", table]); return chain; } }),
   });
   const res = response();
-  await handler({ method: "GET" }, res);
+  await handler({ method: "GET", query: { weeklyMultiMode: "current" } }, res);
   assert.equal(res.statusCode, 200);
   assert.equal(res.body.record, record);
   assert.equal(res.body.week, 5);
@@ -282,13 +349,13 @@ test("read route returns the saved multi for the schedule-backed display week", 
 
 test("read route shows the placeholder only when the upcoming display week has regular-season games", async () => {
   const schedule = [{ season: 2026, week: 5, date: date(0, 1).toISOString(), postseason: false }];
-  const handler = createWeeklyMultiCurrentHandler({
+  const handler = createCurrentEntry({
     getNow: () => date(-1),
     fetchGames: async () => schedule,
     createClient: () => { throw new Error("placeholder state must not query saved records"); },
   });
   const res = response();
-  await handler({ method: "GET" }, res);
+  await handler({ method: "GET", query: { weeklyMultiMode: "current" } }, res);
   assert.equal(res.statusCode, 200);
   assert.equal(res.body.status, "before lock");
   assert.equal(res.body.placeholder, true);
@@ -300,13 +367,13 @@ test("read route returns not ready when the display window has no regular-season
     [],
     [{ season: 2026, week: 1, date: date(0, 1).toISOString(), postseason: true }],
   ]) {
-    const handler = createWeeklyMultiCurrentHandler({
+    const handler = createCurrentEntry({
       getNow: () => date(-1),
       fetchGames: async () => schedule,
       createClient: () => { throw new Error("not-ready state must not query saved records"); },
     });
     const res = response();
-    await handler({ method: "GET" }, res);
+    await handler({ method: "GET", query: { weeklyMultiMode: "current" } }, res);
     assert.equal(res.statusCode, 200);
     assert.equal(res.body.status, "not ready");
     assert.equal(res.body.placeholder, false);
@@ -315,13 +382,13 @@ test("read route returns not ready when the display window has no regular-season
 });
 
 test("read route returns not ready when the schedule lookup fails", async () => {
-  const handler = createWeeklyMultiCurrentHandler({
+  const handler = createCurrentEntry({
     getNow: () => date(-1),
     fetchGames: async () => { throw new Error("schedule unavailable"); },
     createClient: () => { throw new Error("schedule failure must not query saved records"); },
   });
   const res = response();
-  await handler({ method: "GET" }, res);
+  await handler({ method: "GET", query: { weeklyMultiMode: "current" } }, res);
   assert.equal(res.statusCode, 200);
   assert.equal(res.body.status, "not ready");
   assert.match(res.body.reason, /schedule unavailable/i);
@@ -335,20 +402,20 @@ test("read route does not fall back to an older saved week when the active week 
     eq(column, value) { calls.push([column, value]); return this; },
     async maybeSingle() { return { data: null, error: null }; },
   };
-  const handler = createWeeklyMultiCurrentHandler({
+  const handler = createCurrentEntry({
     getNow: () => date(0, 0, 30),
     fetchGames: async () => [{ season: 2026, week: 5, date: date(0, 1).toISOString(), postseason: false }],
     createClient: () => ({ from: () => chain }),
   });
   const res = response();
-  await handler({ method: "GET" }, res);
+  await handler({ method: "GET", query: { weeklyMultiMode: "current" } }, res);
   assert.equal(res.body.status, "not ready");
   assert.match(res.body.message, /not ready yet/i);
   assert.deepEqual(calls, [["season", 2026], ["week", 5]]);
 });
 
 test("read route reports a missed week when no saved multi exists after first kickoff", async () => {
-  const handler = createWeeklyMultiCurrentHandler({
+  const handler = createCurrentEntry({
     getNow: () => date(0, 2),
     fetchGames: async () => [scheduleGame(5, 2026, 5, THURSDAY + 60 * 60 * 1000)],
     createClient: () => ({
@@ -360,7 +427,7 @@ test("read route reports a missed week when no saved multi exists after first ki
     }),
   });
   const res = response();
-  await handler({ method: "GET" }, res);
+  await handler({ method: "GET", query: { weeklyMultiMode: "current" } }, res);
   assert.equal(res.statusCode, 200);
   assert.equal(res.body.status, "missed");
   assert.equal(res.body.message, "No Weekly Best Multi was locked for this week.");
@@ -380,7 +447,7 @@ test("late generation is allowed at the deadline before the first kickoff and fl
     firstKickoffAt: new Date(THURSDAY + 45 * 60 * 1000).toISOString(),
   };
   const database = createLockClient();
-  const handler = createWeeklyMultiLockHandler({
+  const handler = createLockEntry({
     resolveContext: async () => context,
     getNow: () => new Date(context.retryDeadline),
     createClient: () => database.client,
@@ -388,7 +455,7 @@ test("late generation is allowed at the deadline before the first kickoff and fl
   });
   const res = response();
   try {
-    await handler({ method: "GET", headers: { authorization: "Bearer expected-secret", host: "example.test" }, query: {} }, res);
+    await handler({ method: "GET", headers: { authorization: "Bearer expected-secret", host: "example.test" }, query: { weeklyMultiMode: "lock" } }, res);
     assert.equal(res.statusCode, 200);
     assert.equal(res.body.status, "generated late");
     assert.equal(res.body.record.generated_late, true);
@@ -414,7 +481,7 @@ test("late lock after first kickoff is missed and performs no writes", async () 
   };
   const database = createLockClient();
   let oddsCalls = 0;
-  const handler = createWeeklyMultiLockHandler({
+  const handler = createLockEntry({
     resolveContext: async () => context,
     getNow: () => new Date(THURSDAY + 46 * 60 * 1000),
     createClient: () => database.client,
@@ -422,7 +489,7 @@ test("late lock after first kickoff is missed and performs no writes", async () 
   });
   const res = response();
   try {
-    await handler({ method: "GET", headers: { authorization: "Bearer expected-secret", host: "example.test" }, query: {} }, res);
+    await handler({ method: "GET", headers: { authorization: "Bearer expected-secret", host: "example.test" }, query: { weeklyMultiMode: "lock" } }, res);
     assert.equal(res.statusCode, 200);
     assert.equal(res.body.status, "missed");
     assert.equal(res.body.message, "No Weekly Best Multi was locked for this week.");
@@ -448,7 +515,7 @@ test("dry run remains available after kickoff and does not insert a row", async 
     firstKickoffAt: new Date(THURSDAY + 45 * 60 * 1000).toISOString(),
   };
   const database = createLockClient();
-  const handler = createWeeklyMultiLockHandler({
+  const handler = createLockEntry({
     resolveContext: async () => context,
     getNow: () => new Date(THURSDAY + 46 * 60 * 1000),
     createClient: () => database.client,
@@ -456,7 +523,7 @@ test("dry run remains available after kickoff and does not insert a row", async 
   });
   const res = response();
   try {
-    await handler({ method: "GET", headers: { authorization: "Bearer expected-secret", host: "example.test" }, query: { dryRun: "true" } }, res);
+    await handler({ method: "GET", headers: { authorization: "Bearer expected-secret", host: "example.test" }, query: { weeklyMultiMode: "lock", dryRun: "true" } }, res);
     assert.equal(res.statusCode, 200);
     assert.equal(res.body.dryRun, true);
     assert.equal(database.calls.some(([method]) => method === "insert"), false);
@@ -489,7 +556,7 @@ test("dry run returns selection without inserting a row", async () => {
     eq() { return this; },
     then(resolve, reject) { return Promise.resolve({ data: [], error: null }).then(resolve, reject); },
   };
-  const handler = createWeeklyMultiLockHandler({
+  const handler = createLockEntry({
     resolveContext: async () => context,
     getNow: () => new Date(THURSDAY + 2 * 60 * 1000),
     createClient: () => ({
@@ -503,7 +570,7 @@ test("dry run returns selection without inserting a row", async () => {
   const res = { statusCode: null, body: null, setHeader() {}, status(code) { this.statusCode = code; return this; }, json(body) { this.body = body; return this; } };
 
   try {
-    await handler({ method: "GET", headers: { authorization: "Bearer expected-secret", host: "example.test" }, query: { dryRun: "true" } }, res);
+    await handler({ method: "GET", headers: { authorization: "Bearer expected-secret", host: "example.test" }, query: { weeklyMultiMode: "lock", dryRun: "true" } }, res);
     assert.equal(res.statusCode, 200);
     assert.equal(res.body.dryRun, true);
     assert.equal(Array.isArray(res.body.legs), true);

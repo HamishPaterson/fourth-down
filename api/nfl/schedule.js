@@ -1,3 +1,5 @@
+import { createWeeklyMultiCurrentHandler, createWeeklyMultiLockHandler } from "../../api-lib/weeklyMulti.js";
+
 const API_URL =
   "https://api.balldontlie.io/nfl/v1/games";
 
@@ -31,7 +33,25 @@ const TEAM_DIVISION = Object.fromEntries(
   )
 );
 
-export default async function handler(req, res) {
+export function createScheduleHandler({
+  currentHandler = createWeeklyMultiCurrentHandler(),
+  lockHandler = createWeeklyMultiLockHandler(),
+  scheduleHandler = handleScheduleRequest,
+} = {}) {
+  return async function handler(req, res) {
+    const query = req.query || {};
+    if (Object.prototype.hasOwnProperty.call(query, "weeklyMultiMode")) {
+      if (query.weeklyMultiMode === "current") return currentHandler(req, res);
+      if (query.weeklyMultiMode === "lock") return lockHandler(req, res);
+      return res.status(404).json({ error: "Unknown weekly multi mode" });
+    }
+    return scheduleHandler(req, res);
+  };
+}
+
+export default createScheduleHandler();
+
+async function handleScheduleRequest(req, res) {
   if (req.method !== "GET") {
     return res.status(405).json({
       error: "Method not allowed",

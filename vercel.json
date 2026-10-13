@@ -5,6 +5,16 @@
       "includeFiles": "api/nfl/ea_player_records.json"
     }
   },
+  "rewrites": [
+    {
+      "source": "/api/weekly-multi/current",
+      "destination": "/api/nfl/schedule?weeklyMultiMode=current"
+    },
+    {
+      "source": "/api/weekly-multi/lock",
+      "destination": "/api/nfl/schedule?weeklyMultiMode=lock"
+    }
+  ],
   "crons": [
     {
       "path": "/api/weekly-multi/lock",
