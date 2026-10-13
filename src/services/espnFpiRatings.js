@@ -1,28 +1,28 @@
-// ESPN NFL FPI snapshot updated 2026-10-04.
+// ESPN NFL FPI snapshot updated 2026-10-13.
 // Values transcribed from ESPN FPI, Projections and Efficiencies tables.
 const ESPN_FPI_RATINGS = {
   "available": true,
   "source": "ESPN NFL Football Power Index",
-  "generatedAt": "2026-10-06T00:00:00.000Z",
-  "sourceUpdatedAt": "2026-10-04",
+  "generatedAt": "2026-10-13T00:00:00.000Z",
+  "sourceUpdatedAt": "2026-10-13",
   "teams": {
     "SF": {
       "name": "San Francisco 49ers",
-      "record": "4-0-0",
-      "overall": 96,
-      "offense": 94,
-      "defense": 75,
+      "record": "5-0-0",
+      "overall": 95,
+      "offense": 92,
+      "defense": 78,
       "specialTeams": 76,
       "source": "ESPN FPI, projections and efficiencies",
       "espnFpi": {
-        "overall": 6.9,
+        "overall": 6.7,
         "rank": 1,
         "trend": 0,
-        "offense": 6.2,
-        "defense": 0.1,
-        "specialTeams": 0.5,
-        "strengthOfScheduleRank": 29,
-        "remainingStrengthOfScheduleRank": 14,
+        "offense": 5.6,
+        "defense": 0.9,
+        "specialTeams": 0.3,
+        "strengthOfScheduleRank": 24,
+        "remainingStrengthOfScheduleRank": 20,
         "averageWinProbabilityRank": 1
       },
       "projections": {
@@ -35,33 +35,33 @@ const ESPN_FPI_RATINGS = {
         "winSuperBowlPercent": 22.2
       },
       "efficiencies": {
-        "overall": 82.3,
+        "overall": 76.0,
         "overallRank": 1,
-        "offense": 88.1,
-        "offenseRank": 1,
-        "defense": 54.5,
-        "defenseRank": 15,
-        "specialTeams": 77.0,
-        "specialTeamsRank": 3
+        "offense": 76.3,
+        "offenseRank": 2,
+        "defense": 65.7,
+        "defenseRank": 6,
+        "specialTeams": 50.0,
+        "specialTeamsRank": 18
       }
     },
     "JAX": {
       "name": "Jacksonville Jaguars",
-      "record": "3-1-0",
-      "overall": 89,
-      "offense": 83,
-      "defense": 80,
+      "record": "4-1-0",
+      "overall": 88,
+      "offense": 82,
+      "defense": 81,
       "specialTeams": 76,
       "source": "ESPN FPI, projections and efficiencies",
       "espnFpi": {
-        "overall": 4.7,
-        "rank": 2,
-        "trend": 6,
-        "offense": 2.7,
-        "defense": 1.6,
-        "specialTeams": 0.3,
-        "strengthOfScheduleRank": 16,
-        "remainingStrengthOfScheduleRank": 22,
+        "overall": 4.3,
+        "rank": 3,
+        "trend": 1,
+        "offense": 2.2,
+        "defense": 1.9,
+        "specialTeams": 0.2,
+        "strengthOfScheduleRank": 15,
+        "remainingStrengthOfScheduleRank": 26,
         "averageWinProbabilityRank": 2
       },
       "projections": {
@@ -74,34 +74,34 @@ const ESPN_FPI_RATINGS = {
         "winSuperBowlPercent": 11.2
       },
       "efficiencies": {
-        "overall": 74.6,
-        "overallRank": 3,
-        "offense": 65.5,
-        "offenseRank": 7,
-        "defense": 67.4,
-        "defenseRank": 6,
-        "specialTeams": 66.5,
-        "specialTeamsRank": 7
+        "overall": 69.6,
+        "overallRank": 4,
+        "offense": 56.6,
+        "offenseRank": 8,
+        "defense": 69.8,
+        "defenseRank": 3,
+        "specialTeams": 59.4,
+        "specialTeamsRank": 10
       }
     },
     "LAR": {
       "name": "Los Angeles Rams",
       "record": "2-2-0",
-      "overall": 88,
+      "overall": 89,
       "offense": 83,
       "defense": 83,
       "specialTeams": 73,
       "source": "ESPN FPI, projections and efficiencies",
       "espnFpi": {
-        "overall": 4.5,
-        "rank": 3,
-        "trend": 0,
-        "offense": 2.6,
+        "overall": 4.6,
+        "rank": 2,
+        "trend": 4,
+        "offense": 2.7,
         "defense": 2.6,
         "specialTeams": -0.7,
-        "strengthOfScheduleRank": 10,
-        "remainingStrengthOfScheduleRank": 6,
-        "averageWinProbabilityRank": 15
+        "strengthOfScheduleRank": 7,
+        "remainingStrengthOfScheduleRank": 10,
+        "averageWinProbabilityRank": 16
       },
       "projections": {
         "projectedRecord": "10.4-6.6",
@@ -114,11 +114,11 @@ const ESPN_FPI_RATINGS = {
       },
       "efficiencies": {
         "overall": 54.6,
-        "overallRank": 12,
+        "overallRank": 14,
         "offense": 49.3,
         "offenseRank": 13,
         "defense": 66.7,
-        "defenseRank": 7,
+        "defenseRank": 5,
         "specialTeams": 23.7,
         "specialTeamsRank": 29
       }
@@ -132,15 +132,15 @@ const ESPN_FPI_RATINGS = {
       "specialTeams": 76,
       "source": "ESPN FPI, projections and efficiencies",
       "espnFpi": {
-        "overall": 4.4,
+        "overall": 4.3,
         "rank": 4,
-        "trend": 0,
-        "offense": 3.0,
+        "trend": -2,
+        "offense": 2.9,
         "defense": 1.3,
         "specialTeams": 0.2,
         "strengthOfScheduleRank": 32,
         "remainingStrengthOfScheduleRank": 8,
-        "averageWinProbabilityRank": 5
+        "averageWinProbabilityRank": 3
       },
       "projections": {
         "projectedRecord": "12.0-4.9",
@@ -153,9 +153,9 @@ const ESPN_FPI_RATINGS = {
       },
       "efficiencies": {
         "overall": 73.2,
-        "overallRank": 4,
+        "overallRank": 2,
         "offense": 74.6,
-        "offenseRank": 4,
+        "offenseRank": 3,
         "defense": 62.2,
         "defenseRank": 8,
         "specialTeams": 48.4,
@@ -164,22 +164,22 @@ const ESPN_FPI_RATINGS = {
     },
     "SEA": {
       "name": "Seattle Seahawks",
-      "record": "3-1-0",
-      "overall": 87,
-      "offense": 78,
-      "defense": 83,
-      "specialTeams": 76,
+      "record": "3-2-0",
+      "overall": 86,
+      "offense": 74,
+      "defense": 85,
+      "specialTeams": 77,
       "source": "ESPN FPI, projections and efficiencies",
       "espnFpi": {
-        "overall": 4.1,
-        "rank": 5,
-        "trend": 2,
-        "offense": 1.0,
-        "defense": 2.7,
-        "specialTeams": 0.4,
-        "strengthOfScheduleRank": 30,
-        "remainingStrengthOfScheduleRank": 1,
-        "averageWinProbabilityRank": 10
+        "overall": 3.5,
+        "rank": 6,
+        "trend": -3,
+        "offense": -0.2,
+        "defense": 3.2,
+        "specialTeams": 0.5,
+        "strengthOfScheduleRank": 17,
+        "remainingStrengthOfScheduleRank": 2,
+        "averageWinProbabilityRank": 12
       },
       "projections": {
         "projectedRecord": "10.5-6.4",
@@ -191,34 +191,34 @@ const ESPN_FPI_RATINGS = {
         "winSuperBowlPercent": 4.6
       },
       "efficiencies": {
-        "overall": 66.6,
+        "overall": 64.1,
         "overallRank": 7,
-        "offense": 42.8,
-        "offenseRank": 17,
-        "defense": 72.7,
+        "offense": 31.9,
+        "offenseRank": 26,
+        "defense": 74.6,
         "defenseRank": 2,
-        "specialTeams": 71.9,
-        "specialTeamsRank": 5
+        "specialTeams": 81.5,
+        "specialTeamsRank": 1
       }
     },
     "BUF": {
       "name": "Buffalo Bills",
       "record": "3-1-0",
-      "overall": 87,
+      "overall": 88,
       "offense": 90,
-      "defense": 71,
+      "defense": 72,
       "specialTeams": 76,
       "source": "ESPN FPI, projections and efficiencies",
       "espnFpi": {
-        "overall": 3.9,
-        "rank": 6,
-        "trend": -4,
-        "offense": 4.9,
-        "defense": -1.2,
+        "overall": 4.2,
+        "rank": 5,
+        "trend": 0,
+        "offense": 5.0,
+        "defense": -1.1,
         "specialTeams": 0.2,
-        "strengthOfScheduleRank": 9,
-        "remainingStrengthOfScheduleRank": 23,
-        "averageWinProbabilityRank": 8
+        "strengthOfScheduleRank": 5,
+        "remainingStrengthOfScheduleRank": 25,
+        "averageWinProbabilityRank": 9
       },
       "projections": {
         "projectedRecord": "11.2-5.7",
@@ -231,9 +231,9 @@ const ESPN_FPI_RATINGS = {
       },
       "efficiencies": {
         "overall": 64.4,
-        "overallRank": 9,
+        "overallRank": 6,
         "offense": 78.1,
-        "offenseRank": 2,
+        "offenseRank": 1,
         "defense": 39.5,
         "defenseRank": 28,
         "specialTeams": 66.3,
@@ -242,22 +242,22 @@ const ESPN_FPI_RATINGS = {
     },
     "DAL": {
       "name": "Dallas Cowboys",
-      "record": "2-2-0",
-      "overall": 86,
-      "offense": 89,
-      "defense": 70,
-      "specialTeams": 77,
+      "record": "2-3-0",
+      "overall": 83,
+      "offense": 88,
+      "defense": 68,
+      "specialTeams": 76,
       "source": "ESPN FPI, projections and efficiencies",
       "espnFpi": {
-        "overall": 3.6,
-        "rank": 7,
-        "trend": -1,
-        "offense": 4.8,
-        "defense": -1.8,
-        "specialTeams": 0.6,
-        "strengthOfScheduleRank": 17,
-        "remainingStrengthOfScheduleRank": 20,
-        "averageWinProbabilityRank": 17
+        "overall": 2.5,
+        "rank": 8,
+        "trend": 0,
+        "offense": 4.3,
+        "defense": -2.3,
+        "specialTeams": 0.4,
+        "strengthOfScheduleRank": 12,
+        "remainingStrengthOfScheduleRank": 21,
+        "averageWinProbabilityRank": 23
       },
       "projections": {
         "projectedRecord": "10.3-6.6",
@@ -269,34 +269,34 @@ const ESPN_FPI_RATINGS = {
         "winSuperBowlPercent": 4.9
       },
       "efficiencies": {
-        "overall": 54.0,
-        "overallRank": 13,
-        "offense": 75.3,
-        "offenseRank": 3,
-        "defense": 27.6,
-        "defenseRank": 30,
-        "specialTeams": 54.0,
+        "overall": 49.1,
+        "overallRank": 18,
+        "offense": 70.1,
+        "offenseRank": 5,
+        "defense": 29.0,
+        "defenseRank": 31,
+        "specialTeams": 51.0,
         "specialTeamsRank": 16
       }
     },
     "CHI": {
       "name": "Chicago Bears",
-      "record": "3-1-0",
-      "overall": 82,
+      "record": "3-2-0",
+      "overall": 80,
       "offense": 77,
-      "defense": 79,
+      "defense": 77,
       "specialTeams": 76,
       "source": "ESPN FPI, projections and efficiencies",
       "espnFpi": {
-        "overall": 2.3,
-        "rank": 8,
-        "trend": 14,
-        "offense": 0.8,
-        "defense": 1.3,
-        "specialTeams": 0.3,
-        "strengthOfScheduleRank": 28,
-        "remainingStrengthOfScheduleRank": 18,
-        "averageWinProbabilityRank": 4
+        "overall": 1.7,
+        "rank": 12,
+        "trend": 8,
+        "offense": 0.7,
+        "defense": 0.7,
+        "specialTeams": 0.4,
+        "strengthOfScheduleRank": 27,
+        "remainingStrengthOfScheduleRank": 9,
+        "averageWinProbabilityRank": 11
       },
       "projections": {
         "projectedRecord": "11.6-5.4",
@@ -308,34 +308,34 @@ const ESPN_FPI_RATINGS = {
         "winSuperBowlPercent": 11.2
       },
       "efficiencies": {
-        "overall": 75.9,
-        "overallRank": 2,
-        "offense": 63.0,
-        "offenseRank": 8,
-        "defense": 71.5,
-        "defenseRank": 3,
-        "specialTeams": 63.5,
-        "specialTeamsRank": 11
+        "overall": 61.4,
+        "overallRank": 8,
+        "offense": 54.5,
+        "offenseRank": 10,
+        "defense": 57.8,
+        "defenseRank": 13,
+        "specialTeams": 57.9,
+        "specialTeamsRank": 13
       }
     },
     "CIN": {
       "name": "Cincinnati Bengals",
-      "record": "2-2-0",
+      "record": "3-2-0",
       "overall": 82,
-      "offense": 83,
-      "defense": 74,
+      "offense": 85,
+      "defense": 73,
       "specialTeams": 75,
       "source": "ESPN FPI, projections and efficiencies",
       "espnFpi": {
-        "overall": 2.2,
+        "overall": 2.4,
         "rank": 9,
-        "trend": 2,
-        "offense": 2.8,
-        "defense": -0.4,
+        "trend": 1,
+        "offense": 3.2,
+        "defense": -0.6,
         "specialTeams": -0.1,
-        "strengthOfScheduleRank": 12,
+        "strengthOfScheduleRank": 18,
         "remainingStrengthOfScheduleRank": 32,
-        "averageWinProbabilityRank": 9
+        "averageWinProbabilityRank": 5
       },
       "projections": {
         "projectedRecord": "10.3-6.7",
@@ -347,34 +347,34 @@ const ESPN_FPI_RATINGS = {
         "winSuperBowlPercent": 3.5
       },
       "efficiencies": {
-        "overall": 56.2,
+        "overall": 57.6,
         "overallRank": 10,
-        "offense": 52.5,
-        "offenseRank": 11,
-        "defense": 58.6,
-        "defenseRank": 11,
-        "specialTeams": 44.6,
-        "specialTeamsRank": 23
+        "offense": 56.3,
+        "offenseRank": 9,
+        "defense": 58.0,
+        "defenseRank": 12,
+        "specialTeams": 41.0,
+        "specialTeamsRank": 21
       }
     },
     "DET": {
       "name": "Detroit Lions",
-      "record": "2-2-0",
-      "overall": 80,
-      "offense": 86,
+      "record": "3-2-0",
+      "overall": 81,
+      "offense": 87,
       "defense": 68,
       "specialTeams": 76,
       "source": "ESPN FPI, projections and efficiencies",
       "espnFpi": {
-        "overall": 1.5,
+        "overall": 2.1,
         "rank": 10,
         "trend": -1,
-        "offense": 3.5,
-        "defense": -2.2,
-        "specialTeams": 0.2,
-        "strengthOfScheduleRank": 21,
-        "remainingStrengthOfScheduleRank": 30,
-        "averageWinProbabilityRank": 20
+        "offense": 4.1,
+        "defense": -2.4,
+        "specialTeams": 0.4,
+        "strengthOfScheduleRank": 31,
+        "remainingStrengthOfScheduleRank": 24,
+        "averageWinProbabilityRank": 17
       },
       "projections": {
         "projectedRecord": "9.8-7.2",
@@ -386,34 +386,34 @@ const ESPN_FPI_RATINGS = {
         "winSuperBowlPercent": 1.4
       },
       "efficiencies": {
-        "overall": 43.9,
-        "overallRank": 19,
-        "offense": 70.2,
-        "offenseRank": 6,
-        "defense": 22.7,
-        "defenseRank": 31,
-        "specialTeams": 57.1,
-        "specialTeamsRank": 14
+        "overall": 54.7,
+        "overallRank": 12,
+        "offense": 74.2,
+        "offenseRank": 4,
+        "defense": 27.7,
+        "defenseRank": 32,
+        "specialTeams": 71.2,
+        "specialTeamsRank": 6
       }
     },
     "DEN": {
       "name": "Denver Broncos",
-      "record": "2-2-0",
-      "overall": 79,
+      "record": "3-2-0",
+      "overall": 80,
       "offense": 73,
-      "defense": 80,
+      "defense": 82,
       "specialTeams": 75,
       "source": "ESPN FPI, projections and efficiencies",
       "espnFpi": {
-        "overall": 1.2,
-        "rank": 11,
-        "trend": 5,
-        "offense": -0.6,
-        "defense": 1.8,
-        "specialTeams": -0.0,
+        "overall": 1.5,
+        "rank": 14,
+        "trend": -3,
+        "offense": -0.7,
+        "defense": 2.3,
+        "specialTeams": 0.0,
         "strengthOfScheduleRank": 1,
-        "remainingStrengthOfScheduleRank": 26,
-        "averageWinProbabilityRank": 29
+        "remainingStrengthOfScheduleRank": 31,
+        "averageWinProbabilityRank": 27
       },
       "projections": {
         "projectedRecord": "9.3-7.6",
@@ -425,34 +425,34 @@ const ESPN_FPI_RATINGS = {
         "winSuperBowlPercent": 1.8
       },
       "efficiencies": {
-        "overall": 36.8,
+        "overall": 42.0,
         "overallRank": 25,
-        "offense": 40.2,
-        "offenseRank": 19,
-        "defense": 45.1,
-        "defenseRank": 22,
-        "specialTeams": 36.5,
+        "offense": 35.7,
+        "offenseRank": 24,
+        "defense": 57.1,
+        "defenseRank": 14,
+        "specialTeams": 37.0,
         "specialTeamsRank": 24
       }
     },
     "NE": {
       "name": "New England Patriots",
-      "record": "2-2-0",
-      "overall": 78,
-      "offense": 75,
+      "record": "3-2-0",
+      "overall": 83,
+      "offense": 80,
       "defense": 78,
       "specialTeams": 75,
       "source": "ESPN FPI, projections and efficiencies",
       "espnFpi": {
-        "overall": 1.0,
-        "rank": 12,
-        "trend": -2,
-        "offense": 0.0,
+        "overall": 2.6,
+        "rank": 7,
+        "trend": 7,
+        "offense": 1.6,
         "defense": 1.1,
         "specialTeams": -0.1,
-        "strengthOfScheduleRank": 3,
-        "remainingStrengthOfScheduleRank": 25,
-        "averageWinProbabilityRank": 11
+        "strengthOfScheduleRank": 4,
+        "remainingStrengthOfScheduleRank": 27,
+        "averageWinProbabilityRank": 6
       },
       "projections": {
         "projectedRecord": "9.4-7.6",
@@ -464,34 +464,34 @@ const ESPN_FPI_RATINGS = {
         "winSuperBowlPercent": 1.5
       },
       "efficiencies": {
-        "overall": 46.4,
-        "overallRank": 17,
-        "offense": 32.8,
-        "offenseRank": 25,
-        "defense": 60.6,
-        "defenseRank": 9,
-        "specialTeams": 56.2,
-        "specialTeamsRank": 15
+        "overall": 59.3,
+        "overallRank": 9,
+        "offense": 47.2,
+        "offenseRank": 14,
+        "defense": 62.8,
+        "defenseRank": 7,
+        "specialTeams": 61.6,
+        "specialTeamsRank": 9
       }
     },
     "MIN": {
       "name": "Minnesota Vikings",
-      "record": "4-0-0",
-      "overall": 77,
-      "offense": 67,
-      "defense": 85,
-      "specialTeams": 76,
+      "record": "5-0-0",
+      "overall": 80,
+      "offense": 65,
+      "defense": 87,
+      "specialTeams": 77,
       "source": "ESPN FPI, projections and efficiencies",
       "espnFpi": {
-        "overall": 0.8,
+        "overall": 1.5,
         "rank": 13,
         "trend": -1,
-        "offense": -2.8,
-        "defense": 3.3,
-        "specialTeams": 0.4,
-        "strengthOfScheduleRank": 24,
-        "remainingStrengthOfScheduleRank": 15,
-        "averageWinProbabilityRank": 13
+        "offense": -3.2,
+        "defense": 4.0,
+        "specialTeams": 0.7,
+        "strengthOfScheduleRank": 28,
+        "remainingStrengthOfScheduleRank": 6,
+        "averageWinProbabilityRank": 7
       },
       "projections": {
         "projectedRecord": "10.8-6.1",
@@ -503,34 +503,34 @@ const ESPN_FPI_RATINGS = {
         "winSuperBowlPercent": 2.4
       },
       "efficiencies": {
-        "overall": 70.2,
-        "overallRank": 5,
-        "offense": 30.3,
-        "offenseRank": 27,
-        "defense": 84.3,
+        "overall": 69.7,
+        "overallRank": 3,
+        "offense": 30.0,
+        "offenseRank": 28,
+        "defense": 86.1,
         "defenseRank": 1,
-        "specialTeams": 70.4,
-        "specialTeamsRank": 6
+        "specialTeams": 75.9,
+        "specialTeamsRank": 3
       }
     },
     "HOU": {
       "name": "Houston Texans",
-      "record": "0-4-0",
-      "overall": 77,
-      "offense": 74,
-      "defense": 80,
+      "record": "1-4-0",
+      "overall": 80,
+      "offense": 75,
+      "defense": 81,
       "specialTeams": 74,
       "source": "ESPN FPI, projections and efficiencies",
       "espnFpi": {
-        "overall": 0.8,
-        "rank": 14,
-        "trend": 0,
-        "offense": -0.5,
-        "defense": 1.6,
+        "overall": 1.8,
+        "rank": 11,
+        "trend": 2,
+        "offense": 0.0,
+        "defense": 2.1,
         "specialTeams": -0.3,
-        "strengthOfScheduleRank": 4,
-        "remainingStrengthOfScheduleRank": 29,
-        "averageWinProbabilityRank": 26
+        "strengthOfScheduleRank": 10,
+        "remainingStrengthOfScheduleRank": 28,
+        "averageWinProbabilityRank": 21
       },
       "projections": {
         "projectedRecord": "7.4-9.5",
@@ -542,34 +542,34 @@ const ESPN_FPI_RATINGS = {
         "winSuperBowlPercent": 0.4
       },
       "efficiencies": {
-        "overall": 38.8,
-        "overallRank": 24,
-        "offense": 50.4,
-        "offenseRank": 12,
-        "defense": 42.9,
-        "defenseRank": 26,
-        "specialTeams": 23.8,
-        "specialTeamsRank": 28
+        "overall": 50.2,
+        "overallRank": 17,
+        "offense": 53.9,
+        "offenseRank": 11,
+        "defense": 54.1,
+        "defenseRank": 16,
+        "specialTeams": 28.6,
+        "specialTeamsRank": 27
       }
     },
     "BAL": {
       "name": "Baltimore Ravens",
-      "record": "3-1-0",
-      "overall": 76,
-      "offense": 75,
+      "record": "4-1-0",
+      "overall": 78,
+      "offense": 77,
       "defense": 76,
-      "specialTeams": 74,
+      "specialTeams": 75,
       "source": "ESPN FPI, projections and efficiencies",
       "espnFpi": {
-        "overall": 0.3,
+        "overall": 0.9,
         "rank": 15,
-        "trend": -10,
-        "offense": 0.1,
+        "trend": -8,
+        "offense": 0.8,
         "defense": 0.3,
-        "specialTeams": -0.2,
-        "strengthOfScheduleRank": 22,
-        "remainingStrengthOfScheduleRank": 21,
-        "averageWinProbabilityRank": 3
+        "specialTeams": -0.1,
+        "strengthOfScheduleRank": 30,
+        "remainingStrengthOfScheduleRank": 15,
+        "averageWinProbabilityRank": 4
       },
       "projections": {
         "projectedRecord": "10.9-6.0",
@@ -581,34 +581,34 @@ const ESPN_FPI_RATINGS = {
         "winSuperBowlPercent": 6.1
       },
       "efficiencies": {
-        "overall": 65.7,
-        "overallRank": 8,
-        "offense": 71.5,
-        "offenseRank": 5,
-        "defense": 52.1,
-        "defenseRank": 16,
-        "specialTeams": 48.9,
-        "specialTeamsRank": 19
+        "overall": 64.8,
+        "overallRank": 5,
+        "offense": 70.1,
+        "offenseRank": 6,
+        "defense": 51.1,
+        "defenseRank": 19,
+        "specialTeams": 50.7,
+        "specialTeamsRank": 17
       }
     },
     "LAC": {
       "name": "Los Angeles Chargers",
-      "record": "0-4-0",
-      "overall": 74,
-      "offense": 69,
+      "record": "0-5-0",
+      "overall": 71,
+      "offense": 66,
       "defense": 81,
       "specialTeams": 74,
       "source": "ESPN FPI, projections and efficiencies",
       "espnFpi": {
-        "overall": -0.3,
-        "rank": 16,
-        "trend": 3,
-        "offense": -2.0,
-        "defense": 1.9,
-        "specialTeams": -0.2,
-        "strengthOfScheduleRank": 13,
-        "remainingStrengthOfScheduleRank": 4,
-        "averageWinProbabilityRank": 28
+        "overall": -1.2,
+        "rank": 20,
+        "trend": -5,
+        "offense": -3.0,
+        "defense": 2.0,
+        "specialTeams": -0.3,
+        "strengthOfScheduleRank": 14,
+        "remainingStrengthOfScheduleRank": 1,
+        "averageWinProbabilityRank": 29
       },
       "projections": {
         "projectedRecord": "5.9-11.0",
@@ -620,34 +620,34 @@ const ESPN_FPI_RATINGS = {
         "winSuperBowlPercent": 0.1
       },
       "efficiencies": {
-        "overall": 24.8,
-        "overallRank": 31,
-        "offense": 22.9,
-        "offenseRank": 31,
-        "defense": 55.7,
-        "defenseRank": 13,
-        "specialTeams": 10.8,
-        "specialTeamsRank": 31
+        "overall": 27.2,
+        "overallRank": 30,
+        "offense": 19.2,
+        "offenseRank": 32,
+        "defense": 60.9,
+        "defenseRank": 10,
+        "specialTeams": 19.0,
+        "specialTeamsRank": 30
       }
     },
     "IND": {
       "name": "Indianapolis Colts",
-      "record": "2-2-0",
-      "overall": 74,
-      "offense": 74,
-      "defense": 74,
-      "specialTeams": 76,
+      "record": "2-3-0",
+      "overall": 73,
+      "offense": 73,
+      "defense": 73,
+      "specialTeams": 77,
       "source": "ESPN FPI, projections and efficiencies",
       "espnFpi": {
-        "overall": -0.4,
+        "overall": -0.8,
         "rank": 17,
         "trend": 1,
-        "offense": -0.5,
-        "defense": -0.4,
-        "specialTeams": 0.5,
+        "offense": -0.6,
+        "defense": -0.8,
+        "specialTeams": 0.6,
         "strengthOfScheduleRank": 6,
-        "remainingStrengthOfScheduleRank": 28,
-        "averageWinProbabilityRank": 19
+        "remainingStrengthOfScheduleRank": 29,
+        "averageWinProbabilityRank": 24
       },
       "projections": {
         "projectedRecord": "8.7-8.2",
@@ -659,34 +659,34 @@ const ESPN_FPI_RATINGS = {
         "winSuperBowlPercent": 0.8
       },
       "efficiencies": {
-        "overall": 50.6,
-        "overallRank": 14,
-        "offense": 43.6,
-        "offenseRank": 16,
-        "defense": 44.8,
-        "defenseRank": 23,
-        "specialTeams": 81.4,
+        "overall": 45.1,
+        "overallRank": 22,
+        "offense": 41.8,
+        "offenseRank": 18,
+        "defense": 40.2,
+        "defenseRank": 26,
+        "specialTeams": 76.3,
         "specialTeamsRank": 2
       }
     },
     "CAR": {
       "name": "Carolina Panthers",
       "record": "2-2-0",
-      "overall": 73,
-      "offense": 74,
+      "overall": 72,
+      "offense": 73,
       "defense": 74,
       "specialTeams": 75,
       "source": "ESPN FPI, projections and efficiencies",
       "espnFpi": {
-        "overall": -0.8,
+        "overall": -0.9,
         "rank": 18,
         "trend": 3,
-        "offense": -0.5,
+        "offense": -0.6,
         "defense": -0.4,
         "specialTeams": 0.1,
-        "strengthOfScheduleRank": 19,
-        "remainingStrengthOfScheduleRank": 19,
-        "averageWinProbabilityRank": 7
+        "strengthOfScheduleRank": 21,
+        "remainingStrengthOfScheduleRank": 18,
+        "averageWinProbabilityRank": 8
       },
       "projections": {
         "projectedRecord": "8.3-8.7",
@@ -699,33 +699,33 @@ const ESPN_FPI_RATINGS = {
       },
       "efficiencies": {
         "overall": 54.6,
-        "overallRank": 11,
+        "overallRank": 13,
         "offense": 62.1,
-        "offenseRank": 9,
+        "offenseRank": 7,
         "defense": 44.4,
-        "defenseRank": 24,
+        "defenseRank": 25,
         "specialTeams": 49.6,
-        "specialTeamsRank": 17
+        "specialTeamsRank": 19
       }
     },
     "GB": {
       "name": "Green Bay Packers",
-      "record": "2-2-0",
-      "overall": 72,
-      "offense": 76,
-      "defense": 70,
-      "specialTeams": 76,
+      "record": "3-2-0",
+      "overall": 77,
+      "offense": 79,
+      "defense": 73,
+      "specialTeams": 75,
       "source": "ESPN FPI, projections and efficiencies",
       "espnFpi": {
-        "overall": -1.1,
-        "rank": 19,
-        "trend": -4,
-        "offense": 0.2,
-        "defense": -1.7,
-        "specialTeams": 0.3,
-        "strengthOfScheduleRank": 31,
-        "remainingStrengthOfScheduleRank": 2,
-        "averageWinProbabilityRank": 16
+        "overall": 0.7,
+        "rank": 16,
+        "trend": 1,
+        "offense": 1.4,
+        "defense": -0.6,
+        "specialTeams": 0.0,
+        "strengthOfScheduleRank": 20,
+        "remainingStrengthOfScheduleRank": 3,
+        "averageWinProbabilityRank": 10
       },
       "projections": {
         "projectedRecord": "7.4-9.5",
@@ -737,34 +737,34 @@ const ESPN_FPI_RATINGS = {
         "winSuperBowlPercent": 0.1
       },
       "efficiencies": {
-        "overall": 33.0,
-        "overallRank": 29,
-        "offense": 28.4,
-        "offenseRank": 28,
-        "defense": 41.4,
-        "defenseRank": 27,
-        "specialTeams": 65.9,
-        "specialTeamsRank": 9
+        "overall": 47.0,
+        "overallRank": 21,
+        "offense": 39.9,
+        "offenseRank": 20,
+        "defense": 50.4,
+        "defenseRank": 20,
+        "specialTeams": 66.6,
+        "specialTeamsRank": 7
       }
     },
     "NO": {
       "name": "New Orleans Saints",
-      "record": "1-2-0",
-      "overall": 71,
-      "offense": 73,
-      "defense": 73,
+      "record": "1-4-0",
+      "overall": 65,
+      "offense": 70,
+      "defense": 70,
       "specialTeams": 75,
       "source": "ESPN FPI, projections and efficiencies",
       "espnFpi": {
-        "overall": -1.3,
-        "rank": 20,
-        "trend": -3,
-        "offense": -0.8,
-        "defense": -0.6,
-        "specialTeams": 0.1,
-        "strengthOfScheduleRank": 8,
-        "remainingStrengthOfScheduleRank": 31,
-        "averageWinProbabilityRank": 27
+        "overall": -3.5,
+        "rank": 24,
+        "trend": -5,
+        "offense": -1.7,
+        "defense": -1.6,
+        "specialTeams": -0.1,
+        "strengthOfScheduleRank": 11,
+        "remainingStrengthOfScheduleRank": 30,
+        "averageWinProbabilityRank": 30
       },
       "projections": {
         "projectedRecord": "8.1-8.8",
@@ -776,34 +776,34 @@ const ESPN_FPI_RATINGS = {
         "winSuperBowlPercent": 0.5
       },
       "efficiencies": {
-        "overall": 44.1,
-        "overallRank": 18,
-        "offense": 49.1,
-        "offenseRank": 14,
-        "defense": 37.5,
-        "defenseRank": 29,
-        "specialTeams": 59.5,
-        "specialTeamsRank": 12
+        "overall": 35.7,
+        "overallRank": 28,
+        "offense": 42.3,
+        "offenseRank": 17,
+        "defense": 39.6,
+        "defenseRank": 27,
+        "specialTeams": 38.2,
+        "specialTeamsRank": 23
       }
     },
     "LV": {
       "name": "Las Vegas Raiders",
-      "record": "3-1-0",
-      "overall": 71,
+      "record": "3-2-0",
+      "overall": 67,
       "offense": 70,
-      "defense": 76,
+      "defense": 73,
       "specialTeams": 74,
       "source": "ESPN FPI, projections and efficiencies",
       "espnFpi": {
-        "overall": -1.4,
-        "rank": 21,
-        "trend": 3,
-        "offense": -1.5,
-        "defense": 0.3,
+        "overall": -2.7,
+        "rank": 23,
+        "trend": -1,
+        "offense": -1.8,
+        "defense": -0.8,
         "specialTeams": -0.2,
-        "strengthOfScheduleRank": 25,
-        "remainingStrengthOfScheduleRank": 9,
-        "averageWinProbabilityRank": 6
+        "strengthOfScheduleRank": 26,
+        "remainingStrengthOfScheduleRank": 12,
+        "averageWinProbabilityRank": 15
       },
       "projections": {
         "projectedRecord": "8.5-8.5",
@@ -815,34 +815,34 @@ const ESPN_FPI_RATINGS = {
         "winSuperBowlPercent": 0.4
       },
       "efficiencies": {
-        "overall": 69.3,
-        "overallRank": 6,
-        "offense": 56.5,
-        "offenseRank": 10,
-        "defense": 67.6,
-        "defenseRank": 5,
-        "specialTeams": 64.9,
-        "specialTeamsRank": 10
+        "overall": 56.2,
+        "overallRank": 11,
+        "offense": 52.5,
+        "offenseRank": 12,
+        "defense": 53.8,
+        "defenseRank": 17,
+        "specialTeams": 57.9,
+        "specialTeamsRank": 12
       }
     },
     "PHI": {
       "name": "Philadelphia Eagles",
-      "record": "2-2-0",
-      "overall": 70,
-      "offense": 68,
-      "defense": 76,
-      "specialTeams": 75,
+      "record": "2-3-0",
+      "overall": 69,
+      "offense": 67,
+      "defense": 77,
+      "specialTeams": 76,
       "source": "ESPN FPI, projections and efficiencies",
       "espnFpi": {
-        "overall": -1.8,
-        "rank": 22,
-        "trend": -9,
-        "offense": -2.3,
-        "defense": 0.5,
-        "specialTeams": 0.1,
-        "strengthOfScheduleRank": 11,
-        "remainingStrengthOfScheduleRank": 10,
-        "averageWinProbabilityRank": 14
+        "overall": -1.9,
+        "rank": 21,
+        "trend": -5,
+        "offense": -2.8,
+        "defense": 0.7,
+        "specialTeams": 0.2,
+        "strengthOfScheduleRank": 8,
+        "remainingStrengthOfScheduleRank": 17,
+        "averageWinProbabilityRank": 13
       },
       "projections": {
         "projectedRecord": "7.8-9.1",
@@ -854,34 +854,34 @@ const ESPN_FPI_RATINGS = {
         "winSuperBowlPercent": 0.2
       },
       "efficiencies": {
-        "overall": 40.1,
-        "overallRank": 22,
-        "offense": 33.1,
-        "offenseRank": 24,
-        "defense": 44.3,
-        "defenseRank": 25,
-        "specialTeams": 74.2,
-        "specialTeamsRank": 4
+        "overall": 41.5,
+        "overallRank": 26,
+        "offense": 30.9,
+        "offenseRank": 27,
+        "defense": 49.3,
+        "defenseRank": 21,
+        "specialTeams": 71.6,
+        "specialTeamsRank": 5
       }
     },
     "PIT": {
       "name": "Pittsburgh Steelers",
-      "record": "2-2-0",
-      "overall": 69,
-      "offense": 68,
-      "defense": 75,
+      "record": "3-2-0",
+      "overall": 72,
+      "offense": 71,
+      "defense": 76,
       "specialTeams": 76,
       "source": "ESPN FPI, projections and efficiencies",
       "espnFpi": {
-        "overall": -2.1,
-        "rank": 23,
-        "trend": 0,
-        "offense": -2.4,
-        "defense": -0.0,
-        "specialTeams": 0.3,
+        "overall": -1.1,
+        "rank": 19,
+        "trend": 5,
+        "offense": -1.5,
+        "defense": 0.2,
+        "specialTeams": 0.2,
         "strengthOfScheduleRank": 23,
-        "remainingStrengthOfScheduleRank": 17,
-        "averageWinProbabilityRank": 22
+        "remainingStrengthOfScheduleRank": 16,
+        "averageWinProbabilityRank": 20
       },
       "projections": {
         "projectedRecord": "7.8-9.2",
@@ -893,34 +893,34 @@ const ESPN_FPI_RATINGS = {
         "winSuperBowlPercent": 0.1
       },
       "efficiencies": {
-        "overall": 43.5,
-        "overallRank": 20,
-        "offense": 30.8,
-        "offenseRank": 26,
-        "defense": 58.0,
-        "defenseRank": 12,
-        "specialTeams": 58.1,
-        "specialTeamsRank": 13
+        "overall": 50.2,
+        "overallRank": 16,
+        "offense": 39.0,
+        "offenseRank": 22,
+        "defense": 59.5,
+        "defenseRank": 11,
+        "specialTeams": 55.5,
+        "specialTeamsRank": 14
       }
     },
     "ATL": {
       "name": "Atlanta Falcons",
-      "record": "1-2-0",
-      "overall": 65,
-      "offense": 65,
-      "defense": 74,
+      "record": "2-3-0",
+      "overall": 68,
+      "offense": 70,
+      "defense": 73,
       "specialTeams": 75,
       "source": "ESPN FPI, projections and efficiencies",
       "espnFpi": {
-        "overall": -3.4,
-        "rank": 24,
+        "overall": -2.5,
+        "rank": 22,
         "trend": 4,
-        "offense": -3.2,
-        "defense": -0.3,
-        "specialTeams": 0.0,
-        "strengthOfScheduleRank": 27,
-        "remainingStrengthOfScheduleRank": 5,
-        "averageWinProbabilityRank": 25
+        "offense": -1.6,
+        "defense": -0.8,
+        "specialTeams": -0.1,
+        "strengthOfScheduleRank": 16,
+        "remainingStrengthOfScheduleRank": 7,
+        "averageWinProbabilityRank": 14
       },
       "projections": {
         "projectedRecord": "6.4-10.6",
@@ -932,33 +932,33 @@ const ESPN_FPI_RATINGS = {
         "winSuperBowlPercent": 0.1
       },
       "efficiencies": {
-        "overall": 40.0,
-        "overallRank": 23,
-        "offense": 26.3,
-        "offenseRank": 30,
-        "defense": 60.0,
-        "defenseRank": 10,
-        "specialTeams": 49.2,
-        "specialTeamsRank": 18
+        "overall": 49.0,
+        "overallRank": 19,
+        "offense": 45.1,
+        "offenseRank": 15,
+        "defense": 51.8,
+        "defenseRank": 18,
+        "specialTeams": 55.3,
+        "specialTeamsRank": 15
       }
     },
     "NYJ": {
       "name": "New York Jets",
-      "record": "1-3-0",
+      "record": "2-3-0",
       "overall": 62,
-      "offense": 66,
-      "defense": 71,
+      "offense": 64,
+      "defense": 72,
       "specialTeams": 76,
       "source": "ESPN FPI, projections and efficiencies",
       "espnFpi": {
-        "overall": -4.4,
-        "rank": 25,
-        "trend": 0,
-        "offense": -3.1,
-        "defense": -1.4,
-        "specialTeams": 0.2,
-        "strengthOfScheduleRank": 14,
-        "remainingStrengthOfScheduleRank": 27,
+        "overall": -4.5,
+        "rank": 26,
+        "trend": -1,
+        "offense": -3.6,
+        "defense": -1.1,
+        "specialTeams": 0.3,
+        "strengthOfScheduleRank": 25,
+        "remainingStrengthOfScheduleRank": 23,
         "averageWinProbabilityRank": 18
       },
       "projections": {
@@ -971,34 +971,34 @@ const ESPN_FPI_RATINGS = {
         "winSuperBowlPercent": 0.0
       },
       "efficiencies": {
-        "overall": 43.1,
-        "overallRank": 21,
-        "offense": 44.7,
-        "offenseRank": 15,
-        "defense": 46.8,
-        "defenseRank": 18,
-        "specialTeams": 45.9,
-        "specialTeamsRank": 22
+        "overall": 47.1,
+        "overallRank": 20,
+        "offense": 37.9,
+        "offenseRank": 23,
+        "defense": 54.5,
+        "defenseRank": 15,
+        "specialTeams": 59.4,
+        "specialTeamsRank": 11
       }
     },
     "CLE": {
       "name": "Cleveland Browns",
-      "record": "3-1-0",
+      "record": "3-2-0",
       "overall": 61,
-      "offense": 62,
-      "defense": 74,
+      "offense": 61,
+      "defense": 75,
       "specialTeams": 75,
       "source": "ESPN FPI, projections and efficiencies",
       "espnFpi": {
         "overall": -4.7,
-        "rank": 26,
-        "trend": 4,
-        "offense": -4.4,
-        "defense": -0.4,
-        "specialTeams": 0.1,
-        "strengthOfScheduleRank": 15,
-        "remainingStrengthOfScheduleRank": 24,
-        "averageWinProbabilityRank": 21
+        "rank": 27,
+        "trend": 1,
+        "offense": -4.8,
+        "defense": 0.1,
+        "specialTeams": 0.0,
+        "strengthOfScheduleRank": 19,
+        "remainingStrengthOfScheduleRank": 22,
+        "averageWinProbabilityRank": 25
       },
       "projections": {
         "projectedRecord": "7.7-9.2",
@@ -1010,33 +1010,33 @@ const ESPN_FPI_RATINGS = {
         "winSuperBowlPercent": 0.1
       },
       "efficiencies": {
-        "overall": 46.8,
-        "overallRank": 16,
-        "offense": 40.8,
-        "offenseRank": 18,
-        "defense": 55.0,
-        "defenseRank": 14,
-        "specialTeams": 48.1,
-        "specialTeamsRank": 21
+        "overall": 44.9,
+        "overallRank": 23,
+        "offense": 35.1,
+        "offenseRank": 25,
+        "defense": 61.9,
+        "defenseRank": 9,
+        "specialTeams": 36.2,
+        "specialTeamsRank": 25
       }
     },
     "TEN": {
       "name": "Tennessee Titans",
-      "record": "0-4-0",
-      "overall": 60,
-      "offense": 65,
-      "defense": 72,
+      "record": "0-5-0",
+      "overall": 56,
+      "offense": 63,
+      "defense": 71,
       "specialTeams": 73,
       "source": "ESPN FPI, projections and efficiencies",
       "espnFpi": {
-        "overall": -5.0,
-        "rank": 27,
-        "trend": 0,
-        "offense": -3.2,
-        "defense": -0.9,
+        "overall": -6.2,
+        "rank": 31,
+        "trend": -2,
+        "offense": -4.1,
+        "defense": -1.3,
         "specialTeams": -0.8,
-        "strengthOfScheduleRank": 26,
-        "remainingStrengthOfScheduleRank": 11,
+        "strengthOfScheduleRank": 22,
+        "remainingStrengthOfScheduleRank": 13,
         "averageWinProbabilityRank": 31
       },
       "projections": {
@@ -1049,34 +1049,34 @@ const ESPN_FPI_RATINGS = {
         "winSuperBowlPercent": 0.0
       },
       "efficiencies": {
-        "overall": 30.5,
-        "overallRank": 30,
-        "offense": 34.0,
-        "offenseRank": 23,
-        "defense": 50.7,
-        "defenseRank": 17,
-        "specialTeams": 13.6,
-        "specialTeamsRank": 30
+        "overall": 24.5,
+        "overallRank": 31,
+        "offense": 25.7,
+        "offenseRank": 31,
+        "defense": 46.9,
+        "defenseRank": 22,
+        "specialTeams": 16.9,
+        "specialTeamsRank": 32
       }
     },
     "ARI": {
       "name": "Arizona Cardinals",
-      "record": "1-3-0",
-      "overall": 59,
+      "record": "1-4-0",
+      "overall": 57,
       "offense": 69,
-      "defense": 66,
-      "specialTeams": 75,
+      "defense": 64,
+      "specialTeams": 74,
       "source": "ESPN FPI, projections and efficiencies",
       "espnFpi": {
-        "overall": -5.2,
-        "rank": 28,
-        "trend": 1,
-        "offense": -2.1,
-        "defense": -3.0,
-        "specialTeams": -0.1,
-        "strengthOfScheduleRank": 5,
-        "remainingStrengthOfScheduleRank": 3,
-        "averageWinProbabilityRank": 23
+        "overall": -5.9,
+        "rank": 30,
+        "trend": -3,
+        "offense": -2.0,
+        "defense": -3.6,
+        "specialTeams": -0.3,
+        "strengthOfScheduleRank": 3,
+        "remainingStrengthOfScheduleRank": 4,
+        "averageWinProbabilityRank": 28
       },
       "projections": {
         "projectedRecord": "4.8-12.2",
@@ -1088,34 +1088,34 @@ const ESPN_FPI_RATINGS = {
         "winSuperBowlPercent": 0.0
       },
       "efficiencies": {
-        "overall": 35.7,
-        "overallRank": 27,
-        "offense": 39.9,
+        "overall": 28.4,
+        "overallRank": 29,
+        "offense": 39.7,
         "offenseRank": 21,
-        "defense": 45.3,
-        "defenseRank": 21,
-        "specialTeams": 28.3,
-        "specialTeamsRank": 27
+        "defense": 37.5,
+        "defenseRank": 29,
+        "specialTeams": 18.6,
+        "specialTeamsRank": 31
       }
     },
     "WSH": {
       "name": "Washington Commanders",
-      "record": "1-3-0",
-      "overall": 59,
-      "offense": 64,
-      "defense": 70,
-      "specialTeams": 75,
+      "record": "1-3-1",
+      "overall": 65,
+      "offense": 72,
+      "defense": 68,
+      "specialTeams": 74,
       "source": "ESPN FPI, projections and efficiencies",
       "espnFpi": {
-        "overall": -5.3,
-        "rank": 29,
-        "trend": -3,
-        "offense": -3.6,
-        "defense": -1.5,
-        "specialTeams": -0.1,
-        "strengthOfScheduleRank": 7,
-        "remainingStrengthOfScheduleRank": 16,
-        "averageWinProbabilityRank": 24
+        "overall": -3.5,
+        "rank": 25,
+        "trend": -2,
+        "offense": -1.1,
+        "defense": -2.2,
+        "specialTeams": -0.2,
+        "strengthOfScheduleRank": 13,
+        "remainingStrengthOfScheduleRank": 11,
+        "averageWinProbabilityRank": 22
       },
       "projections": {
         "projectedRecord": "6.4-10.6",
@@ -1127,34 +1127,34 @@ const ESPN_FPI_RATINGS = {
         "winSuperBowlPercent": 0.1
       },
       "efficiencies": {
-        "overall": 33.8,
-        "overallRank": 28,
-        "offense": 36.3,
-        "offenseRank": 22,
-        "defense": 45.5,
-        "defenseRank": 20,
-        "specialTeams": 32.3,
-        "specialTeamsRank": 25
+        "overall": 37.4,
+        "overallRank": 27,
+        "offense": 39.9,
+        "offenseRank": 19,
+        "defense": 45.0,
+        "defenseRank": 24,
+        "specialTeams": 38.9,
+        "specialTeamsRank": 22
       }
     },
     "TB": {
       "name": "Tampa Bay Buccaneers",
-      "record": "0-4-0",
-      "overall": 55,
-      "offense": 54,
-      "defense": 76,
+      "record": "1-4-0",
+      "overall": 61,
+      "offense": 58,
+      "defense": 77,
       "specialTeams": 76,
       "source": "ESPN FPI, projections and efficiencies",
       "espnFpi": {
-        "overall": -6.6,
-        "rank": 30,
-        "trend": -10,
-        "offense": -7.1,
-        "defense": 0.3,
-        "specialTeams": 0.3,
-        "strengthOfScheduleRank": 20,
-        "remainingStrengthOfScheduleRank": 12,
-        "averageWinProbabilityRank": 30
+        "overall": -4.7,
+        "rank": 28,
+        "trend": 2,
+        "offense": -5.8,
+        "defense": 0.6,
+        "specialTeams": 0.4,
+        "strengthOfScheduleRank": 9,
+        "remainingStrengthOfScheduleRank": 19,
+        "averageWinProbabilityRank": 26
       },
       "projections": {
         "projectedRecord": "5.2-11.8",
@@ -1166,34 +1166,34 @@ const ESPN_FPI_RATINGS = {
         "winSuperBowlPercent": 0.1
       },
       "efficiencies": {
-        "overall": 36.6,
-        "overallRank": 26,
-        "offense": 20.2,
-        "offenseRank": 32,
-        "defense": 71.3,
+        "overall": 43.1,
+        "overallRank": 24,
+        "offense": 28.7,
+        "offenseRank": 30,
+        "defense": 68.4,
         "defenseRank": 4,
-        "specialTeams": 30.0,
+        "specialTeams": 34.8,
         "specialTeamsRank": 26
       }
     },
     "NYG": {
       "name": "New York Giants",
-      "record": "3-1-0",
-      "overall": 54,
-      "offense": 56,
+      "record": "3-1-1",
+      "overall": 58,
+      "offense": 61,
       "defense": 71,
       "specialTeams": 77,
       "source": "ESPN FPI, projections and efficiencies",
       "espnFpi": {
-        "overall": -7.1,
-        "rank": 31,
-        "trend": 0,
-        "offense": -6.5,
-        "defense": -1.2,
-        "specialTeams": 0.6,
-        "strengthOfScheduleRank": 18,
-        "remainingStrengthOfScheduleRank": 13,
-        "averageWinProbabilityRank": 12
+        "overall": -5.6,
+        "rank": 29,
+        "trend": 2,
+        "offense": -4.7,
+        "defense": -1.4,
+        "specialTeams": 0.5,
+        "strengthOfScheduleRank": 29,
+        "remainingStrengthOfScheduleRank": 14,
+        "averageWinProbabilityRank": 19
       },
       "projections": {
         "projectedRecord": "6.3-10.7",
@@ -1205,33 +1205,33 @@ const ESPN_FPI_RATINGS = {
         "winSuperBowlPercent": 0.0
       },
       "efficiencies": {
-        "overall": 50.4,
+        "overall": 50.5,
         "overallRank": 15,
-        "offense": 40.1,
-        "offenseRank": 20,
-        "defense": 46.5,
-        "defenseRank": 19,
-        "specialTeams": 85.9,
-        "specialTeamsRank": 1
+        "offense": 44.5,
+        "offenseRank": 16,
+        "defense": 46.1,
+        "defenseRank": 23,
+        "specialTeams": 75.9,
+        "specialTeamsRank": 4
       }
     },
     "MIA": {
       "name": "Miami Dolphins",
-      "record": "0-4-0",
-      "overall": 50,
-      "offense": 61,
-      "defense": 65,
-      "specialTeams": 74,
+      "record": "0-5-0",
+      "overall": 52,
+      "offense": 62,
+      "defense": 66,
+      "specialTeams": 73,
       "source": "ESPN FPI, projections and efficiencies",
       "espnFpi": {
-        "overall": -8.4,
+        "overall": -7.8,
         "rank": 32,
         "trend": 0,
-        "offense": -4.6,
-        "defense": -3.2,
-        "specialTeams": -0.5,
+        "offense": -4.2,
+        "defense": -3.0,
+        "specialTeams": -0.6,
         "strengthOfScheduleRank": 2,
-        "remainingStrengthOfScheduleRank": 7,
+        "remainingStrengthOfScheduleRank": 5,
         "averageWinProbabilityRank": 32
       },
       "projections": {
@@ -1244,14 +1244,14 @@ const ESPN_FPI_RATINGS = {
         "winSuperBowlPercent": 0.0
       },
       "efficiencies": {
-        "overall": 11.9,
+        "overall": 20.4,
         "overallRank": 32,
-        "offense": 27.3,
+        "offense": 29.0,
         "offenseRank": 29,
-        "defense": 21.7,
-        "defenseRank": 32,
-        "specialTeams": 9.3,
-        "specialTeamsRank": 32
+        "defense": 33.1,
+        "defenseRank": 30,
+        "specialTeams": 23.8,
+        "specialTeamsRank": 28
       }
     }
   }
