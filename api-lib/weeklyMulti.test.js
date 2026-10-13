@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { createWeeklyMultiCurrentHandler, createWeeklyMultiLockHandler, getDisplayLockCycle, getLockCycle, resolveDisplayWeekContext, resolveLockWeekContext } from "./weeklyMulti.js";
+import { createWeeklyMultiCurrentHandler, createWeeklyMultiLockHandler, fetchScheduleGamesForWindow, getDisplayLockCycle, getLockCycle, resolveDisplayWeekContext, resolveLockWeekContext } from "./weeklyMulti.js";
 import { createScheduleHandler } from "../api/nfl/schedule.js";
 
 const THURSDAY = Date.UTC(2026, 9, 8, 0, 0, 0);
@@ -28,7 +28,8 @@ function response() {
   return {
     statusCode: null,
     body: null,
-    setHeader() {},
+    headers: {},
+    setHeader(name, value) { this.headers[name] = value; },
     status(code) { this.statusCode = code; return this; },
     json(body) { this.body = body; return this; },
   };
@@ -80,6 +81,98 @@ test("schedule entry preserves existing schedule behavior without weeklyMultiMod
     currentHandler: async () => assert.fail("current handler must not run without the mode parameter"),
     lockHandler: async () => assert.fail("lock handler must not run without the mode parameter"),
   });
+
+test("dispatcher caches successful current responses for 120 seconds", async () => {
+  const handler = createScheduleHandler({
+    currentHandler: async (req, res) => res.status(200).json({ status: "locked" }),
+  });
+  const res = response();
+  await handler({ method: "GET", query: { weeklyMultiMode: "current" } }, res);
+  assert.equal(res.headers["Cache-Control"], "public, s-maxage=120, stale-while-revalidate=120");
+});
+
+test("dispatcher caches not-ready and error current responses for no more than 30 seconds", async () => {
+  for (const [status, body] of [[200, { status: "not ready" }], [500, { error: "failed" }]]) {
+    const handler = createScheduleHandler({
+      currentHandler: async (req, res) => res.status(status).json(body),
+    });
+    const res = response();
+    await handler({ method: "GET", query: { weeklyMultiMode: "current" } }, res);
+    assert.equal(res.headers["Cache-Control"], "public, s-maxage=30, stale-while-revalidate=30");
+  }
+});
+
+test("dispatcher does not add Weekly Best Multi cache headers to lock or no-mode schedule paths", async () => {
+  const lockHandler = createScheduleHandler({
+    lockHandler: async (req, res) => res.status(200).json({ status: "locked" }),
+  });
+  const lockResponse = response();
+  await lockHandler({ method: "GET", query: { weeklyMultiMode: "lock" } }, lockResponse);
+  assert.equal(lockResponse.headers["Cache-Control"], undefined);
+
+  const scheduleHandler = createScheduleHandler({
+    scheduleHandler: async (req, res) => res.status(200).json({ schedule: true }),
+  });
+  const scheduleResponse = response();
+  await scheduleHandler({ method: "GET", query: { season: 2026, week: 5 } }, scheduleResponse);
+  assert.equal(scheduleResponse.headers["Cache-Control"], undefined);
+});
+
+test("read route returns the current lock record at Tue 23:59 without provider lookup", async () => {
+  const expectedLockAt = THURSDAY - 7 * DAY;
+  const expectedLockDate = new Date(expectedLockAt);
+  assert.equal(expectedLockDate.getUTCDay(), 4);
+  assert.equal(expectedLockDate.getUTCHours(), 0);
+  assert.equal(expectedLockDate.getUTCMinutes(), 0);
+  const record = { season: 2026, week: 4, lock_at: expectedLockDate.toISOString() };
+  let providerCalls = 0;
+  const handler = createCurrentEntry({
+    getNow: () => date(-2, 23, 59),
+    fetchGames: async () => { providerCalls += 1; return []; },
+    createClient: () => ({
+      from: () => ({
+        select() { return this; },
+        eq(column, value) { assert.equal(column, "lock_at"); assert.equal(value, expectedLockDate.toISOString()); return this; },
+        async maybeSingle() { return { data: record, error: null }; },
+      }),
+    }),
+  });
+  const res = response();
+  await handler({ method: "GET", query: { weeklyMultiMode: "current" } }, res);
+  assert.equal(res.statusCode, 200);
+  assert.equal(res.body.record, record);
+  assert.equal(providerCalls, 0);
+});
+
+test("read route skips the previous lock record at Wed 00:00 and resolves the placeholder week", async () => {
+  const previousRecord = { season: 2026, week: 4, lock_at: new Date(THURSDAY - DAY).toISOString() };
+  let providerCalls = 0;
+  const handler = createCurrentEntry({
+    getNow: () => date(-1),
+    fetchGames: async () => {
+      providerCalls += 1;
+      return [{ season: 2026, week: 5, date: date(0, 1).toISOString(), postseason: false }];
+    },
+    createClient: () => ({
+      from: () => ({
+        select() { return this; },
+        eq(column, value) {
+          assert.equal(column, "lock_at");
+          assert.equal(value, new Date(THURSDAY - DAY).toISOString());
+          return this;
+        },
+        async maybeSingle() { return { data: null, error: null }; },
+      }),
+    }),
+  });
+  const res = response();
+  await handler({ method: "GET", query: { weeklyMultiMode: "current" } }, res);
+  assert.equal(res.statusCode, 200);
+  assert.equal(res.body.status, "before lock");
+  assert.equal(res.body.week, 5);
+  assert.notEqual(res.body.record, previousRecord);
+  assert.equal(providerCalls, 1);
+});
   const res = response();
   try {
     await handler({ method: "GET", query: { season: 2026, week: 5 } }, res);
@@ -326,7 +419,6 @@ test("lock route rejects absent and incorrect CRON_SECRET before accessing depen
 
 test("read route returns the saved multi for the schedule-backed display week", async () => {
   const calls = [];
-  const schedule = [{ season: 2026, week: 5, date: date(0, 1).toISOString(), postseason: false }];
   const record = { season: 2026, week: 5, lock_at: new Date(THURSDAY).toISOString(), legs: [{ result: "won" }, { result: "lost" }] };
   const chain = {
     select(columns) { calls.push(["select", columns]); return this; },
@@ -335,7 +427,7 @@ test("read route returns the saved multi for the schedule-backed display week", 
   };
   const handler = createCurrentEntry({
     getNow: () => date(0, 0, 30),
-    fetchGames: async () => schedule,
+    fetchGames: async () => { throw new Error("saved record must skip provider"); },
     createClient: () => ({ from(table) { calls.push(["from", table]); return chain; } }),
   });
   const res = response();
@@ -343,8 +435,74 @@ test("read route returns the saved multi for the schedule-backed display week", 
   assert.equal(res.statusCode, 200);
   assert.equal(res.body.record, record);
   assert.equal(res.body.week, 5);
-  assert.deepEqual(calls.filter(([method]) => method === "eq"), [["eq", "season", 2026], ["eq", "week", 5]]);
-  assert.equal(calls.some(([method]) => method === "lte"), false);
+  assert.deepEqual(calls.filter(([method]) => method === "eq"), [["eq", "lock_at", new Date(THURSDAY).toISOString()]]);
+});
+
+test("windowed schedule resolver derives the key and earliest kickoff with one request", async () => {
+  const requested = [];
+  const games = [
+    { season: 2026, week: 5, date: new Date(THURSDAY + 3 * 60 * 60 * 1000).toISOString(), postseason: false },
+    { season: 2026, week: 5, date: new Date(THURSDAY + 60 * 60 * 1000).toISOString(), postseason: false },
+  ];
+  const context = await resolveLockWeekContext(date(0, 0, 30), {
+    fetchGames: async (lockAt, end) => {
+      requested.push({ lockAt, end });
+      return games;
+    },
+  });
+  assert.equal(requested.length, 1);
+  assert.deepEqual([context.season, context.week], [2026, 5]);
+  assert.equal(context.firstKickoffAt, new Date(THURSDAY + 60 * 60 * 1000).toISOString());
+});
+
+test("plain-text 429 returns not ready without odds refresh or writes", async () => {
+  const originalSecret = process.env.CRON_SECRET;
+  process.env.CRON_SECRET = "expected-secret";
+  const database = createLockClient();
+  let oddsCalls = 0;
+  try {
+    const handler = createLockEntry({
+      getNow: () => date(0, 0, 30),
+      resolveContext: async () => ({ available: false, lockAt: new Date(THURSDAY).toISOString(), reason: "schedule provider rate limited" }),
+      createClient: () => database.client,
+      fetchOdds: async () => { oddsCalls += 1; throw new Error("must not refresh odds"); },
+    });
+    const res = response();
+    await handler({ method: "GET", headers: { authorization: "Bearer expected-secret" }, query: { weeklyMultiMode: "lock" } }, res);
+    assert.equal(res.statusCode, 200);
+    assert.equal(res.body.status, "not ready");
+    assert.equal(res.body.reason, "schedule provider rate limited");
+    assert.equal(oddsCalls, 0);
+    assert.equal(database.calls.some(([method]) => method === "insert"), false);
+  } finally {
+    if (originalSecret === undefined) delete process.env.CRON_SECRET;
+    else process.env.CRON_SECRET = originalSecret;
+  }
+});
+
+test("schedule retry honors Retry-After before the second request", async () => {
+  const originalApiKey = process.env.BALLDONTLIE_API_KEY;
+  process.env.BALLDONTLIE_API_KEY = "test-key";
+  const waits = [];
+  let requests = 0;
+  const headers = { get(name) { return name === "Retry-After" ? "1" : null; } };
+  const fetchImpl = async () => {
+    requests += 1;
+    if (requests === 1) return { ok: false, status: 429, headers, async text() { return "Too many requests"; } };
+    return { ok: true, status: 200, headers: { get() { return null; } }, async text() { return JSON.stringify({ data: [] }); } };
+  };
+  try {
+    const games = await fetchScheduleGamesForWindow(THURSDAY, THURSDAY + 7 * DAY, {
+      fetchImpl,
+      sleep: async (milliseconds) => waits.push(milliseconds),
+    });
+    assert.deepEqual(games, []);
+    assert.equal(requests, 2);
+    assert.deepEqual(waits, [1000]);
+  } finally {
+    if (originalApiKey === undefined) delete process.env.BALLDONTLIE_API_KEY;
+    else process.env.BALLDONTLIE_API_KEY = originalApiKey;
+  }
 });
 
 test("read route shows the placeholder only when the upcoming display week has regular-season games", async () => {
@@ -352,7 +510,13 @@ test("read route shows the placeholder only when the upcoming display week has r
   const handler = createCurrentEntry({
     getNow: () => date(-1),
     fetchGames: async () => schedule,
-    createClient: () => { throw new Error("placeholder state must not query saved records"); },
+    createClient: () => ({
+      from: () => ({
+        select() { return this; },
+        eq() { return this; },
+        async maybeSingle() { return { data: null, error: null }; },
+      }),
+    }),
   });
   const res = response();
   await handler({ method: "GET", query: { weeklyMultiMode: "current" } }, res);
@@ -370,7 +534,13 @@ test("read route returns not ready when the display window has no regular-season
     const handler = createCurrentEntry({
       getNow: () => date(-1),
       fetchGames: async () => schedule,
-      createClient: () => { throw new Error("not-ready state must not query saved records"); },
+      createClient: () => ({
+        from: () => ({
+          select() { return this; },
+          eq() { return this; },
+          async maybeSingle() { return { data: null, error: null }; },
+        }),
+      }),
     });
     const res = response();
     await handler({ method: "GET", query: { weeklyMultiMode: "current" } }, res);
@@ -385,7 +555,13 @@ test("read route returns not ready when the schedule lookup fails", async () => 
   const handler = createCurrentEntry({
     getNow: () => date(-1),
     fetchGames: async () => { throw new Error("schedule unavailable"); },
-    createClient: () => { throw new Error("schedule failure must not query saved records"); },
+    createClient: () => ({
+      from: () => ({
+        select() { return this; },
+        eq() { return this; },
+        async maybeSingle() { return { data: null, error: null }; },
+      }),
+    }),
   });
   const res = response();
   await handler({ method: "GET", query: { weeklyMultiMode: "current" } }, res);
@@ -411,7 +587,7 @@ test("read route does not fall back to an older saved week when the active week 
   await handler({ method: "GET", query: { weeklyMultiMode: "current" } }, res);
   assert.equal(res.body.status, "not ready");
   assert.match(res.body.message, /not ready yet/i);
-  assert.deepEqual(calls, [["season", 2026], ["week", 5]]);
+  assert.deepEqual(calls, [["lock_at", new Date(THURSDAY).toISOString()]]);
 });
 
 test("read route reports a missed week when no saved multi exists after first kickoff", async () => {

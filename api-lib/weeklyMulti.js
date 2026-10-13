@@ -4,6 +4,8 @@ const BALLDONTLIE_GAMES_URL = "https://api.balldontlie.io/nfl/v1/games";
 const ODDS_MAX_AGE_MS = 15 * 60 * 1000;
 const PREDICTION_MAX_AGE_MS = 24 * 60 * 60 * 1000;
 const RETRY_WINDOW_MS = 30 * 60 * 1000;
+const SCHEDULE_REQUEST_TIMEOUT_MS = 3000;
+const SCHEDULE_RETRY_DELAY_CAP_MS = 2500;
 const LEG_COUNT = 5;
 const START_PROBABILITY = 0.65;
 const FLOOR_PROBABILITY = 0.55;
@@ -40,7 +42,7 @@ export function getDisplayLockCycle(now = new Date()) {
   return { lockAt, eligible: !placeholder && current >= lockAt, placeholder };
 }
 
-export async function resolveLockWeekContext(now = new Date(), { allowBeforeLock = false, fetchGames = fetchSeasonGames } = {}) {
+export async function resolveLockWeekContext(now = new Date(), { allowBeforeLock = false, fetchGames = fetchScheduleGamesForWindow } = {}) {
   const cycle = getLockCycle(now);
   if (!cycle.eligible && !allowBeforeLock) {
     return {
@@ -61,7 +63,7 @@ export async function resolveLockWeekContext(now = new Date(), { allowBeforeLock
       available: false,
       lockAt: new Date(lockAt).toISOString(),
       deadlineAt: new Date(lockAt + RETRY_WINDOW_MS).toISOString(),
-      reason: `Schedule data is unavailable: ${error instanceof Error ? error.message : String(error)}`,
+      reason: getScheduleFailureReason(error),
     };
   }
   return {
@@ -72,7 +74,7 @@ export async function resolveLockWeekContext(now = new Date(), { allowBeforeLock
   };
 }
 
-export async function resolveDisplayWeekContext(now = new Date(), { fetchGames = fetchSeasonGames } = {}) {
+export async function resolveDisplayWeekContext(now = new Date(), { fetchGames = fetchScheduleGamesForWindow } = {}) {
   const cycle = getDisplayLockCycle(now);
   let context;
   try {
@@ -82,7 +84,7 @@ export async function resolveDisplayWeekContext(now = new Date(), { fetchGames =
       available: false,
       lockAt: new Date(cycle.lockAt).toISOString(),
       deadlineAt: new Date(cycle.lockAt + RETRY_WINDOW_MS).toISOString(),
-      reason: `Schedule data is unavailable: ${error instanceof Error ? error.message : String(error)}`,
+      reason: getScheduleFailureReason(error),
     };
   }
   return {
@@ -90,6 +92,13 @@ export async function resolveDisplayWeekContext(now = new Date(), { fetchGames =
     placeholder: context.available && cycle.placeholder,
     notReady: !context.available,
   };
+}
+
+function getScheduleFailureReason(error) {
+  const message = error instanceof Error ? error.message : String(error);
+  return message === "schedule provider rate limited"
+    ? message
+    : `Schedule data is unavailable: ${message}`;
 }
 
 function getNextThursday(now) {
@@ -108,11 +117,10 @@ function getMostRecentThursday(now) {
   return now.getTime() < thursday ? thursday - 7 * 24 * 60 * 60 * 1000 : thursday;
 }
 
-async function resolveScheduleWeek(lockAt, fetchGames = fetchSeasonGames) {
+async function resolveScheduleWeek(lockAt, fetchGames = fetchScheduleGamesForWindow) {
   const end = lockAt + 7 * 24 * 60 * 60 * 1000;
-  const calendarYears = [...new Set([new Date(lockAt).getUTCFullYear(), new Date(lockAt).getUTCFullYear() - 1])];
-  const gamesBySeason = await Promise.all(calendarYears.map(fetchGames));
-  const inWindow = gamesBySeason.flat().filter((game) => {
+  const games = await fetchGames(lockAt, end);
+  const inWindow = games.filter((game) => {
     const kickoff = new Date(game.date).getTime();
     return game.postseason !== true && Number(game.week) >= 1 && Number(game.week) <= 18 &&
       Number.isFinite(kickoff) && kickoff >= lockAt && kickoff < end;
@@ -146,32 +154,70 @@ async function resolveScheduleWeek(lockAt, fetchGames = fetchSeasonGames) {
   };
 }
 
-async function fetchSeasonGames(season) {
+export async function fetchScheduleGamesForWindow(lockAt, end, {
+  fetchImpl = fetch,
+  sleep = (milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds)),
+} = {}) {
   const apiKey = process.env.BALLDONTLIE_API_KEY;
   if (!apiKey) throw new Error("BALLDONTLIE_API_KEY is not configured for weekly lock week resolution");
   const games = [];
   let cursor = null;
+  let retriedRateLimit = false;
+  const params = new URLSearchParams({ per_page: "100" });
+  for (let day = Date.UTC(new Date(lockAt).getUTCFullYear(), new Date(lockAt).getUTCMonth(), new Date(lockAt).getUTCDate()); day < end; day += 24 * 60 * 60 * 1000) {
+    params.append("dates[]", new Date(day).toISOString().slice(0, 10));
+  }
   do {
-    const params = new URLSearchParams({ "seasons[]": String(season), per_page: "100" });
     if (cursor !== null) params.set("cursor", String(cursor));
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 12000);
     let response;
-    try {
-      response = await fetch(`${BALLDONTLIE_GAMES_URL}?${params.toString()}`, {
-        signal: controller.signal,
-        cache: "no-store",
-        headers: { Authorization: apiKey, Accept: "application/json" },
-      });
-    } finally {
-      clearTimeout(timeout);
+    let text;
+    while (true) {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), SCHEDULE_REQUEST_TIMEOUT_MS);
+      try {
+        response = await fetchImpl(`${BALLDONTLIE_GAMES_URL}?${params.toString()}`, {
+          signal: controller.signal,
+          cache: "no-store",
+          headers: { Authorization: apiKey, Accept: "application/json" },
+        });
+        text = await response.text();
+      } finally {
+        clearTimeout(timeout);
+      }
+      if (response.ok) break;
+      if (response.status === 429 && !retriedRateLimit) {
+        const delay = getRetryAfterDelay(response.headers?.get?.("Retry-After"), Date.now());
+        await sleep(Math.min(delay, SCHEDULE_RETRY_DELAY_CAP_MS));
+        retriedRateLimit = true;
+        continue;
+      }
+      if (response.status === 429) throw new Error("schedule provider rate limited");
+      let errorBody;
+      try {
+        errorBody = text ? JSON.parse(text) : {};
+      } catch {
+        errorBody = null;
+      }
+      throw new Error(errorBody?.error?.message || errorBody?.error || `Schedule request failed (${response.status})`);
     }
-    const body = await response.json();
-    if (!response.ok) throw new Error(body?.error?.message || body?.error || `Schedule request failed (${response.status})`);
-    games.push(...(Array.isArray(body.data) ? body.data.map((game) => ({ ...game, season: Number(game.season) || season })) : []));
+    let body;
+    try {
+      body = text ? JSON.parse(text) : {};
+    } catch {
+      throw new Error("Schedule provider returned invalid JSON");
+    }
+    games.push(...(Array.isArray(body.data) ? body.data : []));
     cursor = body.meta?.next_cursor ?? null;
   } while (cursor !== null);
   return games;
+}
+
+function getRetryAfterDelay(value, now) {
+  if (!value) return SCHEDULE_RETRY_DELAY_CAP_MS;
+  const seconds = Number(value);
+  if (Number.isFinite(seconds)) return Math.max(0, seconds * 1000);
+  const date = new Date(value).getTime();
+  return Number.isFinite(date) ? Math.max(0, date - now) : SCHEDULE_RETRY_DELAY_CAP_MS;
 }
 
 export function predictionSnapshotsForWeek(rows, context, now = new Date()) {
@@ -442,7 +488,7 @@ export function createWeeklyMultiCurrentHandler(overrides = {}) {
     resolveDisplayWeekContext(now, { fetchGames: overrides.fetchGames }));
 
   return async function handler(req, res) {
-    res.setHeader("Cache-Control", "no-store, max-age=0");
+    setWeeklyMultiReadCache(res, 30);
     if (req.method !== "GET") {
       res.setHeader("Allow", "GET");
       return res.status(405).json({ error: "Method not allowed" });
@@ -450,8 +496,30 @@ export function createWeeklyMultiCurrentHandler(overrides = {}) {
 
     try {
       const now = getNow();
+      const cycle = getDisplayLockCycle(now);
+      if (!cycle.placeholder) {
+        const lockAt = new Date(cycle.lockAt).toISOString();
+        const supabase = createClient();
+        const { data: savedRecord, error: savedRecordError } = await supabase
+          .from("weekly_best_multis")
+          .select("*")
+          .eq("lock_at", lockAt)
+          .maybeSingle();
+        if (savedRecordError) throw savedRecordError;
+        if (savedRecord) {
+          setWeeklyMultiReadCache(res, 180);
+          return res.status(200).json({
+            status: savedRecord.generated_late ? "generated late" : savedRecord.partial ? "partial" : "locked",
+            locked: true,
+            season: savedRecord.season,
+            week: savedRecord.week,
+            record: savedRecord,
+          });
+        }
+      }
       const context = await resolveDisplayContext(now);
       if (!context.available) {
+        setWeeklyMultiReadCache(res, 30);
         return res.status(200).json({
           status: "not ready",
           locked: false,
@@ -464,6 +532,7 @@ export function createWeeklyMultiCurrentHandler(overrides = {}) {
         });
       }
       if (context.placeholder) {
+        setWeeklyMultiReadCache(res, 180);
         return res.status(200).json({
           status: "before lock",
           locked: false,
@@ -473,46 +542,38 @@ export function createWeeklyMultiCurrentHandler(overrides = {}) {
           lockAt: context.lockAt,
         });
       }
-      const supabase = createClient();
-      const { data, error } = await supabase
-        .from("weekly_best_multis")
-        .select("*")
-        .eq("season", context.season)
-        .eq("week", context.week)
-        .maybeSingle();
-      if (error) throw error;
-      if (!data) {
-        const firstKickoff = new Date(context.firstKickoffAt || "").getTime();
-        if (Number.isFinite(firstKickoff) && now.getTime() >= firstKickoff) {
-          return res.status(200).json({
-            status: "missed",
-            locked: false,
-            season: context.season,
-            week: context.week,
-            firstKickoffAt: context.firstKickoffAt,
-            message: "No Weekly Best Multi was locked for this week.",
-          });
-        }
+      const firstKickoff = new Date(context.firstKickoffAt || "").getTime();
+      if (Number.isFinite(firstKickoff) && now.getTime() >= firstKickoff) {
+        setWeeklyMultiReadCache(res, 30);
         return res.status(200).json({
-          status: "not ready",
+          status: "missed",
           locked: false,
           season: context.season,
           week: context.week,
-          lockAt: context.lockAt,
-          message: "Weekly Best Multi is not ready yet. Please check back later.",
+          firstKickoffAt: context.firstKickoffAt,
+          message: "No Weekly Best Multi was locked for this week.",
         });
       }
+      setWeeklyMultiReadCache(res, 30);
       return res.status(200).json({
-        status: data.generated_late ? "generated late" : data.partial ? "partial" : "locked",
-        locked: true,
-        season: data.season,
-        week: data.week,
-        record: data,
+        status: "not ready",
+        locked: false,
+        season: context.season,
+        week: context.week,
+        lockAt: context.lockAt,
+        message: "Weekly Best Multi is not ready yet. Please check back later.",
       });
     } catch (error) {
       console.error("Weekly Best Multi read failed", error);
+      setWeeklyMultiReadCache(res, 30);
       return res.status(500).json({ error: "Weekly Best Multi read failed" });
     }
+
+function setWeeklyMultiReadCache(res, seconds) {
+  res.setHeader("Cache-Control", `public, s-maxage=${seconds}, stale-while-revalidate=${seconds}`);
+  res.setHeader("CDN-Cache-Control", `public, s-maxage=${seconds}`);
+  res.setHeader("Vercel-CDN-Cache-Control", `public, s-maxage=${seconds}, stale-while-revalidate=${seconds}`);
+}
   };
 }
 
