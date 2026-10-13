@@ -4,5 +4,11 @@
     "api/nfl/sleeper-players.js": {
       "includeFiles": "api/nfl/ea_player_records.json"
     }
-  }
+  },
+  "crons": [
+    {
+      "path": "/api/weekly-multi/lock",
+      "schedule": "0 1 * * *"
+    }
+  ]
 }
