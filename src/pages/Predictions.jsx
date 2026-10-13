@@ -22,6 +22,9 @@ const SEASON = 2026;
 const SCHEDULE_CACHE_PREFIX = "fourth-down:schedule";
 const SCHEDULE_CACHE_TTL_MS = 15 * 60 * 1000;
 const pendingScheduleRequests = new Map();
+const WEEKLY_PARLAY_MODEL_PROBABILITY_MIN = 0.65;
+const WEEKLY_PARLAY_MODEL_PROBABILITY_FLOOR = 0.55;
+const WEEKLY_PARLAY_LEG_COUNT = 5;
 
 export default function Predictions({ onOpen }) {
   const availableWeek = getCurrentWeek();
@@ -269,7 +272,7 @@ export default function Predictions({ onOpen }) {
   }, [week]);
 
   const predictions = useMemo(() => rows, [rows]);
-  const weeklyParlay = useLockedWeeklyParlay(predictions, week, availableWeek);
+  const weeklyParlay = useWeeklyParlay(predictions);
 
   const filtered = predictions.filter((row) => {
     if (filter === "agree") {
@@ -343,9 +346,7 @@ export default function Predictions({ onOpen }) {
         </div>
       </div>
 
-      {week === availableWeek && (
-        <WeeklyParlay parlay={weeklyParlay} week={week} />
-      )}
+      <WeeklyParlay parlay={weeklyParlay} week={weeklyParlay?.week} />
 
       <div className="predictions-summary-grid">
         <PredictionSummary
@@ -1117,91 +1118,73 @@ function formatPredictionWind(weather) {
     .join(" · ");
 }
 
-const WEEKLY_PARLAY_STORAGE_PREFIX = "fourth-down:weekly-best-multi";
-
-function useLockedWeeklyParlay(predictions, week, availableWeek) {
-  const liveParlay = useMemo(() => week === availableWeek ? buildWeeklyParlay(predictions, week) : null, [predictions, week, availableWeek]);
-  const [lockedParlay, setLockedParlay] = useState(null);
+function useWeeklyParlay(predictions) {
+  const [response, setResponse] = useState(null);
   useEffect(() => {
-    if (week !== availableWeek) { setLockedParlay(null); return; }
-    const key = `${WEEKLY_PARLAY_STORAGE_PREFIX}:${SEASON}:${week}`;
-    const stored = readLockedWeeklyParlay(key);
-    const isLocked = Date.now() >= getWeeklyParlayLockTime(week).getTime();
+    let active = true;
+    let controller;
+    const load = async () => {
+      controller?.abort();
+      controller = new AbortController();
+      try {
+        const result = await fetch("/api/weekly-multi/current", {
+          method: "GET",
+          cache: "no-store",
+          signal: controller.signal,
+          headers: { Accept: "application/json" },
+        });
+        if (!result.ok) throw new Error(`Weekly Best Multi request failed (${result.status})`);
+        const payload = await result.json();
+        if (active) setResponse(payload);
+      } catch (error) {
+        if (error?.name !== "AbortError" && active) setResponse({ status: "unavailable", error: error.message });
+      }
+    };
+    load();
+    const timer = window.setInterval(load, 60000);
+    return () => {
+      active = false;
+      controller?.abort();
+      window.clearInterval(timer);
+    };
+  }, []);
 
-    if (!isLocked) {
-      removeLockedWeeklyParlay(key);
-      setLockedParlay({
-        week,
-        legs: [],
-        decimalOdds: null,
-        modelProbability: null,
-        complete: false,
-        locked: false,
-      });
-      return;
-    }
-
-    if (stored?.legs?.length) {
-      const graded = gradeLockedWeeklyParlay(stored, predictions);
-      setLockedParlay(graded);
-      writeLockedWeeklyParlay(key, graded);
-      return;
-    }
-
-    if (liveParlay?.complete) {
-      const snapshot = { ...liveParlay, locked: true, lockedAt: new Date().toISOString(), legs: liveParlay.legs.map((leg) => ({ ...leg, result: "pending" })) };
-      setLockedParlay(snapshot);
-      writeLockedWeeklyParlay(key, snapshot);
-      return;
-    }
-
-    setLockedParlay({
-      week,
+  return useMemo(() => {
+    const record = response?.record;
+    if (!record) return {
+      week: response?.week,
       legs: [],
       decimalOdds: null,
       modelProbability: null,
+      modelProbabilityThreshold: null,
       complete: false,
+      locked: false,
+      status: response?.status || "loading",
+      placeholder: response?.placeholder === true || response?.status === "before lock",
+      reason: response?.reason || response?.message || response?.error || null,
+      lockAt: response?.lockAt || null,
+    };
+    const legs = (record.legs || []).map((leg) => ({
+      ...leg,
+      matchupKey: matchupKey(record.week, leg.awayCode, leg.homeCode),
+      result: "pending",
+    }));
+    const parlay = {
+      ...record,
+      week: record.week,
+      legs,
+      decimalOdds: legs.length ? legs.reduce((total, leg) => total * Number(leg.decimalOdds || 0), 1) : null,
+      modelProbability: legs.length ? legs.reduce((total, leg) => total * Number(leg.modelProbability || 0), 1) : null,
+      modelProbabilityThreshold: Number(record.model_probability_threshold),
+      complete: !record.partial && legs.length === WEEKLY_PARLAY_LEG_COUNT,
       locked: true,
-    });
-  }, [predictions, week, availableWeek, liveParlay]);
-  return lockedParlay;
+      status: response.status,
+      placeholder: false,
+    };
+    return gradeLockedWeeklyParlay(parlay, [...readPredictionLedger(), ...(predictions || [])]);
+  }, [response, predictions]);
 }
 
-function buildWeeklyParlay(predictions, week) {
-  const candidates = [];
-  const seen = new Set();
-  for (const prediction of predictions || []) {
-    for (const bet of prediction?.bestBets?.recommendations || []) {
-      const decimalOdds = getDecimalOddsValue(bet);
-      if (!Number.isFinite(decimalOdds) || decimalOdds <= 1) continue;
-      const key = [bet.market, bet.selection, bet.sportsbook].join(":");
-      if (seen.has(key)) continue;
-      seen.add(key);
-      candidates.push({ ...bet, decimalOdds, awayCode: prediction.awayCode, homeCode: prediction.homeCode, matchup: `${prediction.awayCode} at ${prediction.homeCode}`, matchupKey: matchupKey(prediction.week, prediction.awayCode, prediction.homeCode), kickoff: prediction.kickoff });
-    }
-  }
-  const legs = candidates.sort((a, b) => weeklyParlayScore(b) - weeklyParlayScore(a)).slice(0, 5);
-  return {
-    week,
-    legs,
-    decimalOdds: legs.length ? legs.reduce((total, leg) => total * leg.decimalOdds, 1) : null,
-    modelProbability: legs.length ? legs.reduce((total, leg) => total * Math.max(0, Math.min(1, Number(leg.modelProbability || 0))), 1) : null,
-    complete: legs.length === 5,
-  };
-}
-
-function getWeeklyParlayLockTime(week) {
-  return new Date(Date.UTC(2026, 8, 8, 0, 0, 0) + (Number(week) - 1) * 7 * 86400000 + 2 * 86400000);
-}
-function readLockedWeeklyParlay(key) {
-  try { const raw = localStorage.getItem(key); return raw ? JSON.parse(raw) : null; } catch { return null; }
-}
-function writeLockedWeeklyParlay(key, value) {
-  try { localStorage.setItem(key, JSON.stringify(value)); } catch { /* Keep the lock in memory. */ }
-}
-function removeLockedWeeklyParlay(key) {
-  try { localStorage.removeItem(key); } catch { /* Ignore unavailable storage. */ }
-}
 function gradeLockedWeeklyParlay(parlay, predictions) {
   const rows = new Map((predictions || []).map((row) => [matchupKey(row.week, row.awayCode, row.homeCode), row]));
   return { ...parlay, legs: (parlay.legs || []).map((leg) => ({ ...leg, result: gradeWeeklyParlayLeg(leg, rows.get(leg.matchupKey)) })) };
@@ -1242,18 +1225,11 @@ function resolveSelectedTeam(leg) {
   return null;
 }
 
-function weeklyParlayScore(bet) {
-  return (
-    Number(bet.score || 0) * 0.5 +
-    Number(bet.expectedValue || 0) * 0.3 +
-    Number(bet.edge || 0) * 0.12 +
-    Number(bet.modelProbability || 0) * 0.08
-  );
-}
-
 function getDecimalOddsValue(bet) {
-  const decimal = Number(bet?.decimalOdds);
-  if (Number.isFinite(decimal)) return decimal;
+  if (bet?.decimalOdds !== null && bet?.decimalOdds !== undefined && bet?.decimalOdds !== "") {
+    const decimal = Number(bet.decimalOdds);
+    if (Number.isFinite(decimal)) return decimal;
+  }
   const american = Number(bet?.price);
   if (!Number.isFinite(american) || american === 0) return null;
   return american > 0 ? 1 + american / 100 : 1 + 100 / Math.abs(american);
@@ -1261,6 +1237,11 @@ function getDecimalOddsValue(bet) {
 
 function WeeklyParlay({ parlay, week }) {
   const legs = parlay?.legs || [];
+  const statusLabels = [
+    parlay?.generated_late ? "Generated late" : null,
+    parlay?.partial ? "Partial" : parlay?.locked ? "Locked multi" : null,
+    parlay?.partial && legs.length === 0 ? "No legs available" : null,
+  ].filter(Boolean);
   return (
     <section
       className="card weekly-parlay-card"
@@ -1285,16 +1266,40 @@ function WeeklyParlay({ parlay, week }) {
         }}
       >
         <div style={{ minWidth: 0 }}>
-          <span className="eyebrow">WEEK {week}</span>
+          {week ? <span className="eyebrow">WEEK {week}</span> : null}
           <h2 style={{ margin: "7px 0 5px", fontSize: "clamp(1.3rem, 2.5vw, 1.75rem)" }}>
             Weekly Best Multi
           </h2>
-          <p style={{ margin: 0, color: "rgba(255,255,255,.64)", fontSize: "12px" }}>
-            The five strongest priced Best Bets across the week.
-          </p>
+          {parlay?.placeholder ? (
+            <p style={{ margin: "8px 0", color: "rgba(255,255,255,.72)", fontSize: "12px" }}>
+              Weekly Best Multi locks Thursday 10:00 AEST
+            </p>
+          ) : statusLabels.length > 0 && (
+            <div style={{ display: "flex", flexWrap: "wrap", gap: "6px", marginBottom: "8px" }}>
+              {statusLabels.map((label) => (
+                <strong key={label} style={{ color: label === "Partial" || label === "No legs available" ? "#ffd166" : "#b9ff55", fontSize: "11px", textTransform: "uppercase" }}>
+                  {label}
+                </strong>
+              ))}
+            </div>
+          )}
+          {parlay?.status === "not ready" ? (
+            <p style={{ margin: 0, color: "rgba(255,255,255,.64)", fontSize: "12px" }}>
+              Weekly Best Multi is not ready yet. Please check back later.
+            </p>
+          ) : !parlay?.placeholder && parlay?.status !== "missed" && (
+            <p style={{ margin: 0, color: "rgba(255,255,255,.64)", fontSize: "12px" }}>
+              Up to {WEEKLY_PARLAY_LEG_COUNT} best-value legs with positive edge. The model-probability gate relaxes from {formatPercent(WEEKLY_PARLAY_MODEL_PROBABILITY_MIN)} to {formatPercent(WEEKLY_PARLAY_MODEL_PROBABILITY_FLOOR)} only when needed.
+            </p>
+          )}
+          {parlay?.modelProbabilityThreshold !== null && parlay?.modelProbabilityThreshold !== undefined && (
+            <small style={{ display: "block", marginTop: "5px", color: "rgba(255,255,255,.46)", fontSize: "9px" }}>
+              {parlay.locked ? "Selected" : "Current selection"} at {formatPercent(parlay.modelProbabilityThreshold)} threshold
+            </small>
+          )}
         </div>
 
-        <div
+        {parlay?.locked && <div
           style={{
             minWidth: "150px",
             padding: "13px 15px",
@@ -1315,7 +1320,7 @@ function WeeklyParlay({ parlay, week }) {
               {formatPercent(parlay.modelProbability)} model chance
             </span>
           )}
-        </div>
+        </div>}
       </div>
 
       {legs.length ? (
@@ -1396,7 +1401,21 @@ function WeeklyParlay({ parlay, week }) {
         </div>
       ) : (
         <div style={{ padding: "22px", border: "1px dashed rgba(255,255,255,.14)", borderRadius: "12px", color: "rgba(255,255,255,.6)", textAlign: "center" }}>
-          Weekly Best Multi will be selected and locked at 10:00am AEST Thursday.
+          {parlay?.locked && parlay?.partial
+            ? "No legs available"
+            : parlay?.placeholder
+              ? "Weekly Best Multi locks Thursday 10:00 AEST"
+              : parlay?.locked
+                ? "Locked multi has no legs"
+                : parlay?.status === "loading"
+                  ? "Loading the shared Weekly Best Multi..."
+                  : parlay?.status === "unavailable"
+                    ? "Weekly Best Multi is temporarily unavailable."
+                    : parlay?.status === "not ready"
+                      ? "Weekly Best Multi is not ready yet. Please check back later."
+                    : parlay?.status === "missed"
+                      ? "No Weekly Best Multi was locked for this week."
+                      : "Weekly Best Multi locks Thursday 10:00 AEST"}
         </div>
       )}
 
@@ -1414,9 +1433,10 @@ function WeeklyParlay({ parlay, week }) {
       >
         <span>Same-game and correlated legs may not be accepted by every sportsbook.</span>
         {legs.length > 0 && !parlay.complete && (
-          <strong style={{ color: "#ffd166" }}>{legs.length} of 5 selections available</strong>
+          <strong style={{ color: "#ffd166" }}>{legs.length} of {WEEKLY_PARLAY_LEG_COUNT} selections available</strong>
         )}
       </div>
+
     </section>
   );
 }
