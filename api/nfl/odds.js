@@ -16,13 +16,25 @@ const OPTIONAL_PLAYER_MARKETS = [
 ];
 
 const PAGE_SIZE = 500;
+const MAX_CORE_PAGES_PER_MARKET = 4;
 const MAX_PAGES_PER_MARKET = 10;
 const ODDS_CACHE_MS = 5 * 60 * 1000;
+const REFRESH_REUSE_MS = 60 * 1000;
 
-let cachedOddsResponse = null;
-let oddsRequestInProgress = null;
-const CDN_CACHE_SECONDS = 300;
-const STALE_CACHE_SECONDS = 3600;
+// Shared Vercel CDN lifetimes. Core game odds change slowly before kickoff;
+// player props are only needed for Best Bets so they use a shorter lifetime.
+const CORE_CDN_SECONDS = 86400;
+const CORE_STALE_SECONDS = 86400;
+const PROPS_CDN_SECONDS = 21600;
+const PROPS_STALE_SECONDS = 86400;
+
+const DEFAULT_RETRY_AFTER_SECONDS = 60;
+const MAX_RETRY_AFTER_SECONDS = 3600;
+
+// Per-instance caches only hold genuine, complete provider responses.
+const memoryCache = { core: null, props: null, "core+props": null };
+const inFlightRequests = new Map();
+let rateLimitedUntil = 0;
 
 export default async function handler(req, res) {
   if (req.method !== "GET") {
@@ -31,9 +43,17 @@ export default async function handler(req, res) {
     });
   }
 
-  if (cachedOddsResponse && Date.now() - cachedOddsResponse.savedAt < ODDS_CACHE_MS) {
-    res.setHeader("Cache-Control", `public, s-maxage=${CDN_CACHE_SECONDS}, stale-while-revalidate=${STALE_CACHE_SECONDS}`);
-    return res.status(200).json({ ...cachedOddsResponse.payload, cacheStatus: "memory-hit" });
+  const params = new URL(req.url || "/", "http://localhost").searchParams;
+  // The Weekly Best Multi refresh needs live core and player-prop odds, so it
+  // bypasses every shared cache. All other callers use the cached paths.
+  const refresh = params.has("weeklyMultiRefresh");
+  const scope = refresh ? "core+props" : params.get("props") === "1" ? "props" : "core";
+
+  const cached = memoryCache[scope];
+  const cacheMs = refresh ? REFRESH_REUSE_MS : ODDS_CACHE_MS;
+  if (cached && Date.now() - cached.savedAt < cacheMs) {
+    setCacheHeaders(res, scope, !refresh);
+    return res.status(200).json({ ...cached.payload, cacheStatus: "memory-hit" });
   }
 
   const apiKey = process.env.SHARP_API_KEY;
@@ -44,109 +64,245 @@ export default async function handler(req, res) {
     });
   }
 
-  try {
-    const allRows = [];
-    const marketRecordCounts = {};
-    const discoveredRows = await fetchAllNflMarkets(apiKey);
-    marketRecordCounts.__all_markets__ = discoveredRows.length;
-    allRows.push(...discoveredRows);
+  const result = await shareInFlight(scope, () => loadOdds(scope, apiKey));
+  setCacheHeaders(res, scope, result.cacheable && !refresh);
+  return res.status(200).json(result.payload);
+}
 
-    /*
-     * Fetch markets sequentially.
-     * Do not use Promise.all here because the pre-game API
-     * may reject or throttle simultaneous requests.
-     */
-    for (const market of CORE_MARKETS) {
-      const marketRows = await fetchMarket(apiKey, market);
-      marketRecordCounts[market] = marketRows.length;
-      allRows.push(...marketRows);
+function shareInFlight(key, load) {
+  if (inFlightRequests.has(key)) return inFlightRequests.get(key);
+  const request = load().finally(() => inFlightRequests.delete(key));
+  inFlightRequests.set(key, request);
+  return request;
+}
+
+function setCacheHeaders(res, scope, cacheable) {
+  if (!cacheable) {
+    res.setHeader("Cache-Control", "no-store");
+    res.setHeader("Vercel-CDN-Cache-Control", "no-store");
+    return;
+  }
+  const fresh = scope === "props" ? PROPS_CDN_SECONDS : CORE_CDN_SECONDS;
+  const stale = scope === "props" ? PROPS_STALE_SECONDS : CORE_STALE_SECONDS;
+  // Browsers revalidate against the CDN; only Vercel's shared cache holds the response.
+  res.setHeader("Cache-Control", "public, max-age=0, must-revalidate");
+  res.setHeader(
+    "Vercel-CDN-Cache-Control",
+    `s-maxage=${fresh}, stale-while-revalidate=${stale}, stale-if-error=${stale}`
+  );
+}
+
+async function loadOdds(scope, apiKey) {
+  const state = {
+    rows: [],
+    marketRecordCounts: {},
+    completedMarkets: new Set(),
+    coreComplete: false,
+    propsFailed: false,
+    rateLimited: false,
+    retryAfterSeconds: null,
+    failureStatus: null,
+  };
+
+  const cooldownSeconds = Math.ceil((rateLimitedUntil - Date.now()) / 1000);
+  if (cooldownSeconds > 0) {
+    state.rateLimited = true;
+    state.retryAfterSeconds = cooldownSeconds;
+  } else {
+    if (scope !== "props") await fetchCoreOdds(apiKey, state);
+    // Player props are optional: they never run after a core failure or 429.
+    if (scope !== "core" && !state.rateLimited && (scope === "props" || state.coreComplete)) {
+      await fetchPlayerProps(apiKey, state);
     }
-    for (const market of OPTIONAL_PLAYER_MARKETS) {
-      try {
-        const marketRows = await fetchMarket(apiKey, market);
-        marketRecordCounts[market] = marketRows.length;
-        allRows.push(...marketRows);
-      } catch (error) {
-        marketRecordCounts[market] = 0;
-        console.warn(`Optional market ${market} unavailable`, error?.message || error);
-      }
-    }
+  }
 
-const eligibleRows = allRows.filter(isEligibleOddsRow);
-    const events = ensurePublishedFallbacks(buildEvents(eligibleRows));
+  if (state.rateLimited) {
+    const seconds = state.retryAfterSeconds || DEFAULT_RETRY_AFTER_SECONDS;
+    rateLimitedUntil = Math.max(rateLimitedUntil, Date.now() + seconds * 1000);
+  }
 
-res.setHeader(
-  "Cache-Control",
-  `public, s-maxage=${CDN_CACHE_SECONDS}, stale-while-revalidate=${STALE_CACHE_SECONDS}, stale-if-error=${STALE_CACHE_SECONDS}`
-);
+  const eligibleRows = state.rows.filter(
+    (row) => isEligibleOddsRow(row) && rowMatchesScope(row, scope)
+  );
+  const events = buildEvents(eligibleRows);
+  const partialMarkets = [
+    ...(scope === "props" ? [] : CORE_MARKETS),
+    ...(scope === "core" ? [] : ["player_props"]),
+  ].filter((market) =>
+    market === "player_props"
+      ? state.propsFailed || (state.rateLimited && scope !== "core" && !state.completedMarkets.has("player_props"))
+      : !state.completedMarkets.has(market)
+  );
 
-res.setHeader(
-  "CDN-Cache-Control",
-  `public, s-maxage=${CDN_CACHE_SECONDS}`
-);
+  const success =
+    events.length > 0 &&
+    (scope === "props" ? !state.rateLimited && !state.propsFailed : state.coreComplete);
 
-res.setHeader(
-  "Vercel-CDN-Cache-Control",
-  `public, s-maxage=${CDN_CACHE_SECONDS}, stale-while-revalidate=${STALE_CACHE_SECONDS}`
-);
+  const payload = {
+    count: events.length,
+    events,
+    provider: "SharpAPI",
+    scope,
+    rawRecordCount: state.rows.length,
+    eligibleRecordCount: eligibleRows.length,
+    rejectedPeriodRecordCount: state.rows.length - eligibleRows.length,
+    marketRecordCounts: state.marketRecordCounts,
+    rawMarketTypes: [...new Set(state.rows.map((row) => String(row?.market_type || row?.market || row?.market_key || "").trim()).filter(Boolean))].sort(),
+    playerPropRecordCount: eligibleRows.filter(isPlayerRow).length,
+    playerPropSamples: eligibleRows
+      .filter(isPlayerRow)
+      .slice(0, 25)
+      .map((row) => ({
+        event_id: row.event_id,
+        market_type: row.market_type || row.market || row.market_key,
+        player_name: getPlayerName(row),
+        selection: row.selection,
+        selection_type: row.selection_type,
+        line: getMarketPoint(row),
+        odds_american: getAmericanPrice(row),
+      })),
+    rateLimited: state.rateLimited,
+    partialMarkets,
+    refreshedAt: new Date().toISOString(),
+    cacheStatus: "fresh",
+  };
 
-const payload = {
-      count: events.length,
-      events,
-      provider: "SharpAPI",
-      rawRecordCount: allRows.length,
-      eligibleRecordCount: eligibleRows.length,
-      rejectedPeriodRecordCount: allRows.length - eligibleRows.length,
-      marketRecordCounts,
-      rawMarketTypes: [...new Set(allRows.map((row) => String(row?.market_type || row?.market || row?.market_key || "").trim()).filter(Boolean))].sort(),
-      playerPropRecordCount: allRows.filter((row) => getMarketKey(row?.market_type || row?.market || row?.market_key)?.startsWith("player_")).length,
-      playerPropSamples: allRows
-        .filter((row) => getMarketKey(row?.market_type || row?.market || row?.market_key)?.startsWith("player_"))
-        .slice(0, 25)
-        .map((row) => ({
-          event_id: row.event_id,
-          market_type: row.market_type || row.market || row.market_key,
-          player_name: getPlayerName(row),
-          selection: row.selection,
-          selection_type: row.selection_type,
-          line: getMarketPoint(row),
-          odds_american: getAmericanPrice(row),
-        })),
-      refreshedAt: new Date().toISOString(),
-      cacheStatus: "fresh",
-    };
+  if (success) {
+    memoryCache[scope] = { payload, savedAt: Date.now() };
+    return { payload, cacheable: true };
+  }
 
-    if (events.length > 0) {
-      const cachedCount = Number(cachedOddsResponse?.payload?.count) || 0;
-      if (!cachedOddsResponse || events.length >= cachedCount) {
-        cachedOddsResponse = { payload, savedAt: Date.now() };
-      }
-    }
+  const reason = state.rateLimited
+    ? `SharpAPI rate limit reached. Retry after ${state.retryAfterSeconds || DEFAULT_RETRY_AFTER_SECONDS} seconds.`
+    : state.failureStatus
+      ? `SharpAPI request failed (HTTP ${state.failureStatus}).`
+      : "SharpAPI returned no odds for the requested markets.";
+  if (state.rateLimited) payload.retryAfterSeconds = state.retryAfterSeconds || DEFAULT_RETRY_AFTER_SECONDS;
 
-    return res.status(200).json(payload);
-  } catch (error) {
-    console.error(
-      "SharpAPI odds request failed:",
-      error
-    );
-
-    if (cachedOddsResponse?.payload) {
-      return res.status(200).json({
-        ...cachedOddsResponse.payload,
+  // A genuine earlier complete response is preferred over partial or empty data.
+  const stale = memoryCache[scope]?.payload;
+  if (stale?.events?.length) {
+    return {
+      payload: {
+        ...stale,
         cacheStatus: "stale-fallback",
-        warning: "Live odds refresh failed. Showing cached odds.",
-      });
-    }
+        rateLimited: state.rateLimited,
+        partialMarkets,
+        warning: `Live odds refresh failed. Showing cached odds. ${reason}`,
+      },
+      cacheable: false,
+    };
+  }
 
-    return res.status(200).json({
+  if (events.length > 0) {
+    return {
+      payload: { ...payload, cacheStatus: "partial", warning: `Some odds markets are missing. ${reason}` },
+      cacheable: false,
+    };
+  }
+
+  return {
+    payload: {
       count: 0,
       events: [],
       provider: "SharpAPI",
+      scope,
+      rateLimited: state.rateLimited,
+      partialMarkets,
+      retryAfterSeconds: payload.retryAfterSeconds,
       cacheStatus: "unavailable",
-      warning: "Betting odds are temporarily unavailable.",
+      warning: `Betting odds are temporarily unavailable. ${reason}`,
       refreshedAt: new Date().toISOString(),
-    });
+    },
+    cacheable: false,
+  };
+}
+
+/*
+ * Core game odds: one request per full-game market, fetched sequentially.
+ * Do not use Promise.all here because the pre-game API may throttle
+ * simultaneous requests. The first failure stops further requests.
+ */
+async function fetchCoreOdds(apiKey, state) {
+  for (const market of CORE_MARKETS) {
+    try {
+      const marketRows = await fetchMarket(apiKey, market, MAX_CORE_PAGES_PER_MARKET);
+      state.marketRecordCounts[market] = marketRows.length;
+      state.rows.push(...marketRows);
+      state.completedMarkets.add(market);
+    } catch (error) {
+      recordFailure(state, market, error);
+      return;
+    }
   }
+  state.coreComplete = true;
+}
+
+/*
+ * Optional player props. Failures here never discard core odds, and the
+ * first HTTP 429 stops every remaining request.
+ */
+async function fetchPlayerProps(apiKey, state) {
+  try {
+    const discoveredRows = await fetchAllNflMarkets(apiKey);
+    state.marketRecordCounts.__all_markets__ = discoveredRows.length;
+    state.rows.push(...discoveredRows);
+  } catch (error) {
+    recordFailure(state, "__all_markets__", error);
+    state.propsFailed = true;
+    return;
+  }
+
+  for (const market of OPTIONAL_PLAYER_MARKETS) {
+    try {
+      const marketRows = await fetchMarket(apiKey, market, MAX_PAGES_PER_MARKET);
+      state.marketRecordCounts[market] = marketRows.length;
+      state.rows.push(...marketRows);
+    } catch (error) {
+      state.marketRecordCounts[market] = 0;
+      if (error?.status === 429) {
+        recordFailure(state, market, error);
+        state.propsFailed = true;
+        return;
+      }
+      console.warn(`Optional market ${market} unavailable`, error?.message || error);
+    }
+  }
+  state.completedMarkets.add("player_props");
+}
+
+function recordFailure(state, market, error) {
+  // Pages already received before the failure are genuine provider rows.
+  if (Array.isArray(error?.records) && error.records.length) {
+    state.marketRecordCounts[market] = error.records.length;
+    state.rows.push(...error.records);
+  }
+  if (error?.status === 429) {
+    state.rateLimited = true;
+    state.retryAfterSeconds = error.retryAfterSeconds || DEFAULT_RETRY_AFTER_SECONDS;
+  } else {
+    state.failureStatus = error?.status || 500;
+  }
+  console.error(`SharpAPI odds request failed for ${market}:`, error?.message || error);
+}
+
+function isPlayerRow(row) {
+  return Boolean(getMarketKey(row?.market_type || row?.market || row?.market_key)?.startsWith("player_"));
+}
+
+function rowMatchesScope(row, scope) {
+  if (scope === "core+props") return true;
+  return scope === "props" ? isPlayerRow(row) : !isPlayerRow(row);
+}
+
+function parseRetryAfter(value) {
+  if (value === null || value === undefined || value === "") return DEFAULT_RETRY_AFTER_SECONDS;
+  const seconds = Number(value);
+  const resolved = Number.isFinite(seconds)
+    ? seconds
+    : (new Date(value).getTime() - Date.now()) / 1000;
+  if (!Number.isFinite(resolved) || resolved <= 0) return DEFAULT_RETRY_AFTER_SECONDS;
+  return Math.min(MAX_RETRY_AFTER_SECONDS, Math.ceil(resolved));
 }
 
 async function fetchAllNflMarkets(apiKey) {
@@ -170,7 +326,14 @@ async function fetchAllNflMarkets(apiKey) {
     const text = await response.text();
     const body = parseResponse(text, "all_markets");
     if (!response.ok) {
-      // Discovery is additive. Core market requests below remain the fallback.
+      if (response.status === 429) {
+        const error = new Error(getApiErrorMessage(body, response.status, "all_markets"));
+        error.status = 429;
+        error.retryAfterSeconds = parseRetryAfter(response.headers?.get?.("retry-after"));
+        error.records = records;
+        throw error;
+      }
+      // Discovery is additive. Explicit market requests remain the fallback.
       console.warn("SharpAPI all-market discovery unavailable", getApiErrorMessage(body, response.status, "all_markets"));
       break;
     }
@@ -203,7 +366,8 @@ function rawRowIdentity(row) {
 
 async function fetchMarket(
   apiKey,
-  market
+  market,
+  maxPages = MAX_PAGES_PER_MARKET
 ) {
   const records = [];
   const seenRecordIds = new Set();
@@ -212,7 +376,7 @@ async function fetchMarket(
   let offset = 0;
   let pageNumber = 0;
 
-  while (pageNumber < MAX_PAGES_PER_MARKET) {
+  while (pageNumber < maxPages) {
     const params = new URLSearchParams({
       sport: "football",
       league: "nfl",
@@ -241,6 +405,10 @@ async function fetchMarket(
         getApiErrorMessage(body, response.status, market)
       );
       error.status = response.status;
+      error.retryAfterSeconds = response.status === 429
+        ? parseRetryAfter(response.headers?.get?.("retry-after"))
+        : null;
+      error.records = records;
       throw error;
     }
 
@@ -345,94 +513,19 @@ function getDataRows(body) {
 }
 
 
-function ensurePublishedFallbacks(events) {
-  const completeEvents = Array.isArray(events) ? [...events] : [];
-
-  const hasCardinalsGiants = completeEvents.some((event) => {
-    return (
-      normalizeNflTeam(event?.away_team) === "ARI" &&
-      normalizeNflTeam(event?.home_team) === "NYG"
-    );
-  });
-
-  if (hasCardinalsGiants) {
-    return completeEvents;
-  }
-
-  completeEvents.push({
-    id: "2026-W4-ARI-NYG-published-fallback",
-    sport_key: "americanfootball_nfl",
-    sport_title: "NFL",
-    commence_time: "2026-10-04T17:00:00.000Z",
-    home_team: "New York Giants",
-    away_team: "Arizona Cardinals",
-    home_team_code: "NYG",
-    away_team_code: "ARI",
-    bookmakers: [
-      {
-        key: "published-consensus-fallback",
-        title: "Published consensus",
-        last_update: "2026-09-28T05:12:36.000Z",
-        markets: [
-          {
-            key: "h2h",
-            outcomes: [
-              { name: "Arizona Cardinals", price: -115 },
-              { name: "New York Giants", price: -105 },
-            ],
-          },
-          {
-            key: "spreads",
-            outcomes: [
-              { name: "Arizona Cardinals", price: -102, point: -1.5 },
-              { name: "New York Giants", price: -118, point: 1.5 },
-            ],
-          },
-          {
-            key: "totals",
-            outcomes: [
-              { name: "Over", price: -108, point: 44.5 },
-              { name: "Under", price: -112, point: 44.5 },
-            ],
-          },
-        ],
-      },
-    ],
-    fallbackSource: "published-consensus",
-    fallbackReason: "Primary odds provider omitted the matchup",
-  });
-
-  return completeEvents;
-}
-
-function normalizeNflTeam(value) {
-  const name = normalizeName(value);
-  const aliases = {
-    ari: "ARI",
-    arz: "ARI",
-    arizona: "ARI",
-    cardinals: "ARI",
-    arizonacardinals: "ARI",
-    nyg: "NYG",
-    giants: "NYG",
-    nygiants: "NYG",
-    newyorkgiants: "NYG",
-  };
-
-  return aliases[name] || "";
-}
-
 function isEligibleOddsRow(row) {
   const marketType = String(row?.market_type || row?.market || row?.market_key || "");
   const marketKey = getMarketKey(marketType);
   if (!marketKey) return false;
-  if (!marketKey.startsWith("player_")) return true;
   return isFullGamePlayerMarket(row, marketType);
 }
 
+// Applies to every market: only genuine full-game, pregame, non-alternate rows.
 function isFullGamePlayerMarket(row, marketType) {
+  if (row?.is_live === true || row?.is_alternate_line === true) return false;
   const text = [marketType, row?.period, row?.period_type, row?.segment, row?.scope, row?.market_name]
     .filter(Boolean).join("_").toLowerCase().replace(/[\s-]+/g, "_");
+  if (/(^|_)(half|halves|halftime|quarter|quarters|h1|h2|1h|2h|live|inplay|in_play)(_|$)/.test(text)) return false;
   return !periodMarketMarkers().some((marker) => text.includes(marker));
 }
 

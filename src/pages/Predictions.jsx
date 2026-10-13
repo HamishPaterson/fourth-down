@@ -13,7 +13,7 @@ import {
   CURRENT_MODEL_KEY,
   CURRENT_MODEL_VERSION,
 } from "../services/predictionLedger.js";
-import { findOddsForGame, getNflOdds } from "../services/oddsApi.js";
+import { findOddsForGame, getNflOddsWithProps } from "../services/oddsApi.js";
 import { getFullGamePrediction } from "../services/gamePredictionService.js";
 import { getPlayerRating, resolveFullPlayerName } from "../services/playerRatings.js";
 import { getStadiumWeather } from "../services/weatherApi.js";
@@ -48,7 +48,7 @@ export default function Predictions({ onOpen }) {
         const cachedSchedule = readScheduleCache(SEASON, week);
         const [scheduleResult, oddsResult] = await Promise.allSettled([
           fetchSchedule(SEASON, week, controller.signal),
-          getNflOdds(controller.signal),
+          getNflOddsWithProps(controller.signal),
         ]);
 
         const liveSchedule =

@@ -34,8 +34,119 @@ export async function getNflOdds(signal, options = {}) {
   return pendingRequest;
 }
 
-async function requestNflOdds(signal) {
-  const response = await fetch("/api/nfl/odds", {
+const PROPS_CACHE_KEY = "fourth-down:nfl-odds-props";
+const PROPS_CACHE_TTL_MS = 30 * 60 * 1000;
+
+let propsMemoryCache = null;
+let pendingPropsRequest = null;
+
+/*
+ * Core odds plus optional player props (used by Best Bets). Props come from
+ * the separate /api/nfl/odds?props=1 request and never block or discard core
+ * odds: if the props request fails, core events are returned unchanged.
+ */
+export async function getNflOddsWithProps(signal, options = {}) {
+  const coreEvents = await getNflOdds(signal, options);
+
+  let propEvents = [];
+  try {
+    propEvents = await getPropEvents(signal, options.forceRefresh === true);
+  } catch (error) {
+    console.warn("Player prop odds unavailable. Using core odds only.", error);
+  }
+
+  return mergePropEvents(coreEvents, propEvents);
+}
+
+async function getPropEvents(signal, forceRefresh) {
+  if (!forceRefresh) {
+    const cached = readPropsCache();
+    if (cached) return cached;
+  }
+
+  if (!pendingPropsRequest) {
+    pendingPropsRequest = requestNflOdds(signal, "/api/nfl/odds?props=1")
+      .then((events) => {
+        // Only keep non-empty prop responses so a rate-limited miss is retried.
+        if (events.length > 0) savePropsCache(events);
+        return events;
+      })
+      .finally(() => {
+        pendingPropsRequest = null;
+      });
+  }
+
+  return pendingPropsRequest;
+}
+
+function readPropsCache() {
+  if (propsMemoryCache && Date.now() - propsMemoryCache.savedAt < PROPS_CACHE_TTL_MS) {
+    return propsMemoryCache.events;
+  }
+
+  try {
+    const cached = JSON.parse(sessionStorage.getItem(PROPS_CACHE_KEY) || "null");
+    if (
+      cached &&
+      Array.isArray(cached.events) &&
+      Date.now() - Number(cached.savedAt || 0) < PROPS_CACHE_TTL_MS
+    ) {
+      propsMemoryCache = cached;
+      return cached.events;
+    }
+  } catch {
+    // Fall through to a network request.
+  }
+
+  return null;
+}
+
+function savePropsCache(events) {
+  propsMemoryCache = { events, savedAt: Date.now() };
+
+  try {
+    sessionStorage.setItem(PROPS_CACHE_KEY, JSON.stringify(propsMemoryCache));
+  } catch {
+    // In-memory caching remains available.
+  }
+}
+
+function mergePropEvents(coreEvents, propEvents) {
+  if (!Array.isArray(propEvents) || propEvents.length === 0) return coreEvents;
+
+  const teamKey = (event) =>
+    `${String(event?.away_team || "").toLowerCase()}@${String(event?.home_team || "").toLowerCase()}`;
+  const byId = new Map(coreEvents.map((event) => [event.id, event]));
+  const byTeams = new Map(coreEvents.map((event) => [teamKey(event), event]));
+  const additions = new Map();
+
+  for (const propEvent of propEvents) {
+    const target = byId.get(propEvent.id) || byTeams.get(teamKey(propEvent));
+    if (!target) continue;
+    additions.set(target, [...(additions.get(target) || []), ...(propEvent.bookmakers || [])]);
+  }
+
+  return coreEvents.map((event) => {
+    const extra = additions.get(event);
+    if (!extra) return event;
+
+    const bookmakers = (event.bookmakers || []).map((bookmaker) => ({
+      ...bookmaker,
+      markets: [...(bookmaker.markets || [])],
+    }));
+
+    for (const propBookmaker of extra) {
+      const existing = bookmakers.find((bookmaker) => bookmaker.key === propBookmaker.key);
+      if (existing) existing.markets.push(...(propBookmaker.markets || []));
+      else bookmakers.push({ ...propBookmaker, markets: [...(propBookmaker.markets || [])] });
+    }
+
+    return { ...event, bookmakers };
+  });
+}
+
+async function requestNflOdds(signal, url = "/api/nfl/odds") {
+  const response = await fetch(url, {
     signal,
     headers: { Accept: "application/json" },
   });
