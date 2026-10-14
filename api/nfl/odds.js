@@ -233,10 +233,11 @@ async function fetchCoreOdds(apiKey, state) {
       let marketRows;
       if (market === "moneyline") {
         marketRows = await fetchMarket(apiKey, market, MAX_CORE_PAGES_PER_MARKET);
-        expectedEventIds = collectUsableEventIds(marketRows);
+        expectedEventIds = selectCurrentWeekEventIds(marketRows);
       } else {
         // Half/quarter/alternate rows are rejected after retrieval, so keep
-        // paging until every moneyline event has a genuine full-game line.
+        // paging until every current-week moneyline event has a genuine
+        // full-game line. Future-week events never extend paging.
         marketRows = await fetchMarket(
           apiKey,
           market,
@@ -266,6 +267,33 @@ function collectUsableEventIds(rows) {
 function hasEveryEvent(found, expected) {
   for (const id of expected) if (!found.has(id)) return false;
   return true;
+}
+
+// Same week calculation as Predictions.jsx and Schedule.jsx: week 1 starts
+// Tuesday 8 September 2026 (UTC) and each week lasts seven days.
+const WEEK_ONE_START_MS = Date.UTC(2026, 8, 8, 0, 0, 0);
+const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
+// Monday night kickoffs fall just after 00:00 UTC Tuesday, so the window
+// boundary is moved to midday Tuesday to keep them in their own week.
+const WEEK_BOUNDARY_OFFSET_MS = 12 * 60 * 60 * 1000;
+
+function getCurrentWeekWindow(now = Date.now()) {
+  const week = Math.min(18, Math.max(1, Math.floor((now - WEEK_ONE_START_MS) / WEEK_MS) + 1));
+  const start = WEEK_ONE_START_MS + (week - 1) * WEEK_MS + WEEK_BOUNDARY_OFFSET_MS;
+  return { week, start, end: start + WEEK_MS };
+}
+
+function selectCurrentWeekEventIds(rows) {
+  const { start, end } = getCurrentWeekWindow();
+  const ids = new Set();
+  for (const row of rows) {
+    if (!row?.event_id || !isUsableRow(row) || !isEligibleOddsRow(row)) continue;
+    const kickoff = new Date(row.event_start_time || 0).getTime();
+    if (kickoff >= start && kickoff < end) ids.add(row.event_id);
+  }
+  // With no current-week games in the provider data, fall back to every known
+  // event rather than stopping paging on an empty target.
+  return ids.size ? ids : collectUsableEventIds(rows);
 }
 
 
