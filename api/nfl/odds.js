@@ -17,6 +17,8 @@ const OPTIONAL_PLAYER_MARKETS = [
 
 const PAGE_SIZE = 500;
 const MAX_CORE_PAGES_PER_MARKET = 4;
+// Runaway guard only; paging normally ends on coverage or provider exhaustion.
+const MAX_CORE_SAFETY_PAGES = 25;
 const MAX_PAGES_PER_MARKET = 10;
 const ODDS_CACHE_MS = 5 * 60 * 1000;
 const REFRESH_REUSE_MS = 60 * 1000;
@@ -224,9 +226,24 @@ async function loadOdds(scope, apiKey) {
  * simultaneous requests. The first failure stops further requests.
  */
 async function fetchCoreOdds(apiKey, state) {
+  let expectedEventIds = new Set();
+
   for (const market of CORE_MARKETS) {
     try {
-      const marketRows = await fetchMarket(apiKey, market, MAX_CORE_PAGES_PER_MARKET);
+      let marketRows;
+      if (market === "moneyline") {
+        marketRows = await fetchMarket(apiKey, market, MAX_CORE_PAGES_PER_MARKET);
+        expectedEventIds = collectUsableEventIds(marketRows);
+      } else {
+        // Half/quarter/alternate rows are rejected after retrieval, so keep
+        // paging until every moneyline event has a genuine full-game line.
+        marketRows = await fetchMarket(
+          apiKey,
+          market,
+          MAX_CORE_SAFETY_PAGES,
+          (records) => hasEveryEvent(collectUsableEventIds(records), expectedEventIds)
+        );
+      }
       state.marketRecordCounts[market] = marketRows.length;
       state.rows.push(...marketRows);
       state.completedMarkets.add(market);
@@ -237,6 +254,20 @@ async function fetchCoreOdds(apiKey, state) {
   }
   state.coreComplete = true;
 }
+
+function collectUsableEventIds(rows) {
+  const ids = new Set();
+  for (const row of rows) {
+    if (row?.event_id && isUsableRow(row) && isEligibleOddsRow(row)) ids.add(row.event_id);
+  }
+  return ids;
+}
+
+function hasEveryEvent(found, expected) {
+  for (const id of expected) if (!found.has(id)) return false;
+  return true;
+}
+
 
 /*
  * Optional player props. Failures here never discard core odds, and the
@@ -367,7 +398,8 @@ function rawRowIdentity(row) {
 async function fetchMarket(
   apiKey,
   market,
-  maxPages = MAX_PAGES_PER_MARKET
+  maxPages = MAX_PAGES_PER_MARKET,
+  isComplete = null
 ) {
   const records = [];
   const seenRecordIds = new Set();
@@ -450,6 +482,8 @@ async function fetchMarket(
     }
 
     pageNumber += 1;
+
+    if (isComplete && isComplete(records)) break;
 
     const pagination = body?.pagination || body?.meta || {};
     const nextOffset = numberOrNull(
