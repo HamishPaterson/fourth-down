@@ -41,9 +41,10 @@ let propsMemoryCache = null;
 let pendingPropsRequest = null;
 
 /*
- * Core odds plus optional player props (used by Best Bets). Props come from
- * the separate /api/nfl/odds?props=1 request and never block or discard core
- * odds: if the props request fails, core events are returned unchanged.
+ * Core odds plus optional player props (used by Best Bets). Props are read from
+ * the stored Supabase snapshots (/api/nfl/odds?props=1&source=snapshot), which
+ * never call SharpAPI. They never block or discard core odds: if the props
+ * request fails, core events are returned unchanged.
  */
 export async function getNflOddsWithProps(signal, options = {}) {
   const coreEvents = await getNflOdds(signal, options);
@@ -65,7 +66,7 @@ async function getPropEvents(signal, forceRefresh) {
   }
 
   if (!pendingPropsRequest) {
-    pendingPropsRequest = requestNflOdds(signal, "/api/nfl/odds?props=1")
+    pendingPropsRequest = requestNflOdds(signal, "/api/nfl/odds?props=1&source=snapshot")
       .then((events) => {
         // Only keep non-empty prop responses so a rate-limited miss is retried.
         if (events.length > 0) savePropsCache(events);
