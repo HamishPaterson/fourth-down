@@ -144,7 +144,7 @@ test("read route returns the current lock record at Tue 23:59 without provider l
   assert.equal(providerCalls, 0);
 });
 
-test("read route skips the previous lock record at Wed 00:00 and resolves the placeholder week", async () => {
+test("read route resolves the placeholder week at Wed 00:00 when the previous multi has no unsettled legs", async () => {
   const previousRecord = { season: 2026, week: 4, lock_at: new Date(THURSDAY - DAY).toISOString() };
   let providerCalls = 0;
   const handler = createCurrentEntry({
@@ -158,7 +158,7 @@ test("read route skips the previous lock record at Wed 00:00 and resolves the pl
         select() { return this; },
         eq(column, value) {
           assert.equal(column, "lock_at");
-          assert.equal(value, new Date(THURSDAY - DAY).toISOString());
+          assert.equal(value, new Date(THURSDAY - 7 * DAY).toISOString());
           return this;
         },
         async maybeSingle() { return { data: null, error: null }; },

@@ -53,7 +53,6 @@ const MAX_CORE_PAGES_PER_MARKET = 4;
 const MAX_CORE_SAFETY_PAGES = 25;
 const MAX_PAGES_PER_MARKET = 10;
 const ODDS_CACHE_MS = 5 * 60 * 1000;
-const REFRESH_REUSE_MS = 60 * 1000;
 
 // Core odds are read from Supabase snapshots, so the CDN only needs to absorb
 // bursts. Kept short so a newly refreshed snapshot is visible within minutes.
@@ -68,7 +67,7 @@ const DEFAULT_RETRY_AFTER_SECONDS = 60;
 const MAX_RETRY_AFTER_SECONDS = 3600;
 
 // Per-instance caches only hold genuine, complete provider responses.
-const memoryCache = { props: null, "core+props": null };
+const memoryCache = { props: null };
 const inFlightRequests = new Map();
 let rateLimitedUntil = 0;
 
@@ -89,26 +88,22 @@ export async function handleOddsRequest(req, res, deps = {}) {
     return handleMarketRefresh(req, res, params.get("refreshMarket"), deps);
   }
 
-  // The Weekly Best Multi refresh needs live core and player-prop odds, so it
-  // bypasses every shared cache. All other callers use the cached paths.
-  const refresh = params.has("weeklyMultiRefresh");
-  const scope = refresh ? "core+props" : params.get("props") === "1" ? "props" : "core";
+  const scope = params.get("props") === "1" ? "props" : "core";
 
   // Normal core requests read Supabase snapshots and never call SharpAPI.
   if (scope === "core") {
     return handleCoreFromSnapshots(res, deps);
   }
 
-  // Opt-in read of stored player snapshots. The default ?props=1 stays live
-  // until Best Bets and Weekly Best Multi are moved over in a later phase.
+  // Opt-in read of stored player snapshots. Best Bets and Weekly Best Multi use
+  // this path; the default ?props=1 stays live.
   if (scope === "props" && params.get("source") === "snapshot") {
     return handlePropsFromSnapshots(res, deps);
   }
 
   const cached = memoryCache[scope];
-  const cacheMs = refresh ? REFRESH_REUSE_MS : ODDS_CACHE_MS;
-  if (cached && Date.now() - cached.savedAt < cacheMs) {
-    setCacheHeaders(res, scope, !refresh);
+  if (cached && Date.now() - cached.savedAt < ODDS_CACHE_MS) {
+    setCacheHeaders(res, scope, true);
     return res.status(200).json({ ...cached.payload, cacheStatus: "memory-hit" });
   }
 
@@ -121,7 +116,7 @@ export async function handleOddsRequest(req, res, deps = {}) {
   }
 
   const result = await shareInFlight(scope, () => loadOdds(scope, apiKey));
-  setCacheHeaders(res, scope, result.cacheable && !refresh);
+  setCacheHeaders(res, scope, result.cacheable);
   return res.status(200).json(result.payload);
 }
 

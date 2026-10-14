@@ -993,7 +993,7 @@ function formatFullPlayerSelection(value) {
 }
 
 function formatAustralianOdds(decimalOdds, americanPrice) {
-  let decimal = Number(decimalOdds);
+  let decimal = decimalOdds === null || decimalOdds === undefined || decimalOdds === "" ? NaN : Number(decimalOdds);
   if (!Number.isFinite(decimal)) {
     const price = Number(americanPrice);
     if (!Number.isFinite(price)) return "Odds unavailable";
@@ -1145,16 +1145,17 @@ function useWeeklyParlay(predictions) {
       reason: response?.reason || response?.message || response?.error || null,
       lockAt: response?.lockAt || null,
     };
-    const legs = (record.legs || []).map((leg) => ({
+    const legs = (record.legs || []).map((leg, legIndex) => ({
       ...leg,
       matchupKey: matchupKey(record.week, leg.awayCode, leg.homeCode),
       result: "pending",
+      serverResult: response.legResults?.[legIndex] ?? null,
     }));
     const parlay = {
       ...record,
       week: record.week,
       legs,
-      decimalOdds: legs.length ? legs.reduce((total, leg) => total * Number(leg.decimalOdds || 0), 1) : null,
+      decimalOdds: legs.length && legs.every((leg) => Number(leg.decimalOdds) > 1) ? legs.reduce((total, leg) => total * Number(leg.decimalOdds), 1) : null,
       modelProbability: legs.length ? legs.reduce((total, leg) => total * Number(leg.modelProbability || 0), 1) : null,
       modelProbabilityThreshold: Number(record.model_probability_threshold),
       complete: !record.partial && legs.length === WEEKLY_PARLAY_LEG_COUNT,
@@ -1171,6 +1172,8 @@ function gradeLockedWeeklyParlay(parlay, predictions) {
   return { ...parlay, legs: (parlay.legs || []).map((leg) => ({ ...leg, result: gradeWeeklyParlayLeg(leg, rows.get(leg.matchupKey)) })) };
 }
 function gradeWeeklyParlayLeg(leg, prediction) {
+  // Player-prop and Anytime TD legs are settled server-side from final player stats.
+  if (["won", "lost", "push"].includes(leg.serverResult)) return leg.serverResult;
   const explicit = String(leg.result || leg.status || leg.outcome || "").toLowerCase();
   if (["won", "win", "success", "successful", "hit"].includes(explicit)) return "won";
   if (["lost", "loss", "failed", "fail", "miss"].includes(explicit)) return "lost";

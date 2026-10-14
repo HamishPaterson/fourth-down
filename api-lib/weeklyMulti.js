@@ -1,7 +1,11 @@
 import { createClient } from "@supabase/supabase-js";
+import { SNAPSHOT_MAX_AGE_MS } from "./oddsSnapshots.js";
+import { isPlayerLeg, settleLockedLegs } from "./weeklyMultiSettlement.js";
 
 const BALLDONTLIE_GAMES_URL = "https://api.balldontlie.io/nfl/v1/games";
-const ODDS_MAX_AGE_MS = 15 * 60 * 1000;
+// Odds now come from once-a-day stored snapshots, so quote age is bounded by
+// the snapshot freshness window instead of a live-fetch window.
+const ODDS_MAX_AGE_MS = SNAPSHOT_MAX_AGE_MS;
 const PREDICTION_MAX_AGE_MS = 24 * 60 * 60 * 1000;
 const RETRY_WINDOW_MS = 30 * 60 * 1000;
 const SCHEDULE_REQUEST_TIMEOUT_MS = 3000;
@@ -263,12 +267,39 @@ export function buildWeeklyMultiSelection(snapshots, oddsPayload, context, now =
   const candidates = [];
   const oddsEvents = Array.isArray(oddsPayload?.events) ? oddsPayload.events : [];
   for (const snapshot of snapshots || []) {
+    const bestBetsPayload = snapshot.bestBets || snapshot.dataQuality?.bestBetsPayload;
+    const scorer = bestBetsPayload?.anytimeTdScorer;
+    const scorerProbability = Number(scorer?.modelProbability);
+    // The model-only Anytime TD scorer has no bookmaker price by design.
+    if (scorer?.source === "model-only" && scorer.selection && scorerProbability > 0 && scorerProbability <= 1 &&
+      snapshot.awayCode && snapshot.homeCode) {
+      candidates.push({
+        ...scorer,
+        category: "Anytime touchdowns",
+        market: "Anytime touchdown",
+        modelOnly: true,
+        decimalOdds: null,
+        price: null,
+        sportsbook: null,
+        modelProbability: scorerProbability,
+        impliedProbability: null,
+        edge: null,
+        expectedValue: null,
+        awayCode: snapshot.awayCode,
+        homeCode: snapshot.homeCode,
+        matchup: `${snapshot.awayCode} at ${snapshot.homeCode}`,
+        matchupKey: `${context.season}:${context.week}:${snapshot.awayCode}:${snapshot.homeCode}`,
+        kickoff: snapshot.kickoff,
+        oddsUpdatedAt: null,
+      });
+    }
     const event = findOddsEvent(oddsEvents, snapshot.awayCode, snapshot.homeCode);
     if (!event || isFallbackEvent(event)) {
       reasonCounts.fallbackOdds += 1;
       continue;
     }
-    const bets = snapshot.bestBets?.recommendations || snapshot.dataQuality?.bestBetsPayload?.recommendations || [];
+    const bets = [...(bestBetsPayload?.recommendations || [])];
+    if (scorer?.source === "priced-market") bets.push(scorer);
     for (const bet of bets) {
       const decimalOdds = getDecimalOddsValue(bet);
       const modelProbability = Number(bet.modelProbability);
@@ -278,7 +309,7 @@ export function buildWeeklyMultiSelection(snapshots, oddsPayload, context, now =
         continue;
       }
       if (!Number.isFinite(decimalOdds) || decimalOdds <= 1 || !Number.isFinite(modelProbability) || modelProbability < 0 || modelProbability > 1 ||
-        !bet.selection || !bet.market || !isRealBookmaker(bet.sportsbook, event) || !hasCurrentBookMarket(event, bet)) {
+        !bet.selection || !bet.market || !isRealBookmaker(bet.sportsbook, event, now) || !hasCurrentBookMarket(event, bet)) {
         reasonCounts.invalidCandidates += 1;
         continue;
       }
@@ -322,7 +353,7 @@ export function buildWeeklyMultiSelection(snapshots, oddsPayload, context, now =
     threshold = Math.max(FLOOR_PROBABILITY, Math.round((threshold - PROBABILITY_STEP) * 10000) / 10000);
   }
   const legs = distinctMatchups.slice(0, LEG_COUNT);
-  const oddsTimes = legs.map((leg) => new Date(leg.oddsUpdatedAt).getTime()).filter(Number.isFinite);
+  const oddsTimes = legs.filter((leg) => leg.oddsUpdatedAt).map((leg) => new Date(leg.oddsUpdatedAt).getTime()).filter(Number.isFinite);
   const oddsUpdatedAt = oddsTimes.length ? new Date(Math.min(...oddsTimes)).toISOString() : null;
   const oddsLate = now.getTime() > new Date(context.lockAt).getTime() + 15 * 60 * 1000;
   return {
@@ -370,14 +401,37 @@ export function makeWeeklyMultiRecord(selection, context, now = new Date(), reas
   };
 }
 
-export function getOddsEndpointUrl(request) {
+// Both URLs read stored Supabase snapshots; neither can reach SharpAPI.
+export function getStoredOddsUrls(request) {
   const deploymentHost = process.env.VERCEL_PROJECT_PRODUCTION_URL || process.env.VERCEL_URL;
   const requestHost = request?.headers?.["x-forwarded-host"] || request?.headers?.host;
   const host = deploymentHost || requestHost;
-  if (!host) throw new Error("Could not determine the deployment host for odds refresh");
+  if (!host) throw new Error("Could not determine the deployment host for stored odds");
   const hostname = String(host).replace(/^https?:\/\//, "").replace(/\/$/, "");
   const protocol = /^(localhost|127\.0\.0\.1)(:\d+)?$/i.test(hostname) ? "http" : "https";
-  return `${protocol}://${hostname}/api/nfl/odds?weeklyMultiRefresh=${Date.now()}`;
+  const base = `${protocol}://${hostname}/api/nfl/odds`;
+  return { core: base, props: `${base}?props=1&source=snapshot` };
+}
+
+const STATUS_ORDER = ["fresh", "stale-fallback", "partial", "unavailable"];
+
+// Combined payload is only "fresh" when both stored sets are fresh.
+export function mergeStoredOdds(core, props) {
+  const statuses = [core?.cacheStatus || "unavailable", props?.cacheStatus || "unavailable"];
+  const cacheStatus = STATUS_ORDER[Math.max(...statuses.map((status) => Math.max(0, STATUS_ORDER.indexOf(status))))];
+  const events = (core?.events || []).map((event) => ({ ...event, bookmakers: (event.bookmakers || []).map((book) => ({ ...book, markets: [...(book.markets || [])] })) }));
+  for (const propEvent of props?.events || []) {
+    const target = events.find((event) => event.id === propEvent.id) ||
+      events.find((event) => findOddsEvent([event], propEvent.away_team_code || propEvent.away_team, propEvent.home_team_code || propEvent.home_team));
+    if (!target) continue;
+    for (const propBook of propEvent.bookmakers || []) {
+      const book = target.bookmakers.find((candidate) => candidate.key === propBook.key);
+      if (book) book.markets.push(...(propBook.markets || []));
+      else target.bookmakers.push({ ...propBook, markets: [...(propBook.markets || [])] });
+    }
+  }
+  const refreshed = [core?.refreshedAt, props?.refreshedAt].filter(Boolean).sort();
+  return { events, cacheStatus, refreshedAt: refreshed[0] || null };
 }
 
 export function secureBearerMatches(header, secret) {
@@ -394,6 +448,9 @@ function candidateIdentity(candidate) {
 }
 
 function compareCandidates(first, second) {
+  const firstPriced = Number.isFinite(first.expectedValue);
+  if (firstPriced !== Number.isFinite(second.expectedValue)) return firstPriced ? -1 : 1;
+  if (!firstPriced) return second.modelProbability - first.modelProbability;
   return second.expectedValue - first.expectedValue || second.edge - first.edge || second.modelProbability - first.modelProbability;
 }
 
@@ -486,6 +543,9 @@ export function createWeeklyMultiCurrentHandler(overrides = {}) {
   const getNow = overrides.getNow || (() => new Date());
   const resolveDisplayContext = overrides.resolveDisplayContext || ((now) =>
     resolveDisplayWeekContext(now, { fetchGames: overrides.fetchGames }));
+  const fetchGames = overrides.fetchGames || fetchScheduleGamesForWindow;
+  const settle = overrides.settleLegs || ((record) =>
+    settleLockedLegs(record, { fetchGames, fetchStats: overrides.fetchStats, normaliseCode: normalizeCode }));
 
   return async function handler(req, res) {
     setWeeklyMultiReadCache(res, 30);
@@ -497,24 +557,41 @@ export function createWeeklyMultiCurrentHandler(overrides = {}) {
     try {
       const now = getNow();
       const cycle = getDisplayLockCycle(now);
-      if (!cycle.placeholder) {
-        const lockAt = new Date(cycle.lockAt).toISOString();
-        const supabase = createClient();
-        const { data: savedRecord, error: savedRecordError } = await supabase
+      const savedBody = async (savedRecord, legResults, unresolved) => {
+        setWeeklyMultiReadCache(res, unresolved ? 30 : 180);
+        return res.status(200).json({
+          status: savedRecord.generated_late ? "generated late" : savedRecord.partial ? "partial" : "locked",
+          locked: true,
+          season: savedRecord.season,
+          week: savedRecord.week,
+          record: savedRecord,
+          ...(legResults ? { legResults } : {}),
+        });
+      };
+      const readRecord = async (lockAtMs) => {
+        const { data, error } = await createClient()
           .from("weekly_best_multis")
           .select("*")
-          .eq("lock_at", lockAt)
+          .eq("lock_at", new Date(lockAtMs).toISOString())
           .maybeSingle();
-        if (savedRecordError) throw savedRecordError;
+        if (error) throw error;
+        return data;
+      };
+      if (!cycle.placeholder) {
+        const savedRecord = await readRecord(cycle.lockAt);
         if (savedRecord) {
-          setWeeklyMultiReadCache(res, 180);
-          return res.status(200).json({
-            status: savedRecord.generated_late ? "generated late" : savedRecord.partial ? "partial" : "locked",
-            locked: true,
-            season: savedRecord.season,
-            week: savedRecord.week,
-            record: savedRecord,
-          });
+          const hasPlayerLegs = (savedRecord.legs || []).some(isPlayerLeg);
+          const started = (savedRecord.legs || []).some((leg) => new Date(leg.kickoff || 0).getTime() <= now.getTime());
+          const settlement = hasPlayerLegs && started ? await settle(savedRecord) : null;
+          return savedBody(savedRecord, settlement?.legResults, settlement?.unresolved);
+        }
+      } else {
+        // From Wednesday the display moves to the next week, but a previous-week
+        // multi with unsettled legs stays visible until it is fully resolved.
+        const previous = await readRecord(cycle.lockAt - 7 * 24 * 60 * 60 * 1000);
+        if (previous?.legs?.length) {
+          const settlement = await settle(previous);
+          if (settlement.unresolved) return savedBody(previous, settlement.legResults, true);
         }
       }
       const context = await resolveDisplayContext(now);
@@ -651,19 +728,25 @@ export function createWeeklyMultiLockHandler(overrides = {}) {
         }
       }
 
-      const [{ data: predictionRows, error: predictionError }, oddsResponse] = await Promise.all([
+      const urls = getStoredOddsUrls(req);
+      const readStored = async (url) => {
+        const response = await fetchOdds(url, { cache: "no-store", headers: { Accept: "application/json" } });
+        if (!response.ok) throw new Error(`Stored odds request failed (${response.status})`);
+        return response.json();
+      };
+      const [{ data: predictionRows, error: predictionError }, coreOdds, propOdds] = await Promise.all([
         supabase.from("prediction_snapshots").select("*").eq("season", context.season).eq("week", context.week),
-        fetchOdds(getOddsEndpointUrl(req), { cache: "no-store", headers: { Accept: "application/json" } }),
+        readStored(urls.core),
+        readStored(urls.props),
       ]);
       if (predictionError) throw predictionError;
-      if (!oddsResponse.ok) throw new Error(`Odds refresh request failed (${oddsResponse.status})`);
-      const oddsPayload = await oddsResponse.json();
+      const oddsPayload = mergeStoredOdds(coreOdds, propOdds);
       const snapshots = predictionSnapshotsForWeek(predictionRows, context, now);
       const freshOdds = isFreshOddsPayload(oddsPayload);
       const selection = buildWeeklyMultiSelection(snapshots, freshOdds ? oddsPayload : null, context, now);
       const dataReady = snapshots.length > 0 && freshOdds;
       const notReadyReason = !dataReady
-        ? snapshots.length === 0 ? "No current complete prediction snapshots with fresh odds are available" : "Fresh live odds are unavailable"
+        ? snapshots.length === 0 ? "No current complete prediction snapshots with fresh odds are available" : "Fresh stored odds snapshots are unavailable"
         : selection.complete ? null : "Fewer than five eligible legs qualify at the 55% probability floor";
 
       if (dryRun) {
