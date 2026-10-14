@@ -1,3 +1,17 @@
+import { timingSafeEqual } from "node:crypto";
+import {
+  SNAPSHOT_PROVIDER,
+  createSnapshotClient,
+  hasSnapshotData,
+  readEarlierSnapshots,
+  readSnapshots,
+  selectRolloverFallback,
+  snapshotRows,
+  summarizeSnapshots,
+  writeSnapshotFailure,
+  writeSnapshotSuccess,
+} from "../../api-lib/oddsSnapshots.js";
+
 const SHARP_API_URL =
   "https://api.sharpapi.io/api/v1/odds";
 
@@ -23,10 +37,12 @@ const MAX_PAGES_PER_MARKET = 10;
 const ODDS_CACHE_MS = 5 * 60 * 1000;
 const REFRESH_REUSE_MS = 60 * 1000;
 
-// Shared Vercel CDN lifetimes. Core game odds change slowly before kickoff;
-// player props are only needed for Best Bets so they use a shorter lifetime.
-const CORE_CDN_SECONDS = 86400;
-const CORE_STALE_SECONDS = 86400;
+// Core odds are read from Supabase snapshots, so the CDN only needs to absorb
+// bursts. Kept short so a newly refreshed snapshot is visible within minutes.
+const SNAPSHOT_CDN_SECONDS = 300;
+const SNAPSHOT_CDN_SWR_SECONDS = 600;
+const SNAPSHOT_CDN_STALE_IF_ERROR_SECONDS = 86400;
+// Player props are only needed for Best Bets so they use a longer lifetime.
 const PROPS_CDN_SECONDS = 21600;
 const PROPS_STALE_SECONDS = 86400;
 
@@ -34,11 +50,15 @@ const DEFAULT_RETRY_AFTER_SECONDS = 60;
 const MAX_RETRY_AFTER_SECONDS = 3600;
 
 // Per-instance caches only hold genuine, complete provider responses.
-const memoryCache = { core: null, props: null, "core+props": null };
+const memoryCache = { props: null, "core+props": null };
 const inFlightRequests = new Map();
 let rateLimitedUntil = 0;
 
-export default async function handler(req, res) {
+export default function handler(req, res) {
+  return handleOddsRequest(req, res);
+}
+
+export async function handleOddsRequest(req, res, deps = {}) {
   if (req.method !== "GET") {
     return res.status(405).json({
       error: "Method not allowed",
@@ -46,10 +66,20 @@ export default async function handler(req, res) {
   }
 
   const params = new URL(req.url || "/", "http://localhost").searchParams;
+
+  if (params.has("refreshMarket")) {
+    return handleMarketRefresh(req, res, params.get("refreshMarket"), deps);
+  }
+
   // The Weekly Best Multi refresh needs live core and player-prop odds, so it
   // bypasses every shared cache. All other callers use the cached paths.
   const refresh = params.has("weeklyMultiRefresh");
   const scope = refresh ? "core+props" : params.get("props") === "1" ? "props" : "core";
+
+  // Normal core requests read Supabase snapshots and never call SharpAPI.
+  if (scope === "core") {
+    return handleCoreFromSnapshots(res, deps);
+  }
 
   const cached = memoryCache[scope];
   const cacheMs = refresh ? REFRESH_REUSE_MS : ODDS_CACHE_MS;
@@ -84,14 +114,269 @@ function setCacheHeaders(res, scope, cacheable) {
     res.setHeader("Vercel-CDN-Cache-Control", "no-store");
     return;
   }
-  const fresh = scope === "props" ? PROPS_CDN_SECONDS : CORE_CDN_SECONDS;
-  const stale = scope === "props" ? PROPS_STALE_SECONDS : CORE_STALE_SECONDS;
   // Browsers revalidate against the CDN; only Vercel's shared cache holds the response.
   res.setHeader("Cache-Control", "public, max-age=0, must-revalidate");
   res.setHeader(
     "Vercel-CDN-Cache-Control",
-    `s-maxage=${fresh}, stale-while-revalidate=${stale}, stale-if-error=${stale}`
+    `s-maxage=${PROPS_CDN_SECONDS}, stale-while-revalidate=${PROPS_STALE_SECONDS}, stale-if-error=${PROPS_STALE_SECONDS}`
   );
+}
+
+function setSnapshotCacheHeaders(res, fresh) {
+  if (!fresh) {
+    res.setHeader("Cache-Control", "no-store");
+    res.setHeader("Vercel-CDN-Cache-Control", "no-store");
+    return;
+  }
+  res.setHeader("Cache-Control", "public, max-age=0, must-revalidate");
+  res.setHeader(
+    "Vercel-CDN-Cache-Control",
+    `s-maxage=${SNAPSHOT_CDN_SECONDS}, stale-while-revalidate=${SNAPSHOT_CDN_SWR_SECONDS}, stale-if-error=${SNAPSHOT_CDN_STALE_IF_ERROR_SECONDS}`
+  );
+}
+
+// Each market falls back independently; current-week data always wins.
+async function withRolloverFallback(client, snapshots, missingMarkets, week, now) {
+  let earlier = [];
+  try {
+    earlier = await readEarlierSnapshots(client, { week });
+  } catch (error) {
+    console.error("Odds rollover fallback read failed:", error?.message || error);
+    return snapshots;
+  }
+  const currentEventIds = new Set(
+    snapshots.flatMap((snapshot) => (hasSnapshotData(snapshot) ? snapshotRows(snapshot) : []))
+      .map((row) => String(row?.event_id))
+  );
+  const result = [...snapshots];
+  for (const market of missingMarkets) {
+    const fallback = selectRolloverFallback(earlier, market, { now, currentEventIds });
+    if (!fallback) continue;
+    const index = result.findIndex((snapshot) => snapshot.market === market);
+    if (index >= 0) result[index] = { ...fallback, status: result[index].status, last_error: result[index].last_error };
+    else result.push(fallback);
+  }
+  return result;
+}
+
+async function handleCoreFromSnapshots(res, deps) {
+  const now = deps.now ?? Date.now();
+  const { week } = getCurrentWeekWindow(now);
+
+  let snapshots;
+  try {
+    const client = deps.client || createSnapshotClient();
+    snapshots = await readSnapshots(client, { week });
+    const missingMarkets = CORE_MARKETS.filter(
+      (market) => !hasSnapshotData(snapshots.find((snapshot) => snapshot.market === market))
+    );
+    if (missingMarkets.length && week > 1) {
+      snapshots = await withRolloverFallback(client, snapshots, missingMarkets, week, now);
+    }
+  } catch (error) {
+    console.error("Odds snapshot read failed:", error?.message || error);
+    setSnapshotCacheHeaders(res, false);
+    return res.status(200).json({
+      count: 0,
+      events: [],
+      provider: SNAPSHOT_PROVIDER,
+      scope: "core",
+      cacheStatus: "unavailable",
+      markets: [],
+      warning: "Odds snapshot storage is unavailable.",
+      refreshedAt: new Date(now).toISOString(),
+    });
+  }
+
+  const summary = summarizeSnapshots(snapshots, CORE_MARKETS, now);
+  const byMarket = new Map(snapshots.map((snapshot) => [snapshot.market, snapshot]));
+  const rows = CORE_MARKETS.flatMap((market) =>
+    hasSnapshotData(byMarket.get(market)) ? snapshotRows(byMarket.get(market)) : []
+  );
+  // Snapshots are already filtered; the full-game check stays as a safety net.
+  const eligibleRows = rows.filter(isEligibleOddsRow);
+  const events = buildEvents(eligibleRows);
+  const fetchedTimes = summary.markets
+    .filter((detail) => detail.fetchedAt)
+    .map((detail) => new Date(detail.fetchedAt).getTime());
+
+  const payload = {
+    count: events.length,
+    events,
+    provider: SNAPSHOT_PROVIDER,
+    scope: "core",
+    rawRecordCount: rows.length,
+    eligibleRecordCount: eligibleRows.length,
+    rejectedPeriodRecordCount: rows.length - eligibleRows.length,
+    marketRecordCounts: Object.fromEntries(summary.markets.map((detail) => [detail.market, detail.rowCount])),
+    rawMarketTypes: [...new Set(rows.map((row) => String(row?.market_type || row?.market || row?.market_key || "").trim()).filter(Boolean))].sort(),
+    playerPropRecordCount: 0,
+    playerPropSamples: [],
+    rateLimited: summary.markets.some((detail) => detail.status === "rate_limited"),
+    partialMarkets: summary.missing,
+    markets: summary.markets.map(({ market, fetchedAt, status, stale, fallback, fallbackFromWeek }) => ({
+      market,
+      fetchedAt,
+      status,
+      stale,
+      ...(fallback ? { fallback: true, fallbackFromWeek } : {}),
+    })),
+    refreshedAt: new Date(fetchedTimes.length ? Math.min(...fetchedTimes) : now).toISOString(),
+    cacheStatus: summary.cacheStatus,
+  };
+
+  if (summary.cacheStatus === "stale-fallback") {
+    payload.warning = "Odds snapshots are older than expected. Showing the last successful odds.";
+  } else if (summary.cacheStatus === "partial") {
+    payload.warning = `Odds snapshots are missing for: ${summary.missing.join(", ")}.`;
+  } else if (summary.cacheStatus === "unavailable") {
+    payload.warning = "Betting odds snapshots are not available yet.";
+  }
+
+  setSnapshotCacheHeaders(res, summary.cacheStatus === "fresh");
+  return res.status(200).json(payload);
+}
+
+function isAuthorizedCron(header, secret) {
+  const expected = Buffer.from(`Bearer ${secret}`);
+  const received = Buffer.from(String(header || ""));
+  return received.length === expected.length && timingSafeEqual(received, expected);
+}
+
+// Refreshes exactly one market and never starts another one.
+async function handleMarketRefresh(req, res, market, deps) {
+  res.setHeader("Cache-Control", "no-store");
+
+  const secret = process.env.CRON_SECRET;
+  if (!secret) return res.status(503).json({ error: "CRON_SECRET is not configured" });
+  if (!isAuthorizedCron(req.headers?.authorization, secret)) {
+    return res.status(401).json({ error: "Unauthorized" });
+  }
+  if (!CORE_MARKETS.includes(market)) {
+    return res.status(400).json({ error: `Unsupported market. Use one of: ${CORE_MARKETS.join(", ")}` });
+  }
+
+  const apiKey = process.env.SHARP_API_KEY;
+  if (!apiKey) return res.status(500).json({ error: "SHARP_API_KEY is not configured" });
+
+  try {
+    const client = deps.client || createSnapshotClient();
+    const result = await refreshCoreMarket({
+      market,
+      apiKey,
+      client,
+      now: new Date(deps.now ?? Date.now()),
+    });
+    const httpStatus = { ok: 200, empty: 200, rate_limited: 429, cooldown: 429, error: 502 }[result.status] || 500;
+    return res.status(httpStatus).json(result);
+  } catch (error) {
+    console.error(`Odds snapshot refresh failed for ${market}:`, error?.message || error);
+    return res.status(500).json({ market, status: "error", error: "Snapshot storage failed" });
+  }
+}
+
+async function refreshCoreMarket({ market, apiKey, client, now }) {
+  const window = getCurrentWeekWindow(now.getTime());
+  const key = { week: window.week, market };
+  const snapshots = await readSnapshots(client, { week: window.week });
+  const existing = snapshots.find((snapshot) => snapshot.market === market);
+
+  const cooldownEnds = existing?.rate_limited_until ? new Date(existing.rate_limited_until).getTime() : 0;
+  if (cooldownEnds > now.getTime()) {
+    return {
+      market,
+      week: window.week,
+      status: "cooldown",
+      providerRequests: 0,
+      retryAfterSeconds: Math.ceil((cooldownEnds - now.getTime()) / 1000),
+    };
+  }
+
+  let isComplete = null;
+  if (market !== "moneyline") {
+    const moneyline = snapshots.find((snapshot) => snapshot.market === "moneyline");
+    const targetEventIds = collectUsableEventIds(snapshotRows(moneyline));
+    // Without a moneyline snapshot, rows are sorted by start time, so the
+    // first usable row after this week means every current-week row was seen.
+    isComplete = targetEventIds.size
+      ? (records) => hasEveryEvent(collectUsableEventIds(records), targetEventIds)
+      : (records) => records.some((row) => isUsableRow(row) && isEligibleOddsRow(row) && kickoffMs(row) >= window.end);
+  }
+
+  const stats = { pages: 0, requests: 0 };
+  let rows;
+  try {
+    rows = await fetchMarket(
+      apiKey,
+      market,
+      market === "moneyline" ? MAX_CORE_PAGES_PER_MARKET : MAX_CORE_SAFETY_PAGES,
+      isComplete,
+      stats
+    );
+  } catch (error) {
+    const rateLimited = error?.status === 429;
+    const retryAfterSeconds = rateLimited ? error.retryAfterSeconds || DEFAULT_RETRY_AFTER_SECONDS : null;
+    const status = rateLimited ? "rate_limited" : "error";
+    await writeSnapshotFailure(client, key, {
+      status,
+      error: error?.message,
+      rateLimitedUntil: rateLimited ? new Date(now.getTime() + retryAfterSeconds * 1000) : null,
+      pageCount: stats.pages,
+      now,
+    });
+    return {
+      market,
+      week: window.week,
+      status,
+      error: error?.message,
+      retryAfterSeconds,
+      providerRequests: stats.requests,
+      pageCount: stats.pages,
+      preservedPreviousSnapshot: hasSnapshotData(existing),
+    };
+  }
+
+  const marketKey = getMarketKey(market);
+  const kept = rows.filter(
+    (row) =>
+      isUsableRow(row) &&
+      isEligibleOddsRow(row) &&
+      getMarketKey(row?.market_type || row?.market || row?.market_key) === marketKey &&
+      kickoffMs(row) >= window.start &&
+      kickoffMs(row) < window.end
+  );
+
+  if (!kept.length) {
+    await writeSnapshotFailure(client, key, {
+      status: "empty",
+      error: "Provider returned no current-week full-game rows",
+      pageCount: stats.pages,
+      now,
+    });
+    return {
+      market,
+      week: window.week,
+      status: "empty",
+      providerRequests: stats.requests,
+      pageCount: stats.pages,
+      preservedPreviousSnapshot: hasSnapshotData(existing),
+    };
+  }
+
+  await writeSnapshotSuccess(client, key, { rows: kept, pageCount: stats.pages, now });
+  return {
+    market,
+    week: window.week,
+    status: "ok",
+    rowCount: kept.length,
+    providerRequests: stats.requests,
+    pageCount: stats.pages,
+    fetchedAt: now.toISOString(),
+  };
+}
+
+function kickoffMs(row) {
+  return new Date(row?.event_start_time || 0).getTime();
 }
 
 async function loadOdds(scope, apiKey) {
@@ -277,7 +562,7 @@ const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
 // boundary is moved to midday Tuesday to keep them in their own week.
 const WEEK_BOUNDARY_OFFSET_MS = 12 * 60 * 60 * 1000;
 
-function getCurrentWeekWindow(now = Date.now()) {
+export function getCurrentWeekWindow(now = Date.now()) {
   const week = Math.min(18, Math.max(1, Math.floor((now - WEEK_ONE_START_MS) / WEEK_MS) + 1));
   const start = WEEK_ONE_START_MS + (week - 1) * WEEK_MS + WEEK_BOUNDARY_OFFSET_MS;
   return { week, start, end: start + WEEK_MS };
@@ -427,7 +712,8 @@ async function fetchMarket(
   apiKey,
   market,
   maxPages = MAX_PAGES_PER_MARKET,
-  isComplete = null
+  isComplete = null,
+  stats = { pages: 0, requests: 0 }
 ) {
   const records = [];
   const seenRecordIds = new Set();
@@ -447,6 +733,7 @@ async function fetchMarket(
       sort: "event_start_time",
     });
 
+    stats.requests += 1;
     const response = await fetch(
       `${SHARP_API_URL}?${params.toString()}`,
       {
@@ -510,6 +797,7 @@ async function fetchMarket(
     }
 
     pageNumber += 1;
+    stats.pages = pageNumber;
 
     if (isComplete && isComplete(records)) break;
 

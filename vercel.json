@@ -3,6 +3,9 @@
   "functions": {
     "api/nfl/sleeper-players.js": {
       "includeFiles": "api/nfl/ea_player_records.json"
+    },
+    "api/nfl/odds.js": {
+      "maxDuration": 60
     }
   },
   "rewrites": [
@@ -19,6 +22,18 @@
     {
       "path": "/api/weekly-multi/lock",
       "schedule": "0 1 * * *"
+    },
+    {
+      "path": "/api/nfl/odds?refreshMarket=moneyline",
+      "schedule": "0 12 * * *"
+    },
+    {
+      "path": "/api/nfl/odds?refreshMarket=total_points",
+      "schedule": "0 14 * * *"
+    },
+    {
+      "path": "/api/nfl/odds?refreshMarket=point_spread",
+      "schedule": "0 16 * * *"
     }
   ]
 }

@@ -222,7 +222,8 @@ test("Vercel rewrites preserve both Weekly Best Multi URLs and exactly one lock 
     { source: "/api/weekly-multi/current", destination: "/api/nfl/schedule?weeklyMultiMode=current" },
     { source: "/api/weekly-multi/lock", destination: "/api/nfl/schedule?weeklyMultiMode=lock" },
   ]);
-  assert.deepEqual(config.crons, [{ path: "/api/weekly-multi/lock", schedule: "0 1 * * *" }]);
+  const lockCrons = config.crons.filter((cron) => cron.path === "/api/weekly-multi/lock");
+  assert.deepEqual(lockCrons, [{ path: "/api/weekly-multi/lock", schedule: "0 1 * * *" }]);
 });
 
 test("lock and display cycles follow UTC Thursday and Wednesday boundaries", () => {
