@@ -73,6 +73,8 @@ export function buildDepthMetrics(rows, { season, predictionWeek, cutoff } = {})
     const snapshot = eligible.filter((row) => team(row.team || row.club_code) === code && timestamp(row.dt) === snapshotTime);
     const issues = new Set();
     const slots = new Map();
+    const roster = new Map();
+    const ambiguousRoles = new Set();
     for (const row of snapshot) {
       const formation = row.pos_grp;
       if (formation === "Special Teams") continue;
@@ -97,6 +99,16 @@ export function buildDepthMetrics(rows, { season, predictionWeek, cutoff } = {})
         playerId: String(id), gsisId: row.gsis_id || null, name: row.player_name || null,
         position, group, formation, slot: String(slot), rank, ...depthAvailability(row),
       };
+      const rosterPlayer = roster.get(player.playerId);
+      if (rosterPlayer && (player.group !== rosterPlayer.group ||
+          player.gsisId !== rosterPlayer.gsisId || player.status !== rosterPlayer.status)) {
+        ambiguousRoles.add(player.playerId);
+      }
+      if (!rosterPlayer || player.rank < rosterPlayer.rank) roster.set(player.playerId, player);
+      else if (player.rank === rosterPlayer.rank &&
+          (player.status !== rosterPlayer.status || player.group !== rosterPlayer.group)) {
+        issues.add("Conflicting player role or status");
+      }
       const previous = slots.get(key);
       if (!previous || rank < previous.rank) slots.set(key, player);
       else if (rank === previous.rank && JSON.stringify(player) !== JSON.stringify(previous)) issues.add("Conflicting depth slot");
@@ -132,7 +144,9 @@ export function buildDepthMetrics(rows, { season, predictionWeek, cutoff } = {})
       schemaVersion: DEPTH_SCHEMA_VERSION, season, predictionWeek, cutoff,
       snapshotAt: new Date(snapshotTime).toISOString(),
       available: players.length > 0 && issues.size === 0, schemaValidated: issues.size === 0,
-      rows: snapshot.length, players, supplemental, positionCounts: counts,
+      rows: snapshot.length, players,
+      roster: [...roster.values()].filter((player) => !ambiguousRoles.has(player.playerId)),
+      supplemental, positionCounts: counts,
       offensiveStarters: offense, defensiveStarters: defense,
       projectedStarters: offense + defense, offensiveLineStarters: counts.OL,
       startingQuarterback: quarterbacks.length === 1 ? quarterbacks[0] : null,
@@ -141,6 +155,13 @@ export function buildDepthMetrics(rows, { season, predictionWeek, cutoff } = {})
     result[code] = entry;
   }
   return result;
+}
+
+export function validDepthRoster(lineup, week, season) {
+  return lineup?.schemaVersion === DEPTH_SCHEMA_VERSION && lineup.season === season &&
+    lineup.predictionWeek === week && timestamp(lineup.cutoff) !== null &&
+    timestamp(lineup.snapshotAt) !== null && Date.parse(lineup.snapshotAt) <= Date.parse(lineup.cutoff) &&
+    Array.isArray(lineup.roster) && lineup.roster.length > 0;
 }
 
 export function validDepthLineup(lineup, week, season) {
@@ -161,6 +182,7 @@ export function validDepthLineup(lineup, week, season) {
     slots.add(`${player.formation}:${player.slot}`);
     if (player.available) counts[player.group] += 1;
   }
+
   const offense = ["QB", "RB", "WR", "TE", "OL"].reduce((sum, key) => sum + counts[key], 0);
   const defense = ["front", "LB", "DB"].reduce((sum, key) => sum + counts[key], 0);
   const declaredOffense = lineup.players.filter((player) => ["QB", "RB", "WR", "TE", "OL"].includes(player.group)).length;

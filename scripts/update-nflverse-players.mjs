@@ -4,6 +4,9 @@ import {
   writeFile,
 } from "node:fs/promises";
 import path from "node:path";
+import { pathToFileURL } from "node:url";
+import { weeklyDepthCutoffs } from "../api-lib/depthCharts.js";
+import { PLAYER_METRICS_SCHEMA, completedPlayerGames, playerTeam } from "../api-lib/playerMetrics.js";
 
 const season = Number(
   process.argv[2] ||
@@ -28,6 +31,8 @@ const aliases = {
   STL: "LAR",
 };
 
+export async function main() {
+if (!process.env.BALLDONTLIE_API_KEY) throw new Error("BALLDONTLIE_API_KEY required for player game completion/cutoff provenance");
 console.log(
   `Downloading nflverse ${season} play-by-play for player metrics...`
 );
@@ -52,10 +57,16 @@ const text = gunzipSync(
 ).toString("utf8");
 
 const rows = parseCsv(text);
+for (const field of ["season", "game_id", "play_id", "week", "posteam", "defteam", "play_type"]) {
+  if (!rows.length || !(field in rows[0])) throw new Error(`Player source missing ${field}`);
+}
 
 const plays = rows
   .map(parsePlay)
   .filter(isEligible);
+const schedule = await fetchPlayerSchedule(season);
+const sourceAsOf = new Date().toISOString();
+const cutoffs = weeklyDepthCutoffs(schedule, season);
 
 const completedWeeks = [
   ...new Set(
@@ -76,33 +87,15 @@ for (
     (week) => week + 1
   )
 ) {
-  const eligible = plays.filter(
-    (play) =>
-      play.week < predictionWeek
-  );
-
-  const teams = [
-    ...new Set(
-      eligible
-        .map((play) => play.team)
-        .filter(Boolean)
-    ),
-  ];
-
-  playerMetricsByWeek[
-    predictionWeek
-  ] = Object.fromEntries(
-    teams.map((teamCode) => [
-      teamCode,
-      buildTeamPlayerMetrics(
-        eligible,
-        teamCode
-      ),
-    ])
-  );
+  playerMetricsByWeek[predictionWeek] = buildWeeklyPlayerMetrics(plays, schedule, {
+    season, predictionWeek, cutoff: cutoffs[predictionWeek],
+  });
 }
 
 const payload = {
+  schemaVersion: PLAYER_METRICS_SCHEMA,
+  sourceAsOf,
+  cutoffs,
   season,
 
   generatedAt:
@@ -116,7 +109,7 @@ const payload = {
   garbageTimeFilter:
     "Win probability between 5% and 95%",
   latestCompletedWeek: completedWeeks.length ? Math.max(...completedWeeks) : null,
-  requiredFields: ["game_id", "week", "posteam", "defteam", "play_type"],
+  requiredFields: ["season", "game_id", "play_id", "week", "posteam", "defteam", "play_type"],
   playerMetricsByWeek,
 };
 
@@ -174,8 +167,60 @@ console.log(
   `Eligible plays: ${plays.length} | ` +
     `latest player profiles: ${playerCount}`
 );
+}
 
-function buildTeamPlayerMetrics(
+if (process.argv[1] && import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href) await main();
+
+async function fetchPlayerSchedule(season) {
+  if (!process.env.BALLDONTLIE_API_KEY) throw new Error("BALLDONTLIE_API_KEY required for player game completion/cutoff provenance");
+  const games = [];
+  let cursor = null;
+  let pages = 0;
+  do {
+    const url = new URL("https://api.balldontlie.io/nfl/v1/games");
+    url.searchParams.set("seasons[]", String(season));
+    url.searchParams.set("per_page", "100");
+    if (cursor !== null) url.searchParams.set("cursor", String(cursor));
+    const response = await fetch(url, { headers: { Authorization: process.env.BALLDONTLIE_API_KEY } });
+    if (!response.ok) throw new Error(`Player schedule request failed (${response.status})`);
+    const body = await response.json();
+    if (!Array.isArray(body.data)) throw new Error("Invalid player schedule response");
+    games.push(...body.data);
+    cursor = body.meta?.next_cursor ?? null;
+    if (++pages >= 20 && cursor !== null) throw new Error("Player schedule pagination incomplete");
+  } while (cursor !== null);
+  return games;
+}
+
+export function buildWeeklyPlayerMetrics(plays, schedule, { season, predictionWeek, cutoff }) {
+  const completed = completedPlayerGames(schedule, season, predictionWeek, cutoff);
+  const byKey = new Map(completed.map((game) => [game.key, game]));
+  const seen = new Map();
+  const eligible = plays.filter((play) => {
+    if (play.season !== season || !isEligible(play) ||
+        !byKey.has(`${season}:${play.week}:${[playerTeam(play.team), playerTeam(play.opponent)].sort().join(":")}`)) return false;
+    if (!play.gameId || !play.playId) throw new Error("Missing player play identity");
+    const key = `${play.gameId}:${play.playId}`;
+    const previous = seen.get(key);
+    if (previous && JSON.stringify(previous) !== JSON.stringify(play)) throw new Error(`Conflicting player play ${key}`);
+    seen.set(key, play);
+    return !previous;
+  });
+  const teams = [...new Set(eligible.map((play) => play.team))];
+  return Object.fromEntries(teams.map((code) => {
+    const metrics = buildTeamPlayerMetrics(eligible, code);
+    const logs = new Map(eligible.filter((play) => play.team === code).map((play) => {
+      const game = byKey.get(`${season}:${play.week}:${[playerTeam(play.team), playerTeam(play.opponent)].sort().join(":")}`);
+      return [play.gameId, { ...game, gameId: play.gameId }];
+    }));
+    const expectedCompletedGames = completed.filter((game) => [game.away, game.home].includes(code)).length;
+    // Partial PBP coverage is not an exact-week profile.
+    if (logs.size !== expectedCompletedGames) throw new Error(`Incomplete player game coverage for ${code}, week ${predictionWeek}`);
+    return [code, { ...metrics, predictionWeek, cutoff, expectedCompletedGames, gameProvenance: [...logs.values()] }];
+  }));
+}
+
+export function buildTeamPlayerMetrics(
   allPlays,
   teamCode
 ) {
@@ -398,6 +443,10 @@ function buildTeamPlayerMetrics(
 
       player.rushingTouchdowns +=
         play.rushingTouchdown;
+      player.qbScrambles += play.qbScramble;
+      recordUsage(player, play, "qbScrambles", play.qbScramble);
+      recordUsage(player, play, "redZoneCarries", play.redZone ? 1 : 0);
+      recordUsage(player, play, "goalLineCarries", play.goalLine ? 1 : 0);
 
       player.redZoneCarries +=
         play.redZone
@@ -485,6 +534,8 @@ function buildTeamPlayerMetrics(
         play.endZoneTarget
           ? 1
           : 0;
+      recordUsage(player, play, "redZoneTargets", play.redZone ? 1 : 0);
+      recordUsage(player, play, "endZoneTargets", play.endZoneTarget ? 1 : 0);
 
       player.explosiveReceptions +=
         play.completePass &&
@@ -529,7 +580,8 @@ function buildTeamPlayerMetrics(
       (player) =>
         finalisePlayer(
           player,
-          totals
+          totals,
+          [...new Map(offense.map((play) => [play.gameId, { gameId: play.gameId, week: play.week }])).values()]
         )
     )
     .filter(
@@ -593,6 +645,7 @@ function getPlayer(
         passingTouchdowns: 0,
         interceptions: 0,
         sacksTaken: 0,
+        qbScrambles: 0,
 
         rushingAttempts: 0,
         rushingYards: 0,
@@ -660,6 +713,13 @@ function createUsageRow(
     completions: 0,
     passingYards: 0,
     passingTouchdowns: 0,
+    interceptions: 0,
+    sacksTaken: 0,
+    qbScrambles: 0,
+    redZoneCarries: 0,
+    goalLineCarries: 0,
+    redZoneTargets: 0,
+    endZoneTargets: 0,
 
     rushingAttempts: 0,
     rushingYards: 0,
@@ -701,6 +761,8 @@ function recordPassingUsage(
   player,
   play
 ) {
+  recordUsage(player, play, "interceptions", play.interception);
+  recordUsage(player, play, "sacksTaken", play.sack);
   recordUsage(
     player,
     play,
@@ -732,7 +794,8 @@ function recordPassingUsage(
 
 function finalisePlayer(
   player,
-  totals
+  totals,
+  teamGames
 ) {
   const games =
     Math.max(
@@ -748,8 +811,8 @@ function finalisePlayer(
       second.week
   );
 
-  const recentRows =
-    gameRows.slice(-2);
+  const recentRows = [...teamGames].sort((a, b) => a.week - b.week).slice(-2)
+    .map((game) => player.gameUsage.get(game.gameId) || createUsageRow(game));
 
   const recent =
     aggregateGameUsage(
@@ -818,6 +881,7 @@ function finalisePlayer(
 
       sacksTaken:
         player.sacksTaken,
+      sackRate: rate(player.sacksTaken, player.dropbacks),
 
       completionRate:
         rate(
@@ -857,6 +921,7 @@ function finalisePlayer(
     },
 
     rushing: {
+      scrambles: player.qbScrambles,
       attempts:
         player.rushingAttempts,
 
@@ -1180,8 +1245,9 @@ function aggregateGameUsage(
   );
 }
 
-function parsePlay(row) {
-  const passAttempt =
+export function parsePlay(row) {
+  const sack = number(row.sack) || 0;
+  const passAttempt = sack || number(row.qb_scramble) === 1 ? 0 :
     number(
       row.pass_attempt
     ) ??
@@ -1211,9 +1277,6 @@ function parsePlay(row) {
     number(
       row.complete_pass
     ) || 0;
-
-  const sack =
-    number(row.sack) || 0;
 
   const interception =
     number(
@@ -1279,6 +1342,8 @@ function parsePlay(row) {
       : 0;
 
   return {
+    season: number(row.season),
+    playId: row.play_id,
     gameId:
       row.game_id || "",
 

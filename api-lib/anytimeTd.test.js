@@ -83,3 +83,63 @@ test("without bookmaker TD odds the model-only scorer is still produced", () => 
   assert.equal(result.anytimeTdScorer.source, "model-only");
   assert.equal(result.anytimeTdScorer.modelProbability, 0.55);
 });
+
+function scorer(candidates, odds = null) {
+  return buildBestBets({ game: { away: "KC", home: "LV" }, prediction,
+    playerProjections: candidates, oddsEvent: odds, dataQuality: {} }).anytimeTdScorer;
+}
+
+test("dedicated scorer probability affects selection with equal role confidence", () => {
+  assert.match(scorer(players).selection, /Alpha Runner/);
+  assert.match(scorer(players.map((player, index) => ({
+    ...player, anytimeTouchdownProbability: index ? .8 : .4,
+  }))).selection, /Beta Receiver/);
+});
+
+test("dedicated scorer uses probability times role confidence and displays raw probability", () => {
+  const candidates = [
+    { ...players[0], anytimeTouchdownProbability: .8, roleConfidence: .6 },
+    { ...players[1], anytimeTouchdownProbability: .65, roleConfidence: .9 },
+  ];
+  for (const odds of [null, oddsEvent(true)]) {
+    const result = scorer(candidates, odds);
+    assert.match(result.selection, /Beta Receiver/);
+    assert.equal(result.modelProbability, .65);
+    assert.match(result.explanation, /65%/);
+  }
+  candidates[0].roleConfidence = .95;
+  assert.match(scorer(candidates).selection, /Alpha Runner/);
+});
+
+test("data quality cannot change ranking between eligible players", () => {
+  const candidates = [
+    { ...players[0], anytimeTouchdownProbability: .8, roleConfidence: .6, dataQuality: .99 },
+    { ...players[1], anytimeTouchdownProbability: .65, roleConfidence: .9, dataQuality: .5 },
+  ];
+  assert.match(scorer(candidates).selection, /Beta Receiver/);
+  candidates[0].dataQuality = .5;
+  candidates[1].dataQuality = .99;
+  assert.match(scorer(candidates).selection, /Beta Receiver/);
+});
+
+test("unsupported identities, roles, probabilities and explicit ineligibility cannot win", () => {
+  const unsupported = [
+    { ...players[0], playerName: "", anytimeTouchdownProbability: .99 },
+    ...[undefined, null, NaN, 0].map((roleConfidence) => ({
+      ...players[0], roleConfidence, anytimeTouchdownProbability: .99,
+    })),
+    { ...players[0], eligible: false, anytimeTouchdownProbability: .99 },
+    { ...players[0], available: false, anytimeTouchdownProbability: .99 },
+    { ...players[0], anytimeTouchdownProbability: 2 },
+  ];
+  for (const player of unsupported) {
+    assert.match(scorer([player, players[1]]).selection, /Beta Receiver/);
+    assert.equal(scorer([player], oddsEvent(true)).source, "unavailable");
+  }
+  assert.equal(scorer({ available: false, away: { players } }, oddsEvent(true)).source, "unavailable");
+  assert.equal(scorer([]).source, "unavailable");
+});
+
+test("priced scorer displays raw probability even outside normal bet probability caps", () => {
+  assert.equal(scorer([{ ...players[0], anytimeTouchdownProbability: .98 }], oddsEvent(true)).modelProbability, .98);
+});

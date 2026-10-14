@@ -42,9 +42,57 @@ NYG QB/WR subset of the public 2026 depth archive inspected on 2026-10-14, paire
 with first-game kickoffs from BALLDONTLIE for weeks 2 and 6. Synthetic edge-case
 tests are separately labeled; they are not claims about actual transfers/injuries.
 Schedule revision history and historical injury reports are not available.
-Player projections still choose the historical passing-volume leader and require
-a separate repair. Tiny lineup signals can be masked or locally reversed by the
+Tiny lineup signals can be masked or locally reversed by the
 existing discrete scoring simulation; this repair does not change that engine.
+
+## Point-in-time player projections
+
+Player metrics now require schema 2, the exact season/prediction week and the same
+weekly cutoff as the depth lineup. Older-week fallback and the legacy checked-in
+player artifact are rejected with explicit reasons, not silently treated as current.
+Game provenance records source game IDs, participants, week, kickoff and a proven
+final-status timestamp (`completed_at`, or conservatively `updated_at` on a final
+schedule record). Undated/unproven completions, future games and postseason are
+excluded. Missing eligible PBP coverage or conflicting duplicate plays fails
+generation explicitly; identical plays/games are counted once.
+
+The latest eligible depth snapshot also retains its full deduplicated roster,
+without changing starter counts or personnel weights. Stable GSIS identity and
+current team ownership gate all named players, including reserve RB/WR/TE roles.
+An ambiguous QB slot suppresses QB identity, not independently valid non-QB roles.
+The verified weekly QB supersedes the passing-volume leader and uses only their
+own eligible passing/sack/rushing/scramble profile. Team/game-script opportunity
+volume and existing pass/run/pressure matchup coefficients remain unchanged.
+No verified QB or no eligible own passing sample means **no named passing
+projection**; independently supported receivers/rushers can remain. Receivers
+then use observed aggregate team passing context, not an invented named QB.
+Unavailable/unsupported players are excluded and supported opportunity shares
+renormalized. A transferred player's old-team profile is not transplanted.
+Recent usage uses the last two actual team games, including zero-usage games,
+not the player's last two appearances. Explicit pre-cutoff statuses retain the
+existing availability rules; unknown health remains explicitly unknown.
+
+There is no new statistical regression prior: existing rate caps and sample/role
+confidence remain; no-sample named projections are omitted. Interceptions and
+scrambles are retained as profile evidence, not new scoring interactions.
+The Anytime TD equation remains `1 - exp(-expectedTDs)`. Dedicated scorer ranking
+uses TD probability times role confidence; data quality does not multiply into
+the scorer score. Displayed probability remains the raw model TD probability.
+Unsupported roles/identities do not produce a scorer.
+Best Bets and Weekly Best Multi continue consuming the same downstream outputs.
+
+After explicit approval, regenerate depth context using
+`npm run update:nflverse -- 2026`, then player metrics using
+`node scripts/update-nflverse-players.mjs 2026`, with `BALLDONTLIE_API_KEY` set.
+NFLverse downloads need no key. Both existing production artifacts remain untouched
+during this repair. Regeneration rebuilds available weekly entries, not saved
+predictions. Historical reconstruction requires archived depth plus proven
+pre-cutoff final timestamps; missing completion evidence cannot be invented.
+Generation may occur later than the cutoff, but included games must have proven
+earlier completion. Revised PBP/schedule sources are not an immutable historical
+as-observed archive, so exact historical source-version reproducibility is not
+guaranteed. No arbitrary stale-days threshold is used: exact-week coverage and
+source/game provenance, rather than a recent file timestamp alone, are required.
 
 ## Opponent-Network endpoint
 

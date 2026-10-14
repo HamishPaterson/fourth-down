@@ -4,7 +4,7 @@ import * as nflApi from "./nflApi.js";
 import { getTeamQbr, getTeamRatingsHealth } from "./teamRatings.js";
 import { getStadiumWeather } from "./weatherApi.js";
 import { buildBestBets } from "./bestBetsService.js";
-import { personnelAvailableAt, validDepthLineup } from "../../api-lib/depthCharts.js";
+import { personnelAvailableAt, validDepthLineup, validDepthRoster } from "../../api-lib/depthCharts.js";
 
 export const FULL_MODEL_VERSION = 11;
 export const FULL_MODEL_KEY = "full-v11-week5-data-gap-audit";
@@ -176,12 +176,15 @@ async function createPrediction({ game, oddsEvent, season, week, away, home, sig
       : undefined,
   });
 
+  const playerDepth = [values.playByPlay?.away?.expectedLineup, values.playByPlay?.home?.expectedLineup]
+    .find((lineup) => validDepthRoster(lineup, week, season));
   const playerProjections = buildPlayerProjections({
     away,
     home,
     prediction,
     playerMetrics: values.playerMetrics,
     teamMetrics: values.playByPlay,
+    season, week, cutoff: personnelCutoff || playerDepth?.cutoff,
   });
   dataQuality.playerProjections = playerProjections.available === true;
   const bestBets = buildBestBets({

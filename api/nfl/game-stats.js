@@ -1,5 +1,6 @@
 import { createClient } from "@supabase/supabase-js";
 import NFLVERSE_PLAYER_METRICS from "../../data/nflverse-player-metrics.js";
+import { playerMetricsResponse } from "../../api-lib/playerMetrics.js";
 
 const STATS_URL =
   "https://api.balldontlie.io/nfl/v1/stats";
@@ -246,28 +247,13 @@ function handlePlayerMetrics(req, res) {
   const requestedWeek = Number(req.query.week);
   const away = normalizeTeamCode(req.query.away);
   const home = normalizeTeamCode(req.query.home);
-  if (!away || !home || !Number.isInteger(requestedWeek)) {
+  if (!away || !home || !Number.isInteger(season) || !Number.isInteger(requestedWeek) || requestedWeek < 1 || requestedWeek > 18) {
     return res.status(400).json({ error: "Provide season, week, away and home" });
   }
-  const availableWeeks = Object.keys(NFLVERSE_PLAYER_METRICS.playerMetricsByWeek || {})
-    .map(Number)
-    .filter((week) => Number.isInteger(week) && week <= requestedWeek)
-    .sort((first, second) => second - first);
-  const selectedWeek = availableWeeks[0] || null;
-  const weekMetrics = selectedWeek
-    ? NFLVERSE_PLAYER_METRICS.playerMetricsByWeek?.[selectedWeek] || {}
-    : {};
   res.setHeader("Cache-Control", "public, s-maxage=900, stale-while-revalidate=3600");
-  return res.status(200).json({
-    available: Boolean(selectedWeek && weekMetrics[away] && weekMetrics[home]),
-    season,
-    requestedWeek,
-    metricsWeek: selectedWeek,
-    generatedAt: NFLVERSE_PLAYER_METRICS.generatedAt,
-    source: NFLVERSE_PLAYER_METRICS.source,
-    away: weekMetrics[away] || null,
-    home: weekMetrics[home] || null,
-  });
+  return res.status(200).json(playerMetricsResponse(NFLVERSE_PLAYER_METRICS, {
+    season, week: requestedWeek, away, home,
+  }));
 }
 
 function sendNeutralResponse(

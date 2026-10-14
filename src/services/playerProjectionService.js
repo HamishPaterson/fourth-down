@@ -1,3 +1,6 @@
+import { validDepthLineup, validDepthRoster } from "../../api-lib/depthCharts.js";
+import { validatePlayerMetrics } from "../../api-lib/playerMetrics.js";
+
 const MIN_ROLE_OPPORTUNITIES = 3;
 
 export function buildPlayerProjections({
@@ -6,43 +9,74 @@ export function buildPlayerProjections({
   prediction,
   playerMetrics,
   teamMetrics,
+  season,
+  week,
+  cutoff,
 }) {
-  if (!playerMetrics?.away || !playerMetrics?.home || !prediction) {
+  const context = { season, week, cutoff };
+  const provenanceError = validatePlayerMetrics({ ...playerMetrics, away: null, home: null }, context);
+  if (provenanceError || !prediction) {
     return {
       available: false,
       away: null,
       home: null,
-      reasons: ["Player-level nflverse metrics unavailable"],
+      reasons: [provenanceError || "Team prediction unavailable"],
     };
   }
 
-  return {
-    available: true,
-    generatedAt: new Date().toISOString(),
-    away: projectTeam({
-      teamCode: away,
-      opponentCode: home,
-      side: "away",
-      prediction,
-      metrics: playerMetrics.away,
-      teamMetrics,
-    }),
-    home: projectTeam({
-      teamCode: home,
-      opponentCode: away,
-      side: "home",
-      prediction,
-      metrics: playerMetrics.home,
-      teamMetrics,
-    }),
-  };
+  const reasons = [];
+  const result = { available: false, generatedAt: new Date().toISOString(), away: null, home: null, reasons };
+  for (const [side, teamCode, opponentCode] of [["away", away, home], ["home", home, away]]) {
+    const metrics = playerMetrics[side];
+    const lineup = teamMetrics?.[side]?.expectedLineup;
+    const invalid = validatePlayerMetrics({ ...playerMetrics, [side === "away" ? "home" : "away"]: null }, context);
+    if (invalid || !metrics || metrics.team !== teamCode ||
+        !validDepthRoster(lineup, week, season) || lineup.cutoff !== cutoff) {
+      reasons.push(`${teamCode}: ${invalid || "Verified weekly player roles unavailable"}`);
+      continue;
+    }
+    result[side] = projectTeam({ teamCode, opponentCode, side, prediction, metrics, teamMetrics, lineup });
+    reasons.push(...result[side].reasons.map((reason) => `${teamCode}: ${reason}`));
+  }
+  result.available = [result.away, result.home].some((team) => team?.players.length > 0);
+  return result;
 }
 
-function projectTeam({ teamCode, opponentCode, side, prediction, metrics, teamMetrics }) {
+function projectTeam({ teamCode, opponentCode, side, prediction, metrics, teamMetrics, lineup }) {
   const teamProjection = prediction?.[side] || {};
   const opponentSide = side === "away" ? "home" : "away";
   const opponentProjection = prediction?.[opponentSide] || {};
-  const players = Object.values(metrics?.players || {});
+  const reasons = [];
+  if (![teamProjection.expectedPossessions, teamProjection.score, teamProjection.passingTD,
+    teamProjection.rushingTD, opponentProjection.score].every(finite)) {
+    return { team: teamCode, opponent: opponentCode, players: [], reasons: ["Required team opportunity inputs unavailable"] };
+  }
+  const roles = new Map();
+  const conflicting = new Set();
+  for (const role of lineup.roster) {
+    if (!role.gsisId || !role.playerId || !Number.isInteger(role.rank) || role.rank < 1 ||
+        typeof role.available !== "boolean" || typeof role.statusKnown !== "boolean") continue;
+    if (roles.has(role.gsisId)) conflicting.add(role.gsisId);
+    roles.set(role.gsisId, role);
+  }
+  const declaredQbs = Array.isArray(lineup.players) ? lineup.players.filter((player) => player.group === "QB") : [];
+  const starter = lineup.startingQuarterback;
+  const starterId = validDepthLineup(lineup, metrics.predictionWeek, lineup.season) &&
+    declaredQbs.length === 1 && declaredQbs[0].playerId === starter?.playerId &&
+    declaredQbs[0].gsisId === starter?.gsisId ? starter.gsisId : null;
+  const players = Object.values(metrics?.players || {}).filter((player) => {
+    const role = roles.get(player.gsisId);
+    return role && !conflicting.has(player.gsisId) && role.available &&
+      ["QB", "RB", "WR", "TE"].includes(role.group) &&
+      (role.group !== "QB" || player.gsisId === starterId);
+  }).map((player) => ({ ...player, position: roles.get(player.gsisId).group }));
+  const excludedPlayers = Object.keys(metrics.players || {}).length - players.length;
+  if (excludedPlayers) reasons.push(`${excludedPlayers} historical players excluded without a supported current role/availability`);
+  const quarterback = players.find((player) => player.gsisId === starterId && passingProfile(player)) || null;
+  if (!quarterback) reasons.push("No verified starting QB with an eligible passing profile; named passing projection omitted");
+  if (players.some((player) => !roles.get(player.gsisId).statusKnown)) {
+    reasons.push("Depth source does not establish player health; availability remains unknown");
+  }
   const totals = metrics?.teamTotals || {};
   const games = Math.max(1, Number(metrics?.games || totals?.games) || 1);
 
@@ -62,8 +96,9 @@ function projectTeam({ teamCode, opponentCode, side, prediction, metrics, teamMe
   const passRate = clamp(historicalPassRate + scriptShift, 0.42, 0.72);
   const expectedDropbacks = expectedPlays * passRate;
   const historicalSackRate = rate(
-    number(totals.sacksAllowed),
-    number(totals.passAttempts) + number(totals.sacksAllowed),
+    quarterback ? quarterback.passing.sacksTaken : number(totals.sacksAllowed),
+    quarterback ? quarterback.passing.attempts + quarterback.passing.sacksTaken :
+      number(totals.passAttempts) + number(totals.sacksAllowed),
     0.065
   );
   const opponentPressure = getOpponentMetric(
@@ -76,13 +111,14 @@ function projectTeam({ teamCode, opponentCode, side, prediction, metrics, teamMe
   const passAttempts = Math.max(1, expectedDropbacks * (1 - sackRate));
   const rushAttempts = Math.max(1, expectedPlays - expectedDropbacks);
 
-  const quarterback = players
-    .filter((player) => number(player?.passing?.attempts) > 0)
-    .sort((a, b) => number(b.passing.attempts) - number(a.passing.attempts))[0] || null;
-
-  const historicalYpa = quarterback
-    ? clamp(number(quarterback?.passing?.yardsPerAttempt, 6.8), 4.5, 10)
-    : 6.8;
+  // Aggregate team context can support receivers without inventing a named QB.
+  const passingSample = quarterback?.passing || {
+    attempts: totals.passAttempts, completions: totals.completions, yards: totals.passingYards,
+  };
+  const hasPassingSample = positive(passingSample.attempts) &&
+    nonnegative(passingSample.completions) && finite(passingSample.yards);
+  const historicalYpa = hasPassingSample
+    ? clamp(passingSample.yards / passingSample.attempts, 4.5, 10) : null;
   const opponentPassAllowed = getOpponentMetric(
     teamMetrics,
     opponentCode,
@@ -90,17 +126,20 @@ function projectTeam({ teamCode, opponentCode, side, prediction, metrics, teamMe
     0
   );
   const passMatchupMultiplier = clamp(1 + opponentPassAllowed * 0.16, 0.85, 1.18);
-  const passingYards = passAttempts * historicalYpa * passMatchupMultiplier;
-  const completionRate = quarterback
-    ? clamp(number(quarterback?.passing?.completionRate, 0.64), 0.48, 0.78)
-    : 0.64;
+  const passingYards = hasPassingSample ? passAttempts * historicalYpa * passMatchupMultiplier : null;
+  const completionRate = hasPassingSample
+    ? clamp(passingSample.completions / passingSample.attempts, 0.48, 0.78) : null;
 
   const receivingPlayers = players.filter(
-    (player) => number(player?.receiving?.targets) >= MIN_ROLE_OPPORTUNITIES
+    (player) => hasPassingSample && receivingProfile(player)
   );
   const rushingPlayers = players.filter(
-    (player) => number(player?.rushing?.attempts) >= MIN_ROLE_OPPORTUNITIES
+    (player) => rushingProfile(player)
   );
+  if (players.some((player) => (player.receiving?.targets >= MIN_ROLE_OPPORTUNITIES && !receivingProfile(player)) ||
+      (player.rushing?.attempts >= MIN_ROLE_OPPORTUNITIES && !rushingProfile(player)))) {
+    reasons.push("Unsupported individual statistical inputs excluded from opportunity allocation");
+  }
 
   const passingTouchdowns = Math.max(0, number(teamProjection.passingTD));
   const rushingTouchdowns = Math.max(0, number(teamProjection.rushingTD));
@@ -134,7 +173,7 @@ function projectTeam({ teamCode, opponentCode, side, prediction, metrics, teamMe
         number(projection.receivingTouchdowns) +
         number(projection.rushingTouchdowns) +
         (source.playerId === quarterback?.playerId ? number(projection.quarterbackRushingTouchdowns) : 0);
-      const roleConfidence = calculateRoleConfidence(source, games);
+      const roleConfidence = calculateRoleConfidence(source, Math.min(games, source.games));
 
       return {
         ...projection,
@@ -166,7 +205,11 @@ function projectTeam({ teamCode, opponentCode, side, prediction, metrics, teamMe
       receivingTouchdowns: 0,
       rushingReceivingYards: round1(findProjectedValue(projectedPlayers, quarterback.playerId, "rushingYards")),
       opportunities: round1(passAttempts + findProjectedValue(projectedPlayers, quarterback.playerId, "rushingAttempts")),
-      roleConfidence: calculateRoleConfidence(quarterback, games),
+      roleConfidence: calculateRoleConfidence(quarterback, Math.min(games, quarterback.games)),
+      profile: {
+        playerId: quarterback.playerId, games: quarterback.games, weeks: quarterback.weeks,
+        passing: numericProfile(quarterback.passing), rushing: numericProfile(quarterback.rushing),
+      },
     };
     qbProjection.anytimeTouchdownProbability = round4(
       1 - Math.exp(-number(qbProjection.rushingTouchdowns))
@@ -188,7 +231,10 @@ function projectTeam({ teamCode, opponentCode, side, prediction, metrics, teamMe
     passRate: round4(passRate),
     passAttempts: round1(passAttempts),
     rushAttempts: round1(rushAttempts),
-    passingYards: round1(passingYards),
+    ...(hasPassingSample ? { passingYards: round1(passingYards) } : {}),
+    startingQuarterback: quarterback?.playerId || null,
+    availabilityKnown: players.every((player) => roles.get(player.gsisId).statusKnown),
+    reasons,
     players: projectedPlayers,
   };
 }
@@ -197,8 +243,8 @@ function allocateReceivers({ receivingPlayers, passAttempts, passingYards, passi
   if (!receivingPlayers.length) return [];
   const weightedShares = receivingPlayers.map((player) => {
     const seasonShare = number(player?.receiving?.targetShare);
-    const recentTargets = number(player?.recent?.targetsPerGame);
-    const recentShare = recentTargets > 0
+    const recentTargets = player?.recent?.targetsPerGame;
+    const recentShare = finite(recentTargets)
       ? recentTargets / Math.max(1, number(totals.targets) / games)
       : seasonShare;
     return clamp(seasonShare * 0.7 + recentShare * 0.3, 0.01, 0.6);
@@ -236,8 +282,8 @@ function allocateRushers({ rushingPlayers, rushAttempts, rushingTouchdowns, tota
   if (!rushingPlayers.length) return [];
   const shares = rushingPlayers.map((player) => {
     const seasonShare = number(player?.rushing?.carryShare);
-    const recentAttempts = number(player?.recent?.rushingAttemptsPerGame);
-    const recentShare = recentAttempts > 0
+    const recentAttempts = player?.recent?.rushingAttemptsPerGame;
+    const recentShare = finite(recentAttempts)
       ? recentAttempts / Math.max(1, number(totals.rushingAttempts) / games)
       : seasonShare;
     return clamp(seasonShare * 0.7 + recentShare * 0.3, 0.01, 0.8);
@@ -326,7 +372,28 @@ function getOpponentMetric(teamMetrics, opponentCode, field, fallback) {
   const payload = teamMetrics?.raw || teamMetrics;
   const teams = payload?.teams || payload?.metrics || payload?.data?.teams || {};
   const value = direct?.[field] ?? teams?.[opponentCode]?.[field];
-  return Number.isFinite(Number(value)) ? Number(value) : fallback;
+  return value !== null && value !== undefined && Number.isFinite(Number(value)) ? Number(value) : fallback;
+}
+
+const finite = (value) => typeof value === "number" && Number.isFinite(value);
+const nonnegative = (value) => finite(value) && value >= 0;
+const positive = (value) => finite(value) && value > 0;
+const numericProfile = (profile) => Object.fromEntries(Object.entries(profile || {}).filter(([, value]) => finite(value)));
+function passingProfile(player) {
+  return positive(player.passing?.attempts) && finite(player.passing?.yards) &&
+    nonnegative(player.passing?.completions) && nonnegative(player.passing?.sacksTaken);
+}
+function receivingProfile(player) {
+  const profile = player.receiving;
+  return profile?.targets >= MIN_ROLE_OPPORTUNITIES &&
+    ["targets", "catchRate", "yardsPerTarget", "targetShare", "redZoneTargetShare", "endZoneTargetShare"]
+      .every((key) => nonnegative(profile[key]));
+}
+function rushingProfile(player) {
+  const profile = player.rushing;
+  return profile?.attempts >= MIN_ROLE_OPPORTUNITIES &&
+    ["attempts", "carryShare", "redZoneCarryShare", "goalLineCarryShare"].every((key) => nonnegative(profile[key])) &&
+    finite(profile.yardsPerCarry);
 }
 
 function findProjectedValue(players, playerId, field) {
@@ -342,6 +409,7 @@ function rate(numerator, denominator, fallback = 0) {
 }
 
 function number(value, fallback = 0) {
+  if (value === null || value === undefined || value === "") return fallback;
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : fallback;
 }

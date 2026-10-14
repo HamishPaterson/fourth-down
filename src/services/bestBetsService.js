@@ -146,6 +146,10 @@ function isAnytimeTdBet(bet) {
 
 function selectAnytimeTdScorer({ playerProjections, markets, playerBetCandidates }) {
   const players = collectProjectedPlayers(playerProjections)
+    .filter((player) => playerProjections?.available !== false && player.available !== false &&
+      player.eligible !== false &&
+      Number.isFinite(Number(player.roleConfidence ?? player.confidence ?? player.role?.confidence)) &&
+      Number(player.roleConfidence ?? player.confidence ?? player.role?.confidence) > 0)
     .map((player) => ({
       player,
       playerName: resolvePlayerDisplayName(player),
@@ -157,10 +161,11 @@ function selectAnytimeTdScorer({ playerProjections, markets, playerBetCandidates
         player.dataQuality ?? player.quality ?? player.dataQualityScore
       ),
     }))
-    .filter((row) => row.playerName && Number.isFinite(row.probability))
+    .filter((row) => row.playerName && Number.isFinite(row.probability) &&
+      row.probability > 0 && row.probability <= 1)
     .sort((a, b) =>
-      b.probability * b.roleConfidence * b.dataQuality -
-      a.probability * a.roleConfidence * a.dataQuality
+      b.probability * b.roleConfidence -
+      a.probability * a.roleConfidence
     );
 
   const pricedCandidates = (playerBetCandidates || [])
@@ -175,12 +180,12 @@ function selectAnytimeTdScorer({ playerProjections, markets, playerBetCandidates
         .filter((market) => Number.isFinite(Number(market.price)))
         .sort((a, b) => americanToDecimal(b.price) - americanToDecimal(a.price))[0] || null
     : null;
-  // The dedicated scorer is always the top model-probability player, so a
+  // The dedicated scorer is the top probability-times-role player, so a
   // priced bet for any other player must not replace it.
   let bestPriced = topPlayer
     ? pricedCandidates.find((bet) =>
         namesMatch(normalisePlayerFromSelection(bet.selection), topPlayer.playerName)) || null
-    : pricedCandidates[0] || null;
+    : null;
   if (!bestPriced && topPlayer && directPricedMarket) {
     bestPriced = buildBet({
       category: "Anytime touchdowns", market: "Anytime touchdown",
@@ -189,7 +194,7 @@ function selectAnytimeTdScorer({ playerProjections, markets, playerBetCandidates
       selection: `${topPlayer.playerName} anytime TD`, line: null,
       price: directPricedMarket.price, sportsbook: directPricedMarket.sportsbook,
       modelProjection: topPlayer.probability,
-      modelProbability: clamp(topPlayer.probability, 0.02, 0.95),
+      modelProbability: topPlayer.probability,
       marketProbability: impliedProbability(directPricedMarket.price),
       dataQuality: topPlayer.dataQuality, roleConfidence: topPlayer.roleConfidence,
       reason: `Fourth Down gives ${topPlayer.playerName} a ${percent(topPlayer.probability)} chance to score a touchdown.`,
@@ -201,12 +206,13 @@ function selectAnytimeTdScorer({ playerProjections, markets, playerBetCandidates
   if (bestPriced) {
     return {
       ...bestPriced,
+      modelProbability: topPlayer.probability,
       source: "priced-market",
       title: "Anytime TD scorer",
       confidenceLevel: bestPriced.confidenceLevel || confidenceLabel(bestPriced.confidenceScore || 0),
       explanation:
         `${bestPriced.selection.replace(/ anytime TD$/i, "")} is Fourth Down's top touchdown scorer for this game. ` +
-        `The model gives the player a ${percent(bestPriced.modelProbability)} chance at ${formatDecimalOdds(bestPriced.decimalOdds)}.`,
+        `The model gives the player a ${percent(topPlayer.probability)} chance at ${formatDecimalOdds(bestPriced.decimalOdds)}.`,
     };
   }
 
@@ -242,10 +248,10 @@ function selectAnytimeTdScorer({ playerProjections, markets, playerBetCandidates
     dataQuality: topPlayer.dataQuality,
     roleConfidence: topPlayer.roleConfidence,
     explanation:
-      `${topPlayer.playerName} has the highest projected touchdown probability in this game at ${percent(topPlayer.probability)}. ` +
+      `${topPlayer.playerName} has the highest role-adjusted touchdown score in this game, with a raw TD probability of ${percent(topPlayer.probability)}. ` +
       `No bookmaker anytime-touchdown price matched this player, so this is a model pick rather than a priced value bet.`,
     qualificationReason:
-      `Selected because this is the highest touchdown probability among the projected players for this matchup.`,
+      `Selected by touchdown probability multiplied by role confidence among eligible projected players.`,
     risk: "No matched bookmaker price is available, so expected value cannot be calculated.",
   };
 }
