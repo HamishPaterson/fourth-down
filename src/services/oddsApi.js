@@ -270,6 +270,8 @@ function resolveTeamCode(value) {
     const canonicalName = normalizeName(canonical);
     const nickname = normalizeName(teamNickname(canonical));
     if (name === normalizeName(code) || name === canonicalName || name === nickname) return code;
+    // Provider style "ARI Cardinals": team code followed by the nickname.
+    if (name === normalizeName(code) + nickname) return code;
   }
   return normalizeTeamCode(value);
 }

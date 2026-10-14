@@ -809,7 +809,6 @@ function buildDisplayHighlights(bestBets) {
     ...(bestBets?.recommendations || []),
     stored.mostLikely,
     stored.bestValue,
-    stored.longshot,
   ].filter(Boolean);
   const unique = [];
   const seen = new Set();
@@ -820,7 +819,7 @@ function buildDisplayHighlights(bestBets) {
       unique.push(bet);
     }
   }
-  if (!unique.length) return { mostLikely: null, bestValue: null, longshot: null };
+  if (!unique.length) return { mostLikely: null, bestValue: null };
 
   const playerBets = unique.filter((bet) => bet.category !== "Game");
   const likelyPool = playerBets.length ? playerBets : unique;
@@ -831,12 +830,7 @@ function buildDisplayHighlights(bestBets) {
   const bestValue = [...afterLikely].sort(
     (a, b) => Number(b.expectedValue || 0) - Number(a.expectedValue || 0)
   )[0] || mostLikely;
-  const afterValue = unique.filter((bet) => bet !== mostLikely && bet !== bestValue);
-  const longshot = [...afterValue].sort((a, b) => {
-    const aFive = Number(a.decimalOdds || 0) >= 5 ? 1 : 0;
-    const bFive = Number(b.decimalOdds || 0) >= 5 ? 1 : 0;
-    return bFive - aFive || Number(b.decimalOdds || 0) - Number(a.decimalOdds || 0);
-  })[0] || bestValue || mostLikely;
+
 
   return {
     mostLikely: { ...mostLikely, highlightExplanation: "Highest model probability among the available markets" },
@@ -845,14 +839,6 @@ function buildDisplayHighlights(bestBets) {
       highlightExplanation: bestValue === mostLikely
         ? "Only available selection, reused so Best Value is never empty"
         : "Highest estimated value among the remaining available markets",
-    },
-    longshot: {
-      ...longshot,
-      highlightExplanation: longshot === bestValue || longshot === mostLikely
-        ? "Best available fallback, reused so Longshot is never empty"
-        : Number(longshot.decimalOdds) >= 5
-          ? "Highest-priced separate selection at $5.00 or higher"
-          : "Highest-priced separate selection available",
     },
   };
 }
@@ -915,7 +901,6 @@ function BestBetHighlights({ highlights, awayCode, homeCode }) {
   const items = [
     ["Most likely", highlights?.mostLikely],
     ["Best value", highlights?.bestValue],
-    ["Longshot", highlights?.longshot],
   ];
   return (
     <div className="best-bet-highlights">
@@ -927,16 +912,12 @@ function BestBetHighlights({ highlights, awayCode, homeCode }) {
               <strong>{formatFullPlayerSelection(bet.selection)}</strong>
               <span>{formatAustralianOdds(bet.decimalOdds, bet.price)} · {formatPercent(bet.modelProbability)} model chance</span>
               <p>{bet.highlightExplanation}</p>
-              {label === "Longshot" && Number(bet.decimalOdds) < 5 && (
-                <em style={{ display: "block", marginTop: "5px", color: "#ffd166", fontSize: "9px" }}>
-                  Fallback: below the preferred $5.00 threshold
-                </em>
-              )}
+
             </>
           ) : (
             <>
               <strong>None qualified</strong>
-              <span>{label === "Longshot" ? "No separate market priced at $5.00 or higher was returned for this game" : "No qualifying selection"}</span>
+              <span>No qualifying selection</span>
             </>
           )}
         </div>
@@ -1511,7 +1492,6 @@ function hasClearPlayerPropLabels(saved) {
     ...(bestBets?.recommendations || []),
     bestBets?.highlights?.mostLikely,
     bestBets?.highlights?.bestValue,
-    bestBets?.highlights?.longshot,
     bestBets?.anytimeTdScorer,
   ].filter(Boolean);
 

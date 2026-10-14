@@ -726,15 +726,7 @@ function selectHighlights(recommendations, allCandidates) {
       .filter((bet) => !used.has(betIdentity(bet)))
       .sort((a, b) => b.expectedValue - a.expectedValue)[0] || null;
 
-  if (bestValue) used.add(betIdentity(bestValue));
-  const remaining = [...offered].filter((bet) => !used.has(betIdentity(bet)));
-  const pricedLongshots = remaining
-    .filter((bet) => bet.decimalOdds >= 5)
-    .sort((a, b) => b.expectedValue - a.expectedValue || b.decimalOdds - a.decimalOdds);
-  const fallbackLongshots = remaining
-    .sort((a, b) => b.decimalOdds - a.decimalOdds || b.expectedValue - a.expectedValue);
-  const longshot = pricedLongshots[0] || fallbackLongshots[0] || null;
-  const longshotMeetsPrice = Boolean(longshot && longshot.decimalOdds >= 5);
+
 
   return {
     mostLikely: highlight(
@@ -747,18 +739,6 @@ function selectHighlights(recommendations, allCandidates) {
       "Best value",
       "Highest estimated value after excluding Most likely, prioritising a different player market"
     ),
-    longshot: longshot
-      ? {
-          ...highlight(
-            longshot,
-            "Longshot",
-            longshotMeetsPrice
-              ? "Highest-value separate selection priced at $5.00 or higher"
-              : "Highest-priced separate selection available because no $5.00 market was returned"
-          ),
-          meetsLongshotPrice: longshotMeetsPrice,
-        }
-      : null,
   };
 }
 
