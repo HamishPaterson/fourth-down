@@ -6,11 +6,20 @@
 }
 
 * { box-sizing: border-box; }
-body { margin: 0; min-width: 320px; min-height: 100vh; }
+body {
+  margin: 0;
+  min-width: 320px;
+  min-height: 100vh;
+  background-image: url("/nfl-background.jpg");
+  background-size: cover;
+  background-position: center center;
+  background-repeat: no-repeat;
+  background-attachment: fixed;
+}
 button, select { font: inherit; }
 button { cursor: pointer; }
 
-.app-shell { min-height: 100vh; background: radial-gradient(circle at top, #13223b 0, #07101f 42%); }
+.app-shell { min-height: 100vh; background: transparent; }
 .header { max-width: 1180px; margin: auto; padding: 20px 24px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid #1f2c42; }
 .brand { display: flex; align-items: center; gap: 12px; color: white; background: none; border: 0; text-align: left; }
 .brand-mark { width: 44px; height: 44px; display: grid; place-items: center; color: #07101f; background: #a3e635; border-radius: 12px; }
