@@ -126,7 +126,7 @@ beforeEach(() => {
   responder = () => ({ status: 200, body: { data: [] } });
   global.fetch = async (url) => {
     const parsed = new URL(url);
-    fetchCalls.push({ market: parsed.searchParams.get("market"), offset: Number(parsed.searchParams.get("offset")) });
+    fetchCalls.push({ raw: String(url), market: parsed.searchParams.get("market"), offset: Number(parsed.searchParams.get("offset")) });
     const { status = 200, body = {}, headers = {} } = responder(parsed, fetchCalls.length);
     return {
       ok: status >= 200 && status < 300,
@@ -164,20 +164,18 @@ const stored = (client, market) => client.store.get(["nfl", 2026, WINDOW.week, m
 
 // Provider market_type values that the existing getMarketKey maps to each canonical market.
 const PROVIDER_TYPE = {
-  player_anytime_td: "player_anytime_td",
   player_pass_yds: "player_passing_yards",
   player_rush_yds: "player_rushing_yards",
   player_receptions: "player_receptions",
-  player_reception_yds: "player_receiving_yds",
+  player_reception_yds: "player_receiving_yards",
   player_pass_tds: "player_passing_touchdowns",
   player_pass_attempts: "player_passing_attempts",
   player_completions: "player_completions",
   player_rush_attempts: "player_rushing_attempts",
-  player_rush_reception_yds: "player_rushing_receiving_yards",
+  player_rush_reception_yds: "player_rushing_+_receiving_yards",
 };
 
 const PLAYER_MARKETS = [
-  "player_anytime_td",
   "player_pass_yds",
   "player_rush_yds",
   "player_receptions",
@@ -192,7 +190,7 @@ const PLAYER_MARKETS = [
 for (const market of PLAYER_MARKETS) {
   test(`${market} refresh writes its own snapshot`, async () => {
     const rows = [playerRow(PROVIDER_TYPE[market])];
-    responder = (url) => (url.searchParams.get("market") === market ? { body: { data: rows } } : { body: { data: [] } });
+    responder = (url) => ([market, PROVIDER_TYPE[market]].includes(url.searchParams.get("market")) ? { body: { data: rows } } : { body: { data: [] } });
     const client = createFakeClient();
     const res = await refresh(market, client);
     assert.equal(res.statusCode, 200);
@@ -204,22 +202,33 @@ for (const market of PLAYER_MARKETS) {
   });
 }
 
-test("receiving yards uses existing provider aliases and stores under the canonical market", async () => {
-  responder = (url) => {
-    const requested = url.searchParams.get("market");
-    if (requested === "player_reception_yds") return { status: 400, body: { error: "unknown market" } };
-    if (requested === "player_receiving_yds") return { body: { data: [playerRow("player_receiving_yds")] } };
-    return { body: { data: [] } };
-  };
+test("receiving yards requests the verified SharpAPI name and stores under the canonical market", async () => {
+  responder = (url) =>
+    url.searchParams.get("market") === "player_receiving_yards"
+      ? { body: { data: [playerRow("player_receiving_yards")] } }
+      : { body: { data: [] } };
   const client = createFakeClient();
   const res = await refresh("player_reception_yds", client);
   assert.equal(res.body.status, "ok");
-  assert.equal(res.body.providerMarket, "player_receiving_yds");
-  assert.deepEqual(fetchCalls.map((call) => call.market), ["player_reception_yds", "player_receiving_yds"]);
+  assert.equal(res.body.providerMarket, "player_receiving_yards");
+  assert.deepEqual(fetchCalls.map((call) => call.market), ["player_receiving_yards"]);
   assert.equal(stored(client, "player_reception_yds").row_count, 1);
   assert.equal(client.store.size, 1);
 });
 
+test("rushing + receiving yards sends the literal + URL-encoded as %2B", async () => {
+  responder = (url) =>
+    url.searchParams.get("market") === "player_rushing_+_receiving_yards"
+      ? { body: { data: [playerRow("player_rushing_+_receiving_yards")] } }
+      : { body: { data: [] } };
+  const client = createFakeClient();
+  const res = await refresh("player_rush_reception_yds", client);
+  assert.equal(res.body.status, "ok");
+  assert.equal(res.body.providerMarket, "player_rushing_+_receiving_yards");
+  assert.ok(fetchCalls.every((call) => call.raw.includes("market=player_rushing_%2B_receiving_yards")));
+  assert.ok(fetchCalls.every((call) => !call.raw.includes("market=player_rushing_+")));
+  assert.equal(stored(client, "player_rush_reception_yds").row_count, 1);
+});
 test("an alias is tried only when the previous name had no usable rows", async () => {
   responder = (url) =>
     url.searchParams.get("market") === "passing_yards"
@@ -284,11 +293,11 @@ test("provider error preserves the previous prop snapshot and stops immediately"
 });
 
 test("empty response preserves the previous prop snapshot", async () => {
-  const previous = snapshot("player_anytime_td", [playerRow(PROVIDER_TYPE.player_anytime_td)]);
+  const previous = snapshot("player_receptions", [playerRow(PROVIDER_TYPE.player_receptions)]);
   const client = createFakeClient([previous]);
-  const res = await refresh("player_anytime_td", client);
+  const res = await refresh("player_receptions", client);
   assert.equal(res.body.status, "empty");
-  const after = stored(client, "player_anytime_td");
+  const after = stored(client, "player_receptions");
   assert.equal(after.status, "empty");
   assert.deepEqual(after.rows, previous.rows);
   assert.equal(after.fetched_at, previous.fetched_at);
@@ -368,7 +377,7 @@ test("normal core read ignores player snapshots and makes zero SharpAPI calls", 
 test("?props=1&source=snapshot reads stored player snapshots with zero SharpAPI calls", async () => {
   const client = createFakeClient([
     snapshot("player_pass_yds", [playerRow(PROVIDER_TYPE.player_pass_yds)]),
-    snapshot("player_anytime_td", [playerRow(PROVIDER_TYPE.player_anytime_td)]),
+    snapshot("player_receptions", [playerRow(PROVIDER_TYPE.player_receptions)]),
   ]);
   const res = await read("/api/nfl/odds?props=1&source=snapshot", client);
   assert.equal(fetchCalls.length, 0);
@@ -377,8 +386,16 @@ test("?props=1&source=snapshot reads stored player snapshots with zero SharpAPI 
   assert.equal(res.body.cacheStatus, "partial");
   assert.equal(res.body.count, 1);
   const keys = res.body.events[0].bookmakers[0].markets.map((market) => market.key).sort();
-  assert.deepEqual(keys, ["player_anytime_td", "player_pass_yds"]);
-  assert.equal(res.body.partialMarkets.length, 8);
+  assert.deepEqual(keys, ["player_pass_yds", "player_receptions"]);
+  assert.equal(res.body.partialMarkets.length, 7);
+});
+
+test("player_anytime_td is not a snapshot market: refresh rejected, not required", async () => {
+  const res = await refresh("player_anytime_td", createFakeClient());
+  assert.equal(res.statusCode, 400);
+  assert.equal(fetchCalls.length, 0);
+  const read1 = await read("/api/nfl/odds?props=1&source=snapshot", createFakeClient());
+  assert.ok(!JSON.stringify(read1.body.markets).includes("player_anytime_td"));
 });
 
 test("?props=1&source=snapshot reports unavailable with nothing stored and fresh when all are stored", async () => {

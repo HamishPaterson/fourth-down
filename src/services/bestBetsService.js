@@ -16,10 +16,21 @@ export function buildBestBets({ game, prediction, playerProjections, oddsEvent, 
   const consensusPlayerMarkets = selectConsensusPlayerMarkets(markets);
   const playerBets = buildPlayerBets(playerProjections, consensusPlayerMarkets);
   const assessed = gameBets.assessed + playerBets.assessed;
+  const anytimeTdScorer = selectAnytimeTdScorer({
+    playerProjections,
+    markets,
+    playerBetCandidates: playerBets.recommendations,
+  });
+  // The dedicated scorer owns its player's Anytime TD slot for this game.
+  // Other players' Anytime TD bets remain eligible.
+  const scorerPlayer = normalisePlayerFromSelection(anytimeTdScorer?.selection);
   const allCandidates = dedupeBetCandidates([
     ...gameBets.recommendations,
     ...playerBets.recommendations,
-  ]);
+  ]).filter((bet) =>
+    !(isAnytimeTdBet(bet) && scorerPlayer &&
+      namesMatch(normalisePlayerFromSelection(bet.selection), scorerPlayer))
+  );
 
   const qualifiedGameBets = allCandidates
     .filter(() => coreDataReady)
@@ -45,11 +56,6 @@ export function buildBestBets({ game, prediction, playerProjections, oddsEvent, 
     .slice(0, 8)
     .map((bet, index) => ({ ...bet, rank: index + 1 }));
   const highlights = selectHighlights(recommendations, allCandidates);
-  const anytimeTdScorer = selectAnytimeTdScorer({
-    playerProjections,
-    markets,
-    playerBetCandidates: playerBets.recommendations,
-  });
 
   return {
     available: markets.length > 0,
@@ -132,6 +138,12 @@ function buildGameBets(game, prediction, markets, dataQuality) {
   return { assessed, recommendations: result.filter(Boolean) };
 }
 
+function isAnytimeTdBet(bet) {
+  return bet?.market === "Anytime touchdown" ||
+    bet?.category === "Anytime touchdowns" ||
+    /anytime\s*(td|touchdown)/i.test(String(bet?.selection || ""));
+}
+
 function selectAnytimeTdScorer({ playerProjections, markets, playerBetCandidates }) {
   const players = collectProjectedPlayers(playerProjections)
     .map((player) => ({
@@ -163,9 +175,12 @@ function selectAnytimeTdScorer({ playerProjections, markets, playerBetCandidates
         .filter((market) => Number.isFinite(Number(market.price)))
         .sort((a, b) => americanToDecimal(b.price) - americanToDecimal(a.price))[0] || null
     : null;
-  let bestPriced = pricedCandidates.find((bet) =>
-    topPlayer ? namesMatch(normalisePlayerFromSelection(bet.selection), topPlayer.playerName) : true
-  ) || pricedCandidates[0] || null;
+  // The dedicated scorer is always the top model-probability player, so a
+  // priced bet for any other player must not replace it.
+  let bestPriced = topPlayer
+    ? pricedCandidates.find((bet) =>
+        namesMatch(normalisePlayerFromSelection(bet.selection), topPlayer.playerName)) || null
+    : pricedCandidates[0] || null;
   if (!bestPriced && topPlayer && directPricedMarket) {
     bestPriced = buildBet({
       category: "Anytime touchdowns", market: "Anytime touchdown",

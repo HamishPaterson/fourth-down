@@ -21,16 +21,15 @@ const CORE_MARKETS = ["moneyline", "point_spread", "total_points"];
 // the provider market names the live props path already queries. The refresh
 // route accepts only the canonical key; aliases are tried in order.
 const PLAYER_MARKET_ALIASES = {
-  player_anytime_td: ["player_anytime_td", "anytime_touchdown", "player_touchdowns"],
   player_pass_yds: ["player_pass_yds", "passing_yards", "player_passing_yards"],
   player_rush_yds: ["player_rush_yds", "rushing_yards", "player_rushing_yards"],
   player_receptions: ["player_receptions", "receptions"],
-  player_reception_yds: ["player_reception_yds", "player_receiving_yds", "receiving_yards"],
+  player_reception_yds: ["player_receiving_yards"],
   player_pass_tds: ["player_pass_tds", "passing_touchdowns", "player_passing_touchdowns"],
   player_pass_attempts: ["player_pass_attempts", "passing_attempts", "player_passing_attempts"],
   player_completions: ["player_completions", "passing_completions", "player_passing_completions"],
   player_rush_attempts: ["player_rush_attempts", "rushing_attempts", "player_rushing_attempts"],
-  player_rush_reception_yds: ["player_rush_reception_yds", "rushing_receiving_yards"],
+  player_rush_reception_yds: ["player_rushing_+_receiving_yards"],
 };
 const PLAYER_MARKETS = Object.keys(PLAYER_MARKET_ALIASES);
 // Runaway guard for one player market job, shared across its provider aliases.

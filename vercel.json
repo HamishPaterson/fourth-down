@@ -36,10 +36,6 @@
       "schedule": "0 16 * * *"
     },
     {
-      "path": "/api/nfl/odds?refreshMarket=player_anytime_td",
-      "schedule": "0 13 * * *"
-    },
-    {
       "path": "/api/nfl/odds?refreshMarket=player_pass_yds",
       "schedule": "0 15 * * *"
     },
