@@ -34,6 +34,46 @@
     {
       "path": "/api/nfl/odds?refreshMarket=point_spread",
       "schedule": "0 16 * * *"
+    },
+    {
+      "path": "/api/nfl/odds?refreshMarket=player_anytime_td",
+      "schedule": "0 13 * * *"
+    },
+    {
+      "path": "/api/nfl/odds?refreshMarket=player_pass_yds",
+      "schedule": "0 15 * * *"
+    },
+    {
+      "path": "/api/nfl/odds?refreshMarket=player_rush_yds",
+      "schedule": "0 17 * * *"
+    },
+    {
+      "path": "/api/nfl/odds?refreshMarket=player_receptions",
+      "schedule": "0 18 * * *"
+    },
+    {
+      "path": "/api/nfl/odds?refreshMarket=player_reception_yds",
+      "schedule": "0 19 * * *"
+    },
+    {
+      "path": "/api/nfl/odds?refreshMarket=player_pass_tds",
+      "schedule": "0 20 * * *"
+    },
+    {
+      "path": "/api/nfl/odds?refreshMarket=player_pass_attempts",
+      "schedule": "0 21 * * *"
+    },
+    {
+      "path": "/api/nfl/odds?refreshMarket=player_completions",
+      "schedule": "0 22 * * *"
+    },
+    {
+      "path": "/api/nfl/odds?refreshMarket=player_rush_attempts",
+      "schedule": "0 23 * * *"
+    },
+    {
+      "path": "/api/nfl/odds?refreshMarket=player_rush_reception_yds",
+      "schedule": "0 3 * * *"
     }
   ]
 }

@@ -16,6 +16,25 @@ const SHARP_API_URL =
   "https://api.sharpapi.io/api/v1/odds";
 
 const CORE_MARKETS = ["moneyline", "point_spread", "total_points"];
+
+// Canonical player markets Best Bets consumes (bestBetsService.js), each with
+// the provider market names the live props path already queries. The refresh
+// route accepts only the canonical key; aliases are tried in order.
+const PLAYER_MARKET_ALIASES = {
+  player_anytime_td: ["player_anytime_td", "anytime_touchdown", "player_touchdowns"],
+  player_pass_yds: ["player_pass_yds", "passing_yards", "player_passing_yards"],
+  player_rush_yds: ["player_rush_yds", "rushing_yards", "player_rushing_yards"],
+  player_receptions: ["player_receptions", "receptions"],
+  player_reception_yds: ["player_reception_yds", "player_receiving_yds", "receiving_yards"],
+  player_pass_tds: ["player_pass_tds", "passing_touchdowns", "player_passing_touchdowns"],
+  player_pass_attempts: ["player_pass_attempts", "passing_attempts", "player_passing_attempts"],
+  player_completions: ["player_completions", "passing_completions", "player_passing_completions"],
+  player_rush_attempts: ["player_rush_attempts", "rushing_attempts", "player_rushing_attempts"],
+  player_rush_reception_yds: ["player_rush_reception_yds", "rushing_receiving_yards"],
+};
+const PLAYER_MARKETS = Object.keys(PLAYER_MARKET_ALIASES);
+// Runaway guard for one player market job, shared across its provider aliases.
+const MAX_PLAYER_PAGES_PER_JOB = 15;
 const OPTIONAL_PLAYER_MARKETS = [
   "player_anytime_td", "anytime_touchdown", "player_touchdowns",
   "player_pass_yds", "passing_yards", "player_passing_yards",
@@ -79,6 +98,12 @@ export async function handleOddsRequest(req, res, deps = {}) {
   // Normal core requests read Supabase snapshots and never call SharpAPI.
   if (scope === "core") {
     return handleCoreFromSnapshots(res, deps);
+  }
+
+  // Opt-in read of stored player snapshots. The default ?props=1 stays live
+  // until Best Bets and Weekly Best Multi are moved over in a later phase.
+  if (scope === "props" && params.get("source") === "snapshot") {
+    return handlePropsFromSnapshots(res, deps);
   }
 
   const cached = memoryCache[scope];
@@ -252,8 +277,10 @@ async function handleMarketRefresh(req, res, market, deps) {
   if (!isAuthorizedCron(req.headers?.authorization, secret)) {
     return res.status(401).json({ error: "Unauthorized" });
   }
-  if (!CORE_MARKETS.includes(market)) {
-    return res.status(400).json({ error: `Unsupported market. Use one of: ${CORE_MARKETS.join(", ")}` });
+  if (!CORE_MARKETS.includes(market) && !PLAYER_MARKETS.includes(market)) {
+    return res.status(400).json({
+      error: `Unsupported market. Use one of: ${[...CORE_MARKETS, ...PLAYER_MARKETS].join(", ")}`,
+    });
   }
 
   const apiKey = process.env.SHARP_API_KEY;
@@ -261,7 +288,8 @@ async function handleMarketRefresh(req, res, market, deps) {
 
   try {
     const client = deps.client || createSnapshotClient();
-    const result = await refreshCoreMarket({
+    const refresh = CORE_MARKETS.includes(market) ? refreshCoreMarket : refreshPlayerMarket;
+    const result = await refresh({
       market,
       apiKey,
       client,
@@ -377,6 +405,182 @@ async function refreshCoreMarket({ market, apiKey, client, now }) {
 
 function kickoffMs(row) {
   return new Date(row?.event_start_time || 0).getTime();
+}
+
+/*
+ * Refreshes one canonical player market. Provider aliases are tried in order
+ * and the first alias that yields usable current-week rows wins. A 429 or a
+ * server error stops the job at once; "unknown market" style 4xx responses
+ * move on to the next alias. Failures never touch the stored rows.
+ */
+async function refreshPlayerMarket({ market, apiKey, client, now }) {
+  const window = getCurrentWeekWindow(now.getTime());
+  const key = { week: window.week, market };
+  const snapshots = await readSnapshots(client, { week: window.week });
+  const existing = snapshots.find((snapshot) => snapshot.market === market);
+
+  const cooldownEnds = existing?.rate_limited_until ? new Date(existing.rate_limited_until).getTime() : 0;
+  if (cooldownEnds > now.getTime()) {
+    return {
+      market,
+      week: window.week,
+      status: "cooldown",
+      providerRequests: 0,
+      retryAfterSeconds: Math.ceil((cooldownEnds - now.getTime()) / 1000),
+    };
+  }
+
+  // Rows arrive sorted by kickoff, so a usable row after this week means every
+  // current-week row has been seen.
+  const isComplete = (records) =>
+    records.some((row) => isUsableRow(row) && isEligibleOddsRow(row) && kickoffMs(row) >= window.end);
+  const keep = (row) =>
+    isUsableRow(row) &&
+    isEligibleOddsRow(row) &&
+    getMarketKey(row?.market_type || row?.market || row?.market_key) === market &&
+    kickoffMs(row) >= window.start &&
+    kickoffMs(row) < window.end;
+
+  const totals = { pages: 0, requests: 0 };
+  let keptRows = [];
+  let usedAlias = null;
+  let lastSkippedError = null;
+
+  for (const alias of PLAYER_MARKET_ALIASES[market]) {
+    const remaining = MAX_PLAYER_PAGES_PER_JOB - totals.pages;
+    if (remaining <= 0) break;
+    const stats = { pages: 0, requests: 0 };
+    try {
+      const rows = await fetchMarket(apiKey, alias, remaining, isComplete, stats);
+      totals.pages += stats.pages;
+      totals.requests += stats.requests;
+      keptRows = rows.filter(keep);
+      if (keptRows.length) {
+        usedAlias = alias;
+        break;
+      }
+    } catch (error) {
+      totals.pages += stats.pages;
+      totals.requests += stats.requests;
+      const skippable = [400, 404, 422].includes(error?.status);
+      if (skippable) {
+        lastSkippedError = error;
+        continue;
+      }
+      const rateLimited = error?.status === 429;
+      const retryAfterSeconds = rateLimited ? error.retryAfterSeconds || DEFAULT_RETRY_AFTER_SECONDS : null;
+      const status = rateLimited ? "rate_limited" : "error";
+      await writeSnapshotFailure(client, key, {
+        status,
+        error: error?.message,
+        rateLimitedUntil: rateLimited ? new Date(now.getTime() + retryAfterSeconds * 1000) : null,
+        pageCount: totals.pages,
+        now,
+      });
+      return {
+        market,
+        week: window.week,
+        status,
+        error: error?.message,
+        retryAfterSeconds,
+        providerRequests: totals.requests,
+        pageCount: totals.pages,
+        preservedPreviousSnapshot: hasSnapshotData(existing),
+      };
+    }
+  }
+
+  if (!keptRows.length) {
+    await writeSnapshotFailure(client, key, {
+      status: "empty",
+      error: lastSkippedError?.message || "Provider returned no current-week full-game rows",
+      pageCount: totals.pages,
+      now,
+    });
+    return {
+      market,
+      week: window.week,
+      status: "empty",
+      providerRequests: totals.requests,
+      pageCount: totals.pages,
+      preservedPreviousSnapshot: hasSnapshotData(existing),
+    };
+  }
+
+  await writeSnapshotSuccess(client, key, { rows: keptRows, pageCount: totals.pages, now });
+  return {
+    market,
+    week: window.week,
+    status: "ok",
+    rowCount: keptRows.length,
+    providerMarket: usedAlias,
+    providerRequests: totals.requests,
+    pageCount: totals.pages,
+    fetchedAt: now.toISOString(),
+  };
+}
+
+// Stored player snapshots; only used when ?props=1&source=snapshot is requested.
+async function handlePropsFromSnapshots(res, deps) {
+  const now = deps.now ?? Date.now();
+  const { week } = getCurrentWeekWindow(now);
+
+  let snapshots;
+  try {
+    snapshots = await readSnapshots(deps.client || createSnapshotClient(), { week });
+  } catch (error) {
+    console.error("Props snapshot read failed:", error?.message || error);
+    setSnapshotCacheHeaders(res, false);
+    return res.status(200).json({
+      count: 0,
+      events: [],
+      provider: SNAPSHOT_PROVIDER,
+      scope: "props",
+      source: "snapshot",
+      cacheStatus: "unavailable",
+      markets: [],
+      warning: "Odds snapshot storage is unavailable.",
+      refreshedAt: new Date(now).toISOString(),
+    });
+  }
+
+  const summary = summarizeSnapshots(snapshots, PLAYER_MARKETS, now);
+  const byMarket = new Map(snapshots.map((snapshot) => [snapshot.market, snapshot]));
+  const rows = PLAYER_MARKETS.flatMap((market) =>
+    hasSnapshotData(byMarket.get(market)) ? snapshotRows(byMarket.get(market)) : []
+  );
+  const eligibleRows = rows.filter(isEligibleOddsRow);
+  const events = buildEvents(eligibleRows);
+  const fetchedTimes = summary.markets
+    .filter((detail) => detail.fetchedAt)
+    .map((detail) => new Date(detail.fetchedAt).getTime());
+
+  const payload = {
+    count: events.length,
+    events,
+    provider: SNAPSHOT_PROVIDER,
+    scope: "props",
+    source: "snapshot",
+    rawRecordCount: rows.length,
+    eligibleRecordCount: eligibleRows.length,
+    rejectedPeriodRecordCount: rows.length - eligibleRows.length,
+    marketRecordCounts: Object.fromEntries(summary.markets.map((detail) => [detail.market, detail.rowCount])),
+    playerPropRecordCount: eligibleRows.filter(isPlayerRow).length,
+    rateLimited: summary.markets.some((detail) => detail.status === "rate_limited"),
+    partialMarkets: summary.missing,
+    markets: summary.markets.map(({ market, fetchedAt, status, stale }) => ({ market, fetchedAt, status, stale })),
+    refreshedAt: new Date(fetchedTimes.length ? Math.min(...fetchedTimes) : now).toISOString(),
+    cacheStatus: summary.cacheStatus,
+  };
+  if (summary.cacheStatus !== "fresh") {
+    payload.warning =
+      summary.cacheStatus === "unavailable"
+        ? "Player prop snapshots are not available yet."
+        : `Player prop snapshots are ${summary.cacheStatus === "partial" ? `missing for: ${summary.missing.join(", ")}` : "older than expected"}.`;
+  }
+
+  setSnapshotCacheHeaders(res, summary.cacheStatus === "fresh");
+  return res.status(200).json(payload);
 }
 
 async function loadOdds(scope, apiKey) {

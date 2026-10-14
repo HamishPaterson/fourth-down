@@ -275,7 +275,7 @@ test("unauthorised refresh is rejected without provider calls", async () => {
 });
 
 test("unsupported refresh market is rejected", async () => {
-  const res = await refresh("player_anytime_td", createFakeClient());
+  const res = await   refresh("player_not_a_market", createFakeClient());
   assert.equal(res.statusCode, 400);
   assert.equal(fetchCalls.length, 0);
 });
