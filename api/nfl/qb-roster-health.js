@@ -1,3 +1,6 @@
+import dataset from "./nflverse-team-metrics.js";
+import { validDepthLineup, weeklyDepthCutoffs } from "../../api-lib/depthCharts.js";
+
 const SLEEPER_URL = "https://api.sleeper.app/v1/players/nfl";
 const ADVANCED_PASSING_URL =
   "https://api.balldontlie.io/nfl/v1/advanced_stats/passing";
@@ -77,6 +80,28 @@ export default async function handler(req, res) {
     });
   }
 
+  let cutoff = null;
+  if (req.query.week != null) {
+    const week = Number(req.query.week);
+    if (!Number.isInteger(week) || week < 1 || week > 19) {
+      return res.status(400).json({ error: "Invalid prediction week" });
+    }
+    try {
+      cutoff = await fetchPersonnelCutoff(season, week);
+    } catch (error) {
+      console.error("Personnel cutoff unavailable", error);
+    }
+    // Sleeper provides current state, not an as-of injury/depth history.
+    if (!cutoff || Date.now() > Date.parse(cutoff)) return res.status(200).json({
+      season, week,
+      cutoff,
+      away: pointInTimeHealth(away, season, week),
+      home: pointInTimeHealth(home, season, week),
+      sourceStatus: { sleeper: false, advancedPassing: false },
+      reason: "Undated live personnel/injury data excluded from weekly predictions",
+    });
+  }
+
   try {
     const [players, passing] = await Promise.all([
       getSleeperPlayers(),
@@ -90,6 +115,8 @@ export default async function handler(req, res) {
 
     return res.status(200).json({
       season,
+      week: req.query.week == null ? null : Number(req.query.week),
+      cutoff,
       away: buildTeamHealth(away, players, leagueQbs),
       home: buildTeamHealth(home, players, leagueQbs),
       sourceStatus: {
@@ -109,6 +136,22 @@ export default async function handler(req, res) {
             : String(error),
       });
   }
+}
+
+async function fetchPersonnelCutoff(season, week) {
+  const apiKey = process.env.BALLDONTLIE_API_KEY;
+  if (!apiKey) return null;
+  const url = new URL("https://api.balldontlie.io/nfl/v1/games");
+  url.searchParams.set("seasons[]", String(season));
+  url.searchParams.set("weeks[]", String(week));
+  url.searchParams.set("per_page", "100");
+  const response = await fetch(url, { headers: { Authorization: apiKey } });
+  if (!response.ok) throw new Error(`Personnel schedule failed (${response.status})`);
+  const body = await response.json();
+  if (!Array.isArray(body.data) || body.meta?.next_cursor != null) {
+    throw new Error("Personnel weekly schedule is incomplete");
+  }
+  return weeklyDepthCutoffs(body.data, season)[week] || null;
 }
 
 async function getSleeperPlayers() {
@@ -198,7 +241,7 @@ async function getAdvancedPassing(apiKey, season) {
   return rows;
 }
 
-function buildTeamHealth(
+export function buildTeamHealth(
   team,
   allPlayers,
   leagueQbs
@@ -223,21 +266,13 @@ function buildTeamHealth(
         (a.depth ?? 99) - (b.depth ?? 99)
     );
 
-  const expectedStarter =
-    qbs.find((player) => player.depth === 1) ||
-    qbs[0] ||
-    null;
+  const firstTeamQbs = qbs.filter((player) => player.depth === 1);
+  const expectedStarter = firstTeamQbs.length === 1 ? firstTeamQbs[0] : null;
 
-  const availableQb =
-    qbs.find(
-      (player) => player.availableForGame
-    ) ||
-    qbs.find(
-      (player) =>
-        player.rosterEligible &&
-        player.availability >= 0.5
-    ) ||
-    null;
+  const availableQbs = qbs.filter((player) => player.availableForGame && player.depth !== null);
+  const bestDepth = Math.min(...availableQbs.map((player) => player.depth));
+  const bestQbs = availableQbs.filter((player) => player.depth === bestDepth);
+  const availableQb = expectedStarter && bestQbs.length === 1 ? bestQbs[0] : null;
 
   const starterRating = findQbRating(
     expectedStarter,
@@ -388,9 +423,10 @@ function buildTeamHealth(
     starterUnavailable,
 
     quarterback: {
+      available: Boolean(expectedStarter && availableQb),
       points: round(qbPoints),
 
-      confidence: round(
+      confidence: expectedStarter && availableQb ? round(
         Math.min(
           starterRating.confidence,
           Math.max(
@@ -398,7 +434,7 @@ function buildTeamHealth(
             0.35
           )
         )
-      ),
+      ) : 0,
 
       reasons: qbReasons,
     },
@@ -427,6 +463,26 @@ function buildTeamHealth(
           ]
         : [],
     },
+  };
+}
+
+export function pointInTimeHealth(team, season, week,
+  lineup = Number(dataset.season) === season ? dataset.metricsByWeek?.[week]?.[team]?.expectedLineup : null) {
+  const valid = validDepthLineup(lineup, week, season);
+  const qb = valid ? lineup.startingQuarterback : null;
+  const summary = qb ? {
+    id: qb.playerId, name: qb.name, depth: qb.rank, status: qb.status,
+    statusKnown: qb.statusKnown, availableForGame: qb.statusKnown ? qb.available : null,
+  } : null;
+  const reason = valid
+    ? "Point-in-time chart identified; historical injury and QB performance coverage unavailable"
+    : "Validated point-in-time depth chart unavailable; regenerate the lineup artifact";
+  return {
+    team, expectedStarter: summary,
+    projectedStarter: qb?.statusKnown && qb.available ? summary : null,
+    starterUnavailable: qb?.statusKnown ? !qb.available : null,
+    quarterback: { available: false, points: 0, confidence: 0, reasons: [reason] },
+    rosterHealth: { available: false, points: 0, confidence: 0, affectedStarters: [], reasons: [reason] },
   };
 }
 

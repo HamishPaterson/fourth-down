@@ -1,4 +1,5 @@
 import dataset from "./nflverse-team-metrics.js";
+import { validDepthLineup } from "../../api-lib/depthCharts.js";
 
 const TEAM_ALIASES = { WAS: "WSH", LA: "LAR", OAK: "LV", SD: "LAC", STL: "LAR" };
 
@@ -56,7 +57,8 @@ export function compareTeams(away, home, week) {
   const lineRegularDifference = metric(home,"snapParticipation.offensiveLineRegulars") - metric(away,"snapParticipation.offensiveLineRegulars");
   const snaps = edge(snapDifference * 0.9,0.45);
   const line = edge(lineRegularDifference * 0.12 + snapDifference * 0.35,0.75);
-  const lineupAvailable = Boolean(away.expectedLineup?.available && home.expectedLineup?.available && away.expectedLineup?.schemaValidated && home.expectedLineup?.schemaValidated);
+  const lineupAvailable = validDepthLineup(away.expectedLineup, week, dataset.season) &&
+    validDepthLineup(home.expectedLineup, week, dataset.season);
   const lineup = edge((metric(home,"expectedLineup.projectedStarters")-metric(away,"expectedLineup.projectedStarters"))*0.04,0.3);
   const turnover = edge(
     ((metric(away,"turnoversPerDrive")-metric(home,"turnoversPerDrive")) +
@@ -78,7 +80,7 @@ export function compareTeams(away, home, week) {
     coverageMatchup:layer(coverageMatchup,confidence,"Passing EPA and explosive rate matched against opponent coverage results"),
     snapParticipation:sourceLayer(snaps,snapConfidence,"Snap-weighted participation and returning workload",snapAvailable),
     offensiveLineContinuity:sourceLayer(line,snapConfidence,"Offensive-line regulars, returning workload and snap continuity",snapAvailable),
-    expectedLineup:sourceLayer(lineup,confidence,"Validated depth-chart starters",lineupAvailable),
+    expectedLineup:sourceLayer(lineup,confidence,lineupAvailable ? "Validated point-in-time depth-chart starters" : "Point-in-time depth-chart lineup unavailable or invalid; regenerate with the repaired extractor",lineupAvailable),
     turnoverRegression: layer(turnover, confidence, "Regressed interceptions, fumbles and takeaways per drive"),
     pace: totalLayer(paceTotal, confidence, "Current-season offensive play volume"),
   };

@@ -1,6 +1,8 @@
 import { gunzipSync } from "node:zlib";
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
+import { pathToFileURL } from "node:url";
+import { buildDepthMetrics, weeklyDepthCutoffs } from "../api-lib/depthCharts.js";
 
 const season = Number(process.argv[2] || new Date().getUTCFullYear());
 const outputPath = path.resolve("api/nfl/nflverse-team-metrics.js");
@@ -19,59 +21,89 @@ const sourceCandidates = {
   ],
 };
 
-console.log(`Downloading nflverse ${season} datasets...`);
-const pbpSource = await fetchFirst(sourceCandidates.pbp, true);
-const snapSource = await fetchFirst(sourceCandidates.snapCounts, false);
-const depthSource = await fetchFirst(sourceCandidates.depthCharts, false);
-const plays = parsePbp(pbpSource.text);
-const snapRows = snapSource ? parseGenericCsv(snapSource.text) : [];
-const depthRows = depthSource ? parseGenericCsv(depthSource.text) : [];
-const completedWeeks = [...new Set(plays.map((play) => play.week).filter((week) => week > 0))].sort((a, b) => a - b);
-const metricsByWeek = {};
+export async function main() {
+  console.log(`Downloading nflverse ${season} datasets...`);
+  const pbpSource = await fetchFirst(sourceCandidates.pbp, true);
+  const snapSource = await fetchFirst(sourceCandidates.snapCounts, false);
+  const depthSource = await fetchFirst(sourceCandidates.depthCharts, false);
+  const plays = parsePbp(pbpSource.text);
+  const snapRows = snapSource ? parseGenericCsv(snapSource.text) : [];
+  const depthRows = depthSource ? parseGenericCsv(depthSource.text) : [];
+  const depthCutoffs = await fetchDepthCutoffs(season);
+  const completedWeeks = [...new Set(plays.map((play) => play.week).filter((week) => week > 0))].sort((a, b) => a - b);
+  const metricsByWeek = {};
 
-for (const predictionWeek of completedWeeks.map((week) => week + 1)) {
-  const eligible = plays.filter((play) => play.week < predictionWeek && isEligible(play));
-  const teams = [...new Set(eligible.flatMap((play) => [play.posteam, play.defteam]).filter(Boolean))];
-  const base = Object.fromEntries(teams.map((code) => [code, buildMetrics(eligible, code)]));
-  const snap = buildSnapMetrics(snapRows, predictionWeek);
-  const depth = buildDepthMetrics(depthRows, predictionWeek);
+  for (const predictionWeek of completedWeeks.map((week) => week + 1)) {
+    const eligible = plays.filter((play) => play.week < predictionWeek && isEligible(play));
+    const teams = [...new Set(eligible.flatMap((play) => [play.posteam, play.defteam]).filter(Boolean))];
+    const base = Object.fromEntries(teams.map((code) => [code, buildMetrics(eligible, code)]));
+    const snap = buildSnapMetrics(snapRows, predictionWeek);
+    const depth = buildDepthMetrics(depthRows, { season, predictionWeek, cutoff: depthCutoffs[predictionWeek] });
 
-  metricsByWeek[predictionWeek] = Object.fromEntries(teams.map((code) => [
-    code,
-    {
-      ...base[code],
-      opponentAdjusted: buildOpponentAdjustedMetrics(code, base, eligible),
-      snapParticipation: snap[code] || null,
-      expectedLineup: depth[code] || null,
+    metricsByWeek[predictionWeek] = Object.fromEntries(teams.map((code) => [
+      code,
+      {
+        ...base[code],
+        opponentAdjusted: buildOpponentAdjustedMetrics(code, base, eligible),
+        snapParticipation: snap[code] || null,
+        expectedLineup: depth[code] || null,
+      },
+    ]));
+  }
+
+  const payload = {
+    season,
+    generatedAt: new Date().toISOString(),
+    source: "nflverse/nflfastR",
+    garbageTimeFilter: "Win probability between 5% and 95%",
+    weighting: {
+      method: "play-level recency weighting",
+      currentSeasonShareFromWeek5: 0.75,
+      priorBaselineShareFromWeek5: 0.10,
+      marketCalibrationShareFromWeek5: 0.15,
+      recentFourGameMultipliers: [0.75, 0.85, 0.95, 1.00],
     },
-  ]));
+    pressureDefinition: "qb_hit or sack proxy from play-by-play; not charted pressure",
+    sourceStatus: {
+      playByPlay: sourceMeta(pbpSource, true),
+      snapCounts: sourceMeta(snapSource, false),
+      depthCharts: sourceMeta(depthSource, false),
+    },
+    metricsByWeek,
+  };
+
+  await mkdir(path.dirname(outputPath), { recursive: true });
+  await writeFile(outputPath, `const NFLVERSE_TEAM_METRICS = ${JSON.stringify(payload, null, 2)};\n\nexport default NFLVERSE_TEAM_METRICS;\n`);
+  console.log(`Wrote ${outputPath}`);
+  console.log(`PBP: ${plays.length} plays | snap counts: ${snapRows.length} rows | depth charts: ${depthRows.length} rows`);
 }
 
-const payload = {
-  season,
-  generatedAt: new Date().toISOString(),
-  source: "nflverse/nflfastR",
-  garbageTimeFilter: "Win probability between 5% and 95%",
-  weighting: {
-    method: "play-level recency weighting",
-    currentSeasonShareFromWeek5: 0.75,
-    priorBaselineShareFromWeek5: 0.10,
-    marketCalibrationShareFromWeek5: 0.15,
-    recentFourGameMultipliers: [0.75, 0.85, 0.95, 1.00],
-  },
-  pressureDefinition: "qb_hit or sack proxy from play-by-play; not charted pressure",
-  sourceStatus: {
-    playByPlay: sourceMeta(pbpSource, true),
-    snapCounts: sourceMeta(snapSource, false),
-    depthCharts: sourceMeta(depthSource, false),
-  },
-  metricsByWeek,
-};
+if (process.argv[1] && import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href) await main();
 
-await mkdir(path.dirname(outputPath), { recursive: true });
-await writeFile(outputPath, `const NFLVERSE_TEAM_METRICS = ${JSON.stringify(payload, null, 2)};\n\nexport default NFLVERSE_TEAM_METRICS;\n`);
-console.log(`Wrote ${outputPath}`);
-console.log(`PBP: ${plays.length} plays | snap counts: ${snapRows.length} rows | depth charts: ${depthRows.length} rows`);
+async function fetchDepthCutoffs(season) {
+  if (!process.env.BALLDONTLIE_API_KEY) {
+    console.warn("Depth charts unavailable: BALLDONTLIE_API_KEY is required for weekly kickoff cutoffs");
+    return {};
+  }
+  const games = [];
+  let cursor = null;
+  let pages = 0;
+  do {
+    const url = new URL("https://api.balldontlie.io/nfl/v1/games");
+    url.searchParams.set("seasons[]", String(season));
+    url.searchParams.set("per_page", "100");
+    if (cursor !== null) url.searchParams.set("cursor", String(cursor));
+    const response = await fetch(url, { headers: { Authorization: process.env.BALLDONTLIE_API_KEY } });
+    if (!response.ok) throw new Error(`Depth cutoff schedule failed (${response.status})`);
+    const body = await response.json();
+    if (!Array.isArray(body.data)) throw new Error("Depth cutoff schedule returned invalid games");
+    games.push(...body.data);
+    cursor = body.meta?.next_cursor ?? null;
+    pages += 1;
+    if (pages >= 20 && cursor !== null) throw new Error("Depth cutoff schedule pagination incomplete");
+  } while (cursor !== null);
+  return weeklyDepthCutoffs(games, season);
+}
 
 async function fetchFirst(urls, required) {
   const errors = [];
@@ -146,7 +178,7 @@ function parsePbp(text) {
   }));
 }
 
-function parseGenericCsv(text) {
+export function parseGenericCsv(text) {
   const lines = text.split(/\r?\n/);
   const headings = parseCsvLine(lines.shift() || "");
   return lines.filter(Boolean).map((line) => {
@@ -315,32 +347,6 @@ function buildSnapMetrics(rows, predictionWeek) {
     defensiveRegulars: entry.defensiveRegulars.size,
     offensiveLineRegulars: entry.offensiveLineRegulars.size,
     continuityScore: round(Math.min(1, (entry.offensiveRegulars.size + entry.defensiveRegulars.size) / 22)),
-  }]));
-}
-
-function buildDepthMetrics(rows, predictionWeek) {
-  const map = {};
-  for (const row of rows) {
-    const week = num(row.week);
-    if (week !== null && week > predictionWeek) continue;
-    const code = team(row.team || row.club_code);
-    if (!code) continue;
-    const rank = num(row.pos_rank || row.depth_team || row.depth_chart_order);
-    const player = cleanName(row.player_name || row.full_name || row.football_name);
-    const position = String(row.pos_abb || row.position || row.depth_position || "").toUpperCase();
-    const entry = map[code] ||= { rows: 0, projectedStarters: 0, offensiveLineStarters: 0, schema: Object.keys(row) };
-    entry.rows += 1;
-    if (player && (rank === 1 || row.depth_team === "1")) {
-      entry.projectedStarters += 1;
-      if (/^(C|G|OG|T|OT|OL|LT|LG|RG|RT)$/.test(position)) entry.offensiveLineStarters += 1;
-    }
-  }
-  return Object.fromEntries(Object.entries(map).map(([code, entry]) => [code, {
-    available: entry.rows > 0,
-    rows: entry.rows,
-    projectedStarters: entry.projectedStarters,
-    offensiveLineStarters: entry.offensiveLineStarters,
-    schemaValidated: entry.schema.some((name) => ["team", "club_code"].includes(name)) && entry.schema.some((name) => ["player_name", "full_name", "football_name"].includes(name)),
   }]));
 }
 

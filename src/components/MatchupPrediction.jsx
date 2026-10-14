@@ -13,8 +13,9 @@ import {
   CURRENT_MODEL_VERSION,
 } from "../services/predictionLedger.js";
 import { getPlayerRating, getTeamPlayerRatings } from "../services/playerRatings.js";
-import { getTeamQbr } from "../services/teamRatings.js";
+import { getTeamQbr, getTeamRatingsHealth } from "../services/teamRatings.js";
 import { classifyDataHealth, normaliseLayers, saveDataHealthSnapshot } from "../services/dataHealth.js";
+import { personnelAvailableAt } from "../../api-lib/depthCharts.js";
 
 async function readRosterResponse(response) {
   const body = await response.json();
@@ -83,8 +84,8 @@ function currentQbPerformanceWeight(week) {
   return 0.7;
 }
 
-function buildUnifiedQbAdjustment(roster, teamCode, personnelQb, week = 1) {
-  const qbr = getTeamQbr(teamCode);
+function buildUnifiedQbAdjustment(roster, teamCode, personnelQb, week = 1, cutoff = null) {
+  const qbr = personnelAvailableAt(getTeamRatingsHealth(), cutoff) ? getTeamQbr(teamCode) : null;
   const rosterPlayers = Object.values(roster?.groups || {}).flat();
   const activeQbs = rosterPlayers
     .filter((player) => String(player.position || "").toUpperCase() === "QB" && player.active !== false)
@@ -222,12 +223,15 @@ export default function MatchupPrediction({ awayCode, homeCode, kickoff, weather
   const [loadedOddsEvent, setLoadedOddsEvent] = useState(null);
   const marketEvent = oddsEvent || loadedOddsEvent || savedOddsEvent;
   const [standingsByCode, setStandingsByCode] = useState({});
-  const [personnel, setPersonnel] = useState(null);
+  const [loadedPersonnel, setPersonnel] = useState(null);
+  const personnel = loadedPersonnel?.week === Number(week) ? loadedPersonnel : null;
   const [kickerData, setKickerData] = useState(null);
   const [teamForm, setTeamForm] = useState(null);
   const [opponentNetwork, setOpponentNetwork] = useState(null);
   const [playByPlayData, setPlayByPlayData] = useState(null);
-  const [playerMatchup, setPlayerMatchup] = useState(null);
+  const [loadedPlayerMatchup, setPlayerMatchup] = useState(null);
+  const playerMatchup = personnelAvailableAt(loadedPlayerMatchup?.rosters?.away, personnel?.cutoff) &&
+    personnelAvailableAt(loadedPlayerMatchup?.rosters?.home, personnel?.cutoff) ? loadedPlayerMatchup : null;
 
   useEffect(() => {
     const stored = readMarketSnapshot(marketSnapshotKey);
@@ -269,11 +273,11 @@ export default function MatchupPrediction({ awayCode, homeCode, kickoff, weather
     if (!awayCode || !homeCode) return;
     const controller = new AbortController();
     const season = kickoff ? new Date(kickoff).getUTCFullYear() : new Date().getUTCFullYear();
-    getQbRosterHealth(normalizeCode(awayCode), normalizeCode(homeCode), season, controller.signal)
+    getQbRosterHealth(normalizeCode(awayCode), normalizeCode(homeCode), season, controller.signal, Number(week))
       .then(setPersonnel)
       .catch(() => setPersonnel(null));
     return () => controller.abort();
-  }, [awayCode, homeCode, kickoff]);
+  }, [awayCode, homeCode, kickoff, week]);
 
   useEffect(() => {
     if (!awayCode || !homeCode) return;
@@ -437,13 +441,15 @@ export default function MatchupPrediction({ awayCode, homeCode, kickoff, weather
     playerMatchup?.rosters?.away,
     awayCode,
     personnel?.away?.quarterback,
-    week
+    week,
+    personnel?.cutoff
   );
   const homeQbAdjustment = buildUnifiedQbAdjustment(
     playerMatchup?.rosters?.home,
     homeCode,
     personnel?.home?.quarterback,
-    week
+    week,
+    personnel?.cutoff
   );
   const localPrediction = predictMatchup(awayCode, homeCode, {
     kickoff,
@@ -1318,4 +1324,3 @@ function clamp(value, minimum, maximum) {
 function roundThree(value) {
   return Math.round(value * 1000) / 1000;
 }
-

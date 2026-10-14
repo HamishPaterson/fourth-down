@@ -55,12 +55,14 @@ export async function getQbRosterHealth(
   away,
   home,
   season,
-  signal
+  signal,
+  week
 ) {
   const params = new URLSearchParams({
     away,
     home,
   });
+  if (week != null) params.set("week", String(week));
 
   if (season) {
     params.set(

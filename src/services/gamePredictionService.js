@@ -1,9 +1,10 @@
 import { predictMatchup } from "./predictionEngine.js";
 import { buildPlayerProjections } from "./playerProjectionService.js";
 import * as nflApi from "./nflApi.js";
-import { getTeamQbr } from "./teamRatings.js";
+import { getTeamQbr, getTeamRatingsHealth } from "./teamRatings.js";
 import { getStadiumWeather } from "./weatherApi.js";
 import { buildBestBets } from "./bestBetsService.js";
+import { personnelAvailableAt, validDepthLineup } from "../../api-lib/depthCharts.js";
 
 export const FULL_MODEL_VERSION = 11;
 export const FULL_MODEL_KEY = "full-v11-week5-data-gap-audit";
@@ -75,7 +76,7 @@ async function createPrediction({ game, oddsEvent, season, week, away, home, sig
   };
   const tasks = {
     standings: optionalCall("getStandings", [signal]),
-    personnel: optionalCall("getQbRosterHealth", [away, home, season, signal]),
+    personnel: optionalCall("getQbRosterHealth", [away, home, season, signal, week]),
     kicker: optionalCall("getKickerStats", [away, home, season - 1, signal]),
     teamForm: week > 1
       ? optionalCall("getTeamForm", [away, home, season, week, signal])
@@ -115,12 +116,27 @@ async function createPrediction({ game, oddsEvent, season, week, away, home, sig
 
   const homeStanding = standingsByCode[home];
   const awayStanding = standingsByCode[away];
-  const personnel = values.personnel;
+  const depthLineup = values.playByPlay?.away?.expectedLineup;
+  const personnelCutoff = values.personnel?.cutoff ||
+    (validDepthLineup(depthLineup, week, season) ? depthLineup.cutoff : null);
+  const personnel = personnelAvailableAt(values.personnel, personnelCutoff) ? values.personnel : null;
+  const awayRoster = personnelAvailableAt(values.awayRoster, personnelCutoff) ? values.awayRoster : null;
+  const homeRoster = personnelAvailableAt(values.homeRoster, personnelCutoff) ? values.homeRoster : null;
+  const qbrAvailable = personnelAvailableAt(getTeamRatingsHealth(), personnelCutoff);
+  dataQuality.personnel = Boolean(personnel);
+  dataQuality.awayRoster = Boolean(awayRoster);
+  dataQuality.homeRoster = Boolean(homeRoster);
+  dataQuality.personnelTiming = {
+    cutoff: personnelCutoff,
+    personnel: Boolean(personnel), awayRoster: Boolean(awayRoster), homeRoster: Boolean(homeRoster),
+    qbr: qbrAvailable,
+    rule: "Exclude personnel sources without proven availability at or before the weekly cutoff",
+  };
 
   const modelLayers = {
     ...extractLayers(values.teamForm),
     ...extractLayers(values.playByPlay),
-    playerRatings: buildPlayerRatingsLayer(values.awayRoster, values.homeRoster),
+    playerRatings: buildPlayerRatingsLayer(awayRoster, homeRoster),
     opponentNetwork:
       values.opponentNetwork?.modelLayer ||
       values.opponentNetwork?.modelLayers?.opponentNetwork ||
@@ -128,8 +144,8 @@ async function createPrediction({ game, oddsEvent, season, week, away, home, sig
     quarterback: buildQuarterbackLayer(
       personnel?.away?.quarterback,
       personnel?.home?.quarterback,
-      getTeamQbr(away),
-      getTeamQbr(home),
+      qbrAvailable ? getTeamQbr(away) : null,
+      qbrAvailable ? getTeamQbr(home) : null,
       week
     ),
     rosterHealth: buildPersonnelLayer(
@@ -183,7 +199,7 @@ async function createPrediction({ game, oddsEvent, season, week, away, home, sig
     dataQuality: {
       ...dataQuality,
       weather,
-      sources: buildSourceDiagnostics(values, weather, oddsEvent),
+      sources: buildSourceDiagnostics({ ...values, personnel }, weather, oddsEvent),
     },
     weather,
     modelVersion: FULL_MODEL_VERSION,
@@ -360,11 +376,16 @@ function qbrPointAdjustment(qbr, week) {
 }
 
 function buildPersonnelLayer(away, home) {
+  const awayAvailable = away?.available !== false && nullableFinite(away?.points) !== null;
+  const homeAvailable = home?.available !== false && nullableFinite(home?.points) !== null;
+  const awayPoints = awayAvailable ? finite(away.points) : 0;
+  const homePoints = homeAvailable ? finite(home.points) : 0;
   return {
-    active: Boolean(away?.points || home?.points),
-    awayPoints: finite(away?.points),
-    homePoints: finite(home?.points),
-    confidence: Math.min(finite(away?.confidence), finite(home?.confidence)),
+    available: awayAvailable || homeAvailable,
+    active: Boolean(awayPoints || homePoints),
+    awayPoints,
+    homePoints,
+    confidence: Math.min(awayAvailable ? finite(away.confidence) : 0, homeAvailable ? finite(home.confidence) : 0),
     reasons: [...toArray(away?.reasons), ...toArray(home?.reasons)],
   };
 }
@@ -403,17 +424,17 @@ function buildPlayerRatingsLayer(awayRoster, homeRoster) {
 function buildUnits(roster) {
   const players = Object.values(roster?.groups || {}).flat();
   const rated = players.filter(
-    (player) => player?.active !== false && Number.isFinite(Number(player?.playerRating))
+    (player) => player?.active !== false && nullableFinite(player?.playerRating) !== null
   );
   const starters = rated.filter((player) => Number(player.depthChartOrder) === 1);
   const pool = starters.length >= 12 ? starters : rated;
 
-  const unit = (positions, limit, fallback = 72) => {
+  const unit = (positions, limit) => {
     const matches = pool
       .filter((player) => positions.includes(String(player.position || "").toUpperCase()))
       .sort((a, b) => (a.depthChartOrder ?? 99) - (b.depthChartOrder ?? 99))
       .slice(0, limit);
-    if (!matches.length) return fallback;
+    if (!matches.length) return null;
     return matches.reduce((sum, player) => sum + Number(player.playerRating), 0) / matches.length;
   };
 
@@ -425,6 +446,9 @@ function buildUnits(roster) {
   const front = unit(["DE", "DT", "DL", "NT", "EDGE", "LEDG", "REDG", "OLB"], 5);
   const lb = unit(["LB", "ILB", "MLB", "OLB"], 3);
   const db = unit(["CB", "DB", "S", "FS", "SS"], 5);
+  if ([qb, rb, wr, te, ol, front, lb, db].some((rating) => rating === null)) {
+    return { coverage: 0 };
+  }
 
   return {
     passingOffense: qb * 0.35 + wr * 0.25 + te * 0.1 + ol * 0.3,
