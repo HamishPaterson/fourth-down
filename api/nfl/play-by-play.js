@@ -32,7 +32,7 @@ export default async function handler(req, res) {
     dataStatus: "available",
   });
 }
-function compareTeams(away, home, week) {
+export function compareTeams(away, home, week) {
   const weekConfidence = confidenceForWeek(week);
   const sampleConfidence = Math.min(
     confidenceForSample(away),
@@ -48,8 +48,8 @@ function compareTeams(away, home, week) {
   const drive = edge(((home.scoringDriveRate-away.scoringDriveRate)+(away.threeAndOutRate-home.threeAndOutRate))*1.1,0.65);
   const situational = edge(((home.thirdDownRate-away.thirdDownRate)+(home.redZoneTouchdownRate-away.redZoneTouchdownRate))*0.55,0.4);
   const protection = edge(((home.pressureGeneratedRate-away.pressureGeneratedRate)+(away.pressureAllowedRate-home.pressureAllowedRate))*1.5,0.65);
-  const pressureMatchup = edge(((home.pressureGeneratedRate-away.pressureAllowedRate)-(away.pressureGeneratedRate-home.pressureAllowedRate))*1.35,0.55);
-  const coverageMatchup = edge(((away.passingEpaAllowedPerPlay-home.passingEpaPerPlay)-(home.passingEpaAllowedPerPlay-away.passingEpaPerPlay))*0.8+((away.explosivePlayRateAllowed-home.explosivePlayRate)-(home.explosivePlayRateAllowed-away.explosivePlayRate))*1.5,0.5);
+  const pressureMatchup = edge(((home.pressureGeneratedRate+away.pressureAllowedRate)-(away.pressureGeneratedRate+home.pressureAllowedRate))*1.35,0.55);
+  const coverageMatchup = edge(((home.passingEpaPerPlay+away.passingEpaAllowedPerPlay)-(away.passingEpaPerPlay+home.passingEpaAllowedPerPlay))*0.8+((away.explosivePlayRateAllowed-home.explosivePlayRate)-(home.explosivePlayRateAllowed-away.explosivePlayRate))*1.5,0.5);
   const snapAvailable = Boolean(away.snapParticipation?.available && home.snapParticipation?.available);
   const snapConfidence = Math.min(metric(away,"snapParticipation.continuityScore"),metric(home,"snapParticipation.continuityScore"),confidence);
   const snapDifference = metric(home,"snapParticipation.continuityScore") - metric(away,"snapParticipation.continuityScore");

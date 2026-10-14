@@ -449,7 +449,7 @@ async function getJson(
   return body;
 }
 
-function buildScoringBaseline(
+export function buildScoringBaseline(
   away,
   home,
   awayGames,
@@ -642,13 +642,14 @@ function getDynamicLeagueAverage(
   );
 }
 
-function calculateWeightedAverage(
+export function calculateWeightedAverage(
   games,
   team,
   usePointsScored,
   lowerBoundary,
   upperBoundary
 ) {
+  if (!games.length) return LEAGUE_PRIOR;
   const scores =
     games.map((game) => {
       const isHome =
@@ -657,42 +658,29 @@ function calculateWeightedAverage(
           "home"
         ) === team;
 
-      const pointsScored =
-        getGameScore(
-          game,
-          isHome
-            ? "home"
-            : "away"
-        );
-
-      const pointsAllowed =
-        getGameScore(
-          game,
-          isHome
-            ? "away"
-            : "home"
-        );
+      const side = usePointsScored === isHome ? "home" : "away";
+      const value = side === "home"
+        ? game.home_team_score ?? game.home_score
+        : game.visitor_team_score ?? game.away_team_score ?? game.away_score;
+      if (
+        !["number", "string"].includes(typeof value) ||
+        String(value).trim() === "" ||
+        !Number.isFinite(Number(value))
+      ) {
+        throw new Error(`Invalid ${side} score in scoring baseline for game ${game.id}`);
+      }
 
       return clamp(
-        usePointsScored
-          ? pointsScored
-          : pointsAllowed,
+        Number(value),
         lowerBoundary,
         upperBoundary
       );
     });
 
-  const weightOffset =
-    Math.max(
-      0,
-      RECENCY_WEIGHTS.length -
-        scores.length
-    );
-
-  const weights =
-    RECENCY_WEIGHTS.slice(
-      weightOffset
-    );
+  // Keep the existing last-four weights; older games retain the oldest weight.
+  const weights = scores.map((_, index) =>
+    RECENCY_WEIGHTS[Math.max(0, RECENCY_WEIGHTS.length - scores.length + index)]
+  );
 
   const weightedTotal =
     scores.reduce(
@@ -719,10 +707,7 @@ function calculateWeightedAverage(
 
   return (
     weightedTotal /
-    Math.max(
-      1,
-      totalWeight
-    )
+    totalWeight
   );
 }
 
@@ -959,7 +944,7 @@ function buildTeamForm(
   };
 }
 
-function compareForms(
+export function compareForms(
   away,
   home
 ) {
@@ -982,12 +967,15 @@ function compareForms(
       1.3
     );
 
+  // Convert the allowed rate back to sacks/game using its dropback denominator.
+  const awayDropbacksPerGame = (away.raw.passingAttempts + away.raw.sacksAllowed) / away.games;
+  const homeDropbacksPerGame = (home.raw.passingAttempts + home.raw.sacksAllowed) / home.games;
   const homePressure =
     clamp(
       (
-        home.defensiveSacksPerGame -
+        home.defensiveSacksPerGame +
         away.sackRateAllowed *
-          away.offensivePlaysPerGame
+          awayDropbacksPerGame
       ) *
         0.12,
       -0.65,
@@ -997,9 +985,9 @@ function compareForms(
   const awayPressure =
     clamp(
       (
-        away.defensiveSacksPerGame -
+        away.defensiveSacksPerGame +
         home.sackRateAllowed *
-          home.offensivePlaysPerGame
+          homeDropbacksPerGame
       ) *
         0.12,
       -0.65,
@@ -1008,8 +996,8 @@ function compareForms(
 
   const pressureHomePoints =
     clamp(
-      awayPressure -
-        homePressure,
+      homePressure -
+        awayPressure,
       -0.8,
       0.8
     );

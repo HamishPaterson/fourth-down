@@ -287,19 +287,34 @@ function extractLayers(payload) {
     : {};
 }
 
-function buildQuarterbackLayer(awayPersonnel, homePersonnel, awayQbr, homeQbr, week) {
-  const away = qbrPointAdjustment(awayQbr, week);
-  const home = qbrPointAdjustment(homeQbr, week);
-  const awayPersonnelPoints = finite(awayPersonnel?.points);
-  const homePersonnelPoints = finite(homePersonnel?.points);
+export function buildQuarterbackLayer(awayPersonnel, homePersonnel, awayQbr, homeQbr, week) {
   const qbrWeight = Number(week) >= 5 ? 0.65 : Number(week) >= 4 ? 0.55 : 0.4;
-  const personnelWeight = 1 - qbrWeight;
-  const awayPoints = clamp(away.points * qbrWeight + awayPersonnelPoints * personnelWeight, -3.5, 3.5);
-  const homePoints = clamp(home.points * qbrWeight + homePersonnelPoints * personnelWeight, -3.5, 3.5);
+  const blend = (personnel, qbr) => {
+    const performance = qbrPointAdjustment(qbr, week);
+    const personnelPoints = nullableFinite(personnel?.points);
+    const personnelAvailable = personnelPoints !== null && personnel?.available !== false;
+    const performanceWeight = performance.available ? qbrWeight : 0;
+    const personnelWeight = personnelAvailable ? 1 - qbrWeight : 0;
+    const totalWeight = performanceWeight + personnelWeight;
+    return {
+      available: totalWeight > 0,
+      points: totalWeight
+        ? clamp((performance.points * performanceWeight + (personnelPoints ?? 0) * personnelWeight) / totalWeight, -3.5, 3.5)
+        : 0,
+      confidence: totalWeight
+        ? (performance.confidence * performanceWeight + clamp(finite(personnel?.confidence), 0, 1) * personnelWeight) / totalWeight
+        : 0,
+      qbrWeight: totalWeight ? performanceWeight / totalWeight : 0,
+      reasons: performance.reasons,
+    };
+  };
+  const away = blend(awayPersonnel, awayQbr);
+  const home = blend(homePersonnel, homeQbr);
   return {
-    active: Math.abs(awayPoints) >= 0.05 || Math.abs(homePoints) >= 0.05,
-    awayPoints: round3(awayPoints),
-    homePoints: round3(homePoints),
+    active: Math.abs(away.points) >= 0.05 || Math.abs(home.points) >= 0.05,
+    available: away.available || home.available,
+    awayPoints: round3(away.points),
+    homePoints: round3(home.points),
     confidence: Math.min(away.confidence, home.confidence),
     reasons: [
       ...toArray(awayPersonnel?.reasons),
@@ -307,25 +322,35 @@ function buildQuarterbackLayer(awayPersonnel, homePersonnel, awayQbr, homeQbr, w
       ...away.reasons,
       ...home.reasons,
     ],
-    qbr: { away: awayQbr, home: homeQbr, weight: qbrWeight },
+    qbr: {
+      away: awayQbr,
+      home: homeQbr,
+      weight: qbrWeight,
+      effectiveWeights: { away: away.qbrWeight, home: home.qbrWeight },
+    },
   };
 }
 
 function qbrPointAdjustment(qbr, week) {
-  if (!qbr) return { points: 0, confidence: 0, reasons: [] };
-  const seasonQbr = Number(qbr.seasonQbr);
-  const weeklyQbr = Number(qbr.weeklyQbr);
+  const seasonQbr = nullableFinite(qbr?.seasonQbr);
+  const weeklyQbr = nullableFinite(qbr?.weeklyQbr);
+  if (qbr?.available === false || (seasonQbr === null && weeklyQbr === null)) {
+    return { available: false, points: 0, confidence: 0, reasons: [] };
+  }
   const plays = Number(qbr.plays) || 0;
   const sampleReliability = clamp(plays / 120, 0.35, 1);
-  const seasonSignal = Number.isFinite(seasonQbr) ? (seasonQbr - 50) / 18 : 0;
-  const weeklySignal = Number.isFinite(weeklyQbr) ? (weeklyQbr - 50) / 28 : 0;
+  const seasonSignal = seasonQbr !== null ? (seasonQbr - 50) / 18 : 0;
+  const weeklySignal = weeklyQbr !== null ? (weeklyQbr - 50) / 28 : 0;
   const recentWeight = Number(week) >= 5 ? 0.45 : Number(week) >= 4 ? 0.35 : 0.2;
+  const seasonWeight = seasonQbr !== null ? 1 - recentWeight : 0;
+  const weeklyWeight = weeklyQbr !== null ? recentWeight : 0;
   const points = clamp(
-    (seasonSignal * (1 - recentWeight) + weeklySignal * recentWeight) * sampleReliability,
+    (seasonSignal * seasonWeight + weeklySignal * weeklyWeight) / (seasonWeight + weeklyWeight) * sampleReliability,
     -2.5,
     2.5
   );
   return {
+    available: true,
     points,
     confidence: sampleReliability,
     reasons: [
@@ -469,6 +494,12 @@ function toArray(value) {
 function finite(value) {
   const number = Number(value);
   return Number.isFinite(number) ? number : 0;
+}
+
+function nullableFinite(value) {
+  if (!["number", "string"].includes(typeof value) || String(value).trim() === "") return null;
+  const number = Number(value);
+  return Number.isFinite(number) ? number : null;
 }
 
 function normalizeCode(code) {
