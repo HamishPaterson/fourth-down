@@ -13,6 +13,12 @@ const TEAM_ALIASES = {
 const RECENT_GAME_LIMIT = 4;
 const MAX_ADJUSTMENT = 1;
 const ITERATIONS = 30;
+export const NFL_TEAMS = [
+  "ARI", "ATL", "BAL", "BUF", "CAR", "CHI", "CIN", "CLE",
+  "DAL", "DEN", "DET", "GB", "HOU", "IND", "JAX", "KC",
+  "LAC", "LAR", "LV", "MIA", "MIN", "NE", "NO", "NYG",
+  "NYJ", "PHI", "PIT", "SEA", "SF", "TB", "TEN", "WSH",
+];
 
 export default async function handler(req, res) {
   if (req.method !== "GET") {
@@ -46,8 +52,10 @@ export default async function handler(req, res) {
   if (
     !Number.isInteger(season) ||
     !Number.isInteger(week) ||
-    !away ||
-    !home
+    week < 1 || week > 19 ||
+    !NFL_TEAMS.includes(away) ||
+    !NFL_TEAMS.includes(home) ||
+    away === home
   ) {
     return res.status(400).json({
       error:
@@ -73,25 +81,7 @@ export default async function handler(req, res) {
         season
       );
 
-    const games = sourceGames
-      .filter(
-        (game) =>
-          isCompleted(game) &&
-          Number(game.week) < week &&
-          game.postseason !== true
-      )
-      .map(normalizeGame)
-      .filter(
-        (game) =>
-          game.away &&
-          game.home &&
-          Number.isFinite(
-            game.awayScore
-          ) &&
-          Number.isFinite(
-            game.homeScore
-          )
-      );
+    const games = prepareNetworkGames(sourceGames, season, week);
 
     if (!games.length) {
       return sendNeutral(
@@ -117,6 +107,11 @@ export default async function handler(req, res) {
     const homeRating =
       ratings[home] ||
       createNeutralRating();
+
+    if (!awayRating.games || !homeRating.games) {
+      return sendNeutral(res, season, week, away, home,
+        "Both teams need completed current-season games", ratings);
+    }
 
     const commonOpponents =
       findCommonOpponents(
@@ -359,14 +354,18 @@ async function fetchSeasonGames(
     requestCount < 20
   );
 
+  if (cursor !== null) {
+    throw new Error("Opponent network games pagination exceeded 20 pages");
+  }
+
   return games;
 }
 
-function solveOpponentNetwork(
+export function solveOpponentNetwork(
   games,
   targetWeek
 ) {
-  const teams = [
+  const activeTeams = [
     ...new Set(
       games.flatMap(
         (game) => [
@@ -379,7 +378,7 @@ function solveOpponentNetwork(
 
   let offense =
     Object.fromEntries(
-      teams.map(
+      NFL_TEAMS.map(
         (team) => [
           team,
           0,
@@ -389,7 +388,7 @@ function solveOpponentNetwork(
 
   let defense =
     Object.fromEntries(
-      teams.map(
+      NFL_TEAMS.map(
         (team) => [
           team,
           0,
@@ -405,7 +404,7 @@ function solveOpponentNetwork(
     const nextOffense = {};
     const nextDefense = {};
 
-    for (const team of teams) {
+    for (const team of activeTeams) {
       const recentGames =
         getRecentTeamGames(
           games,
@@ -437,17 +436,7 @@ function solveOpponentNetwork(
             ? game.awayScore
             : game.homeScore;
 
-        const weight =
-          recencyWeight(
-            game.week,
-            targetWeek
-          ) *
-          volatilityWeight(
-            Math.abs(
-              game.homeScore -
-              game.awayScore
-            )
-          );
+        const weight = networkGameWeight(game, targetWeek);
 
         offensiveEntries.push({
           value:
@@ -471,16 +460,17 @@ function solveOpponentNetwork(
       }
 
       nextOffense[team] =
-        weightedAverage(
+        (offense[team] + weightedAverage(
           offensiveEntries
-        );
+        )) / 2;
 
       nextDefense[team] =
-        weightedAverage(
+        (defense[team] + weightedAverage(
           defensiveEntries
-        );
+        )) / 2;
     }
 
+    // Half-step relaxation prevents the synchronous two-cycle on sparse/bipartite schedules.
     offense =
       centerRatings(
         nextOffense
@@ -493,7 +483,7 @@ function solveOpponentNetwork(
   }
 
   return Object.fromEntries(
-    teams.map((team) => {
+    NFL_TEAMS.map((team) => {
       const teamGames =
         getRecentTeamGames(
           games,
@@ -526,18 +516,18 @@ function solveOpponentNetwork(
         {
           offense:
             round(
-              offense[team]
+              offense[team] ?? 0
             ),
 
           defense:
             round(
-              defense[team]
+              defense[team] ?? 0
             ),
 
           overall:
             round(
-              offense[team] +
-                defense[team]
+              (offense[team] ?? 0) +
+                (defense[team] ?? 0)
             ),
 
           scheduleStrength:
@@ -553,7 +543,7 @@ function solveOpponentNetwork(
   );
 }
 
-function getRecentTeamGames(
+export function getRecentTeamGames(
   games,
   team
 ) {
@@ -565,8 +555,9 @@ function getRecentTeamGames(
     )
     .sort(
       (first, second) =>
-        second.week -
-        first.week
+        second.week - first.week ||
+        String(second.date || "").localeCompare(String(first.date || "")) ||
+        String(first.id).localeCompare(String(second.id))
     )
     .slice(
       0,
@@ -574,7 +565,7 @@ function getRecentTeamGames(
     );
 }
 
-function findCommonOpponents(
+export function findCommonOpponents(
   games,
   away,
   home,
@@ -651,7 +642,7 @@ function getOpponentSet(
   );
 }
 
-function teamPerformanceAgainst(
+export function teamPerformanceAgainst(
   games,
   team,
   opponent,
@@ -660,8 +651,145 @@ function teamPerformanceAgainst(
 ) {
   const matches =
     games.filter(
-      (game) =>
-        [
-          game.away,
-          game.home,
-        ].includes
+      (game) => (game.away === team && game.home === opponent) ||
+        (game.home === team && game.away === opponent)
+    );
+
+  // Reconstructed: compare weighted scoring margins plus opponent strength.
+  return weightedAverage(matches.map((game) => ({
+    value: (game.home === team
+      ? game.homeScore - game.awayScore
+      : game.awayScore - game.homeScore) + (ratings[opponent]?.overall ?? 0),
+    weight: networkGameWeight(game, targetWeek),
+  })));
+}
+
+// The tail below was missing in every recoverable revision; these helpers are reconstructed.
+export function calculateCommonOpponentEdge(commonOpponents) {
+  // Reconstructed: use the existing one-point limit, without adding a new weight.
+  return clamp(average(commonOpponents.map(
+    (opponent) => opponent.homePerformance - opponent.awayPerformance
+  )), -MAX_ADJUSTMENT, MAX_ADJUSTMENT);
+}
+
+export function networkGameWeight(game, targetWeek) {
+  // Reconstructed from the existing NFLverse recency curve; latest eligible week is age zero.
+  const age = Math.max(0, targetWeek - 1 - game.week);
+  const recency = [1, 0.95, 0.85, 0.75][age] ?? 0.65;
+  // Reconstructed smooth volatility discount, scaled by the network's existing 22-point baseline.
+  return recency * 22 / (22 + Math.abs(game.homeScore - game.awayScore));
+}
+
+export function prepareNetworkGames(sourceGames, season, targetWeek) {
+  const byId = new Map();
+  const byMatchup = new Map();
+  for (const source of sourceGames) {
+    const week = Number(source.week);
+    const type = String(source.season_type ?? source.game_type ?? "").toUpperCase();
+    if (Number(source.season) !== season ||
+        !Number.isInteger(week) || week < 1 || week > 18 || week >= targetWeek ||
+        [true, 1, "true", "1"].includes(source.postseason) ||
+        (type && !["REG", "REGULAR", "REGULAR SEASON", "2"].includes(type)) ||
+        !isCompleted(source)) continue;
+
+    const game = normalizeGame(source);
+    if (!NFL_TEAMS.includes(game.away) || !NFL_TEAMS.includes(game.home) ||
+        game.away === game.home || game.awayScore === null || game.homeScore === null) {
+      throw new Error(`Invalid teams or scores in opponent network game ${source.id ?? "without ID"}`);
+    }
+    const matchup = `${season}:${week}:${[game.away, game.home].sort().join(":")}`;
+    const signature = [game.away, game.home].sort()
+      .map((team) => `${team}:${team === game.away ? game.awayScore : game.homeScore}`).join(":");
+    const id = source.id == null ? matchup : String(source.id);
+    const existing = byId.get(id) || byMatchup.get(matchup);
+    if (existing) {
+      if (existing.matchup !== matchup || existing.signature !== signature) {
+        throw new Error(`Conflicting duplicate opponent network game ${id}`);
+      }
+      byId.set(id, existing);
+      continue;
+    }
+    const entry = { matchup, signature, game: { ...game, id, season, weight: networkGameWeight(game, targetWeek) } };
+    byId.set(id, entry);
+    byMatchup.set(matchup, entry);
+  }
+  return [...byMatchup.values()].map((entry) => entry.game);
+}
+
+function isCompleted(game) {
+  const status = String(game.status || game.status_state || game.state || "").trim().toLowerCase();
+  return game.completed === true || /^(final\b|completed?$|closed$|post$)/.test(status);
+}
+
+function normalizeGame(game) {
+  return {
+    week: Number(game.week),
+    date: game.date || null,
+    away: normalizeTeam(game.visitor_team?.abbreviation ?? game.away_team?.abbreviation ?? game.away_team_abbreviation),
+    home: normalizeTeam(game.home_team?.abbreviation ?? game.home_team_abbreviation),
+    awayScore: scoreOrNull(game.visitor_team_score ?? game.away_team_score ?? game.away_score),
+    homeScore: scoreOrNull(game.home_team_score ?? game.home_score),
+  };
+}
+
+function scoreOrNull(value) {
+  if (!["number", "string"].includes(typeof value) || String(value).trim() === "") return null;
+  const score = Number(value);
+  return Number.isSafeInteger(score) && score >= 0 ? score : null;
+}
+
+function normalizeTeam(value) {
+  const team = String(value || "").trim().toUpperCase();
+  return TEAM_ALIASES[team] || team;
+}
+
+function weightedAverage(entries) {
+  const totalWeight = entries.reduce((sum, entry) => sum + entry.weight, 0);
+  return totalWeight ? entries.reduce((sum, entry) => sum + entry.value * entry.weight, 0) / totalWeight : 0;
+}
+
+function average(values) {
+  return values.length ? values.reduce((sum, value) => sum + value, 0) / values.length : 0;
+}
+
+function centerRatings(ratings) {
+  const mean = average(Object.values(ratings));
+  return Object.fromEntries(Object.entries(ratings).map(([team, value]) => [team, value - mean]));
+}
+
+function createNeutralRating() {
+  return { offense: 0, defense: 0, overall: 0, scheduleStrength: 0, games: 0 };
+}
+
+function sendNeutral(res, season, week, away, home, reason, ratings) {
+  return res.status(200).json({
+    season, week, away, home,
+    source: "BALLDONTLIE completed games",
+    ratings: ratings || Object.fromEntries(NFL_TEAMS.map((team) => [team, createNeutralRating()])),
+    commonOpponents: [],
+    gamesUsed: 0,
+    dataStatus: "neutral",
+    reason,
+    modelLayer: {
+      active: false, available: false, awayPoints: 0, homePoints: 0,
+      rawAwayPoints: 0, rawHomePoints: 0, confidence: 0,
+      gamesUsed: 0, commonOpponents: 0, reasons: [reason],
+    },
+  });
+}
+
+function buildReasons({ away, home, homePoints, commonOpponents, minimumGames }) {
+  return [
+    `Opponent-adjusted scoring network: ${home} versus ${away}`,
+    `${minimumGames} recent games per team minimum; ${commonOpponents.length} common opponents`,
+    `Home adjustment ${round(homePoints)} points`,
+  ];
+}
+
+function clamp(value, minimum, maximum) {
+  return Math.min(maximum, Math.max(minimum, value));
+}
+
+function round(value) {
+  return Math.round(value * 1000) / 1000;
+}
