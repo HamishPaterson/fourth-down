@@ -16,6 +16,7 @@ import { getPlayerRating, getTeamPlayerRatings } from "../services/playerRatings
 import { getTeamQbr, getTeamRatingsHealth } from "../services/teamRatings.js";
 import { classifyDataHealth, normaliseLayers, saveDataHealthSnapshot } from "../services/dataHealth.js";
 import { personnelAvailableAt } from "../../api-lib/depthCharts.js";
+import MatchupIntelligencePanel from "./MatchupIntelligencePanel.jsx";
 
 async function readRosterResponse(response) {
   const body = await response.json();
@@ -452,6 +453,8 @@ export default function MatchupPrediction({ awayCode, homeCode, kickoff, weather
     personnel?.cutoff
   );
   const localPrediction = predictMatchup(awayCode, homeCode, {
+    season: kickoff ? new Date(kickoff).getUTCFullYear() : 2026,
+    teamMetrics: playByPlayData,
     kickoff,
     weather,
     market: marketEvent,
@@ -711,7 +714,9 @@ export default function MatchupPrediction({ awayCode, homeCode, kickoff, weather
         ))}
       </div>
 
+      <MatchupIntelligencePanel prediction={prediction} />
       <section className="card prediction-explanation-card">
+        {!prediction.matchupIntelligence?.available && <>
         <span className="eyebrow">WHY THIS PREDICTION?</span>
         <h3>{explanation.heading}</h3>
         <p>{explanation.summary}</p>
@@ -753,6 +758,7 @@ export default function MatchupPrediction({ awayCode, homeCode, kickoff, weather
           ))}
         </div>
 
+        </>}
         <div className="prediction-confidence-block">
           <div>
             <small>CONFIDENCE</small>

@@ -156,6 +156,9 @@ async function createPrediction({ game, oddsEvent, season, week, away, home, sig
   };
 
   const prediction = predictMatchup(away, home, {
+    season,
+    teamMetrics: values.playByPlay,
+    playerMetrics: values.playerMetrics,
     kickoff: gameWithWeather.sourceDate,
     weather: gameWithWeather.weather || null,
     market: oddsEvent,

@@ -2,9 +2,11 @@
 // Deterministic matchup projection with component-level weather effects.
 import { getTeamRatings } from "./teamRatings.js";
 import { getHomeFieldAdvantage } from "./homeFieldAdvantage.js";
+import { buildExpectedPlayMix, buildMatchupIntelligence, pressureSignal, explainMatchupSignal } from "./matchupIntelligence.js";
 
 const RATING_BASELINE = 75;
 const BASE_PASS_RATIO = 0.6;
+const CORRELATED_MATCHUP_LAYERS = ["rushMatchup", "passMatchup", "successMatchup", "explosiveMatchup"];
 
 const NFL_DIVISIONS = {
   "AFC East": ["BUF", "MIA", "NE", "NYJ"],
@@ -29,6 +31,48 @@ const TEAM_DIVISION = Object.fromEntries(
 const DIVISIONAL_MARGIN_COMPRESSION_POINTS = 1.2;
 
 export function predictMatchup(awayCode, homeCode, options = {}) {
+  const baseline = predictCore(awayCode, homeCode, options);
+  const data = options.teamMetrics;
+  const away = normalizeTeamCode(awayCode), home = normalizeTeamCode(homeCode);
+  if (!data || data.season !== options.season || data.week !== Number(options.week) ||
+      data.away?.team !== away || data.home?.team !== home) {
+    return { ...baseline, matchupIntelligence: { available: false, signals: [],
+      reason: "Exact-season/week team matchup data unavailable" } };
+  }
+  const playMix = buildExpectedPlayMix({ away, home, teamMetrics: data,
+    playerMetrics: options.playerMetrics, prediction: baseline, season: options.season, week: Number(options.week) });
+  const intelligence = buildMatchupIntelligence({ away, home, teamMetrics: data, playMix });
+  const modelLayers = { ...options.modelLayers, ...intelligence.layers };
+  const result = predictCore(away, home, { ...options, modelLayers });
+  const signals = [...intelligence.signals,
+    pressureSignal({ away, home, teamMetrics: data, layer: result.modelLayers.pressureMatchup })]
+    .map((signal) => {
+      const without = predictCore(away, home, { ...options, modelLayers: {
+        ...modelLayers, [signal.layer]: { active: false, available: false, awayPoints: 0, homePoints: 0 },
+      } });
+      return explainMatchupSignal({ ...signal,
+        homePoints: result.modelLayers[signal.layer].homePoints,
+        awayPoints: result.modelLayers[signal.layer].awayPoints,
+      }, result.continuousMargin - without.continuousMargin);
+    });
+  return {
+    ...result,
+    away: { ...result.away, expectedPlayMix: playMix.away },
+    home: { ...result.home, expectedPlayMix: playMix.home },
+    matchupIntelligence: {
+      phase: 1,
+      available: signals.some((signal) => signal.available), signals, playMix,
+      incrementalMargin: round3(result.continuousMargin - baseline.continuousMargin),
+      maxPreSimulationMargin: 1,
+      limitations: ["Explosives combine pass and rush.", "Pressure is a hit/sack proxy, not charted pressure or blitz performance.",
+        "Separate passing/rushing success and neutral-situation tendency are unavailable.",
+        "NFLverse metric-specific adjustment is distinct from the score-based Opponent-Network.",
+        "Earlier team PBP versions are not immutable as-observed history; player mix requires proven pre-cutoff completions."],
+    },
+  };
+}
+
+function predictCore(awayCode, homeCode, options = {}) {
   const awayTeam = normalizeTeamCode(awayCode);
   const homeTeam = normalizeTeamCode(homeCode);
 
@@ -458,6 +502,7 @@ export function createModelLayers(input = {}) {
     "snapParticipation",
     "expectedLineup",
     "pace",
+    ...CORRELATED_MATCHUP_LAYERS,
   ];
 
   const totalMovingLayers = new Set(["scoringBaseline", "pace"]);
@@ -1007,9 +1052,10 @@ function createSeededRandom(seedValue) {
 }
 
 function calculateWinProbability(projectedMargin, modelLayers, market) {
-  const layers = Object.values(modelLayers || {}).filter(
-    (layer) => layer && typeof layer === "object" && "confidence" in layer
-  );
+  const layers = Object.entries(modelLayers || {})
+    .filter(([name, layer]) => !CORRELATED_MATCHUP_LAYERS.includes(name) &&
+      layer && typeof layer === "object" && "confidence" in layer)
+    .map(([, layer]) => layer);
   const available = layers.filter((layer) => layer.available !== false && Number(layer.confidence) > 0);
   const active = available.filter((layer) => layer.active);
   const meanConfidence = available.length

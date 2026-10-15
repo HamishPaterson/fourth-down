@@ -85,7 +85,8 @@ function projectTeam({ teamCode, opponentCode, side, prediction, metrics, teamMe
     7,
     16
   );
-  const expectedPlays = clamp(expectedPossessions * 6.05, 48, 82);
+  const mix = teamProjection.expectedPlayMix;
+  const expectedPlays = mix?.available ? mix.expectedPlays : clamp(expectedPossessions * 6.05, 48, 82);
   const historicalPassRate = rate(
     number(totals.passAttempts) + number(totals.sacksAllowed),
     number(totals.passAttempts) + number(totals.sacksAllowed) + number(totals.rushingAttempts),
@@ -93,7 +94,7 @@ function projectTeam({ teamCode, opponentCode, side, prediction, metrics, teamMe
   );
   const scoreEdge = number(teamProjection.score) - number(opponentProjection.score);
   const scriptShift = clamp(-scoreEdge * 0.0025, -0.045, 0.045);
-  const passRate = clamp(historicalPassRate + scriptShift, 0.42, 0.72);
+  const passRate = mix?.available ? mix.passRate : clamp(historicalPassRate + scriptShift, 0.42, 0.72);
   const expectedDropbacks = expectedPlays * passRate;
   const historicalSackRate = rate(
     quarterback ? quarterback.passing.sacksTaken : number(totals.sacksAllowed),
