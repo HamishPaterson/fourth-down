@@ -9,7 +9,7 @@ import { playerMetricsResponse, validatePlayerMetrics, completedPlayerGames } fr
 import { buildPlayerProjections } from "../src/services/playerProjectionService.js";
 import { buildBestBets } from "../src/services/bestBetsService.js";
 import handler from "../api/nfl/game-stats.js";
-import legacy from "../data/nflverse-player-metrics.js";
+import regenerated from "../data/nflverse-player-metrics.js";
 import { getFullGamePrediction, clearFullGamePredictionCache } from "../src/services/gamePredictionService.js";
 
 const history = parseGenericCsv(readFileSync(new URL("./fixtures/depth-chart-history.csv", import.meta.url), "utf8"));
@@ -325,13 +325,27 @@ test("null required individual rates exclude that unsupported profile, not other
     }
   }
 });
-test("legacy production artifact is rejected; endpoint executes without artifact writes or providers", async () => {
+test("regenerated schema-2 Week 6 artifact is accepted; legacy provenance is still rejected", async () => {
   const response = { status(code) { this.code = code; return this; }, setHeader() {}, json(value) { this.body = value; return this; } };
   await handler({ method: "GET", query: { action: "player-metrics", season: 2026, week: 6, away: "NYG", home: "KC" } }, response);
   assert.equal(response.code, 200);
-  assert.equal(response.body.available, false);
-  assert.match(response.body.reason, /Legacy/);
-  assert.equal(legacy.generatedAt, "2026-09-29T03:47:09.511Z");
+  assert.equal(response.body.available, true);
+  assert.equal(response.body.schemaVersion, 2);
+  assert.equal(response.body.metricsWeek, 6);
+  assert.equal(validatePlayerMetrics(response.body, { season: 2026, week: 6, cutoff: regenerated.cutoffs[6] }), null);
+  assert.deepEqual(response.body.away, regenerated.playerMetricsByWeek[6].NYG);
+  assert.deepEqual(response.body.home, regenerated.playerMetricsByWeek[6].KC);
+  const legacy = {
+    ...regenerated,
+    schemaVersion: 1,
+    sourceAsOf: undefined,
+    generatedAt: "2026-09-29T03:47:09.511Z",
+  };
+  const rejected = playerMetricsResponse(legacy, { season: 2026, week: 6, away: "NYG", home: "KC" });
+  assert.equal(rejected.available, false);
+  assert.match(rejected.reason, /Legacy/);
+  assert.equal(rejected.away, null);
+  assert.equal(rejected.home, null);
 });
 test("exact-week endpoint payload rejects older-week fallback and season mismatches", () => {
   const { artifact } = fixture();

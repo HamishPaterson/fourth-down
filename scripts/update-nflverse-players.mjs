@@ -7,6 +7,7 @@ import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { weeklyDepthCutoffs } from "../api-lib/depthCharts.js";
 import { PLAYER_METRICS_SCHEMA, completedPlayerGames, playerTeam } from "../api-lib/playerMetrics.js";
+import { fetchSchedule as fetchPlayerSchedule } from "./balldontlie-schedule.mjs";
 
 const season = Number(
   process.argv[2] ||
@@ -170,27 +171,6 @@ console.log(
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href) await main();
-
-async function fetchPlayerSchedule(season) {
-  if (!process.env.BALLDONTLIE_API_KEY) throw new Error("BALLDONTLIE_API_KEY required for player game completion/cutoff provenance");
-  const games = [];
-  let cursor = null;
-  let pages = 0;
-  do {
-    const url = new URL("https://api.balldontlie.io/nfl/v1/games");
-    url.searchParams.set("seasons[]", String(season));
-    url.searchParams.set("per_page", "100");
-    if (cursor !== null) url.searchParams.set("cursor", String(cursor));
-    const response = await fetch(url, { headers: { Authorization: process.env.BALLDONTLIE_API_KEY } });
-    if (!response.ok) throw new Error(`Player schedule request failed (${response.status})`);
-    const body = await response.json();
-    if (!Array.isArray(body.data)) throw new Error("Invalid player schedule response");
-    games.push(...body.data);
-    cursor = body.meta?.next_cursor ?? null;
-    if (++pages >= 20 && cursor !== null) throw new Error("Player schedule pagination incomplete");
-  } while (cursor !== null);
-  return games;
-}
 
 export function buildWeeklyPlayerMetrics(plays, schedule, { season, predictionWeek, cutoff }) {
   const completed = completedPlayerGames(schedule, season, predictionWeek, cutoff);

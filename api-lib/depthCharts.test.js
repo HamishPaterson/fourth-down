@@ -150,7 +150,7 @@ test("unknown availability stays explicitly unknown and missing/ambiguous QB dep
 test("legacy, nonfinite, inconsistent, duplicated and impossible lineup objects fail validation", () => {
   const lineup = extract(fullRoster()).KC;
   const invalid = [
-    {}, dataset.metricsByWeek[6].KC.expectedLineup,
+    {}, { ...lineup, schemaVersion: 1 },
     { ...lineup, projectedStarters: NaN }, { ...lineup, projectedStarters: Infinity },
     { ...lineup, predictionWeek: 2 }, { ...lineup, season: 2025 },
     { ...lineup, snapshotAt: "2027-01-01T00:00:00Z" },
@@ -205,12 +205,17 @@ test("a contemporaneous IR roster designation cannot be overridden by a question
   assert.equal(state.absenceProbability, 1);
 });
 
-test("the checked-in corrupted artifact is gated off without modifying other PBP layers", () => {
-  const layers = compareTeams(dataset.metricsByWeek[6].SF, dataset.metricsByWeek[6].KC, 6);
+test("an explicitly legacy lineup is gated off without modifying other PBP layers", () => {
+  const valid = extract(fullRoster()).KC;
+  const baseline = compareTeams(metrics(valid), metrics(valid), 6);
+  const layers = compareTeams(metrics(valid), metrics({ ...valid, schemaVersion: 1 }), 6);
   assert.equal(layers.expectedLineup.available, false);
   assert.equal(layers.expectedLineup.homePoints, 0);
   assert.equal(layers.expectedLineup.confidence, 0);
   assert.match(layers.expectedLineup.reasons[0], /regenerate/);
+  for (const key of Object.keys(baseline).filter((key) => key !== "expectedLineup")) {
+    assert.deepEqual(layers[key], baseline[key]);
+  }
   const changed = compareTeams(metrics(null), metrics({ projectedStarters: Infinity }), 6).expectedLineup;
   assert.equal(changed.homePoints, 0);
   assert.equal(changed.awayPoints, 0);
@@ -234,7 +239,9 @@ test("weekly personnel requests never fetch present-day Sleeper injury state", a
   try {
     await healthHandler({ method: "GET", query: { season: "2026", week: "2", away: "SF", home: "KC" } }, response);
     assert.equal(response.code, 200);
-    assert.equal(response.body.home.expectedStarter, null); // Legacy artifact has no trustworthy identity.
+    assert.deepEqual(response.body.home.expectedStarter, pointInTimeHealth("KC", 2026, 2).expectedStarter);
+    assert.equal(response.body.home.projectedStarter, null);
+    assert.equal(response.body.home.starterUnavailable, null);
     assert.equal(response.body.home.quarterback.available, false);
     assert.equal(response.body.home.rosterHealth.points, 0);
     assert.equal(response.body.home.rosterHealth.confidence, 0);

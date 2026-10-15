@@ -3,6 +3,7 @@ import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { buildDepthMetrics, weeklyDepthCutoffs } from "../api-lib/depthCharts.js";
+import { fetchSchedule } from "./balldontlie-schedule.mjs";
 
 const season = Number(process.argv[2] || new Date().getUTCFullYear());
 const outputPath = path.resolve("api/nfl/nflverse-team-metrics.js");
@@ -85,23 +86,7 @@ async function fetchDepthCutoffs(season) {
     console.warn("Depth charts unavailable: BALLDONTLIE_API_KEY is required for weekly kickoff cutoffs");
     return {};
   }
-  const games = [];
-  let cursor = null;
-  let pages = 0;
-  do {
-    const url = new URL("https://api.balldontlie.io/nfl/v1/games");
-    url.searchParams.set("seasons[]", String(season));
-    url.searchParams.set("per_page", "100");
-    if (cursor !== null) url.searchParams.set("cursor", String(cursor));
-    const response = await fetch(url, { headers: { Authorization: process.env.BALLDONTLIE_API_KEY } });
-    if (!response.ok) throw new Error(`Depth cutoff schedule failed (${response.status})`);
-    const body = await response.json();
-    if (!Array.isArray(body.data)) throw new Error("Depth cutoff schedule returned invalid games");
-    games.push(...body.data);
-    cursor = body.meta?.next_cursor ?? null;
-    pages += 1;
-    if (pages >= 20 && cursor !== null) throw new Error("Depth cutoff schedule pagination incomplete");
-  } while (cursor !== null);
+  const games = await fetchSchedule(season);
   return weeklyDepthCutoffs(games, season);
 }
 
