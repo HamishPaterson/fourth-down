@@ -1,7 +1,7 @@
 import process from "node:process";
 import test, { beforeEach, afterEach } from "node:test";
 import assert from "node:assert/strict";
-import { createPredictionRefreshHandler, predictionRefreshContext, validatePredictionRefreshBatch } from "./predictionRefresh.js";
+import { createPredictionRefreshHandler, createAdministrativePredictionRefreshHandler, predictionRefreshContext, validatePredictionRefreshBatch } from "./predictionRefresh.js";
 import { validateWeeklyOpponentNetwork, loadWeeklyOpponentNetwork, NFL_TEAMS, createOpponentNetworkHandler } from "../api/nfl/opponent-network.js";
 import { completePrediction, retainPrediction } from "./predictionEligibility.js";
 import { predictionFeatureStatus, PREDICTION_FEATURE_VERSION, MATCHUP_INTELLIGENCE_SCHEMA_VERSION } from "../src/services/predictionFeatures.js";
@@ -74,14 +74,18 @@ function database(snapshots = []) {
       then(resolve, reject) { return execute().then(resolve, reject); } };
   } };
 }
-let secret, key;
+let secret, key, environment, adminToken;
 beforeEach(() => {
   secret = process.env.CRON_SECRET; key = process.env.BALLDONTLIE_API_KEY;
+  environment = process.env.VERCEL_ENV; adminToken = process.env.PREDICTION_REFRESH_TOKEN;
+  process.env.VERCEL_ENV = "production"; process.env.PREDICTION_REFRESH_TOKEN = "mock-admin-token";
   process.env.CRON_SECRET = "mock-refresh-secret"; process.env.BALLDONTLIE_API_KEY = "mock-provider-secret";
 });
 afterEach(() => {
   if (secret === undefined) delete process.env.CRON_SECRET; else process.env.CRON_SECRET = secret;
   if (key === undefined) delete process.env.BALLDONTLIE_API_KEY; else process.env.BALLDONTLIE_API_KEY = key;
+  if (environment === undefined) delete process.env.VERCEL_ENV; else process.env.VERCEL_ENV = environment;
+  if (adminToken === undefined) delete process.env.PREDICTION_REFRESH_TOKEN; else process.env.PREDICTION_REFRESH_TOKEN = adminToken;
 });
 async function run({ db = database(), dryRun = true, method = "POST", authorization = "Bearer mock-refresh-secret",
   build = fixture, ...overrides } = {}) {
@@ -253,4 +257,130 @@ test("the deployed action dispatch reaches CRON protection without touching stor
   await gameStats({ method: "POST", query: { action: "refresh-predictions" }, headers: {}, body: { dryRun: false } }, res);
   assert.equal(res.statusCode, 401);
   assert.equal(res.calls, 1);
+});
+
+async function admin({ db = database(), method = "GET", body, query = {}, token = "mock-admin-token",
+  contentType = "application/json", build = fixture, ...overrides } = {}) {
+  let networkLoads = 0, generations = 0, oddsReads = 0;
+  const handler = createAdministrativePredictionRefreshHandler({
+    getNow: () => NOW, createClient: () => db, readSchedule: async () => [],
+    resolveContext: () => context, readOdds: async () => { oddsReads++; return { stored: true }; },
+    loadNetwork: async () => { networkLoads++; return structuredClone(network); },
+    createGenerator: () => async (game) => { generations++; return build(game); },
+    ...overrides,
+  });
+  const res = response();
+  await handler({ method, query, body, headers: {
+    authorization: token === null ? undefined : `Bearer ${token}`, "content-type": contentType,
+  } }, res);
+  return { res, db, networkLoads, generations, oddsReads };
+}
+
+for (const mode of ["preview", "development", ""]) {
+  test(`administrative trigger rejects ${mode || "missing"} Production environment before work`, async () => {
+    process.env.VERCEL_ENV = mode;
+    const r = await admin({ readSchedule: () => assert.fail("must not read inputs") });
+    assert.equal(r.res.statusCode, 403); assert.deepEqual(r.db.reads, []);
+  });
+}
+for (const method of ["GET", "POST"]) {
+  for (const token of [null, "wrong", "mock-refresh-secret"]) {
+    test(`administrative ${method} rejects missing/wrong/CRON bearer (${token}) before work`, async () => {
+      const r = await admin({ method, token, body: { dryRun: false },
+        readSchedule: () => assert.fail("must not read inputs") });
+      assert.equal(r.res.statusCode, 401); assert.deepEqual(r.db.reads, []);
+    });
+  }
+}
+test("administrative trigger fails closed with missing dedicated secret", async () => {
+  delete process.env.PREDICTION_REFRESH_TOKEN;
+  const r = await admin({ readSchedule: () => assert.fail("must not read inputs") });
+  assert.equal(r.res.statusCode, 401);
+});
+test("administrative authenticated GET always dry runs regardless of query or body, with safe counts only", async () => {
+  const r = await admin({ query: { save: "true", dryRun: "false" }, body: { dryRun: false } });
+  assert.equal(r.res.statusCode, 200);
+  assert.equal(r.res.body.dryRun, true); assert.equal(r.generations, 14); assert.equal(r.networkLoads, 1);
+  for (const key of ["scheduledGames", "predictionsGenerated", "predictionsValidated", "phase1Count", "phase2aCount",
+    "opponentNetworkCount", "playerProjectionCount", "candidatePoolCount"]) assert.equal(r.res.body[key], 14);
+  assert.equal(r.res.body.predictionFeatureVersion, 1);
+  assert.equal(r.res.body.matchupIntelligenceSchemaVersion, 2);
+  assert.equal(r.res.body.predictionsWritten, 0);
+  assert.deepEqual(r.db.writes, []);
+  assert.doesNotMatch(JSON.stringify(r.res.body), /mock-admin-token|mock-refresh-secret|mock-provider-secret|predictionPayload/);
+});
+for (const body of [undefined, null, {}, [], '{"dryRun":false}', { dryRun: true }, { dryRun: "false" },
+  { dryRun: 0 }, { dryRun: false, extra: true }]) {
+  test(`administrative POST rejects nonexact JSON ${JSON.stringify(body)}`, async () => {
+    const r = await admin({ method: "POST", body, query: { save: "true" },
+      readSchedule: () => assert.fail("must not read inputs") });
+    assert.equal(r.res.statusCode, 400); assert.deepEqual(r.db.writes, []);
+  });
+}
+test("administrative POST requires JSON content type", async () => {
+  const r = await admin({ method: "POST", body: { dryRun: false }, contentType: "text/plain" });
+  assert.equal(r.res.statusCode, 400); assert.deepEqual(r.db.reads, []);
+});
+test("administrative save validates all 14 before writes, writes predictions only and second save is rejected", async () => {
+  const db = database(), locked = db.locked;
+  let generated = 0;
+  const first = await admin({ db, method: "POST", body: { dryRun: false },
+    build: (game) => { generated++; return fixture(game); },
+    savePrediction: async (...args) => {
+      assert.equal(generated, 14);
+      const { saveAuthoritativePrediction } = await import("./serverPredictions.js");
+      return saveAuthoritativePrediction(...args);
+    } });
+  assert.equal(first.res.statusCode, 200, JSON.stringify(first.res.body));
+  assert.equal(first.res.body.dryRun, false); assert.equal(first.res.body.predictionsWritten, 14);
+  assert.equal(first.networkLoads, 1); assert.equal(db.writes.length, 14);
+  assert.deepEqual(new Set(db.reads), new Set(["prediction_snapshots"]));
+  assert.deepEqual(new Set(db.writes), new Set(["prediction_snapshots"])); assert.equal(db.locked, locked);
+  const second = await admin({ db, method: "POST", body: { dryRun: false },
+    loadNetwork: () => assert.fail("second invocation must not compute network"),
+    readOdds: () => assert.fail("second invocation must not read odds") });
+  assert.equal(second.res.statusCode, 409); assert.equal(second.generations, 0);
+  assert.equal(second.res.body.predictionsWritten, 0); assert.equal(db.writes.length, 14);
+});
+test("administrative failed game returns game and reason with zero prediction/Multi writes", async () => {
+  const r = await admin({ method: "POST", body: { dryRun: false }, build: (game) => {
+    const s = fixture(game);
+    if (game === games[13]) s.predictionPayload.continuousMargin = Infinity;
+    return s;
+  } });
+  assert.equal(r.res.statusCode, 502); assert.equal(r.generations, 14);
+  assert.equal(r.res.body.failedGames[0].game, `${games[13].away} at ${games[13].home}`);
+  assert.match(r.res.body.failedGames[0].reason, /Incomplete or inconsistent/);
+  assert.equal(r.res.body.predictionsWritten, 0); assert.deepEqual(r.db.writes, []);
+});
+test("administrative trigger rejects non-Week6 or incomplete schedules before storage", async () => {
+  for (const ctx of [{ ...context, week: 7 }, { ...context, games: games.slice(0, 13) }]) {
+    const r = await admin({ method: "POST", body: { dryRun: false }, resolveContext: () => ctx });
+    assert.equal(r.res.statusCode, 502); assert.deepEqual(r.db.reads, []); assert.deepEqual(r.db.writes, []);
+  }
+});
+test("administrative action dispatch is Production-only and cannot use CRON authentication", async () => {
+  const res = response();
+  await gameStats({ method: "GET", query: { action: "admin-prediction-refresh" },
+    headers: { authorization: "Bearer mock-refresh-secret" } }, res);
+  assert.equal(res.statusCode, 401); assert.equal(res.calls, 1);
+});
+test("administrative failure diagnostics redact dedicated and provider secrets", async () => {
+  const r = await admin({ build: () => { throw new Error("Provider failed mock-admin-token mock-provider-secret"); } });
+  assert.equal(r.res.statusCode, 502);
+  assert.doesNotMatch(JSON.stringify(r.res.body), /mock-admin-token|mock-provider-secret/);
+  assert.match(r.res.body.failedGames[0].reason, /\[redacted\]/);
+  assert.deepEqual(r.db.writes, []);
+});
+
+test("administrative current-feature records with incomplete player arrays cannot block repair", async () => {
+  const snapshots = games.map((game) => ({ ...fixture(game), authoritative: true }));
+  snapshots[0].playerProjections.home.players = [];
+  const db = database(snapshots);
+  const r = await admin({ db, method: "POST", body: { dryRun: false } });
+  assert.equal(r.generations, 14);
+  // Existing persistence protects authoritative current-feature records, so a retained
+  // malformed record must fail explicitly rather than report a successful repair.
+  assert.equal(r.res.statusCode, 502);
+  assert.match(r.res.body.failedGames[0].reason, /Incomplete or inconsistent/);
 });
