@@ -7,7 +7,7 @@ import { databaseToSnapshot } from "../api/nfl/game-stats.js";
 import { getCurrentWeekWindow } from "../api/nfl/odds.js";
 import { loadWeeklyOpponentNetwork, validateWeeklyOpponentNetwork, NFL_TEAMS } from "../api/nfl/opponent-network.js";
 import { completePrediction } from "./predictionEligibility.js";
-import { predictionFeatureStatus, PREDICTION_FEATURE_VERSION, MATCHUP_INTELLIGENCE_SCHEMA_VERSION } from "../src/services/predictionFeatures.js";
+import { predictionFeatureStatus, PREDICTION_FEATURE_VERSION } from "../src/services/predictionFeatures.js";
 import { playerTeam } from "./playerMetrics.js";
 import dataset from "../api/nfl/nflverse-team-metrics.js";
 
@@ -76,11 +76,18 @@ export function validatePredictionRefreshBatch(snapshots, context, now) {
   }
 }
 
-export function createAdministrativePredictionRefreshHandler(overrides = {}) {
-  return createPredictionRefreshHandler(overrides, { administrative: true });
+export function createPredictionRefreshHandler(overrides = {}) {
+  const batch = createPredictionRefreshBatch(overrides);
+  return (req, res) => {
+    res.setHeader("Cache-Control", "no-store");
+    if (!["GET", "POST"].includes(req.method)) return res.status(405).json({ error: "Method not allowed" });
+    if (!secureBearerMatches(req.headers?.authorization, process.env.CRON_SECRET)) return res.status(401).json({ error: "Unauthorized" });
+    return batch(req, res);
+  };
 }
 
-export function createPredictionRefreshHandler(overrides = {}, { administrative = false } = {}) {
+// Internal build entry, never routed to HTTP without the protected handler above.
+export function createPredictionRefreshBatch(overrides = {}, { oneTimeWeek6 = false } = {}) {
   const getNow = overrides.getNow || (() => new Date());
   const createClient = overrides.createClient || createSnapshotClient;
   const readSchedule = overrides.readSchedule || fetchSchedule;
@@ -91,31 +98,13 @@ export function createPredictionRefreshHandler(overrides = {}, { administrative 
   const save = overrides.savePrediction || saveAuthoritativePrediction;
   return async (req, res) => {
     res.setHeader("Cache-Control", "no-store");
-    if (administrative && process.env.VERCEL_ENV !== "production") return res.status(403).json({ error: "Production only" });
-    if (!["GET", "POST"].includes(req.method)) return res.status(405).json({ error: "Method not allowed" });
-    const secret = administrative ? process.env.PREDICTION_REFRESH_TOKEN : process.env.CRON_SECRET;
-    if (!secureBearerMatches(req.headers?.authorization, secret)) return res.status(401).json({ error: "Unauthorized" });
-    if (administrative && req.method === "POST" && (
-      !/^application\/json(?:\s*;|$)/i.test(req.headers?.["content-type"] || "") ||
-      !req.body || typeof req.body !== "object" || Array.isArray(req.body) ||
-      Object.keys(req.body).length !== 1 || req.body.dryRun !== false
-    )) return res.status(400).json({ error: 'POST requires exactly {"dryRun":false} as JSON' });
-    const failures = [];
-    let written = 0;
-    const safeReason = (error) => {
-      let reason = error instanceof Error ? error.message : "Prediction refresh failed";
-      for (const value of [secret, process.env.CRON_SECRET, process.env.BALLDONTLIE_API_KEY]) {
-        if (value) reason = reason.split(value).join("[redacted]");
-      }
-      return reason;
-    };
     try {
       const now = getNow();
       const dryRun = req.method !== "POST" || req.body?.dryRun !== false;
       const sourceGames = await readSchedule(dataset.season, { deadline: Date.now() + 55000 });
       const context = await resolveContext(sourceGames, now);
-      if (administrative && (context.season !== 2026 || context.week !== 6 || context.games.length !== 14)) {
-        throw new Error("Temporary administrative refresh requires exactly 14 games in 2026 Week 6");
+      if (oneTimeWeek6 && (context.season !== 2026 || context.week !== 6 || context.games.length !== 14)) {
+        throw new Error("One-time refresh requires exactly 14 games in 2026 Week 6");
       }
       const client = createClient();
       const { data: rows, error } = await client.from("prediction_snapshots").select("*")
@@ -127,7 +116,7 @@ export function createPredictionRefreshHandler(overrides = {}, { administrative 
         if (prior.has(key)) throw new Error("Duplicate saved prediction identity");
         prior.set(key, s);
       }
-      if (administrative && !dryRun && context.games.every((game) => {
+      if (oneTimeWeek6 && !dryRun && context.games.every((game) => {
         const existing = prior.get(identity(game));
         if (!existing?.authoritative) return false;
         try {
@@ -136,8 +125,8 @@ export function createPredictionRefreshHandler(overrides = {}, { administrative 
         } catch {
           return false;
         }
-      })) return res.status(409).json({ error: "All 14 authoritative predictions are already current", dryRun: false,
-        predictionsGenerated: 0, predictionsWritten: 0 });
+      })) return res.status(200).json({ status: "already current", dryRun: false, generated: 0,
+        reused: 14, writes: 0, predictionFeatureVersion: PREDICTION_FEATURE_VERSION });
       const odds = await readOdds(client, now, context);
       const network = validateWeeklyOpponentNetwork(await loadNetwork(context.season, context.week, {
         sourceGames, cutoff: context.cutoff, now,
@@ -148,7 +137,7 @@ export function createPredictionRefreshHandler(overrides = {}, { administrative 
       for (let index = 0; index < context.games.length; index += 3) {
         generated.push(...await Promise.all(context.games.slice(index, index + 3).map(async (game) => {
           const existing = prior.get(identity(game));
-          if (!administrative && existing?.authoritative && completePrediction(existing) && predictionFeatureStatus(existing).complete &&
+          if (!oneTimeWeek6 && existing?.authoritative && completePrediction(existing) && predictionFeatureStatus(existing).complete &&
               Date.parse(existing.kickoff) === Date.parse(game.sourceDate)) {
             reused++;
             return existing;
@@ -156,42 +145,17 @@ export function createPredictionRefreshHandler(overrides = {}, { administrative 
           try {
             if (existing?.frozenAt || existing?.actualWinner) throw new Error("Frozen or graded prediction cannot be refreshed");
             const snapshot = await generate(game, odds, now);
-            if (administrative) validatePredictionRefreshBatch([snapshot], { ...context, games: [game] }, getNow());
+            if (oneTimeWeek6) validatePredictionRefreshBatch([snapshot], { ...context, games: [game] }, getNow());
             return snapshot;
           } catch (error) {
-            if (!administrative) throw error;
-            failures.push({ game: `${game.away} at ${game.home}`, reason: safeReason(error) });
-            return null;
+            throw new Error(`${game.away} at ${game.home}: ${error instanceof Error ? error.message : "Prediction generation failed"}`, { cause: error });
           }
         })));
-      }
-      if (failures.length) {
-        const valid = generated.filter(Boolean);
-        return res.status(502).json({ error: "Prediction batch validation failed",
-          dryRun, scheduledGames: context.games.length, predictionsGenerated: generated.length,
-          predictionsValidated: valid.length, predictionsWritten: 0,
-          phase1Count: valid.filter((s) => predictionFeatureStatus(s).phase1).length,
-          phase2aCount: valid.filter((s) => predictionFeatureStatus(s).phase2a).length,
-          opponentNetworkCount: valid.filter((s) => predictionFeatureStatus(s).network).length,
-          playerProjectionCount: valid.filter((s) => s.playerProjections?.available === true).length,
-          candidatePoolCount: valid.filter((s) => predictionFeatureStatus(s).candidates).length,
-          predictionFeatureVersion: PREDICTION_FEATURE_VERSION,
-          matchupIntelligenceSchemaVersion: MATCHUP_INTELLIGENCE_SCHEMA_VERSION,
-          failedGames: failures });
       }
       validatePredictionRefreshBatch(generated, context, getNow());
       if (!dryRun) {
         for (const snapshot of generated) {
-          if (prior.get(`${snapshot.awayCode}:${snapshot.homeCode}`) !== snapshot) {
-            const saved = await save(client, snapshot, getNow());
-            if (administrative && saved) {
-              const retained = databaseToSnapshot(saved);
-              validatePredictionRefreshBatch([retained], { ...context, games: [context.games.find(
-                (game) => game.away === snapshot.awayCode && game.home === snapshot.homeCode)] }, getNow());
-              if (retained.authoritative !== true) throw new Error("Saved prediction is not authoritative");
-            }
-            written++;
-          }
+          if (prior.get(`${snapshot.awayCode}:${snapshot.homeCode}`) !== snapshot) await save(client, snapshot, getNow());
         }
         const { data: stored, error: readError } = await client.from("prediction_snapshots").select("*")
           .eq("season", context.season).eq("week", context.week);
@@ -202,18 +166,6 @@ export function createPredictionRefreshHandler(overrides = {}, { administrative 
         }));
         validatePredictionRefreshBatch(context.games.map((game) => byGame.get(identity(game))), context, getNow());
       }
-      if (administrative) return res.status(200).json({
-        dryRun, scheduledGames: context.games.length, predictionsGenerated: generated.length,
-        predictionsValidated: generated.length, predictionsWritten: dryRun ? 0 : written,
-        phase1Count: generated.filter((s) => predictionFeatureStatus(s).phase1).length,
-        phase2aCount: generated.filter((s) => predictionFeatureStatus(s).phase2a).length,
-        opponentNetworkCount: generated.filter((s) => predictionFeatureStatus(s).network).length,
-        playerProjectionCount: generated.filter((s) => s.playerProjections?.available === true).length,
-        candidatePoolCount: generated.filter((s) => predictionFeatureStatus(s).candidates).length,
-        predictionFeatureVersion: PREDICTION_FEATURE_VERSION,
-        matchupIntelligenceSchemaVersion: MATCHUP_INTELLIGENCE_SCHEMA_VERSION,
-        failedGames: [],
-      });
       return res.status(200).json({
         status: dryRun ? "dry run" : "refreshed", dryRun, season: context.season, week: context.week,
         predictionFeatureVersion: PREDICTION_FEATURE_VERSION, networkComputations: 1,
@@ -230,13 +182,6 @@ export function createPredictionRefreshHandler(overrides = {}, { administrative 
         })),
       });
     } catch (error) {
-      if (administrative) {
-        const reason = safeReason(error);
-        console.error("Administrative prediction refresh failed:", reason);
-        return res.status(502).json({ error: "Administrative prediction refresh failed",
-          dryRun: req.method !== "POST", predictionsWritten: written,
-          failedGames: [{ game: null, reason }] });
-      }
       console.error("Prediction-only refresh failed:", error instanceof Error ? error.message : "Unknown failure");
       return res.status(502).json({ error: "Prediction-only refresh failed", code: "PREDICTION_REFRESH_FAILED",
         reason: error instanceof Error ? error.message : "Unknown failure" });
