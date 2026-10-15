@@ -1,8 +1,7 @@
 import process from "node:process";
 import test, { beforeEach, afterEach } from "node:test";
 import assert from "node:assert/strict";
-import { createPredictionRefreshHandler, createPredictionRefreshBatch, predictionRefreshContext, validatePredictionRefreshBatch } from "./predictionRefresh.js";
-import { runPredictionRefreshBuild } from "../scripts/prediction-refresh-build.mjs";
+import { createPredictionRefreshHandler, predictionRefreshContext, validatePredictionRefreshBatch } from "./predictionRefresh.js";
 import { validateWeeklyOpponentNetwork, loadWeeklyOpponentNetwork, NFL_TEAMS, createOpponentNetworkHandler } from "../api/nfl/opponent-network.js";
 import { completePrediction, retainPrediction } from "./predictionEligibility.js";
 import { predictionFeatureStatus, PREDICTION_FEATURE_VERSION, MATCHUP_INTELLIGENCE_SCHEMA_VERSION } from "../src/services/predictionFeatures.js";
@@ -85,7 +84,7 @@ afterEach(() => {
   if (key === undefined) delete process.env.BALLDONTLIE_API_KEY; else process.env.BALLDONTLIE_API_KEY = key;
 });
 async function run({ db = database(), dryRun = true, method = "POST", authorization = "Bearer mock-refresh-secret",
-  build = fixture, oneTimeWeek6 = false, ...overrides } = {}) {
+  build = fixture, ...overrides } = {}) {
   let loads = 0, generators = 0, generated = 0;
   const dependencies = {
     getNow: () => NOW, createClient: () => db, readSchedule: async () => [],
@@ -96,8 +95,7 @@ async function run({ db = database(), dryRun = true, method = "POST", authorizat
       return async (game) => { generated++; return build(game, NOW); };
     }, ...overrides,
   };
-  const handler = oneTimeWeek6 ? createPredictionRefreshBatch(dependencies, { oneTimeWeek6 })
-    : createPredictionRefreshHandler(dependencies);
+  const handler = createPredictionRefreshHandler(dependencies);
   const res = response();
   await handler({ method, headers: { authorization }, body: { dryRun } }, res);
   return { db, res, loads, generators, generated };
@@ -258,94 +256,6 @@ test("the deployed action dispatch reaches CRON protection without touching stor
   assert.equal(res.calls, 1);
 });
 
-const buildEnvironment = { VERCEL: "1", VERCEL_ENV: "production", VERCEL_URL: "staged-build.vercel.app" };
-for (const args of [[], ["--save"], ["--save=true"], ["--dry-run", "--save-week6"]]) {
-  test(`build refresh requires one explicit mode: ${JSON.stringify(args)}`, async () => {
-    await assert.rejects(runPredictionRefreshBuild(args, { environment: buildEnvironment,
-      createBatch: () => assert.fail("invalid mode must not create batch") }), /Specify exactly/);
-  });
-}
-for (const environment of [{}, { ...buildEnvironment, VERCEL: undefined },
-  { ...buildEnvironment, VERCEL_ENV: "preview" }, { ...buildEnvironment, VERCEL_ENV: "development" },
-  { ...buildEnvironment, VERCEL_URL: undefined }]) {
-  test(`build refresh rejects nonremote/nonProduction context: ${JSON.stringify(environment)}`, async () => {
-    await assert.rejects(runPredictionRefreshBuild(["--save-week6"], { environment,
-      createBatch: () => assert.fail("invalid build context must not touch inputs") }), /remote Vercel Production build/);
-  });
-}
-for (const [mode, dryRun] of [["--dry-run", true], ["--save-week6", false]]) {
-  test(`authorized remote build selects ${mode} explicitly without credentials in request`, async () => {
-    const body = await runPredictionRefreshBuild([mode], { environment: buildEnvironment,
-      createBatch: (options, guard) => {
-        assert.deepEqual(options, {}); assert.deepEqual(guard, { oneTimeWeek6: true });
-        return async (req, res) => {
-          assert.equal(req.method, dryRun ? "GET" : "POST"); assert.equal(req.body.dryRun, dryRun);
-          assert.equal(req.headers, undefined);
-          return res.status(200).json({ dryRun, writes: dryRun ? 0 : 14 });
-        };
-      } });
-    assert.equal(body.dryRun, dryRun);
-  });
-}
-test("build dry run fails if implementation reports writes and never retries", async () => {
-  let calls = 0;
-  await assert.rejects(runPredictionRefreshBuild(["--dry-run"], { environment: buildEnvironment,
-    createBatch: () => async (req, res) => { calls++; return res.json({ dryRun: true, writes: 1 }); },
-  }), /mode\/write result/);
-  assert.equal(calls, 1);
-});
-test("build failure returns failure without retrying or printing provider error body", async () => {
-  let calls = 0;
-  await assert.rejects(runPredictionRefreshBuild(["--save-week6"], { environment: buildEnvironment,
-    createBatch: () => async (req, res) => { calls++; return res.status(502).json({ error: "provider" }); },
-  }), /build failed/);
-  assert.equal(calls, 1);
-});
-test("one-time build dry run validates all 14 Phase2A predictions, computes network once, never accesses Multi or writes", async () => {
-  const r = await run({ oneTimeWeek6: true });
-  assert.equal(r.res.statusCode, 200, r.res.body.reason);
-  assert.equal(r.generated, 14); assert.equal(r.loads, 1);
-  assert.equal(r.res.body.dryRun, true); assert.equal(r.res.body.writes, 0);
-  assert.ok(r.res.body.predictions.every((p) => p.phase1 && p.phase2a && p.network && p.thirdDown && p.redZone && p.complete));
-  assert.deepEqual(new Set(r.db.reads), new Set(["prediction_snapshots"])); assert.deepEqual(r.db.writes, []);
-});
-test("one-time explicit save validates all 14 before writes and second save is no-op before odds/network/generation", async () => {
-  const db = database(), locked = db.locked;
-  let generated = 0;
-  const r = await run({ db, oneTimeWeek6: true, dryRun: false,
-    build: (game) => { generated++; return fixture(game); },
-    savePrediction: async (...args) => {
-      assert.equal(generated, 14);
-      const { saveAuthoritativePrediction } = await import("./serverPredictions.js");
-      return saveAuthoritativePrediction(...args);
-    } });
-  assert.equal(r.res.statusCode, 200, r.res.body.reason); assert.equal(r.loads, 1);
-  assert.equal(r.res.body.writes, 14); assert.equal(db.writes.length, 14);
-  assert.deepEqual(new Set(db.reads), new Set(["prediction_snapshots"]));
-  assert.deepEqual(new Set(db.writes), new Set(["prediction_snapshots"]));
-  assert.equal(db.locked, locked); assert.match(locked, /bb998fce-9992-423a-8581-e14ce4e2a8b7/);
-  const next = await run({ db, oneTimeWeek6: true, dryRun: false,
-    readOdds: () => assert.fail("must not read odds"),
-    loadNetwork: () => assert.fail("must not compute network"),
-    createGenerator: () => assert.fail("must not generate predictions") });
-  assert.equal(next.res.statusCode, 200); assert.equal(next.res.body.status, "already current");
-  assert.equal(next.res.body.writes, 0); assert.equal(db.writes.length, 14);
-});
-test("one-time build rejects incomplete or wrong-week schedule before reading storage", async () => {
-  for (const ctx of [{ ...context, week: 7 }, { ...context, games: games.slice(0, 13) }]) {
-    const r = await run({ oneTimeWeek6: true, dryRun: false, resolveContext: () => ctx });
-    assert.equal(r.res.statusCode, 502); assert.deepEqual(r.db.reads, []); assert.deepEqual(r.db.writes, []);
-  }
-});
-test("failed one-time 14-game Phase2A validation returns named game and writes zero predictions/Multi", async () => {
-  const r = await run({ oneTimeWeek6: true, dryRun: false, build(game) {
-    const s = fixture(game);
-    if (game === games[13]) s.predictionPayload.matchupIntelligence.signals.pop();
-    return s;
-  } });
-  assert.equal(r.res.statusCode, 502); assert.deepEqual(r.db.writes, []);
-  assert.match(r.res.body.reason, new RegExp(`${games[13].away} at ${games[13].home}`));
-});
 test("anonymous GET/POST cannot save via public refresh or removed administrative action", async () => {
   for (const action of ["refresh-predictions", "admin-prediction-refresh"]) {
     for (const method of ["GET", "POST"]) {

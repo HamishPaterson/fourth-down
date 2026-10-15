@@ -77,17 +77,6 @@ export function validatePredictionRefreshBatch(snapshots, context, now) {
 }
 
 export function createPredictionRefreshHandler(overrides = {}) {
-  const batch = createPredictionRefreshBatch(overrides);
-  return (req, res) => {
-    res.setHeader("Cache-Control", "no-store");
-    if (!["GET", "POST"].includes(req.method)) return res.status(405).json({ error: "Method not allowed" });
-    if (!secureBearerMatches(req.headers?.authorization, process.env.CRON_SECRET)) return res.status(401).json({ error: "Unauthorized" });
-    return batch(req, res);
-  };
-}
-
-// Internal build entry, never routed to HTTP without the protected handler above.
-export function createPredictionRefreshBatch(overrides = {}, { oneTimeWeek6 = false } = {}) {
   const getNow = overrides.getNow || (() => new Date());
   const createClient = overrides.createClient || createSnapshotClient;
   const readSchedule = overrides.readSchedule || fetchSchedule;
@@ -98,14 +87,13 @@ export function createPredictionRefreshBatch(overrides = {}, { oneTimeWeek6 = fa
   const save = overrides.savePrediction || saveAuthoritativePrediction;
   return async (req, res) => {
     res.setHeader("Cache-Control", "no-store");
+    if (!["GET", "POST"].includes(req.method)) return res.status(405).json({ error: "Method not allowed" });
+    if (!secureBearerMatches(req.headers?.authorization, process.env.CRON_SECRET)) return res.status(401).json({ error: "Unauthorized" });
     try {
       const now = getNow();
       const dryRun = req.method !== "POST" || req.body?.dryRun !== false;
       const sourceGames = await readSchedule(dataset.season, { deadline: Date.now() + 55000 });
       const context = await resolveContext(sourceGames, now);
-      if (oneTimeWeek6 && (context.season !== 2026 || context.week !== 6 || context.games.length !== 14)) {
-        throw new Error("One-time refresh requires exactly 14 games in 2026 Week 6");
-      }
       const client = createClient();
       const { data: rows, error } = await client.from("prediction_snapshots").select("*")
         .eq("season", context.season).eq("week", context.week);
@@ -116,17 +104,6 @@ export function createPredictionRefreshBatch(overrides = {}, { oneTimeWeek6 = fa
         if (prior.has(key)) throw new Error("Duplicate saved prediction identity");
         prior.set(key, s);
       }
-      if (oneTimeWeek6 && !dryRun && context.games.every((game) => {
-        const existing = prior.get(identity(game));
-        if (!existing?.authoritative) return false;
-        try {
-          validatePredictionRefreshBatch([existing], { ...context, games: [game] }, now);
-          return true;
-        } catch {
-          return false;
-        }
-      })) return res.status(200).json({ status: "already current", dryRun: false, generated: 0,
-        reused: 14, writes: 0, predictionFeatureVersion: PREDICTION_FEATURE_VERSION });
       const odds = await readOdds(client, now, context);
       const network = validateWeeklyOpponentNetwork(await loadNetwork(context.season, context.week, {
         sourceGames, cutoff: context.cutoff, now,
@@ -137,7 +114,7 @@ export function createPredictionRefreshBatch(overrides = {}, { oneTimeWeek6 = fa
       for (let index = 0; index < context.games.length; index += 3) {
         generated.push(...await Promise.all(context.games.slice(index, index + 3).map(async (game) => {
           const existing = prior.get(identity(game));
-          if (!oneTimeWeek6 && existing?.authoritative && completePrediction(existing) && predictionFeatureStatus(existing).complete &&
+          if (existing?.authoritative && completePrediction(existing) && predictionFeatureStatus(existing).complete &&
               Date.parse(existing.kickoff) === Date.parse(game.sourceDate)) {
             reused++;
             return existing;
@@ -145,7 +122,6 @@ export function createPredictionRefreshBatch(overrides = {}, { oneTimeWeek6 = fa
           try {
             if (existing?.frozenAt || existing?.actualWinner) throw new Error("Frozen or graded prediction cannot be refreshed");
             const snapshot = await generate(game, odds, now);
-            if (oneTimeWeek6) validatePredictionRefreshBatch([snapshot], { ...context, games: [game] }, getNow());
             return snapshot;
           } catch (error) {
             throw new Error(`${game.away} at ${game.home}: ${error instanceof Error ? error.message : "Prediction generation failed"}`, { cause: error });
