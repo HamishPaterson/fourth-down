@@ -1,4 +1,5 @@
 import { TEAM_NAMES } from "../data.js";
+import { situationalFootballExplanation } from "../services/situationalMatchups.js";
 
 const teamName = (code) => TEAM_NAMES[code] || code;
 
@@ -8,9 +9,12 @@ const footballLabels = {
   successMatchup: "Keeping drives alive",
   explosiveMatchup: "Explosive plays",
   pressureMatchup: "Pass protection and pressure",
+  thirdDownMatchup: "THIRD-DOWN ADVANTAGE",
+  redZoneMatchup: "RED-ZONE ADVANTAGE",
 };
 
 function matchupFootballExplanation(signal) {
+  if (signal.phase === "2A") return situationalFootballExplanation(signal);
   const side = signal.advantagedTeam === signal.homeTeam ? "home" : "away";
   const otherSide = side === "home" ? "away" : "home";
   const own = signal.matchups[side], other = signal.matchups[otherSide];
@@ -62,6 +66,8 @@ function leanOpportunity(signal) {
     successMatchup: "keeping drives alive",
     explosiveMatchup: "creating big plays",
     pressureMatchup: "balancing pressure with reliable pass protection",
+    thirdDownMatchup: "sustaining possessions on third down",
+    redZoneMatchup: "finishing red-zone trips with touchdowns",
   }[signal.layer];
 }
 
@@ -87,12 +93,14 @@ function gameStyle(prediction) {
 export default function MatchupIntelligencePanel({ prediction }) {
   const intelligence = prediction?.matchupIntelligence;
   if (!intelligence?.available) return null;
-  const signals = intelligence.signals.filter((signal) =>
+  const eligible = intelligence.signals.filter((signal) =>
     signal.explanationSafe && Math.abs(signal.modelMarginContribution) >= .05)
-    .sort((a, b) => Math.abs(b.modelMarginContribution) - Math.abs(a.modelMarginContribution))
-    .slice(0, 4);
+    .sort((a, b) => Math.abs(b.modelMarginContribution) - Math.abs(a.modelMarginContribution));
+  const phase1 = eligible.filter((signal) => signal.phase !== "2A").slice(0, 4);
+  const signals = [...phase1, ...eligible.filter((signal) => signal.phase === "2A")];
   const winner = prediction.winner;
-  const reasons = signals.filter((signal) => signal.advantagedTeam === winner).slice(0, 2);
+  const reasons = signals.filter((signal) => signal.advantagedTeam === winner)
+    .sort((a, b) => Math.abs(b.modelMarginContribution) - Math.abs(a.modelMarginContribution)).slice(0, 2);
   const style = gameStyle(prediction);
   return (
     <section className="card prediction-explanation-card">

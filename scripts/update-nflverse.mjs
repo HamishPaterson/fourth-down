@@ -4,6 +4,7 @@ import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { buildDepthMetrics, weeklyDepthCutoffs } from "../api-lib/depthCharts.js";
 import { fetchSchedule } from "./balldontlie-schedule.mjs";
+import { buildWeeklySituationalMetrics } from "../api-lib/situationalMetrics.js";
 
 const season = Number(process.argv[2] || new Date().getUTCFullYear());
 const outputPath = path.resolve("api/nfl/nflverse-team-metrics.js");
@@ -27,12 +28,14 @@ export async function main() {
   const pbpSource = await fetchFirst(sourceCandidates.pbp, true);
   const snapSource = await fetchFirst(sourceCandidates.snapCounts, false);
   const depthSource = await fetchFirst(sourceCandidates.depthCharts, false);
-  const plays = parsePbp(pbpSource.text);
+  const rows = parseGenericCsv(pbpSource.text);
+  const plays = parsePbp(rows);
   const snapRows = snapSource ? parseGenericCsv(snapSource.text) : [];
   const depthRows = depthSource ? parseGenericCsv(depthSource.text) : [];
-  const depthCutoffs = await fetchDepthCutoffs(season);
+  const { cutoffs: depthCutoffs, games, sourceAsOf } = await fetchSeasonContext(season);
   const completedWeeks = [...new Set(plays.map((play) => play.week).filter((week) => week > 0))].sort((a, b) => a - b);
   const metricsByWeek = {};
+  const situationalAuditsByWeek = {};
 
   for (const predictionWeek of completedWeeks.map((week) => week + 1)) {
     const eligible = plays.filter((play) => play.week < predictionWeek && isEligible(play));
@@ -40,6 +43,10 @@ export async function main() {
     const base = Object.fromEntries(teams.map((code) => [code, buildMetrics(eligible, code)]));
     const snap = buildSnapMetrics(snapRows, predictionWeek);
     const depth = buildDepthMetrics(depthRows, { season, predictionWeek, cutoff: depthCutoffs[predictionWeek] });
+    const situational = buildWeeklySituationalMetrics(rows, games, {
+      season, predictionWeek, cutoff: depthCutoffs[predictionWeek], sourceAsOf,
+    });
+    situationalAuditsByWeek[predictionWeek] = situational.audit;
 
     metricsByWeek[predictionWeek] = Object.fromEntries(teams.map((code) => [
       code,
@@ -48,6 +55,7 @@ export async function main() {
         opponentAdjusted: buildOpponentAdjustedMetrics(code, base, eligible),
         snapParticipation: snap[code] || null,
         expectedLineup: depth[code] || null,
+        situational: situational.teams[code] || null,
       },
     ]));
   }
@@ -71,6 +79,7 @@ export async function main() {
       depthCharts: sourceMeta(depthSource, false),
     },
     metricsByWeek,
+    situationalAuditsByWeek,
   };
 
   await mkdir(path.dirname(outputPath), { recursive: true });
@@ -81,13 +90,13 @@ export async function main() {
 
 if (process.argv[1] && import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href) await main();
 
-async function fetchDepthCutoffs(season) {
+async function fetchSeasonContext(season) {
   if (!process.env.BALLDONTLIE_API_KEY) {
     console.warn("Depth charts unavailable: BALLDONTLIE_API_KEY is required for weekly kickoff cutoffs");
-    return {};
+    return { cutoffs: {}, games: [], sourceAsOf: new Date().toISOString() };
   }
   const games = await fetchSchedule(season);
-  return weeklyDepthCutoffs(games, season);
+  return { cutoffs: weeklyDepthCutoffs(games, season), games, sourceAsOf: new Date().toISOString() };
 }
 
 async function fetchFirst(urls, required) {
@@ -117,8 +126,8 @@ function sourceMeta(source, required) {
     : { available: false, required, url: null, fetchedAt: null };
 }
 
-function parsePbp(text) {
-  return parseGenericCsv(text).map((row) => ({
+function parsePbp(rows) {
+  return rows.map((row) => ({
     gameId: row.game_id || "",
     seasonType: row.season_type || "",
     week: num(row.week) || 0,

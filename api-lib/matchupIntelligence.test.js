@@ -327,21 +327,68 @@ test("full orchestration passes real artifact matchups through predictions, role
 
 test("all 32 real teams have finite named matchups without changing existing coarse roster or network layers", () => {
   const codes = Object.keys(dataset.metricsByWeek[6]).sort();
+  const phase1Layers = ["rushMatchup", "passMatchup", "successMatchup", "explosiveMatchup", "pressureMatchup"];
   for (let i = 0; i < codes.length; i += 2) {
     const input = real(6, codes[i], codes[i + 1]);
     const network = { active: true, homePoints: .3, awayPoints: -.3, confidence: .8 };
     const roster = { active: true, homePoints: .2, awayPoints: -.2, confidence: .7 };
-    const result = predict(input, { playerMetrics: input.playerMetrics,
+    const options = { playerMetrics: input.playerMetrics,
       modelLayers: { ...compareTeams(input.teamMetrics.away, input.teamMetrics.home, 6),
-        scoringBaseline: baseline, opponentNetwork: network, playerRatings: roster } });
+        scoringBaseline: baseline, opponentNetwork: network, playerRatings: roster } };
+    const result = predict(input, options);
     finiteNumbers(result);
     assert.equal(result.modelLayers.opponentNetwork.homePoints, .3);
     assert.equal(result.modelLayers.playerRatings.homePoints, .2);
-    assert.equal(result.matchupIntelligence.signals.length, 5);
+    const signals = result.matchupIntelligence.signals;
+    assert.equal(signals.length, 7);
+    assert.deepEqual(signals.map((s) => s.layer), [...phase1Layers, "thirdDownMatchup", "redZoneMatchup"]);
+    assert.equal(new Set(signals.map((s) => s.category)).size, 7);
+    assert.ok(signals.slice(5).every((s) => s.available && s.phase === "2A" && s.matchups));
+    const withoutSituational = structuredClone(input);
+    delete withoutSituational.teamMetrics.away.situational;
+    delete withoutSituational.teamMetrics.home.situational;
+    const phase1 = predict(withoutSituational, options);
+    assert.deepEqual(signals.slice(0, 5), phase1.matchupIntelligence.signals);
+    assert.deepEqual(phase1.matchupIntelligence.signals.map((s) => s.layer), phase1Layers);
+    assert.ok(phase1.matchupIntelligence.situational.signals.every((s) => !s.available && !s.explanationSafe));
+    for (const key of ["thirdDown", "redZone"]) {
+      const unsupported = structuredClone(input);
+      delete unsupported.teamMetrics.home.situational[key];
+      const output = predict(unsupported, options);
+      assert.deepEqual(output.matchupIntelligence.signals, phase1.matchupIntelligence.signals);
+      assert.equal(output.matchupIntelligence.situational.available, false);
+      assert.equal(output.matchupIntelligence.situational.finalMarginAblation, 0);
+    }
     const projected = buildPlayerProjections({ ...input, prediction: result, season: 2026, week: 6,
       cutoff: players.cutoffs[6] });
     assert.ok(projected.available);
     finiteNumbers(projected);
+  }
+});
+
+test("earlier real weeks keep exactly the five ordered Phase 1 signals when situational provenance is unavailable", () => {
+  const phase1Layers = ["rushMatchup", "passMatchup", "successMatchup", "explosiveMatchup", "pressureMatchup"];
+  for (const week of [2, 3, 4, 5]) {
+    const input = real(week);
+    const result = predict(input, { week, playerMetrics: input.playerMetrics });
+    const signals = result.matchupIntelligence.signals;
+    assert.equal(signals.length, 5);
+    assert.deepEqual(signals.map((s) => s.layer), phase1Layers);
+    assert.equal(new Set(signals.map((s) => s.category)).size, 5);
+    const situational = result.matchupIntelligence.situational;
+    assert.equal(situational.available, false);
+    assert.equal(situational.finalMarginAblation, 0);
+    assert.equal(situational.sharedPreSimulationMargin, 0);
+    assert.ok(situational.signals.every((s) =>
+      !s.available && !s.explanationSafe && s.homePoints === 0 && s.awayPoints === 0 && s.reason));
+    const withoutSituational = structuredClone(input);
+    delete withoutSituational.teamMetrics.away.situational;
+    delete withoutSituational.teamMetrics.home.situational;
+    const without = predict(withoutSituational, { week, playerMetrics: input.playerMetrics });
+    assert.deepEqual(signals, without.matchupIntelligence.signals);
+    assert.equal(result.continuousMargin, without.continuousMargin);
+    assert.equal(result.homeWinProbability, without.homeWinProbability);
+    assert.equal(result.awayWinProbability, without.awayWinProbability);
   }
 });
 

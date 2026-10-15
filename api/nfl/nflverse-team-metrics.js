@@ -1,6 +1,6 @@
 const NFLVERSE_TEAM_METRICS = {
   "season": 2026,
-  "generatedAt": "2026-10-14T23:22:44.694Z",
+  "generatedAt": "2026-10-15T05:14:06.292Z",
   "source": "nflverse/nflfastR",
   "garbageTimeFilter": "Win probability between 5% and 95%",
   "weighting": {
@@ -21,19 +21,19 @@ const NFLVERSE_TEAM_METRICS = {
       "available": true,
       "required": true,
       "url": "https://github.com/nflverse/nflverse-data/releases/download/pbp/play_by_play_2026.csv.gz",
-      "fetchedAt": "2026-10-14T23:21:49.688Z"
+      "fetchedAt": "2026-10-15T05:12:45.553Z"
     },
     "snapCounts": {
       "available": true,
       "required": false,
       "url": "https://github.com/nflverse/nflverse-data/releases/download/snap_counts/snap_counts_2026.csv",
-      "fetchedAt": "2026-10-14T23:21:50.272Z"
+      "fetchedAt": "2026-10-15T05:12:46.133Z"
     },
     "depthCharts": {
       "available": true,
       "required": false,
       "url": "https://github.com/nflverse/nflverse-data/releases/download/depth_charts/depth_charts_2026.csv",
-      "fetchedAt": "2026-10-14T23:21:52.302Z"
+      "fetchedAt": "2026-10-15T05:12:48.321Z"
     }
   },
   "metricsByWeek": {
@@ -1320,6 +1320,89 @@ const NFLVERSE_TEAM_METRICS = {
             "statusKnown": false
           },
           "issues": []
+        },
+        "situational": {
+          "team": "ARI",
+          "schemaVersion": 1,
+          "season": 2026,
+          "predictionWeek": 2,
+          "cutoff": "2026-09-18T00:15:00.000Z",
+          "sourceAsOf": "2026-10-15T05:13:31.876Z",
+          "gameProvenance": [],
+          "thirdDown": {
+            "offense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null,
+              "buckets": {
+                "short": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "medium": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "long": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                }
+              }
+            },
+            "defense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null,
+              "buckets": {
+                "short": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "medium": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "long": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                }
+              }
+            }
+          },
+          "redZone": {
+            "offense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            },
+            "defense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            }
+          },
+          "league": {
+            "cutoff": "2026-09-18T00:15:00.000Z",
+            "sourceAsOf": "2026-10-15T05:13:31.876Z",
+            "maxWeek": null,
+            "latestCompletion": null,
+            "thirdDown": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            },
+            "redZone": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            }
+          }
         }
       },
       "LAC": {
@@ -2576,6 +2659,89 @@ const NFLVERSE_TEAM_METRICS = {
             "statusKnown": false
           },
           "issues": []
+        },
+        "situational": {
+          "team": "LAC",
+          "schemaVersion": 1,
+          "season": 2026,
+          "predictionWeek": 2,
+          "cutoff": "2026-09-18T00:15:00.000Z",
+          "sourceAsOf": "2026-10-15T05:13:31.876Z",
+          "gameProvenance": [],
+          "thirdDown": {
+            "offense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null,
+              "buckets": {
+                "short": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "medium": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "long": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                }
+              }
+            },
+            "defense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null,
+              "buckets": {
+                "short": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "medium": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "long": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                }
+              }
+            }
+          },
+          "redZone": {
+            "offense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            },
+            "defense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            }
+          },
+          "league": {
+            "cutoff": "2026-09-18T00:15:00.000Z",
+            "sourceAsOf": "2026-10-15T05:13:31.876Z",
+            "maxWeek": null,
+            "latestCompletion": null,
+            "thirdDown": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            },
+            "redZone": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            }
+          }
         }
       },
       "PIT": {
@@ -3832,6 +3998,89 @@ const NFLVERSE_TEAM_METRICS = {
             "statusKnown": false
           },
           "issues": []
+        },
+        "situational": {
+          "team": "PIT",
+          "schemaVersion": 1,
+          "season": 2026,
+          "predictionWeek": 2,
+          "cutoff": "2026-09-18T00:15:00.000Z",
+          "sourceAsOf": "2026-10-15T05:13:31.876Z",
+          "gameProvenance": [],
+          "thirdDown": {
+            "offense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null,
+              "buckets": {
+                "short": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "medium": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "long": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                }
+              }
+            },
+            "defense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null,
+              "buckets": {
+                "short": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "medium": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "long": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                }
+              }
+            }
+          },
+          "redZone": {
+            "offense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            },
+            "defense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            }
+          },
+          "league": {
+            "cutoff": "2026-09-18T00:15:00.000Z",
+            "sourceAsOf": "2026-10-15T05:13:31.876Z",
+            "maxWeek": null,
+            "latestCompletion": null,
+            "thirdDown": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            },
+            "redZone": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            }
+          }
         }
       },
       "ATL": {
@@ -5116,6 +5365,89 @@ const NFLVERSE_TEAM_METRICS = {
             "statusKnown": false
           },
           "issues": []
+        },
+        "situational": {
+          "team": "ATL",
+          "schemaVersion": 1,
+          "season": 2026,
+          "predictionWeek": 2,
+          "cutoff": "2026-09-18T00:15:00.000Z",
+          "sourceAsOf": "2026-10-15T05:13:31.876Z",
+          "gameProvenance": [],
+          "thirdDown": {
+            "offense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null,
+              "buckets": {
+                "short": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "medium": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "long": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                }
+              }
+            },
+            "defense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null,
+              "buckets": {
+                "short": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "medium": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "long": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                }
+              }
+            }
+          },
+          "redZone": {
+            "offense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            },
+            "defense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            }
+          },
+          "league": {
+            "cutoff": "2026-09-18T00:15:00.000Z",
+            "sourceAsOf": "2026-10-15T05:13:31.876Z",
+            "maxWeek": null,
+            "latestCompletion": null,
+            "thirdDown": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            },
+            "redZone": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            }
+          }
         }
       },
       "IND": {
@@ -6330,6 +6662,89 @@ const NFLVERSE_TEAM_METRICS = {
             "statusKnown": false
           },
           "issues": []
+        },
+        "situational": {
+          "team": "IND",
+          "schemaVersion": 1,
+          "season": 2026,
+          "predictionWeek": 2,
+          "cutoff": "2026-09-18T00:15:00.000Z",
+          "sourceAsOf": "2026-10-15T05:13:31.876Z",
+          "gameProvenance": [],
+          "thirdDown": {
+            "offense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null,
+              "buckets": {
+                "short": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "medium": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "long": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                }
+              }
+            },
+            "defense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null,
+              "buckets": {
+                "short": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "medium": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "long": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                }
+              }
+            }
+          },
+          "redZone": {
+            "offense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            },
+            "defense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            }
+          },
+          "league": {
+            "cutoff": "2026-09-18T00:15:00.000Z",
+            "sourceAsOf": "2026-10-15T05:13:31.876Z",
+            "maxWeek": null,
+            "latestCompletion": null,
+            "thirdDown": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            },
+            "redZone": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            }
+          }
         }
       },
       "BAL": {
@@ -7558,6 +7973,89 @@ const NFLVERSE_TEAM_METRICS = {
             "statusKnown": false
           },
           "issues": []
+        },
+        "situational": {
+          "team": "BAL",
+          "schemaVersion": 1,
+          "season": 2026,
+          "predictionWeek": 2,
+          "cutoff": "2026-09-18T00:15:00.000Z",
+          "sourceAsOf": "2026-10-15T05:13:31.876Z",
+          "gameProvenance": [],
+          "thirdDown": {
+            "offense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null,
+              "buckets": {
+                "short": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "medium": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "long": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                }
+              }
+            },
+            "defense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null,
+              "buckets": {
+                "short": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "medium": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "long": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                }
+              }
+            }
+          },
+          "redZone": {
+            "offense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            },
+            "defense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            }
+          },
+          "league": {
+            "cutoff": "2026-09-18T00:15:00.000Z",
+            "sourceAsOf": "2026-10-15T05:13:31.876Z",
+            "maxWeek": null,
+            "latestCompletion": null,
+            "thirdDown": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            },
+            "redZone": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            }
+          }
         }
       },
       "BUF": {
@@ -8772,6 +9270,89 @@ const NFLVERSE_TEAM_METRICS = {
             "statusKnown": false
           },
           "issues": []
+        },
+        "situational": {
+          "team": "BUF",
+          "schemaVersion": 1,
+          "season": 2026,
+          "predictionWeek": 2,
+          "cutoff": "2026-09-18T00:15:00.000Z",
+          "sourceAsOf": "2026-10-15T05:13:31.876Z",
+          "gameProvenance": [],
+          "thirdDown": {
+            "offense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null,
+              "buckets": {
+                "short": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "medium": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "long": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                }
+              }
+            },
+            "defense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null,
+              "buckets": {
+                "short": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "medium": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "long": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                }
+              }
+            }
+          },
+          "redZone": {
+            "offense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            },
+            "defense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            }
+          },
+          "league": {
+            "cutoff": "2026-09-18T00:15:00.000Z",
+            "sourceAsOf": "2026-10-15T05:13:31.876Z",
+            "maxWeek": null,
+            "latestCompletion": null,
+            "thirdDown": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            },
+            "redZone": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            }
+          }
         }
       },
       "HOU": {
@@ -10126,6 +10707,89 @@ const NFLVERSE_TEAM_METRICS = {
             "statusKnown": false
           },
           "issues": []
+        },
+        "situational": {
+          "team": "HOU",
+          "schemaVersion": 1,
+          "season": 2026,
+          "predictionWeek": 2,
+          "cutoff": "2026-09-18T00:15:00.000Z",
+          "sourceAsOf": "2026-10-15T05:13:31.876Z",
+          "gameProvenance": [],
+          "thirdDown": {
+            "offense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null,
+              "buckets": {
+                "short": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "medium": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "long": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                }
+              }
+            },
+            "defense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null,
+              "buckets": {
+                "short": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "medium": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "long": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                }
+              }
+            }
+          },
+          "redZone": {
+            "offense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            },
+            "defense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            }
+          },
+          "league": {
+            "cutoff": "2026-09-18T00:15:00.000Z",
+            "sourceAsOf": "2026-10-15T05:13:31.876Z",
+            "maxWeek": null,
+            "latestCompletion": null,
+            "thirdDown": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            },
+            "redZone": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            }
+          }
         }
       },
       "CHI": {
@@ -11452,6 +12116,89 @@ const NFLVERSE_TEAM_METRICS = {
             "statusKnown": false
           },
           "issues": []
+        },
+        "situational": {
+          "team": "CHI",
+          "schemaVersion": 1,
+          "season": 2026,
+          "predictionWeek": 2,
+          "cutoff": "2026-09-18T00:15:00.000Z",
+          "sourceAsOf": "2026-10-15T05:13:31.876Z",
+          "gameProvenance": [],
+          "thirdDown": {
+            "offense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null,
+              "buckets": {
+                "short": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "medium": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "long": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                }
+              }
+            },
+            "defense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null,
+              "buckets": {
+                "short": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "medium": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "long": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                }
+              }
+            }
+          },
+          "redZone": {
+            "offense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            },
+            "defense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            }
+          },
+          "league": {
+            "cutoff": "2026-09-18T00:15:00.000Z",
+            "sourceAsOf": "2026-10-15T05:13:31.876Z",
+            "maxWeek": null,
+            "latestCompletion": null,
+            "thirdDown": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            },
+            "redZone": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            }
+          }
         }
       },
       "CAR": {
@@ -12722,6 +13469,89 @@ const NFLVERSE_TEAM_METRICS = {
             "statusKnown": false
           },
           "issues": []
+        },
+        "situational": {
+          "team": "CAR",
+          "schemaVersion": 1,
+          "season": 2026,
+          "predictionWeek": 2,
+          "cutoff": "2026-09-18T00:15:00.000Z",
+          "sourceAsOf": "2026-10-15T05:13:31.876Z",
+          "gameProvenance": [],
+          "thirdDown": {
+            "offense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null,
+              "buckets": {
+                "short": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "medium": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "long": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                }
+              }
+            },
+            "defense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null,
+              "buckets": {
+                "short": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "medium": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "long": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                }
+              }
+            }
+          },
+          "redZone": {
+            "offense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            },
+            "defense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            }
+          },
+          "league": {
+            "cutoff": "2026-09-18T00:15:00.000Z",
+            "sourceAsOf": "2026-10-15T05:13:31.876Z",
+            "maxWeek": null,
+            "latestCompletion": null,
+            "thirdDown": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            },
+            "redZone": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            }
+          }
         }
       },
       "CLE": {
@@ -14034,6 +14864,89 @@ const NFLVERSE_TEAM_METRICS = {
             "statusKnown": false
           },
           "issues": []
+        },
+        "situational": {
+          "team": "CLE",
+          "schemaVersion": 1,
+          "season": 2026,
+          "predictionWeek": 2,
+          "cutoff": "2026-09-18T00:15:00.000Z",
+          "sourceAsOf": "2026-10-15T05:13:31.876Z",
+          "gameProvenance": [],
+          "thirdDown": {
+            "offense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null,
+              "buckets": {
+                "short": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "medium": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "long": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                }
+              }
+            },
+            "defense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null,
+              "buckets": {
+                "short": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "medium": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "long": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                }
+              }
+            }
+          },
+          "redZone": {
+            "offense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            },
+            "defense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            }
+          },
+          "league": {
+            "cutoff": "2026-09-18T00:15:00.000Z",
+            "sourceAsOf": "2026-10-15T05:13:31.876Z",
+            "maxWeek": null,
+            "latestCompletion": null,
+            "thirdDown": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            },
+            "redZone": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            }
+          }
         }
       },
       "JAX": {
@@ -15276,6 +16189,89 @@ const NFLVERSE_TEAM_METRICS = {
             "statusKnown": false
           },
           "issues": []
+        },
+        "situational": {
+          "team": "JAX",
+          "schemaVersion": 1,
+          "season": 2026,
+          "predictionWeek": 2,
+          "cutoff": "2026-09-18T00:15:00.000Z",
+          "sourceAsOf": "2026-10-15T05:13:31.876Z",
+          "gameProvenance": [],
+          "thirdDown": {
+            "offense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null,
+              "buckets": {
+                "short": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "medium": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "long": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                }
+              }
+            },
+            "defense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null,
+              "buckets": {
+                "short": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "medium": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "long": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                }
+              }
+            }
+          },
+          "redZone": {
+            "offense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            },
+            "defense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            }
+          },
+          "league": {
+            "cutoff": "2026-09-18T00:15:00.000Z",
+            "sourceAsOf": "2026-10-15T05:13:31.876Z",
+            "maxWeek": null,
+            "latestCompletion": null,
+            "thirdDown": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            },
+            "redZone": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            }
+          }
         }
       },
       "DAL": {
@@ -16560,6 +17556,89 @@ const NFLVERSE_TEAM_METRICS = {
             "statusKnown": false
           },
           "issues": []
+        },
+        "situational": {
+          "team": "DAL",
+          "schemaVersion": 1,
+          "season": 2026,
+          "predictionWeek": 2,
+          "cutoff": "2026-09-18T00:15:00.000Z",
+          "sourceAsOf": "2026-10-15T05:13:31.876Z",
+          "gameProvenance": [],
+          "thirdDown": {
+            "offense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null,
+              "buckets": {
+                "short": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "medium": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "long": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                }
+              }
+            },
+            "defense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null,
+              "buckets": {
+                "short": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "medium": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "long": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                }
+              }
+            }
+          },
+          "redZone": {
+            "offense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            },
+            "defense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            }
+          },
+          "league": {
+            "cutoff": "2026-09-18T00:15:00.000Z",
+            "sourceAsOf": "2026-10-15T05:13:31.876Z",
+            "maxWeek": null,
+            "latestCompletion": null,
+            "thirdDown": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            },
+            "redZone": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            }
+          }
         }
       },
       "NYG": {
@@ -17830,6 +18909,89 @@ const NFLVERSE_TEAM_METRICS = {
             "statusKnown": false
           },
           "issues": []
+        },
+        "situational": {
+          "team": "NYG",
+          "schemaVersion": 1,
+          "season": 2026,
+          "predictionWeek": 2,
+          "cutoff": "2026-09-18T00:15:00.000Z",
+          "sourceAsOf": "2026-10-15T05:13:31.876Z",
+          "gameProvenance": [],
+          "thirdDown": {
+            "offense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null,
+              "buckets": {
+                "short": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "medium": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "long": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                }
+              }
+            },
+            "defense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null,
+              "buckets": {
+                "short": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "medium": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "long": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                }
+              }
+            }
+          },
+          "redZone": {
+            "offense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            },
+            "defense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            }
+          },
+          "league": {
+            "cutoff": "2026-09-18T00:15:00.000Z",
+            "sourceAsOf": "2026-10-15T05:13:31.876Z",
+            "maxWeek": null,
+            "latestCompletion": null,
+            "thirdDown": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            },
+            "redZone": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            }
+          }
         }
       },
       "DEN": {
@@ -19100,6 +20262,89 @@ const NFLVERSE_TEAM_METRICS = {
             "statusKnown": false
           },
           "issues": []
+        },
+        "situational": {
+          "team": "DEN",
+          "schemaVersion": 1,
+          "season": 2026,
+          "predictionWeek": 2,
+          "cutoff": "2026-09-18T00:15:00.000Z",
+          "sourceAsOf": "2026-10-15T05:13:31.876Z",
+          "gameProvenance": [],
+          "thirdDown": {
+            "offense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null,
+              "buckets": {
+                "short": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "medium": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "long": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                }
+              }
+            },
+            "defense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null,
+              "buckets": {
+                "short": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "medium": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "long": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                }
+              }
+            }
+          },
+          "redZone": {
+            "offense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            },
+            "defense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            }
+          },
+          "league": {
+            "cutoff": "2026-09-18T00:15:00.000Z",
+            "sourceAsOf": "2026-10-15T05:13:31.876Z",
+            "maxWeek": null,
+            "latestCompletion": null,
+            "thirdDown": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            },
+            "redZone": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            }
+          }
         }
       },
       "KC": {
@@ -20370,6 +21615,89 @@ const NFLVERSE_TEAM_METRICS = {
             "statusKnown": false
           },
           "issues": []
+        },
+        "situational": {
+          "team": "KC",
+          "schemaVersion": 1,
+          "season": 2026,
+          "predictionWeek": 2,
+          "cutoff": "2026-09-18T00:15:00.000Z",
+          "sourceAsOf": "2026-10-15T05:13:31.876Z",
+          "gameProvenance": [],
+          "thirdDown": {
+            "offense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null,
+              "buckets": {
+                "short": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "medium": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "long": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                }
+              }
+            },
+            "defense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null,
+              "buckets": {
+                "short": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "medium": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "long": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                }
+              }
+            }
+          },
+          "redZone": {
+            "offense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            },
+            "defense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            }
+          },
+          "league": {
+            "cutoff": "2026-09-18T00:15:00.000Z",
+            "sourceAsOf": "2026-10-15T05:13:31.876Z",
+            "maxWeek": null,
+            "latestCompletion": null,
+            "thirdDown": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            },
+            "redZone": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            }
+          }
         }
       },
       "MIN": {
@@ -21640,6 +22968,89 @@ const NFLVERSE_TEAM_METRICS = {
             "statusKnown": false
           },
           "issues": []
+        },
+        "situational": {
+          "team": "MIN",
+          "schemaVersion": 1,
+          "season": 2026,
+          "predictionWeek": 2,
+          "cutoff": "2026-09-18T00:15:00.000Z",
+          "sourceAsOf": "2026-10-15T05:13:31.876Z",
+          "gameProvenance": [],
+          "thirdDown": {
+            "offense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null,
+              "buckets": {
+                "short": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "medium": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "long": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                }
+              }
+            },
+            "defense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null,
+              "buckets": {
+                "short": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "medium": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "long": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                }
+              }
+            }
+          },
+          "redZone": {
+            "offense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            },
+            "defense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            }
+          },
+          "league": {
+            "cutoff": "2026-09-18T00:15:00.000Z",
+            "sourceAsOf": "2026-10-15T05:13:31.876Z",
+            "maxWeek": null,
+            "latestCompletion": null,
+            "thirdDown": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            },
+            "redZone": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            }
+          }
         }
       },
       "GB": {
@@ -22924,6 +24335,89 @@ const NFLVERSE_TEAM_METRICS = {
             "statusKnown": false
           },
           "issues": []
+        },
+        "situational": {
+          "team": "GB",
+          "schemaVersion": 1,
+          "season": 2026,
+          "predictionWeek": 2,
+          "cutoff": "2026-09-18T00:15:00.000Z",
+          "sourceAsOf": "2026-10-15T05:13:31.876Z",
+          "gameProvenance": [],
+          "thirdDown": {
+            "offense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null,
+              "buckets": {
+                "short": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "medium": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "long": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                }
+              }
+            },
+            "defense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null,
+              "buckets": {
+                "short": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "medium": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "long": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                }
+              }
+            }
+          },
+          "redZone": {
+            "offense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            },
+            "defense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            }
+          },
+          "league": {
+            "cutoff": "2026-09-18T00:15:00.000Z",
+            "sourceAsOf": "2026-10-15T05:13:31.876Z",
+            "maxWeek": null,
+            "latestCompletion": null,
+            "thirdDown": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            },
+            "redZone": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            }
+          }
         }
       },
       "MIA": {
@@ -24194,6 +25688,89 @@ const NFLVERSE_TEAM_METRICS = {
             "statusKnown": false
           },
           "issues": []
+        },
+        "situational": {
+          "team": "MIA",
+          "schemaVersion": 1,
+          "season": 2026,
+          "predictionWeek": 2,
+          "cutoff": "2026-09-18T00:15:00.000Z",
+          "sourceAsOf": "2026-10-15T05:13:31.876Z",
+          "gameProvenance": [],
+          "thirdDown": {
+            "offense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null,
+              "buckets": {
+                "short": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "medium": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "long": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                }
+              }
+            },
+            "defense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null,
+              "buckets": {
+                "short": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "medium": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "long": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                }
+              }
+            }
+          },
+          "redZone": {
+            "offense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            },
+            "defense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            }
+          },
+          "league": {
+            "cutoff": "2026-09-18T00:15:00.000Z",
+            "sourceAsOf": "2026-10-15T05:13:31.876Z",
+            "maxWeek": null,
+            "latestCompletion": null,
+            "thirdDown": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            },
+            "redZone": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            }
+          }
         }
       },
       "LV": {
@@ -25506,6 +27083,89 @@ const NFLVERSE_TEAM_METRICS = {
             "statusKnown": false
           },
           "issues": []
+        },
+        "situational": {
+          "team": "LV",
+          "schemaVersion": 1,
+          "season": 2026,
+          "predictionWeek": 2,
+          "cutoff": "2026-09-18T00:15:00.000Z",
+          "sourceAsOf": "2026-10-15T05:13:31.876Z",
+          "gameProvenance": [],
+          "thirdDown": {
+            "offense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null,
+              "buckets": {
+                "short": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "medium": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "long": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                }
+              }
+            },
+            "defense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null,
+              "buckets": {
+                "short": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "medium": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "long": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                }
+              }
+            }
+          },
+          "redZone": {
+            "offense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            },
+            "defense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            }
+          },
+          "league": {
+            "cutoff": "2026-09-18T00:15:00.000Z",
+            "sourceAsOf": "2026-10-15T05:13:31.876Z",
+            "maxWeek": null,
+            "latestCompletion": null,
+            "thirdDown": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            },
+            "redZone": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            }
+          }
         }
       },
       "SEA": {
@@ -26776,6 +28436,89 @@ const NFLVERSE_TEAM_METRICS = {
             "statusKnown": false
           },
           "issues": []
+        },
+        "situational": {
+          "team": "SEA",
+          "schemaVersion": 1,
+          "season": 2026,
+          "predictionWeek": 2,
+          "cutoff": "2026-09-18T00:15:00.000Z",
+          "sourceAsOf": "2026-10-15T05:13:31.876Z",
+          "gameProvenance": [],
+          "thirdDown": {
+            "offense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null,
+              "buckets": {
+                "short": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "medium": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "long": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                }
+              }
+            },
+            "defense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null,
+              "buckets": {
+                "short": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "medium": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "long": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                }
+              }
+            }
+          },
+          "redZone": {
+            "offense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            },
+            "defense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            }
+          },
+          "league": {
+            "cutoff": "2026-09-18T00:15:00.000Z",
+            "sourceAsOf": "2026-10-15T05:13:31.876Z",
+            "maxWeek": null,
+            "latestCompletion": null,
+            "thirdDown": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            },
+            "redZone": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            }
+          }
         }
       },
       "NE": {
@@ -28074,6 +29817,89 @@ const NFLVERSE_TEAM_METRICS = {
             "statusKnown": false
           },
           "issues": []
+        },
+        "situational": {
+          "team": "NE",
+          "schemaVersion": 1,
+          "season": 2026,
+          "predictionWeek": 2,
+          "cutoff": "2026-09-18T00:15:00.000Z",
+          "sourceAsOf": "2026-10-15T05:13:31.876Z",
+          "gameProvenance": [],
+          "thirdDown": {
+            "offense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null,
+              "buckets": {
+                "short": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "medium": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "long": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                }
+              }
+            },
+            "defense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null,
+              "buckets": {
+                "short": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "medium": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "long": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                }
+              }
+            }
+          },
+          "redZone": {
+            "offense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            },
+            "defense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            }
+          },
+          "league": {
+            "cutoff": "2026-09-18T00:15:00.000Z",
+            "sourceAsOf": "2026-10-15T05:13:31.876Z",
+            "maxWeek": null,
+            "latestCompletion": null,
+            "thirdDown": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            },
+            "redZone": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            }
+          }
         }
       },
       "DET": {
@@ -29330,6 +31156,89 @@ const NFLVERSE_TEAM_METRICS = {
             "statusKnown": false
           },
           "issues": []
+        },
+        "situational": {
+          "team": "DET",
+          "schemaVersion": 1,
+          "season": 2026,
+          "predictionWeek": 2,
+          "cutoff": "2026-09-18T00:15:00.000Z",
+          "sourceAsOf": "2026-10-15T05:13:31.876Z",
+          "gameProvenance": [],
+          "thirdDown": {
+            "offense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null,
+              "buckets": {
+                "short": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "medium": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "long": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                }
+              }
+            },
+            "defense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null,
+              "buckets": {
+                "short": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "medium": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "long": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                }
+              }
+            }
+          },
+          "redZone": {
+            "offense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            },
+            "defense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            }
+          },
+          "league": {
+            "cutoff": "2026-09-18T00:15:00.000Z",
+            "sourceAsOf": "2026-10-15T05:13:31.876Z",
+            "maxWeek": null,
+            "latestCompletion": null,
+            "thirdDown": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            },
+            "redZone": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            }
+          }
         }
       },
       "NO": {
@@ -30670,6 +32579,89 @@ const NFLVERSE_TEAM_METRICS = {
             "statusKnown": false
           },
           "issues": []
+        },
+        "situational": {
+          "team": "NO",
+          "schemaVersion": 1,
+          "season": 2026,
+          "predictionWeek": 2,
+          "cutoff": "2026-09-18T00:15:00.000Z",
+          "sourceAsOf": "2026-10-15T05:13:31.876Z",
+          "gameProvenance": [],
+          "thirdDown": {
+            "offense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null,
+              "buckets": {
+                "short": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "medium": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "long": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                }
+              }
+            },
+            "defense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null,
+              "buckets": {
+                "short": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "medium": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "long": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                }
+              }
+            }
+          },
+          "redZone": {
+            "offense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            },
+            "defense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            }
+          },
+          "league": {
+            "cutoff": "2026-09-18T00:15:00.000Z",
+            "sourceAsOf": "2026-10-15T05:13:31.876Z",
+            "maxWeek": null,
+            "latestCompletion": null,
+            "thirdDown": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            },
+            "redZone": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            }
+          }
         }
       },
       "NYJ": {
@@ -31940,6 +33932,89 @@ const NFLVERSE_TEAM_METRICS = {
             "statusKnown": false
           },
           "issues": []
+        },
+        "situational": {
+          "team": "NYJ",
+          "schemaVersion": 1,
+          "season": 2026,
+          "predictionWeek": 2,
+          "cutoff": "2026-09-18T00:15:00.000Z",
+          "sourceAsOf": "2026-10-15T05:13:31.876Z",
+          "gameProvenance": [],
+          "thirdDown": {
+            "offense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null,
+              "buckets": {
+                "short": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "medium": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "long": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                }
+              }
+            },
+            "defense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null,
+              "buckets": {
+                "short": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "medium": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "long": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                }
+              }
+            }
+          },
+          "redZone": {
+            "offense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            },
+            "defense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            }
+          },
+          "league": {
+            "cutoff": "2026-09-18T00:15:00.000Z",
+            "sourceAsOf": "2026-10-15T05:13:31.876Z",
+            "maxWeek": null,
+            "latestCompletion": null,
+            "thirdDown": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            },
+            "redZone": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            }
+          }
         }
       },
       "TEN": {
@@ -33196,6 +35271,89 @@ const NFLVERSE_TEAM_METRICS = {
             "statusKnown": false
           },
           "issues": []
+        },
+        "situational": {
+          "team": "TEN",
+          "schemaVersion": 1,
+          "season": 2026,
+          "predictionWeek": 2,
+          "cutoff": "2026-09-18T00:15:00.000Z",
+          "sourceAsOf": "2026-10-15T05:13:31.876Z",
+          "gameProvenance": [],
+          "thirdDown": {
+            "offense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null,
+              "buckets": {
+                "short": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "medium": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "long": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                }
+              }
+            },
+            "defense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null,
+              "buckets": {
+                "short": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "medium": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "long": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                }
+              }
+            }
+          },
+          "redZone": {
+            "offense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            },
+            "defense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            }
+          },
+          "league": {
+            "cutoff": "2026-09-18T00:15:00.000Z",
+            "sourceAsOf": "2026-10-15T05:13:31.876Z",
+            "maxWeek": null,
+            "latestCompletion": null,
+            "thirdDown": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            },
+            "redZone": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            }
+          }
         }
       },
       "LAR": {
@@ -34438,6 +36596,89 @@ const NFLVERSE_TEAM_METRICS = {
             "statusKnown": false
           },
           "issues": []
+        },
+        "situational": {
+          "team": "LAR",
+          "schemaVersion": 1,
+          "season": 2026,
+          "predictionWeek": 2,
+          "cutoff": "2026-09-18T00:15:00.000Z",
+          "sourceAsOf": "2026-10-15T05:13:31.876Z",
+          "gameProvenance": [],
+          "thirdDown": {
+            "offense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null,
+              "buckets": {
+                "short": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "medium": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "long": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                }
+              }
+            },
+            "defense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null,
+              "buckets": {
+                "short": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "medium": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "long": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                }
+              }
+            }
+          },
+          "redZone": {
+            "offense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            },
+            "defense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            }
+          },
+          "league": {
+            "cutoff": "2026-09-18T00:15:00.000Z",
+            "sourceAsOf": "2026-10-15T05:13:31.876Z",
+            "maxWeek": null,
+            "latestCompletion": null,
+            "thirdDown": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            },
+            "redZone": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            }
+          }
         }
       },
       "SF": {
@@ -35834,6 +38075,89 @@ const NFLVERSE_TEAM_METRICS = {
             "statusKnown": false
           },
           "issues": []
+        },
+        "situational": {
+          "team": "SF",
+          "schemaVersion": 1,
+          "season": 2026,
+          "predictionWeek": 2,
+          "cutoff": "2026-09-18T00:15:00.000Z",
+          "sourceAsOf": "2026-10-15T05:13:31.876Z",
+          "gameProvenance": [],
+          "thirdDown": {
+            "offense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null,
+              "buckets": {
+                "short": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "medium": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "long": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                }
+              }
+            },
+            "defense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null,
+              "buckets": {
+                "short": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "medium": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "long": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                }
+              }
+            }
+          },
+          "redZone": {
+            "offense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            },
+            "defense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            }
+          },
+          "league": {
+            "cutoff": "2026-09-18T00:15:00.000Z",
+            "sourceAsOf": "2026-10-15T05:13:31.876Z",
+            "maxWeek": null,
+            "latestCompletion": null,
+            "thirdDown": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            },
+            "redZone": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            }
+          }
         }
       },
       "TB": {
@@ -37048,6 +39372,89 @@ const NFLVERSE_TEAM_METRICS = {
             "statusKnown": false
           },
           "issues": []
+        },
+        "situational": {
+          "team": "TB",
+          "schemaVersion": 1,
+          "season": 2026,
+          "predictionWeek": 2,
+          "cutoff": "2026-09-18T00:15:00.000Z",
+          "sourceAsOf": "2026-10-15T05:13:31.876Z",
+          "gameProvenance": [],
+          "thirdDown": {
+            "offense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null,
+              "buckets": {
+                "short": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "medium": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "long": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                }
+              }
+            },
+            "defense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null,
+              "buckets": {
+                "short": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "medium": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "long": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                }
+              }
+            }
+          },
+          "redZone": {
+            "offense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            },
+            "defense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            }
+          },
+          "league": {
+            "cutoff": "2026-09-18T00:15:00.000Z",
+            "sourceAsOf": "2026-10-15T05:13:31.876Z",
+            "maxWeek": null,
+            "latestCompletion": null,
+            "thirdDown": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            },
+            "redZone": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            }
+          }
         }
       },
       "CIN": {
@@ -38234,6 +40641,89 @@ const NFLVERSE_TEAM_METRICS = {
             "statusKnown": false
           },
           "issues": []
+        },
+        "situational": {
+          "team": "CIN",
+          "schemaVersion": 1,
+          "season": 2026,
+          "predictionWeek": 2,
+          "cutoff": "2026-09-18T00:15:00.000Z",
+          "sourceAsOf": "2026-10-15T05:13:31.876Z",
+          "gameProvenance": [],
+          "thirdDown": {
+            "offense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null,
+              "buckets": {
+                "short": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "medium": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "long": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                }
+              }
+            },
+            "defense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null,
+              "buckets": {
+                "short": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "medium": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "long": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                }
+              }
+            }
+          },
+          "redZone": {
+            "offense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            },
+            "defense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            }
+          },
+          "league": {
+            "cutoff": "2026-09-18T00:15:00.000Z",
+            "sourceAsOf": "2026-10-15T05:13:31.876Z",
+            "maxWeek": null,
+            "latestCompletion": null,
+            "thirdDown": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            },
+            "redZone": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            }
+          }
         }
       },
       "WSH": {
@@ -39476,6 +41966,89 @@ const NFLVERSE_TEAM_METRICS = {
             "statusKnown": false
           },
           "issues": []
+        },
+        "situational": {
+          "team": "WSH",
+          "schemaVersion": 1,
+          "season": 2026,
+          "predictionWeek": 2,
+          "cutoff": "2026-09-18T00:15:00.000Z",
+          "sourceAsOf": "2026-10-15T05:13:31.876Z",
+          "gameProvenance": [],
+          "thirdDown": {
+            "offense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null,
+              "buckets": {
+                "short": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "medium": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "long": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                }
+              }
+            },
+            "defense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null,
+              "buckets": {
+                "short": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "medium": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "long": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                }
+              }
+            }
+          },
+          "redZone": {
+            "offense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            },
+            "defense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            }
+          },
+          "league": {
+            "cutoff": "2026-09-18T00:15:00.000Z",
+            "sourceAsOf": "2026-10-15T05:13:31.876Z",
+            "maxWeek": null,
+            "latestCompletion": null,
+            "thirdDown": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            },
+            "redZone": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            }
+          }
         }
       },
       "PHI": {
@@ -40718,6 +43291,89 @@ const NFLVERSE_TEAM_METRICS = {
             "statusKnown": false
           },
           "issues": []
+        },
+        "situational": {
+          "team": "PHI",
+          "schemaVersion": 1,
+          "season": 2026,
+          "predictionWeek": 2,
+          "cutoff": "2026-09-18T00:15:00.000Z",
+          "sourceAsOf": "2026-10-15T05:13:31.876Z",
+          "gameProvenance": [],
+          "thirdDown": {
+            "offense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null,
+              "buckets": {
+                "short": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "medium": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "long": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                }
+              }
+            },
+            "defense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null,
+              "buckets": {
+                "short": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "medium": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "long": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                }
+              }
+            }
+          },
+          "redZone": {
+            "offense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            },
+            "defense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            }
+          },
+          "league": {
+            "cutoff": "2026-09-18T00:15:00.000Z",
+            "sourceAsOf": "2026-10-15T05:13:31.876Z",
+            "maxWeek": null,
+            "latestCompletion": null,
+            "thirdDown": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            },
+            "redZone": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            }
+          }
         }
       }
     },
@@ -42019,6 +44675,89 @@ const NFLVERSE_TEAM_METRICS = {
             "statusKnown": false
           },
           "issues": []
+        },
+        "situational": {
+          "team": "ARI",
+          "schemaVersion": 1,
+          "season": 2026,
+          "predictionWeek": 3,
+          "cutoff": "2026-09-25T00:15:00.000Z",
+          "sourceAsOf": "2026-10-15T05:13:31.876Z",
+          "gameProvenance": [],
+          "thirdDown": {
+            "offense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null,
+              "buckets": {
+                "short": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "medium": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "long": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                }
+              }
+            },
+            "defense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null,
+              "buckets": {
+                "short": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "medium": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "long": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                }
+              }
+            }
+          },
+          "redZone": {
+            "offense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            },
+            "defense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            }
+          },
+          "league": {
+            "cutoff": "2026-09-25T00:15:00.000Z",
+            "sourceAsOf": "2026-10-15T05:13:31.876Z",
+            "maxWeek": null,
+            "latestCompletion": null,
+            "thirdDown": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            },
+            "redZone": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            }
+          }
         }
       },
       "LAC": {
@@ -43290,6 +46029,89 @@ const NFLVERSE_TEAM_METRICS = {
             "statusKnown": false
           },
           "issues": []
+        },
+        "situational": {
+          "team": "LAC",
+          "schemaVersion": 1,
+          "season": 2026,
+          "predictionWeek": 3,
+          "cutoff": "2026-09-25T00:15:00.000Z",
+          "sourceAsOf": "2026-10-15T05:13:31.876Z",
+          "gameProvenance": [],
+          "thirdDown": {
+            "offense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null,
+              "buckets": {
+                "short": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "medium": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "long": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                }
+              }
+            },
+            "defense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null,
+              "buckets": {
+                "short": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "medium": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "long": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                }
+              }
+            }
+          },
+          "redZone": {
+            "offense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            },
+            "defense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            }
+          },
+          "league": {
+            "cutoff": "2026-09-25T00:15:00.000Z",
+            "sourceAsOf": "2026-10-15T05:13:31.876Z",
+            "maxWeek": null,
+            "latestCompletion": null,
+            "thirdDown": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            },
+            "redZone": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            }
+          }
         }
       },
       "PIT": {
@@ -44547,6 +47369,89 @@ const NFLVERSE_TEAM_METRICS = {
             "statusKnown": false
           },
           "issues": []
+        },
+        "situational": {
+          "team": "PIT",
+          "schemaVersion": 1,
+          "season": 2026,
+          "predictionWeek": 3,
+          "cutoff": "2026-09-25T00:15:00.000Z",
+          "sourceAsOf": "2026-10-15T05:13:31.876Z",
+          "gameProvenance": [],
+          "thirdDown": {
+            "offense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null,
+              "buckets": {
+                "short": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "medium": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "long": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                }
+              }
+            },
+            "defense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null,
+              "buckets": {
+                "short": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "medium": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "long": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                }
+              }
+            }
+          },
+          "redZone": {
+            "offense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            },
+            "defense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            }
+          },
+          "league": {
+            "cutoff": "2026-09-25T00:15:00.000Z",
+            "sourceAsOf": "2026-10-15T05:13:31.876Z",
+            "maxWeek": null,
+            "latestCompletion": null,
+            "thirdDown": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            },
+            "redZone": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            }
+          }
         }
       },
       "ATL": {
@@ -45860,6 +48765,89 @@ const NFLVERSE_TEAM_METRICS = {
             "statusKnown": false
           },
           "issues": []
+        },
+        "situational": {
+          "team": "ATL",
+          "schemaVersion": 1,
+          "season": 2026,
+          "predictionWeek": 3,
+          "cutoff": "2026-09-25T00:15:00.000Z",
+          "sourceAsOf": "2026-10-15T05:13:31.876Z",
+          "gameProvenance": [],
+          "thirdDown": {
+            "offense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null,
+              "buckets": {
+                "short": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "medium": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "long": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                }
+              }
+            },
+            "defense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null,
+              "buckets": {
+                "short": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "medium": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "long": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                }
+              }
+            }
+          },
+          "redZone": {
+            "offense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            },
+            "defense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            }
+          },
+          "league": {
+            "cutoff": "2026-09-25T00:15:00.000Z",
+            "sourceAsOf": "2026-10-15T05:13:31.876Z",
+            "maxWeek": null,
+            "latestCompletion": null,
+            "thirdDown": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            },
+            "redZone": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            }
+          }
         }
       },
       "IND": {
@@ -47089,6 +50077,89 @@ const NFLVERSE_TEAM_METRICS = {
             "statusKnown": false
           },
           "issues": []
+        },
+        "situational": {
+          "team": "IND",
+          "schemaVersion": 1,
+          "season": 2026,
+          "predictionWeek": 3,
+          "cutoff": "2026-09-25T00:15:00.000Z",
+          "sourceAsOf": "2026-10-15T05:13:31.876Z",
+          "gameProvenance": [],
+          "thirdDown": {
+            "offense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null,
+              "buckets": {
+                "short": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "medium": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "long": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                }
+              }
+            },
+            "defense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null,
+              "buckets": {
+                "short": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "medium": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "long": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                }
+              }
+            }
+          },
+          "redZone": {
+            "offense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            },
+            "defense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            }
+          },
+          "league": {
+            "cutoff": "2026-09-25T00:15:00.000Z",
+            "sourceAsOf": "2026-10-15T05:13:31.876Z",
+            "maxWeek": null,
+            "latestCompletion": null,
+            "thirdDown": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            },
+            "redZone": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            }
+          }
         }
       },
       "BAL": {
@@ -48346,6 +51417,89 @@ const NFLVERSE_TEAM_METRICS = {
             "statusKnown": false
           },
           "issues": []
+        },
+        "situational": {
+          "team": "BAL",
+          "schemaVersion": 1,
+          "season": 2026,
+          "predictionWeek": 3,
+          "cutoff": "2026-09-25T00:15:00.000Z",
+          "sourceAsOf": "2026-10-15T05:13:31.876Z",
+          "gameProvenance": [],
+          "thirdDown": {
+            "offense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null,
+              "buckets": {
+                "short": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "medium": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "long": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                }
+              }
+            },
+            "defense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null,
+              "buckets": {
+                "short": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "medium": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "long": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                }
+              }
+            }
+          },
+          "redZone": {
+            "offense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            },
+            "defense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            }
+          },
+          "league": {
+            "cutoff": "2026-09-25T00:15:00.000Z",
+            "sourceAsOf": "2026-10-15T05:13:31.876Z",
+            "maxWeek": null,
+            "latestCompletion": null,
+            "thirdDown": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            },
+            "redZone": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            }
+          }
         }
       },
       "BUF": {
@@ -49561,6 +52715,89 @@ const NFLVERSE_TEAM_METRICS = {
             "statusKnown": false
           },
           "issues": []
+        },
+        "situational": {
+          "team": "BUF",
+          "schemaVersion": 1,
+          "season": 2026,
+          "predictionWeek": 3,
+          "cutoff": "2026-09-25T00:15:00.000Z",
+          "sourceAsOf": "2026-10-15T05:13:31.876Z",
+          "gameProvenance": [],
+          "thirdDown": {
+            "offense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null,
+              "buckets": {
+                "short": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "medium": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "long": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                }
+              }
+            },
+            "defense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null,
+              "buckets": {
+                "short": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "medium": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "long": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                }
+              }
+            }
+          },
+          "redZone": {
+            "offense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            },
+            "defense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            }
+          },
+          "league": {
+            "cutoff": "2026-09-25T00:15:00.000Z",
+            "sourceAsOf": "2026-10-15T05:13:31.876Z",
+            "maxWeek": null,
+            "latestCompletion": null,
+            "thirdDown": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            },
+            "redZone": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            }
+          }
         }
       },
       "HOU": {
@@ -50916,6 +54153,89 @@ const NFLVERSE_TEAM_METRICS = {
             "statusKnown": false
           },
           "issues": []
+        },
+        "situational": {
+          "team": "HOU",
+          "schemaVersion": 1,
+          "season": 2026,
+          "predictionWeek": 3,
+          "cutoff": "2026-09-25T00:15:00.000Z",
+          "sourceAsOf": "2026-10-15T05:13:31.876Z",
+          "gameProvenance": [],
+          "thirdDown": {
+            "offense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null,
+              "buckets": {
+                "short": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "medium": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "long": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                }
+              }
+            },
+            "defense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null,
+              "buckets": {
+                "short": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "medium": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "long": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                }
+              }
+            }
+          },
+          "redZone": {
+            "offense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            },
+            "defense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            }
+          },
+          "league": {
+            "cutoff": "2026-09-25T00:15:00.000Z",
+            "sourceAsOf": "2026-10-15T05:13:31.876Z",
+            "maxWeek": null,
+            "latestCompletion": null,
+            "thirdDown": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            },
+            "redZone": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            }
+          }
         }
       },
       "CHI": {
@@ -52243,6 +55563,89 @@ const NFLVERSE_TEAM_METRICS = {
             "statusKnown": false
           },
           "issues": []
+        },
+        "situational": {
+          "team": "CHI",
+          "schemaVersion": 1,
+          "season": 2026,
+          "predictionWeek": 3,
+          "cutoff": "2026-09-25T00:15:00.000Z",
+          "sourceAsOf": "2026-10-15T05:13:31.876Z",
+          "gameProvenance": [],
+          "thirdDown": {
+            "offense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null,
+              "buckets": {
+                "short": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "medium": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "long": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                }
+              }
+            },
+            "defense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null,
+              "buckets": {
+                "short": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "medium": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "long": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                }
+              }
+            }
+          },
+          "redZone": {
+            "offense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            },
+            "defense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            }
+          },
+          "league": {
+            "cutoff": "2026-09-25T00:15:00.000Z",
+            "sourceAsOf": "2026-10-15T05:13:31.876Z",
+            "maxWeek": null,
+            "latestCompletion": null,
+            "thirdDown": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            },
+            "redZone": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            }
+          }
         }
       },
       "CAR": {
@@ -53528,6 +56931,89 @@ const NFLVERSE_TEAM_METRICS = {
             "statusKnown": false
           },
           "issues": []
+        },
+        "situational": {
+          "team": "CAR",
+          "schemaVersion": 1,
+          "season": 2026,
+          "predictionWeek": 3,
+          "cutoff": "2026-09-25T00:15:00.000Z",
+          "sourceAsOf": "2026-10-15T05:13:31.876Z",
+          "gameProvenance": [],
+          "thirdDown": {
+            "offense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null,
+              "buckets": {
+                "short": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "medium": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "long": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                }
+              }
+            },
+            "defense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null,
+              "buckets": {
+                "short": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "medium": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "long": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                }
+              }
+            }
+          },
+          "redZone": {
+            "offense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            },
+            "defense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            }
+          },
+          "league": {
+            "cutoff": "2026-09-25T00:15:00.000Z",
+            "sourceAsOf": "2026-10-15T05:13:31.876Z",
+            "maxWeek": null,
+            "latestCompletion": null,
+            "thirdDown": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            },
+            "redZone": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            }
+          }
         }
       },
       "CLE": {
@@ -54841,6 +58327,89 @@ const NFLVERSE_TEAM_METRICS = {
             "statusKnown": false
           },
           "issues": []
+        },
+        "situational": {
+          "team": "CLE",
+          "schemaVersion": 1,
+          "season": 2026,
+          "predictionWeek": 3,
+          "cutoff": "2026-09-25T00:15:00.000Z",
+          "sourceAsOf": "2026-10-15T05:13:31.876Z",
+          "gameProvenance": [],
+          "thirdDown": {
+            "offense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null,
+              "buckets": {
+                "short": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "medium": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "long": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                }
+              }
+            },
+            "defense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null,
+              "buckets": {
+                "short": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "medium": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "long": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                }
+              }
+            }
+          },
+          "redZone": {
+            "offense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            },
+            "defense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            }
+          },
+          "league": {
+            "cutoff": "2026-09-25T00:15:00.000Z",
+            "sourceAsOf": "2026-10-15T05:13:31.876Z",
+            "maxWeek": null,
+            "latestCompletion": null,
+            "thirdDown": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            },
+            "redZone": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            }
+          }
         }
       },
       "JAX": {
@@ -56084,6 +59653,89 @@ const NFLVERSE_TEAM_METRICS = {
             "statusKnown": false
           },
           "issues": []
+        },
+        "situational": {
+          "team": "JAX",
+          "schemaVersion": 1,
+          "season": 2026,
+          "predictionWeek": 3,
+          "cutoff": "2026-09-25T00:15:00.000Z",
+          "sourceAsOf": "2026-10-15T05:13:31.876Z",
+          "gameProvenance": [],
+          "thirdDown": {
+            "offense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null,
+              "buckets": {
+                "short": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "medium": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "long": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                }
+              }
+            },
+            "defense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null,
+              "buckets": {
+                "short": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "medium": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "long": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                }
+              }
+            }
+          },
+          "redZone": {
+            "offense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            },
+            "defense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            }
+          },
+          "league": {
+            "cutoff": "2026-09-25T00:15:00.000Z",
+            "sourceAsOf": "2026-10-15T05:13:31.876Z",
+            "maxWeek": null,
+            "latestCompletion": null,
+            "thirdDown": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            },
+            "redZone": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            }
+          }
         }
       },
       "DAL": {
@@ -57369,6 +61021,89 @@ const NFLVERSE_TEAM_METRICS = {
             "statusKnown": false
           },
           "issues": []
+        },
+        "situational": {
+          "team": "DAL",
+          "schemaVersion": 1,
+          "season": 2026,
+          "predictionWeek": 3,
+          "cutoff": "2026-09-25T00:15:00.000Z",
+          "sourceAsOf": "2026-10-15T05:13:31.876Z",
+          "gameProvenance": [],
+          "thirdDown": {
+            "offense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null,
+              "buckets": {
+                "short": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "medium": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "long": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                }
+              }
+            },
+            "defense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null,
+              "buckets": {
+                "short": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "medium": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "long": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                }
+              }
+            }
+          },
+          "redZone": {
+            "offense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            },
+            "defense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            }
+          },
+          "league": {
+            "cutoff": "2026-09-25T00:15:00.000Z",
+            "sourceAsOf": "2026-10-15T05:13:31.876Z",
+            "maxWeek": null,
+            "latestCompletion": null,
+            "thirdDown": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            },
+            "redZone": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            }
+          }
         }
       },
       "NYG": {
@@ -58654,6 +62389,89 @@ const NFLVERSE_TEAM_METRICS = {
             "statusKnown": false
           },
           "issues": []
+        },
+        "situational": {
+          "team": "NYG",
+          "schemaVersion": 1,
+          "season": 2026,
+          "predictionWeek": 3,
+          "cutoff": "2026-09-25T00:15:00.000Z",
+          "sourceAsOf": "2026-10-15T05:13:31.876Z",
+          "gameProvenance": [],
+          "thirdDown": {
+            "offense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null,
+              "buckets": {
+                "short": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "medium": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "long": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                }
+              }
+            },
+            "defense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null,
+              "buckets": {
+                "short": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "medium": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "long": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                }
+              }
+            }
+          },
+          "redZone": {
+            "offense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            },
+            "defense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            }
+          },
+          "league": {
+            "cutoff": "2026-09-25T00:15:00.000Z",
+            "sourceAsOf": "2026-10-15T05:13:31.876Z",
+            "maxWeek": null,
+            "latestCompletion": null,
+            "thirdDown": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            },
+            "redZone": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            }
+          }
         }
       },
       "DEN": {
@@ -59925,6 +63743,89 @@ const NFLVERSE_TEAM_METRICS = {
             "statusKnown": false
           },
           "issues": []
+        },
+        "situational": {
+          "team": "DEN",
+          "schemaVersion": 1,
+          "season": 2026,
+          "predictionWeek": 3,
+          "cutoff": "2026-09-25T00:15:00.000Z",
+          "sourceAsOf": "2026-10-15T05:13:31.876Z",
+          "gameProvenance": [],
+          "thirdDown": {
+            "offense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null,
+              "buckets": {
+                "short": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "medium": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "long": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                }
+              }
+            },
+            "defense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null,
+              "buckets": {
+                "short": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "medium": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "long": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                }
+              }
+            }
+          },
+          "redZone": {
+            "offense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            },
+            "defense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            }
+          },
+          "league": {
+            "cutoff": "2026-09-25T00:15:00.000Z",
+            "sourceAsOf": "2026-10-15T05:13:31.876Z",
+            "maxWeek": null,
+            "latestCompletion": null,
+            "thirdDown": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            },
+            "redZone": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            }
+          }
         }
       },
       "KC": {
@@ -61196,6 +65097,89 @@ const NFLVERSE_TEAM_METRICS = {
             "statusKnown": false
           },
           "issues": []
+        },
+        "situational": {
+          "team": "KC",
+          "schemaVersion": 1,
+          "season": 2026,
+          "predictionWeek": 3,
+          "cutoff": "2026-09-25T00:15:00.000Z",
+          "sourceAsOf": "2026-10-15T05:13:31.876Z",
+          "gameProvenance": [],
+          "thirdDown": {
+            "offense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null,
+              "buckets": {
+                "short": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "medium": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "long": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                }
+              }
+            },
+            "defense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null,
+              "buckets": {
+                "short": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "medium": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "long": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                }
+              }
+            }
+          },
+          "redZone": {
+            "offense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            },
+            "defense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            }
+          },
+          "league": {
+            "cutoff": "2026-09-25T00:15:00.000Z",
+            "sourceAsOf": "2026-10-15T05:13:31.876Z",
+            "maxWeek": null,
+            "latestCompletion": null,
+            "thirdDown": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            },
+            "redZone": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            }
+          }
         }
       },
       "MIN": {
@@ -62453,6 +66437,89 @@ const NFLVERSE_TEAM_METRICS = {
             "statusKnown": false
           },
           "issues": []
+        },
+        "situational": {
+          "team": "MIN",
+          "schemaVersion": 1,
+          "season": 2026,
+          "predictionWeek": 3,
+          "cutoff": "2026-09-25T00:15:00.000Z",
+          "sourceAsOf": "2026-10-15T05:13:31.876Z",
+          "gameProvenance": [],
+          "thirdDown": {
+            "offense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null,
+              "buckets": {
+                "short": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "medium": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "long": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                }
+              }
+            },
+            "defense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null,
+              "buckets": {
+                "short": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "medium": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "long": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                }
+              }
+            }
+          },
+          "redZone": {
+            "offense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            },
+            "defense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            }
+          },
+          "league": {
+            "cutoff": "2026-09-25T00:15:00.000Z",
+            "sourceAsOf": "2026-10-15T05:13:31.876Z",
+            "maxWeek": null,
+            "latestCompletion": null,
+            "thirdDown": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            },
+            "redZone": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            }
+          }
         }
       },
       "GB": {
@@ -63738,6 +67805,89 @@ const NFLVERSE_TEAM_METRICS = {
             "statusKnown": false
           },
           "issues": []
+        },
+        "situational": {
+          "team": "GB",
+          "schemaVersion": 1,
+          "season": 2026,
+          "predictionWeek": 3,
+          "cutoff": "2026-09-25T00:15:00.000Z",
+          "sourceAsOf": "2026-10-15T05:13:31.876Z",
+          "gameProvenance": [],
+          "thirdDown": {
+            "offense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null,
+              "buckets": {
+                "short": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "medium": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "long": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                }
+              }
+            },
+            "defense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null,
+              "buckets": {
+                "short": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "medium": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "long": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                }
+              }
+            }
+          },
+          "redZone": {
+            "offense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            },
+            "defense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            }
+          },
+          "league": {
+            "cutoff": "2026-09-25T00:15:00.000Z",
+            "sourceAsOf": "2026-10-15T05:13:31.876Z",
+            "maxWeek": null,
+            "latestCompletion": null,
+            "thirdDown": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            },
+            "redZone": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            }
+          }
         }
       },
       "MIA": {
@@ -65023,6 +69173,89 @@ const NFLVERSE_TEAM_METRICS = {
             "statusKnown": false
           },
           "issues": []
+        },
+        "situational": {
+          "team": "MIA",
+          "schemaVersion": 1,
+          "season": 2026,
+          "predictionWeek": 3,
+          "cutoff": "2026-09-25T00:15:00.000Z",
+          "sourceAsOf": "2026-10-15T05:13:31.876Z",
+          "gameProvenance": [],
+          "thirdDown": {
+            "offense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null,
+              "buckets": {
+                "short": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "medium": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "long": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                }
+              }
+            },
+            "defense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null,
+              "buckets": {
+                "short": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "medium": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "long": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                }
+              }
+            }
+          },
+          "redZone": {
+            "offense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            },
+            "defense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            }
+          },
+          "league": {
+            "cutoff": "2026-09-25T00:15:00.000Z",
+            "sourceAsOf": "2026-10-15T05:13:31.876Z",
+            "maxWeek": null,
+            "latestCompletion": null,
+            "thirdDown": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            },
+            "redZone": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            }
+          }
         }
       },
       "LV": {
@@ -66336,6 +70569,89 @@ const NFLVERSE_TEAM_METRICS = {
             "statusKnown": false
           },
           "issues": []
+        },
+        "situational": {
+          "team": "LV",
+          "schemaVersion": 1,
+          "season": 2026,
+          "predictionWeek": 3,
+          "cutoff": "2026-09-25T00:15:00.000Z",
+          "sourceAsOf": "2026-10-15T05:13:31.876Z",
+          "gameProvenance": [],
+          "thirdDown": {
+            "offense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null,
+              "buckets": {
+                "short": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "medium": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "long": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                }
+              }
+            },
+            "defense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null,
+              "buckets": {
+                "short": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "medium": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "long": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                }
+              }
+            }
+          },
+          "redZone": {
+            "offense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            },
+            "defense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            }
+          },
+          "league": {
+            "cutoff": "2026-09-25T00:15:00.000Z",
+            "sourceAsOf": "2026-10-15T05:13:31.876Z",
+            "maxWeek": null,
+            "latestCompletion": null,
+            "thirdDown": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            },
+            "redZone": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            }
+          }
         }
       },
       "SEA": {
@@ -67621,6 +71937,89 @@ const NFLVERSE_TEAM_METRICS = {
             "statusKnown": false
           },
           "issues": []
+        },
+        "situational": {
+          "team": "SEA",
+          "schemaVersion": 1,
+          "season": 2026,
+          "predictionWeek": 3,
+          "cutoff": "2026-09-25T00:15:00.000Z",
+          "sourceAsOf": "2026-10-15T05:13:31.876Z",
+          "gameProvenance": [],
+          "thirdDown": {
+            "offense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null,
+              "buckets": {
+                "short": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "medium": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "long": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                }
+              }
+            },
+            "defense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null,
+              "buckets": {
+                "short": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "medium": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "long": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                }
+              }
+            }
+          },
+          "redZone": {
+            "offense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            },
+            "defense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            }
+          },
+          "league": {
+            "cutoff": "2026-09-25T00:15:00.000Z",
+            "sourceAsOf": "2026-10-15T05:13:31.876Z",
+            "maxWeek": null,
+            "latestCompletion": null,
+            "thirdDown": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            },
+            "redZone": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            }
+          }
         }
       },
       "NE": {
@@ -68934,6 +73333,89 @@ const NFLVERSE_TEAM_METRICS = {
             "statusKnown": false
           },
           "issues": []
+        },
+        "situational": {
+          "team": "NE",
+          "schemaVersion": 1,
+          "season": 2026,
+          "predictionWeek": 3,
+          "cutoff": "2026-09-25T00:15:00.000Z",
+          "sourceAsOf": "2026-10-15T05:13:31.876Z",
+          "gameProvenance": [],
+          "thirdDown": {
+            "offense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null,
+              "buckets": {
+                "short": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "medium": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "long": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                }
+              }
+            },
+            "defense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null,
+              "buckets": {
+                "short": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "medium": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "long": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                }
+              }
+            }
+          },
+          "redZone": {
+            "offense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            },
+            "defense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            }
+          },
+          "league": {
+            "cutoff": "2026-09-25T00:15:00.000Z",
+            "sourceAsOf": "2026-10-15T05:13:31.876Z",
+            "maxWeek": null,
+            "latestCompletion": null,
+            "thirdDown": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            },
+            "redZone": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            }
+          }
         }
       },
       "DET": {
@@ -70219,6 +74701,89 @@ const NFLVERSE_TEAM_METRICS = {
             "statusKnown": false
           },
           "issues": []
+        },
+        "situational": {
+          "team": "DET",
+          "schemaVersion": 1,
+          "season": 2026,
+          "predictionWeek": 3,
+          "cutoff": "2026-09-25T00:15:00.000Z",
+          "sourceAsOf": "2026-10-15T05:13:31.876Z",
+          "gameProvenance": [],
+          "thirdDown": {
+            "offense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null,
+              "buckets": {
+                "short": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "medium": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "long": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                }
+              }
+            },
+            "defense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null,
+              "buckets": {
+                "short": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "medium": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "long": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                }
+              }
+            }
+          },
+          "redZone": {
+            "offense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            },
+            "defense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            }
+          },
+          "league": {
+            "cutoff": "2026-09-25T00:15:00.000Z",
+            "sourceAsOf": "2026-10-15T05:13:31.876Z",
+            "maxWeek": null,
+            "latestCompletion": null,
+            "thirdDown": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            },
+            "redZone": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            }
+          }
         }
       },
       "NO": {
@@ -71560,6 +76125,89 @@ const NFLVERSE_TEAM_METRICS = {
             "statusKnown": false
           },
           "issues": []
+        },
+        "situational": {
+          "team": "NO",
+          "schemaVersion": 1,
+          "season": 2026,
+          "predictionWeek": 3,
+          "cutoff": "2026-09-25T00:15:00.000Z",
+          "sourceAsOf": "2026-10-15T05:13:31.876Z",
+          "gameProvenance": [],
+          "thirdDown": {
+            "offense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null,
+              "buckets": {
+                "short": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "medium": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "long": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                }
+              }
+            },
+            "defense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null,
+              "buckets": {
+                "short": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "medium": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "long": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                }
+              }
+            }
+          },
+          "redZone": {
+            "offense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            },
+            "defense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            }
+          },
+          "league": {
+            "cutoff": "2026-09-25T00:15:00.000Z",
+            "sourceAsOf": "2026-10-15T05:13:31.876Z",
+            "maxWeek": null,
+            "latestCompletion": null,
+            "thirdDown": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            },
+            "redZone": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            }
+          }
         }
       },
       "NYJ": {
@@ -72859,6 +77507,89 @@ const NFLVERSE_TEAM_METRICS = {
             "statusKnown": false
           },
           "issues": []
+        },
+        "situational": {
+          "team": "NYJ",
+          "schemaVersion": 1,
+          "season": 2026,
+          "predictionWeek": 3,
+          "cutoff": "2026-09-25T00:15:00.000Z",
+          "sourceAsOf": "2026-10-15T05:13:31.876Z",
+          "gameProvenance": [],
+          "thirdDown": {
+            "offense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null,
+              "buckets": {
+                "short": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "medium": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "long": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                }
+              }
+            },
+            "defense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null,
+              "buckets": {
+                "short": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "medium": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "long": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                }
+              }
+            }
+          },
+          "redZone": {
+            "offense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            },
+            "defense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            }
+          },
+          "league": {
+            "cutoff": "2026-09-25T00:15:00.000Z",
+            "sourceAsOf": "2026-10-15T05:13:31.876Z",
+            "maxWeek": null,
+            "latestCompletion": null,
+            "thirdDown": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            },
+            "redZone": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            }
+          }
         }
       },
       "TEN": {
@@ -74116,6 +78847,89 @@ const NFLVERSE_TEAM_METRICS = {
             "statusKnown": false
           },
           "issues": []
+        },
+        "situational": {
+          "team": "TEN",
+          "schemaVersion": 1,
+          "season": 2026,
+          "predictionWeek": 3,
+          "cutoff": "2026-09-25T00:15:00.000Z",
+          "sourceAsOf": "2026-10-15T05:13:31.876Z",
+          "gameProvenance": [],
+          "thirdDown": {
+            "offense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null,
+              "buckets": {
+                "short": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "medium": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "long": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                }
+              }
+            },
+            "defense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null,
+              "buckets": {
+                "short": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "medium": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "long": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                }
+              }
+            }
+          },
+          "redZone": {
+            "offense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            },
+            "defense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            }
+          },
+          "league": {
+            "cutoff": "2026-09-25T00:15:00.000Z",
+            "sourceAsOf": "2026-10-15T05:13:31.876Z",
+            "maxWeek": null,
+            "latestCompletion": null,
+            "thirdDown": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            },
+            "redZone": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            }
+          }
         }
       },
       "LAR": {
@@ -75387,6 +80201,89 @@ const NFLVERSE_TEAM_METRICS = {
             "statusKnown": false
           },
           "issues": []
+        },
+        "situational": {
+          "team": "LAR",
+          "schemaVersion": 1,
+          "season": 2026,
+          "predictionWeek": 3,
+          "cutoff": "2026-09-25T00:15:00.000Z",
+          "sourceAsOf": "2026-10-15T05:13:31.876Z",
+          "gameProvenance": [],
+          "thirdDown": {
+            "offense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null,
+              "buckets": {
+                "short": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "medium": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "long": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                }
+              }
+            },
+            "defense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null,
+              "buckets": {
+                "short": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "medium": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "long": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                }
+              }
+            }
+          },
+          "redZone": {
+            "offense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            },
+            "defense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            }
+          },
+          "league": {
+            "cutoff": "2026-09-25T00:15:00.000Z",
+            "sourceAsOf": "2026-10-15T05:13:31.876Z",
+            "maxWeek": null,
+            "latestCompletion": null,
+            "thirdDown": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            },
+            "redZone": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            }
+          }
         }
       },
       "SF": {
@@ -76812,6 +81709,89 @@ const NFLVERSE_TEAM_METRICS = {
             "statusKnown": false
           },
           "issues": []
+        },
+        "situational": {
+          "team": "SF",
+          "schemaVersion": 1,
+          "season": 2026,
+          "predictionWeek": 3,
+          "cutoff": "2026-09-25T00:15:00.000Z",
+          "sourceAsOf": "2026-10-15T05:13:31.876Z",
+          "gameProvenance": [],
+          "thirdDown": {
+            "offense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null,
+              "buckets": {
+                "short": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "medium": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "long": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                }
+              }
+            },
+            "defense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null,
+              "buckets": {
+                "short": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "medium": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "long": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                }
+              }
+            }
+          },
+          "redZone": {
+            "offense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            },
+            "defense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            }
+          },
+          "league": {
+            "cutoff": "2026-09-25T00:15:00.000Z",
+            "sourceAsOf": "2026-10-15T05:13:31.876Z",
+            "maxWeek": null,
+            "latestCompletion": null,
+            "thirdDown": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            },
+            "redZone": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            }
+          }
         }
       },
       "TB": {
@@ -78027,6 +83007,89 @@ const NFLVERSE_TEAM_METRICS = {
             "statusKnown": false
           },
           "issues": []
+        },
+        "situational": {
+          "team": "TB",
+          "schemaVersion": 1,
+          "season": 2026,
+          "predictionWeek": 3,
+          "cutoff": "2026-09-25T00:15:00.000Z",
+          "sourceAsOf": "2026-10-15T05:13:31.876Z",
+          "gameProvenance": [],
+          "thirdDown": {
+            "offense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null,
+              "buckets": {
+                "short": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "medium": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "long": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                }
+              }
+            },
+            "defense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null,
+              "buckets": {
+                "short": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "medium": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "long": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                }
+              }
+            }
+          },
+          "redZone": {
+            "offense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            },
+            "defense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            }
+          },
+          "league": {
+            "cutoff": "2026-09-25T00:15:00.000Z",
+            "sourceAsOf": "2026-10-15T05:13:31.876Z",
+            "maxWeek": null,
+            "latestCompletion": null,
+            "thirdDown": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            },
+            "redZone": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            }
+          }
         }
       },
       "CIN": {
@@ -79214,6 +84277,89 @@ const NFLVERSE_TEAM_METRICS = {
             "statusKnown": false
           },
           "issues": []
+        },
+        "situational": {
+          "team": "CIN",
+          "schemaVersion": 1,
+          "season": 2026,
+          "predictionWeek": 3,
+          "cutoff": "2026-09-25T00:15:00.000Z",
+          "sourceAsOf": "2026-10-15T05:13:31.876Z",
+          "gameProvenance": [],
+          "thirdDown": {
+            "offense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null,
+              "buckets": {
+                "short": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "medium": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "long": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                }
+              }
+            },
+            "defense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null,
+              "buckets": {
+                "short": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "medium": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "long": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                }
+              }
+            }
+          },
+          "redZone": {
+            "offense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            },
+            "defense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            }
+          },
+          "league": {
+            "cutoff": "2026-09-25T00:15:00.000Z",
+            "sourceAsOf": "2026-10-15T05:13:31.876Z",
+            "maxWeek": null,
+            "latestCompletion": null,
+            "thirdDown": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            },
+            "redZone": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            }
+          }
         }
       },
       "WSH": {
@@ -80457,6 +85603,89 @@ const NFLVERSE_TEAM_METRICS = {
             "statusKnown": false
           },
           "issues": []
+        },
+        "situational": {
+          "team": "WSH",
+          "schemaVersion": 1,
+          "season": 2026,
+          "predictionWeek": 3,
+          "cutoff": "2026-09-25T00:15:00.000Z",
+          "sourceAsOf": "2026-10-15T05:13:31.876Z",
+          "gameProvenance": [],
+          "thirdDown": {
+            "offense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null,
+              "buckets": {
+                "short": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "medium": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "long": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                }
+              }
+            },
+            "defense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null,
+              "buckets": {
+                "short": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "medium": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "long": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                }
+              }
+            }
+          },
+          "redZone": {
+            "offense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            },
+            "defense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            }
+          },
+          "league": {
+            "cutoff": "2026-09-25T00:15:00.000Z",
+            "sourceAsOf": "2026-10-15T05:13:31.876Z",
+            "maxWeek": null,
+            "latestCompletion": null,
+            "thirdDown": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            },
+            "redZone": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            }
+          }
         }
       },
       "PHI": {
@@ -81700,6 +86929,89 @@ const NFLVERSE_TEAM_METRICS = {
             "statusKnown": false
           },
           "issues": []
+        },
+        "situational": {
+          "team": "PHI",
+          "schemaVersion": 1,
+          "season": 2026,
+          "predictionWeek": 3,
+          "cutoff": "2026-09-25T00:15:00.000Z",
+          "sourceAsOf": "2026-10-15T05:13:31.876Z",
+          "gameProvenance": [],
+          "thirdDown": {
+            "offense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null,
+              "buckets": {
+                "short": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "medium": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "long": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                }
+              }
+            },
+            "defense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null,
+              "buckets": {
+                "short": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "medium": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "long": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                }
+              }
+            }
+          },
+          "redZone": {
+            "offense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            },
+            "defense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            }
+          },
+          "league": {
+            "cutoff": "2026-09-25T00:15:00.000Z",
+            "sourceAsOf": "2026-10-15T05:13:31.876Z",
+            "maxWeek": null,
+            "latestCompletion": null,
+            "thirdDown": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            },
+            "redZone": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            }
+          }
         }
       }
     },
@@ -83002,6 +88314,89 @@ const NFLVERSE_TEAM_METRICS = {
             "statusKnown": false
           },
           "issues": []
+        },
+        "situational": {
+          "team": "ARI",
+          "schemaVersion": 1,
+          "season": 2026,
+          "predictionWeek": 4,
+          "cutoff": "2026-10-02T00:15:00.000Z",
+          "sourceAsOf": "2026-10-15T05:13:31.876Z",
+          "gameProvenance": [],
+          "thirdDown": {
+            "offense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null,
+              "buckets": {
+                "short": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "medium": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "long": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                }
+              }
+            },
+            "defense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null,
+              "buckets": {
+                "short": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "medium": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "long": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                }
+              }
+            }
+          },
+          "redZone": {
+            "offense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            },
+            "defense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            }
+          },
+          "league": {
+            "cutoff": "2026-10-02T00:15:00.000Z",
+            "sourceAsOf": "2026-10-15T05:13:31.876Z",
+            "maxWeek": null,
+            "latestCompletion": null,
+            "thirdDown": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            },
+            "redZone": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            }
+          }
         }
       },
       "LAC": {
@@ -84288,6 +89683,89 @@ const NFLVERSE_TEAM_METRICS = {
             "statusKnown": false
           },
           "issues": []
+        },
+        "situational": {
+          "team": "LAC",
+          "schemaVersion": 1,
+          "season": 2026,
+          "predictionWeek": 4,
+          "cutoff": "2026-10-02T00:15:00.000Z",
+          "sourceAsOf": "2026-10-15T05:13:31.876Z",
+          "gameProvenance": [],
+          "thirdDown": {
+            "offense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null,
+              "buckets": {
+                "short": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "medium": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "long": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                }
+              }
+            },
+            "defense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null,
+              "buckets": {
+                "short": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "medium": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "long": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                }
+              }
+            }
+          },
+          "redZone": {
+            "offense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            },
+            "defense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            }
+          },
+          "league": {
+            "cutoff": "2026-10-02T00:15:00.000Z",
+            "sourceAsOf": "2026-10-15T05:13:31.876Z",
+            "maxWeek": null,
+            "latestCompletion": null,
+            "thirdDown": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            },
+            "redZone": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            }
+          }
         }
       },
       "PIT": {
@@ -85546,6 +91024,89 @@ const NFLVERSE_TEAM_METRICS = {
             "statusKnown": false
           },
           "issues": []
+        },
+        "situational": {
+          "team": "PIT",
+          "schemaVersion": 1,
+          "season": 2026,
+          "predictionWeek": 4,
+          "cutoff": "2026-10-02T00:15:00.000Z",
+          "sourceAsOf": "2026-10-15T05:13:31.876Z",
+          "gameProvenance": [],
+          "thirdDown": {
+            "offense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null,
+              "buckets": {
+                "short": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "medium": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "long": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                }
+              }
+            },
+            "defense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null,
+              "buckets": {
+                "short": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "medium": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "long": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                }
+              }
+            }
+          },
+          "redZone": {
+            "offense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            },
+            "defense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            }
+          },
+          "league": {
+            "cutoff": "2026-10-02T00:15:00.000Z",
+            "sourceAsOf": "2026-10-15T05:13:31.876Z",
+            "maxWeek": null,
+            "latestCompletion": null,
+            "thirdDown": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            },
+            "redZone": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            }
+          }
         }
       },
       "ATL": {
@@ -86860,6 +92421,89 @@ const NFLVERSE_TEAM_METRICS = {
             "statusKnown": false
           },
           "issues": []
+        },
+        "situational": {
+          "team": "ATL",
+          "schemaVersion": 1,
+          "season": 2026,
+          "predictionWeek": 4,
+          "cutoff": "2026-10-02T00:15:00.000Z",
+          "sourceAsOf": "2026-10-15T05:13:31.876Z",
+          "gameProvenance": [],
+          "thirdDown": {
+            "offense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null,
+              "buckets": {
+                "short": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "medium": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "long": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                }
+              }
+            },
+            "defense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null,
+              "buckets": {
+                "short": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "medium": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "long": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                }
+              }
+            }
+          },
+          "redZone": {
+            "offense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            },
+            "defense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            }
+          },
+          "league": {
+            "cutoff": "2026-10-02T00:15:00.000Z",
+            "sourceAsOf": "2026-10-15T05:13:31.876Z",
+            "maxWeek": null,
+            "latestCompletion": null,
+            "thirdDown": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            },
+            "redZone": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            }
+          }
         }
       },
       "IND": {
@@ -88104,6 +93748,89 @@ const NFLVERSE_TEAM_METRICS = {
             "statusKnown": false
           },
           "issues": []
+        },
+        "situational": {
+          "team": "IND",
+          "schemaVersion": 1,
+          "season": 2026,
+          "predictionWeek": 4,
+          "cutoff": "2026-10-02T00:15:00.000Z",
+          "sourceAsOf": "2026-10-15T05:13:31.876Z",
+          "gameProvenance": [],
+          "thirdDown": {
+            "offense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null,
+              "buckets": {
+                "short": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "medium": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "long": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                }
+              }
+            },
+            "defense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null,
+              "buckets": {
+                "short": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "medium": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "long": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                }
+              }
+            }
+          },
+          "redZone": {
+            "offense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            },
+            "defense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            }
+          },
+          "league": {
+            "cutoff": "2026-10-02T00:15:00.000Z",
+            "sourceAsOf": "2026-10-15T05:13:31.876Z",
+            "maxWeek": null,
+            "latestCompletion": null,
+            "thirdDown": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            },
+            "redZone": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            }
+          }
         }
       },
       "BAL": {
@@ -89362,6 +95089,89 @@ const NFLVERSE_TEAM_METRICS = {
             "statusKnown": false
           },
           "issues": []
+        },
+        "situational": {
+          "team": "BAL",
+          "schemaVersion": 1,
+          "season": 2026,
+          "predictionWeek": 4,
+          "cutoff": "2026-10-02T00:15:00.000Z",
+          "sourceAsOf": "2026-10-15T05:13:31.876Z",
+          "gameProvenance": [],
+          "thirdDown": {
+            "offense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null,
+              "buckets": {
+                "short": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "medium": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "long": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                }
+              }
+            },
+            "defense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null,
+              "buckets": {
+                "short": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "medium": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "long": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                }
+              }
+            }
+          },
+          "redZone": {
+            "offense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            },
+            "defense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            }
+          },
+          "league": {
+            "cutoff": "2026-10-02T00:15:00.000Z",
+            "sourceAsOf": "2026-10-15T05:13:31.876Z",
+            "maxWeek": null,
+            "latestCompletion": null,
+            "thirdDown": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            },
+            "redZone": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            }
+          }
         }
       },
       "BUF": {
@@ -90578,6 +96388,89 @@ const NFLVERSE_TEAM_METRICS = {
             "statusKnown": false
           },
           "issues": []
+        },
+        "situational": {
+          "team": "BUF",
+          "schemaVersion": 1,
+          "season": 2026,
+          "predictionWeek": 4,
+          "cutoff": "2026-10-02T00:15:00.000Z",
+          "sourceAsOf": "2026-10-15T05:13:31.876Z",
+          "gameProvenance": [],
+          "thirdDown": {
+            "offense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null,
+              "buckets": {
+                "short": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "medium": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "long": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                }
+              }
+            },
+            "defense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null,
+              "buckets": {
+                "short": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "medium": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "long": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                }
+              }
+            }
+          },
+          "redZone": {
+            "offense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            },
+            "defense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            }
+          },
+          "league": {
+            "cutoff": "2026-10-02T00:15:00.000Z",
+            "sourceAsOf": "2026-10-15T05:13:31.876Z",
+            "maxWeek": null,
+            "latestCompletion": null,
+            "thirdDown": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            },
+            "redZone": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            }
+          }
         }
       },
       "HOU": {
@@ -91962,6 +97855,89 @@ const NFLVERSE_TEAM_METRICS = {
             "statusKnown": false
           },
           "issues": []
+        },
+        "situational": {
+          "team": "HOU",
+          "schemaVersion": 1,
+          "season": 2026,
+          "predictionWeek": 4,
+          "cutoff": "2026-10-02T00:15:00.000Z",
+          "sourceAsOf": "2026-10-15T05:13:31.876Z",
+          "gameProvenance": [],
+          "thirdDown": {
+            "offense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null,
+              "buckets": {
+                "short": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "medium": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "long": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                }
+              }
+            },
+            "defense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null,
+              "buckets": {
+                "short": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "medium": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "long": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                }
+              }
+            }
+          },
+          "redZone": {
+            "offense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            },
+            "defense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            }
+          },
+          "league": {
+            "cutoff": "2026-10-02T00:15:00.000Z",
+            "sourceAsOf": "2026-10-15T05:13:31.876Z",
+            "maxWeek": null,
+            "latestCompletion": null,
+            "thirdDown": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            },
+            "redZone": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            }
+          }
         }
       },
       "CHI": {
@@ -93290,6 +99266,89 @@ const NFLVERSE_TEAM_METRICS = {
             "statusKnown": false
           },
           "issues": []
+        },
+        "situational": {
+          "team": "CHI",
+          "schemaVersion": 1,
+          "season": 2026,
+          "predictionWeek": 4,
+          "cutoff": "2026-10-02T00:15:00.000Z",
+          "sourceAsOf": "2026-10-15T05:13:31.876Z",
+          "gameProvenance": [],
+          "thirdDown": {
+            "offense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null,
+              "buckets": {
+                "short": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "medium": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "long": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                }
+              }
+            },
+            "defense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null,
+              "buckets": {
+                "short": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "medium": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "long": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                }
+              }
+            }
+          },
+          "redZone": {
+            "offense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            },
+            "defense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            }
+          },
+          "league": {
+            "cutoff": "2026-10-02T00:15:00.000Z",
+            "sourceAsOf": "2026-10-15T05:13:31.876Z",
+            "maxWeek": null,
+            "latestCompletion": null,
+            "thirdDown": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            },
+            "redZone": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            }
+          }
         }
       },
       "CAR": {
@@ -94604,6 +100663,89 @@ const NFLVERSE_TEAM_METRICS = {
             "statusKnown": false
           },
           "issues": []
+        },
+        "situational": {
+          "team": "CAR",
+          "schemaVersion": 1,
+          "season": 2026,
+          "predictionWeek": 4,
+          "cutoff": "2026-10-02T00:15:00.000Z",
+          "sourceAsOf": "2026-10-15T05:13:31.876Z",
+          "gameProvenance": [],
+          "thirdDown": {
+            "offense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null,
+              "buckets": {
+                "short": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "medium": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "long": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                }
+              }
+            },
+            "defense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null,
+              "buckets": {
+                "short": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "medium": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "long": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                }
+              }
+            }
+          },
+          "redZone": {
+            "offense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            },
+            "defense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            }
+          },
+          "league": {
+            "cutoff": "2026-10-02T00:15:00.000Z",
+            "sourceAsOf": "2026-10-15T05:13:31.876Z",
+            "maxWeek": null,
+            "latestCompletion": null,
+            "thirdDown": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            },
+            "redZone": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            }
+          }
         }
       },
       "CLE": {
@@ -95904,6 +102046,89 @@ const NFLVERSE_TEAM_METRICS = {
             "statusKnown": false
           },
           "issues": []
+        },
+        "situational": {
+          "team": "CLE",
+          "schemaVersion": 1,
+          "season": 2026,
+          "predictionWeek": 4,
+          "cutoff": "2026-10-02T00:15:00.000Z",
+          "sourceAsOf": "2026-10-15T05:13:31.876Z",
+          "gameProvenance": [],
+          "thirdDown": {
+            "offense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null,
+              "buckets": {
+                "short": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "medium": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "long": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                }
+              }
+            },
+            "defense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null,
+              "buckets": {
+                "short": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "medium": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "long": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                }
+              }
+            }
+          },
+          "redZone": {
+            "offense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            },
+            "defense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            }
+          },
+          "league": {
+            "cutoff": "2026-10-02T00:15:00.000Z",
+            "sourceAsOf": "2026-10-15T05:13:31.876Z",
+            "maxWeek": null,
+            "latestCompletion": null,
+            "thirdDown": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            },
+            "redZone": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            }
+          }
         }
       },
       "JAX": {
@@ -97148,6 +103373,89 @@ const NFLVERSE_TEAM_METRICS = {
             "statusKnown": false
           },
           "issues": []
+        },
+        "situational": {
+          "team": "JAX",
+          "schemaVersion": 1,
+          "season": 2026,
+          "predictionWeek": 4,
+          "cutoff": "2026-10-02T00:15:00.000Z",
+          "sourceAsOf": "2026-10-15T05:13:31.876Z",
+          "gameProvenance": [],
+          "thirdDown": {
+            "offense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null,
+              "buckets": {
+                "short": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "medium": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "long": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                }
+              }
+            },
+            "defense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null,
+              "buckets": {
+                "short": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "medium": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "long": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                }
+              }
+            }
+          },
+          "redZone": {
+            "offense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            },
+            "defense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            }
+          },
+          "league": {
+            "cutoff": "2026-10-02T00:15:00.000Z",
+            "sourceAsOf": "2026-10-15T05:13:31.876Z",
+            "maxWeek": null,
+            "latestCompletion": null,
+            "thirdDown": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            },
+            "redZone": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            }
+          }
         }
       },
       "DAL": {
@@ -98476,6 +104784,89 @@ const NFLVERSE_TEAM_METRICS = {
             "statusKnown": false
           },
           "issues": []
+        },
+        "situational": {
+          "team": "DAL",
+          "schemaVersion": 1,
+          "season": 2026,
+          "predictionWeek": 4,
+          "cutoff": "2026-10-02T00:15:00.000Z",
+          "sourceAsOf": "2026-10-15T05:13:31.876Z",
+          "gameProvenance": [],
+          "thirdDown": {
+            "offense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null,
+              "buckets": {
+                "short": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "medium": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "long": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                }
+              }
+            },
+            "defense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null,
+              "buckets": {
+                "short": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "medium": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "long": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                }
+              }
+            }
+          },
+          "redZone": {
+            "offense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            },
+            "defense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            }
+          },
+          "league": {
+            "cutoff": "2026-10-02T00:15:00.000Z",
+            "sourceAsOf": "2026-10-15T05:13:31.876Z",
+            "maxWeek": null,
+            "latestCompletion": null,
+            "thirdDown": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            },
+            "redZone": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            }
+          }
         }
       },
       "NYG": {
@@ -99776,6 +106167,89 @@ const NFLVERSE_TEAM_METRICS = {
             "statusKnown": false
           },
           "issues": []
+        },
+        "situational": {
+          "team": "NYG",
+          "schemaVersion": 1,
+          "season": 2026,
+          "predictionWeek": 4,
+          "cutoff": "2026-10-02T00:15:00.000Z",
+          "sourceAsOf": "2026-10-15T05:13:31.876Z",
+          "gameProvenance": [],
+          "thirdDown": {
+            "offense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null,
+              "buckets": {
+                "short": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "medium": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "long": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                }
+              }
+            },
+            "defense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null,
+              "buckets": {
+                "short": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "medium": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "long": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                }
+              }
+            }
+          },
+          "redZone": {
+            "offense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            },
+            "defense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            }
+          },
+          "league": {
+            "cutoff": "2026-10-02T00:15:00.000Z",
+            "sourceAsOf": "2026-10-15T05:13:31.876Z",
+            "maxWeek": null,
+            "latestCompletion": null,
+            "thirdDown": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            },
+            "redZone": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            }
+          }
         }
       },
       "DEN": {
@@ -101048,6 +107522,89 @@ const NFLVERSE_TEAM_METRICS = {
             "statusKnown": false
           },
           "issues": []
+        },
+        "situational": {
+          "team": "DEN",
+          "schemaVersion": 1,
+          "season": 2026,
+          "predictionWeek": 4,
+          "cutoff": "2026-10-02T00:15:00.000Z",
+          "sourceAsOf": "2026-10-15T05:13:31.876Z",
+          "gameProvenance": [],
+          "thirdDown": {
+            "offense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null,
+              "buckets": {
+                "short": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "medium": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "long": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                }
+              }
+            },
+            "defense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null,
+              "buckets": {
+                "short": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "medium": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "long": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                }
+              }
+            }
+          },
+          "redZone": {
+            "offense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            },
+            "defense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            }
+          },
+          "league": {
+            "cutoff": "2026-10-02T00:15:00.000Z",
+            "sourceAsOf": "2026-10-15T05:13:31.876Z",
+            "maxWeek": null,
+            "latestCompletion": null,
+            "thirdDown": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            },
+            "redZone": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            }
+          }
         }
       },
       "KC": {
@@ -102320,6 +108877,89 @@ const NFLVERSE_TEAM_METRICS = {
             "statusKnown": false
           },
           "issues": []
+        },
+        "situational": {
+          "team": "KC",
+          "schemaVersion": 1,
+          "season": 2026,
+          "predictionWeek": 4,
+          "cutoff": "2026-10-02T00:15:00.000Z",
+          "sourceAsOf": "2026-10-15T05:13:31.876Z",
+          "gameProvenance": [],
+          "thirdDown": {
+            "offense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null,
+              "buckets": {
+                "short": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "medium": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "long": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                }
+              }
+            },
+            "defense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null,
+              "buckets": {
+                "short": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "medium": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "long": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                }
+              }
+            }
+          },
+          "redZone": {
+            "offense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            },
+            "defense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            }
+          },
+          "league": {
+            "cutoff": "2026-10-02T00:15:00.000Z",
+            "sourceAsOf": "2026-10-15T05:13:31.876Z",
+            "maxWeek": null,
+            "latestCompletion": null,
+            "thirdDown": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            },
+            "redZone": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            }
+          }
         }
       },
       "MIN": {
@@ -103606,6 +110246,89 @@ const NFLVERSE_TEAM_METRICS = {
             "statusKnown": false
           },
           "issues": []
+        },
+        "situational": {
+          "team": "MIN",
+          "schemaVersion": 1,
+          "season": 2026,
+          "predictionWeek": 4,
+          "cutoff": "2026-10-02T00:15:00.000Z",
+          "sourceAsOf": "2026-10-15T05:13:31.876Z",
+          "gameProvenance": [],
+          "thirdDown": {
+            "offense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null,
+              "buckets": {
+                "short": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "medium": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "long": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                }
+              }
+            },
+            "defense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null,
+              "buckets": {
+                "short": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "medium": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "long": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                }
+              }
+            }
+          },
+          "redZone": {
+            "offense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            },
+            "defense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            }
+          },
+          "league": {
+            "cutoff": "2026-10-02T00:15:00.000Z",
+            "sourceAsOf": "2026-10-15T05:13:31.876Z",
+            "maxWeek": null,
+            "latestCompletion": null,
+            "thirdDown": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            },
+            "redZone": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            }
+          }
         }
       },
       "GB": {
@@ -104920,6 +111643,89 @@ const NFLVERSE_TEAM_METRICS = {
             "statusKnown": false
           },
           "issues": []
+        },
+        "situational": {
+          "team": "GB",
+          "schemaVersion": 1,
+          "season": 2026,
+          "predictionWeek": 4,
+          "cutoff": "2026-10-02T00:15:00.000Z",
+          "sourceAsOf": "2026-10-15T05:13:31.876Z",
+          "gameProvenance": [],
+          "thirdDown": {
+            "offense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null,
+              "buckets": {
+                "short": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "medium": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "long": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                }
+              }
+            },
+            "defense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null,
+              "buckets": {
+                "short": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "medium": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "long": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                }
+              }
+            }
+          },
+          "redZone": {
+            "offense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            },
+            "defense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            }
+          },
+          "league": {
+            "cutoff": "2026-10-02T00:15:00.000Z",
+            "sourceAsOf": "2026-10-15T05:13:31.876Z",
+            "maxWeek": null,
+            "latestCompletion": null,
+            "thirdDown": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            },
+            "redZone": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            }
+          }
         }
       },
       "MIA": {
@@ -106206,6 +113012,89 @@ const NFLVERSE_TEAM_METRICS = {
             "statusKnown": false
           },
           "issues": []
+        },
+        "situational": {
+          "team": "MIA",
+          "schemaVersion": 1,
+          "season": 2026,
+          "predictionWeek": 4,
+          "cutoff": "2026-10-02T00:15:00.000Z",
+          "sourceAsOf": "2026-10-15T05:13:31.876Z",
+          "gameProvenance": [],
+          "thirdDown": {
+            "offense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null,
+              "buckets": {
+                "short": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "medium": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "long": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                }
+              }
+            },
+            "defense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null,
+              "buckets": {
+                "short": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "medium": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "long": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                }
+              }
+            }
+          },
+          "redZone": {
+            "offense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            },
+            "defense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            }
+          },
+          "league": {
+            "cutoff": "2026-10-02T00:15:00.000Z",
+            "sourceAsOf": "2026-10-15T05:13:31.876Z",
+            "maxWeek": null,
+            "latestCompletion": null,
+            "thirdDown": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            },
+            "redZone": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            }
+          }
         }
       },
       "LV": {
@@ -107520,6 +114409,89 @@ const NFLVERSE_TEAM_METRICS = {
             "statusKnown": false
           },
           "issues": []
+        },
+        "situational": {
+          "team": "LV",
+          "schemaVersion": 1,
+          "season": 2026,
+          "predictionWeek": 4,
+          "cutoff": "2026-10-02T00:15:00.000Z",
+          "sourceAsOf": "2026-10-15T05:13:31.876Z",
+          "gameProvenance": [],
+          "thirdDown": {
+            "offense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null,
+              "buckets": {
+                "short": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "medium": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "long": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                }
+              }
+            },
+            "defense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null,
+              "buckets": {
+                "short": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "medium": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "long": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                }
+              }
+            }
+          },
+          "redZone": {
+            "offense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            },
+            "defense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            }
+          },
+          "league": {
+            "cutoff": "2026-10-02T00:15:00.000Z",
+            "sourceAsOf": "2026-10-15T05:13:31.876Z",
+            "maxWeek": null,
+            "latestCompletion": null,
+            "thirdDown": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            },
+            "redZone": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            }
+          }
         }
       },
       "SEA": {
@@ -108806,6 +115778,89 @@ const NFLVERSE_TEAM_METRICS = {
             "statusKnown": false
           },
           "issues": []
+        },
+        "situational": {
+          "team": "SEA",
+          "schemaVersion": 1,
+          "season": 2026,
+          "predictionWeek": 4,
+          "cutoff": "2026-10-02T00:15:00.000Z",
+          "sourceAsOf": "2026-10-15T05:13:31.876Z",
+          "gameProvenance": [],
+          "thirdDown": {
+            "offense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null,
+              "buckets": {
+                "short": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "medium": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "long": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                }
+              }
+            },
+            "defense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null,
+              "buckets": {
+                "short": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "medium": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "long": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                }
+              }
+            }
+          },
+          "redZone": {
+            "offense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            },
+            "defense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            }
+          },
+          "league": {
+            "cutoff": "2026-10-02T00:15:00.000Z",
+            "sourceAsOf": "2026-10-15T05:13:31.876Z",
+            "maxWeek": null,
+            "latestCompletion": null,
+            "thirdDown": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            },
+            "redZone": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            }
+          }
         }
       },
       "NE": {
@@ -110134,6 +117189,89 @@ const NFLVERSE_TEAM_METRICS = {
             "statusKnown": false
           },
           "issues": []
+        },
+        "situational": {
+          "team": "NE",
+          "schemaVersion": 1,
+          "season": 2026,
+          "predictionWeek": 4,
+          "cutoff": "2026-10-02T00:15:00.000Z",
+          "sourceAsOf": "2026-10-15T05:13:31.876Z",
+          "gameProvenance": [],
+          "thirdDown": {
+            "offense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null,
+              "buckets": {
+                "short": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "medium": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "long": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                }
+              }
+            },
+            "defense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null,
+              "buckets": {
+                "short": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "medium": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "long": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                }
+              }
+            }
+          },
+          "redZone": {
+            "offense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            },
+            "defense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            }
+          },
+          "league": {
+            "cutoff": "2026-10-02T00:15:00.000Z",
+            "sourceAsOf": "2026-10-15T05:13:31.876Z",
+            "maxWeek": null,
+            "latestCompletion": null,
+            "thirdDown": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            },
+            "redZone": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            }
+          }
         }
       },
       "DET": {
@@ -111434,6 +118572,89 @@ const NFLVERSE_TEAM_METRICS = {
             "statusKnown": false
           },
           "issues": []
+        },
+        "situational": {
+          "team": "DET",
+          "schemaVersion": 1,
+          "season": 2026,
+          "predictionWeek": 4,
+          "cutoff": "2026-10-02T00:15:00.000Z",
+          "sourceAsOf": "2026-10-15T05:13:31.876Z",
+          "gameProvenance": [],
+          "thirdDown": {
+            "offense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null,
+              "buckets": {
+                "short": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "medium": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "long": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                }
+              }
+            },
+            "defense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null,
+              "buckets": {
+                "short": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "medium": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "long": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                }
+              }
+            }
+          },
+          "redZone": {
+            "offense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            },
+            "defense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            }
+          },
+          "league": {
+            "cutoff": "2026-10-02T00:15:00.000Z",
+            "sourceAsOf": "2026-10-15T05:13:31.876Z",
+            "maxWeek": null,
+            "latestCompletion": null,
+            "thirdDown": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            },
+            "redZone": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            }
+          }
         }
       },
       "NO": {
@@ -112776,6 +119997,89 @@ const NFLVERSE_TEAM_METRICS = {
             "statusKnown": false
           },
           "issues": []
+        },
+        "situational": {
+          "team": "NO",
+          "schemaVersion": 1,
+          "season": 2026,
+          "predictionWeek": 4,
+          "cutoff": "2026-10-02T00:15:00.000Z",
+          "sourceAsOf": "2026-10-15T05:13:31.876Z",
+          "gameProvenance": [],
+          "thirdDown": {
+            "offense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null,
+              "buckets": {
+                "short": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "medium": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "long": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                }
+              }
+            },
+            "defense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null,
+              "buckets": {
+                "short": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "medium": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "long": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                }
+              }
+            }
+          },
+          "redZone": {
+            "offense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            },
+            "defense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            }
+          },
+          "league": {
+            "cutoff": "2026-10-02T00:15:00.000Z",
+            "sourceAsOf": "2026-10-15T05:13:31.876Z",
+            "maxWeek": null,
+            "latestCompletion": null,
+            "thirdDown": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            },
+            "redZone": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            }
+          }
         }
       },
       "NYJ": {
@@ -114090,6 +121394,89 @@ const NFLVERSE_TEAM_METRICS = {
             "statusKnown": false
           },
           "issues": []
+        },
+        "situational": {
+          "team": "NYJ",
+          "schemaVersion": 1,
+          "season": 2026,
+          "predictionWeek": 4,
+          "cutoff": "2026-10-02T00:15:00.000Z",
+          "sourceAsOf": "2026-10-15T05:13:31.876Z",
+          "gameProvenance": [],
+          "thirdDown": {
+            "offense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null,
+              "buckets": {
+                "short": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "medium": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "long": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                }
+              }
+            },
+            "defense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null,
+              "buckets": {
+                "short": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "medium": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "long": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                }
+              }
+            }
+          },
+          "redZone": {
+            "offense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            },
+            "defense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            }
+          },
+          "league": {
+            "cutoff": "2026-10-02T00:15:00.000Z",
+            "sourceAsOf": "2026-10-15T05:13:31.876Z",
+            "maxWeek": null,
+            "latestCompletion": null,
+            "thirdDown": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            },
+            "redZone": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            }
+          }
         }
       },
       "TEN": {
@@ -115376,6 +122763,89 @@ const NFLVERSE_TEAM_METRICS = {
             "statusKnown": false
           },
           "issues": []
+        },
+        "situational": {
+          "team": "TEN",
+          "schemaVersion": 1,
+          "season": 2026,
+          "predictionWeek": 4,
+          "cutoff": "2026-10-02T00:15:00.000Z",
+          "sourceAsOf": "2026-10-15T05:13:31.876Z",
+          "gameProvenance": [],
+          "thirdDown": {
+            "offense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null,
+              "buckets": {
+                "short": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "medium": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "long": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                }
+              }
+            },
+            "defense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null,
+              "buckets": {
+                "short": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "medium": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "long": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                }
+              }
+            }
+          },
+          "redZone": {
+            "offense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            },
+            "defense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            }
+          },
+          "league": {
+            "cutoff": "2026-10-02T00:15:00.000Z",
+            "sourceAsOf": "2026-10-15T05:13:31.876Z",
+            "maxWeek": null,
+            "latestCompletion": null,
+            "thirdDown": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            },
+            "redZone": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            }
+          }
         }
       },
       "LAR": {
@@ -116648,6 +124118,89 @@ const NFLVERSE_TEAM_METRICS = {
             "statusKnown": false
           },
           "issues": []
+        },
+        "situational": {
+          "team": "LAR",
+          "schemaVersion": 1,
+          "season": 2026,
+          "predictionWeek": 4,
+          "cutoff": "2026-10-02T00:15:00.000Z",
+          "sourceAsOf": "2026-10-15T05:13:31.876Z",
+          "gameProvenance": [],
+          "thirdDown": {
+            "offense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null,
+              "buckets": {
+                "short": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "medium": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "long": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                }
+              }
+            },
+            "defense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null,
+              "buckets": {
+                "short": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "medium": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "long": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                }
+              }
+            }
+          },
+          "redZone": {
+            "offense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            },
+            "defense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            }
+          },
+          "league": {
+            "cutoff": "2026-10-02T00:15:00.000Z",
+            "sourceAsOf": "2026-10-15T05:13:31.876Z",
+            "maxWeek": null,
+            "latestCompletion": null,
+            "thirdDown": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            },
+            "redZone": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            }
+          }
         }
       },
       "SF": {
@@ -118088,6 +125641,89 @@ const NFLVERSE_TEAM_METRICS = {
             "statusKnown": false
           },
           "issues": []
+        },
+        "situational": {
+          "team": "SF",
+          "schemaVersion": 1,
+          "season": 2026,
+          "predictionWeek": 4,
+          "cutoff": "2026-10-02T00:15:00.000Z",
+          "sourceAsOf": "2026-10-15T05:13:31.876Z",
+          "gameProvenance": [],
+          "thirdDown": {
+            "offense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null,
+              "buckets": {
+                "short": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "medium": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "long": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                }
+              }
+            },
+            "defense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null,
+              "buckets": {
+                "short": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "medium": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "long": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                }
+              }
+            }
+          },
+          "redZone": {
+            "offense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            },
+            "defense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            }
+          },
+          "league": {
+            "cutoff": "2026-10-02T00:15:00.000Z",
+            "sourceAsOf": "2026-10-15T05:13:31.876Z",
+            "maxWeek": null,
+            "latestCompletion": null,
+            "thirdDown": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            },
+            "redZone": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            }
+          }
         }
       },
       "TB": {
@@ -119304,6 +126940,89 @@ const NFLVERSE_TEAM_METRICS = {
             "statusKnown": false
           },
           "issues": []
+        },
+        "situational": {
+          "team": "TB",
+          "schemaVersion": 1,
+          "season": 2026,
+          "predictionWeek": 4,
+          "cutoff": "2026-10-02T00:15:00.000Z",
+          "sourceAsOf": "2026-10-15T05:13:31.876Z",
+          "gameProvenance": [],
+          "thirdDown": {
+            "offense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null,
+              "buckets": {
+                "short": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "medium": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "long": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                }
+              }
+            },
+            "defense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null,
+              "buckets": {
+                "short": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "medium": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "long": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                }
+              }
+            }
+          },
+          "redZone": {
+            "offense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            },
+            "defense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            }
+          },
+          "league": {
+            "cutoff": "2026-10-02T00:15:00.000Z",
+            "sourceAsOf": "2026-10-15T05:13:31.876Z",
+            "maxWeek": null,
+            "latestCompletion": null,
+            "thirdDown": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            },
+            "redZone": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            }
+          }
         }
       },
       "CIN": {
@@ -120520,6 +128239,89 @@ const NFLVERSE_TEAM_METRICS = {
             "statusKnown": false
           },
           "issues": []
+        },
+        "situational": {
+          "team": "CIN",
+          "schemaVersion": 1,
+          "season": 2026,
+          "predictionWeek": 4,
+          "cutoff": "2026-10-02T00:15:00.000Z",
+          "sourceAsOf": "2026-10-15T05:13:31.876Z",
+          "gameProvenance": [],
+          "thirdDown": {
+            "offense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null,
+              "buckets": {
+                "short": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "medium": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "long": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                }
+              }
+            },
+            "defense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null,
+              "buckets": {
+                "short": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "medium": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "long": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                }
+              }
+            }
+          },
+          "redZone": {
+            "offense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            },
+            "defense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            }
+          },
+          "league": {
+            "cutoff": "2026-10-02T00:15:00.000Z",
+            "sourceAsOf": "2026-10-15T05:13:31.876Z",
+            "maxWeek": null,
+            "latestCompletion": null,
+            "thirdDown": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            },
+            "redZone": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            }
+          }
         }
       },
       "WSH": {
@@ -121764,6 +129566,89 @@ const NFLVERSE_TEAM_METRICS = {
             "statusKnown": false
           },
           "issues": []
+        },
+        "situational": {
+          "team": "WSH",
+          "schemaVersion": 1,
+          "season": 2026,
+          "predictionWeek": 4,
+          "cutoff": "2026-10-02T00:15:00.000Z",
+          "sourceAsOf": "2026-10-15T05:13:31.876Z",
+          "gameProvenance": [],
+          "thirdDown": {
+            "offense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null,
+              "buckets": {
+                "short": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "medium": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "long": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                }
+              }
+            },
+            "defense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null,
+              "buckets": {
+                "short": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "medium": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "long": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                }
+              }
+            }
+          },
+          "redZone": {
+            "offense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            },
+            "defense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            }
+          },
+          "league": {
+            "cutoff": "2026-10-02T00:15:00.000Z",
+            "sourceAsOf": "2026-10-15T05:13:31.876Z",
+            "maxWeek": null,
+            "latestCompletion": null,
+            "thirdDown": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            },
+            "redZone": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            }
+          }
         }
       },
       "PHI": {
@@ -123036,6 +130921,89 @@ const NFLVERSE_TEAM_METRICS = {
             "statusKnown": false
           },
           "issues": []
+        },
+        "situational": {
+          "team": "PHI",
+          "schemaVersion": 1,
+          "season": 2026,
+          "predictionWeek": 4,
+          "cutoff": "2026-10-02T00:15:00.000Z",
+          "sourceAsOf": "2026-10-15T05:13:31.876Z",
+          "gameProvenance": [],
+          "thirdDown": {
+            "offense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null,
+              "buckets": {
+                "short": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "medium": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "long": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                }
+              }
+            },
+            "defense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null,
+              "buckets": {
+                "short": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "medium": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "long": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                }
+              }
+            }
+          },
+          "redZone": {
+            "offense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            },
+            "defense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            }
+          },
+          "league": {
+            "cutoff": "2026-10-02T00:15:00.000Z",
+            "sourceAsOf": "2026-10-15T05:13:31.876Z",
+            "maxWeek": null,
+            "latestCompletion": null,
+            "thirdDown": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            },
+            "redZone": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            }
+          }
         }
       }
     },
@@ -124367,6 +132335,89 @@ const NFLVERSE_TEAM_METRICS = {
             "statusKnown": false
           },
           "issues": []
+        },
+        "situational": {
+          "team": "ARI",
+          "schemaVersion": 1,
+          "season": 2026,
+          "predictionWeek": 5,
+          "cutoff": "2026-10-09T00:15:00.000Z",
+          "sourceAsOf": "2026-10-15T05:13:31.876Z",
+          "gameProvenance": [],
+          "thirdDown": {
+            "offense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null,
+              "buckets": {
+                "short": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "medium": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "long": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                }
+              }
+            },
+            "defense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null,
+              "buckets": {
+                "short": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "medium": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "long": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                }
+              }
+            }
+          },
+          "redZone": {
+            "offense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            },
+            "defense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            }
+          },
+          "league": {
+            "cutoff": "2026-10-09T00:15:00.000Z",
+            "sourceAsOf": "2026-10-15T05:13:31.876Z",
+            "maxWeek": null,
+            "latestCompletion": null,
+            "thirdDown": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            },
+            "redZone": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            }
+          }
         }
       },
       "LAC": {
@@ -125654,6 +133705,89 @@ const NFLVERSE_TEAM_METRICS = {
             "statusKnown": false
           },
           "issues": []
+        },
+        "situational": {
+          "team": "LAC",
+          "schemaVersion": 1,
+          "season": 2026,
+          "predictionWeek": 5,
+          "cutoff": "2026-10-09T00:15:00.000Z",
+          "sourceAsOf": "2026-10-15T05:13:31.876Z",
+          "gameProvenance": [],
+          "thirdDown": {
+            "offense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null,
+              "buckets": {
+                "short": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "medium": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "long": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                }
+              }
+            },
+            "defense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null,
+              "buckets": {
+                "short": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "medium": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "long": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                }
+              }
+            }
+          },
+          "redZone": {
+            "offense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            },
+            "defense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            }
+          },
+          "league": {
+            "cutoff": "2026-10-09T00:15:00.000Z",
+            "sourceAsOf": "2026-10-15T05:13:31.876Z",
+            "maxWeek": null,
+            "latestCompletion": null,
+            "thirdDown": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            },
+            "redZone": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            }
+          }
         }
       },
       "PIT": {
@@ -126941,6 +135075,89 @@ const NFLVERSE_TEAM_METRICS = {
             "statusKnown": false
           },
           "issues": []
+        },
+        "situational": {
+          "team": "PIT",
+          "schemaVersion": 1,
+          "season": 2026,
+          "predictionWeek": 5,
+          "cutoff": "2026-10-09T00:15:00.000Z",
+          "sourceAsOf": "2026-10-15T05:13:31.876Z",
+          "gameProvenance": [],
+          "thirdDown": {
+            "offense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null,
+              "buckets": {
+                "short": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "medium": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "long": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                }
+              }
+            },
+            "defense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null,
+              "buckets": {
+                "short": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "medium": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "long": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                }
+              }
+            }
+          },
+          "redZone": {
+            "offense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            },
+            "defense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            }
+          },
+          "league": {
+            "cutoff": "2026-10-09T00:15:00.000Z",
+            "sourceAsOf": "2026-10-15T05:13:31.876Z",
+            "maxWeek": null,
+            "latestCompletion": null,
+            "thirdDown": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            },
+            "redZone": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            }
+          }
         }
       },
       "ATL": {
@@ -128256,6 +136473,89 @@ const NFLVERSE_TEAM_METRICS = {
             "statusKnown": false
           },
           "issues": []
+        },
+        "situational": {
+          "team": "ATL",
+          "schemaVersion": 1,
+          "season": 2026,
+          "predictionWeek": 5,
+          "cutoff": "2026-10-09T00:15:00.000Z",
+          "sourceAsOf": "2026-10-15T05:13:31.876Z",
+          "gameProvenance": [],
+          "thirdDown": {
+            "offense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null,
+              "buckets": {
+                "short": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "medium": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "long": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                }
+              }
+            },
+            "defense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null,
+              "buckets": {
+                "short": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "medium": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "long": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                }
+              }
+            }
+          },
+          "redZone": {
+            "offense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            },
+            "defense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            }
+          },
+          "league": {
+            "cutoff": "2026-10-09T00:15:00.000Z",
+            "sourceAsOf": "2026-10-15T05:13:31.876Z",
+            "maxWeek": null,
+            "latestCompletion": null,
+            "thirdDown": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            },
+            "redZone": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            }
+          }
         }
       },
       "IND": {
@@ -129501,6 +137801,89 @@ const NFLVERSE_TEAM_METRICS = {
             "statusKnown": false
           },
           "issues": []
+        },
+        "situational": {
+          "team": "IND",
+          "schemaVersion": 1,
+          "season": 2026,
+          "predictionWeek": 5,
+          "cutoff": "2026-10-09T00:15:00.000Z",
+          "sourceAsOf": "2026-10-15T05:13:31.876Z",
+          "gameProvenance": [],
+          "thirdDown": {
+            "offense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null,
+              "buckets": {
+                "short": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "medium": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "long": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                }
+              }
+            },
+            "defense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null,
+              "buckets": {
+                "short": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "medium": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "long": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                }
+              }
+            }
+          },
+          "redZone": {
+            "offense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            },
+            "defense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            }
+          },
+          "league": {
+            "cutoff": "2026-10-09T00:15:00.000Z",
+            "sourceAsOf": "2026-10-15T05:13:31.876Z",
+            "maxWeek": null,
+            "latestCompletion": null,
+            "thirdDown": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            },
+            "redZone": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            }
+          }
         }
       },
       "BAL": {
@@ -130788,6 +139171,89 @@ const NFLVERSE_TEAM_METRICS = {
             "statusKnown": false
           },
           "issues": []
+        },
+        "situational": {
+          "team": "BAL",
+          "schemaVersion": 1,
+          "season": 2026,
+          "predictionWeek": 5,
+          "cutoff": "2026-10-09T00:15:00.000Z",
+          "sourceAsOf": "2026-10-15T05:13:31.876Z",
+          "gameProvenance": [],
+          "thirdDown": {
+            "offense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null,
+              "buckets": {
+                "short": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "medium": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "long": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                }
+              }
+            },
+            "defense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null,
+              "buckets": {
+                "short": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "medium": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "long": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                }
+              }
+            }
+          },
+          "redZone": {
+            "offense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            },
+            "defense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            }
+          },
+          "league": {
+            "cutoff": "2026-10-09T00:15:00.000Z",
+            "sourceAsOf": "2026-10-15T05:13:31.876Z",
+            "maxWeek": null,
+            "latestCompletion": null,
+            "thirdDown": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            },
+            "redZone": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            }
+          }
         }
       },
       "BUF": {
@@ -132005,6 +140471,89 @@ const NFLVERSE_TEAM_METRICS = {
             "statusKnown": false
           },
           "issues": []
+        },
+        "situational": {
+          "team": "BUF",
+          "schemaVersion": 1,
+          "season": 2026,
+          "predictionWeek": 5,
+          "cutoff": "2026-10-09T00:15:00.000Z",
+          "sourceAsOf": "2026-10-15T05:13:31.876Z",
+          "gameProvenance": [],
+          "thirdDown": {
+            "offense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null,
+              "buckets": {
+                "short": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "medium": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "long": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                }
+              }
+            },
+            "defense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null,
+              "buckets": {
+                "short": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "medium": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "long": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                }
+              }
+            }
+          },
+          "redZone": {
+            "offense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            },
+            "defense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            }
+          },
+          "league": {
+            "cutoff": "2026-10-09T00:15:00.000Z",
+            "sourceAsOf": "2026-10-15T05:13:31.876Z",
+            "maxWeek": null,
+            "latestCompletion": null,
+            "thirdDown": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            },
+            "redZone": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            }
+          }
         }
       },
       "HOU": {
@@ -133404,6 +141953,89 @@ const NFLVERSE_TEAM_METRICS = {
             "statusKnown": false
           },
           "issues": []
+        },
+        "situational": {
+          "team": "HOU",
+          "schemaVersion": 1,
+          "season": 2026,
+          "predictionWeek": 5,
+          "cutoff": "2026-10-09T00:15:00.000Z",
+          "sourceAsOf": "2026-10-15T05:13:31.876Z",
+          "gameProvenance": [],
+          "thirdDown": {
+            "offense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null,
+              "buckets": {
+                "short": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "medium": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "long": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                }
+              }
+            },
+            "defense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null,
+              "buckets": {
+                "short": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "medium": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "long": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                }
+              }
+            }
+          },
+          "redZone": {
+            "offense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            },
+            "defense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            }
+          },
+          "league": {
+            "cutoff": "2026-10-09T00:15:00.000Z",
+            "sourceAsOf": "2026-10-15T05:13:31.876Z",
+            "maxWeek": null,
+            "latestCompletion": null,
+            "thirdDown": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            },
+            "redZone": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            }
+          }
         }
       },
       "CHI": {
@@ -134733,6 +143365,89 @@ const NFLVERSE_TEAM_METRICS = {
             "statusKnown": false
           },
           "issues": []
+        },
+        "situational": {
+          "team": "CHI",
+          "schemaVersion": 1,
+          "season": 2026,
+          "predictionWeek": 5,
+          "cutoff": "2026-10-09T00:15:00.000Z",
+          "sourceAsOf": "2026-10-15T05:13:31.876Z",
+          "gameProvenance": [],
+          "thirdDown": {
+            "offense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null,
+              "buckets": {
+                "short": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "medium": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "long": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                }
+              }
+            },
+            "defense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null,
+              "buckets": {
+                "short": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "medium": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "long": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                }
+              }
+            }
+          },
+          "redZone": {
+            "offense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            },
+            "defense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            }
+          },
+          "league": {
+            "cutoff": "2026-10-09T00:15:00.000Z",
+            "sourceAsOf": "2026-10-15T05:13:31.876Z",
+            "maxWeek": null,
+            "latestCompletion": null,
+            "thirdDown": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            },
+            "redZone": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            }
+          }
         }
       },
       "CAR": {
@@ -136034,6 +144749,89 @@ const NFLVERSE_TEAM_METRICS = {
             "statusKnown": false
           },
           "issues": []
+        },
+        "situational": {
+          "team": "CAR",
+          "schemaVersion": 1,
+          "season": 2026,
+          "predictionWeek": 5,
+          "cutoff": "2026-10-09T00:15:00.000Z",
+          "sourceAsOf": "2026-10-15T05:13:31.876Z",
+          "gameProvenance": [],
+          "thirdDown": {
+            "offense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null,
+              "buckets": {
+                "short": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "medium": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "long": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                }
+              }
+            },
+            "defense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null,
+              "buckets": {
+                "short": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "medium": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "long": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                }
+              }
+            }
+          },
+          "redZone": {
+            "offense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            },
+            "defense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            }
+          },
+          "league": {
+            "cutoff": "2026-10-09T00:15:00.000Z",
+            "sourceAsOf": "2026-10-15T05:13:31.876Z",
+            "maxWeek": null,
+            "latestCompletion": null,
+            "thirdDown": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            },
+            "redZone": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            }
+          }
         }
       },
       "CLE": {
@@ -137335,6 +146133,89 @@ const NFLVERSE_TEAM_METRICS = {
             "statusKnown": false
           },
           "issues": []
+        },
+        "situational": {
+          "team": "CLE",
+          "schemaVersion": 1,
+          "season": 2026,
+          "predictionWeek": 5,
+          "cutoff": "2026-10-09T00:15:00.000Z",
+          "sourceAsOf": "2026-10-15T05:13:31.876Z",
+          "gameProvenance": [],
+          "thirdDown": {
+            "offense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null,
+              "buckets": {
+                "short": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "medium": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "long": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                }
+              }
+            },
+            "defense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null,
+              "buckets": {
+                "short": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "medium": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "long": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                }
+              }
+            }
+          },
+          "redZone": {
+            "offense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            },
+            "defense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            }
+          },
+          "league": {
+            "cutoff": "2026-10-09T00:15:00.000Z",
+            "sourceAsOf": "2026-10-15T05:13:31.876Z",
+            "maxWeek": null,
+            "latestCompletion": null,
+            "thirdDown": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            },
+            "redZone": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            }
+          }
         }
       },
       "JAX": {
@@ -138608,6 +147489,89 @@ const NFLVERSE_TEAM_METRICS = {
             "statusKnown": false
           },
           "issues": []
+        },
+        "situational": {
+          "team": "JAX",
+          "schemaVersion": 1,
+          "season": 2026,
+          "predictionWeek": 5,
+          "cutoff": "2026-10-09T00:15:00.000Z",
+          "sourceAsOf": "2026-10-15T05:13:31.876Z",
+          "gameProvenance": [],
+          "thirdDown": {
+            "offense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null,
+              "buckets": {
+                "short": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "medium": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "long": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                }
+              }
+            },
+            "defense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null,
+              "buckets": {
+                "short": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "medium": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "long": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                }
+              }
+            }
+          },
+          "redZone": {
+            "offense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            },
+            "defense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            }
+          },
+          "league": {
+            "cutoff": "2026-10-09T00:15:00.000Z",
+            "sourceAsOf": "2026-10-15T05:13:31.876Z",
+            "maxWeek": null,
+            "latestCompletion": null,
+            "thirdDown": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            },
+            "redZone": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            }
+          }
         }
       },
       "DAL": {
@@ -139937,6 +148901,89 @@ const NFLVERSE_TEAM_METRICS = {
             "statusKnown": false
           },
           "issues": []
+        },
+        "situational": {
+          "team": "DAL",
+          "schemaVersion": 1,
+          "season": 2026,
+          "predictionWeek": 5,
+          "cutoff": "2026-10-09T00:15:00.000Z",
+          "sourceAsOf": "2026-10-15T05:13:31.876Z",
+          "gameProvenance": [],
+          "thirdDown": {
+            "offense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null,
+              "buckets": {
+                "short": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "medium": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "long": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                }
+              }
+            },
+            "defense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null,
+              "buckets": {
+                "short": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "medium": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "long": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                }
+              }
+            }
+          },
+          "redZone": {
+            "offense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            },
+            "defense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            }
+          },
+          "league": {
+            "cutoff": "2026-10-09T00:15:00.000Z",
+            "sourceAsOf": "2026-10-15T05:13:31.876Z",
+            "maxWeek": null,
+            "latestCompletion": null,
+            "thirdDown": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            },
+            "redZone": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            }
+          }
         }
       },
       "NYG": {
@@ -141266,6 +150313,89 @@ const NFLVERSE_TEAM_METRICS = {
             "statusKnown": false
           },
           "issues": []
+        },
+        "situational": {
+          "team": "NYG",
+          "schemaVersion": 1,
+          "season": 2026,
+          "predictionWeek": 5,
+          "cutoff": "2026-10-09T00:15:00.000Z",
+          "sourceAsOf": "2026-10-15T05:13:31.876Z",
+          "gameProvenance": [],
+          "thirdDown": {
+            "offense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null,
+              "buckets": {
+                "short": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "medium": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "long": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                }
+              }
+            },
+            "defense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null,
+              "buckets": {
+                "short": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "medium": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "long": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                }
+              }
+            }
+          },
+          "redZone": {
+            "offense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            },
+            "defense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            }
+          },
+          "league": {
+            "cutoff": "2026-10-09T00:15:00.000Z",
+            "sourceAsOf": "2026-10-15T05:13:31.876Z",
+            "maxWeek": null,
+            "latestCompletion": null,
+            "thirdDown": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            },
+            "redZone": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            }
+          }
         }
       },
       "DEN": {
@@ -142553,6 +151683,89 @@ const NFLVERSE_TEAM_METRICS = {
             "statusKnown": false
           },
           "issues": []
+        },
+        "situational": {
+          "team": "DEN",
+          "schemaVersion": 1,
+          "season": 2026,
+          "predictionWeek": 5,
+          "cutoff": "2026-10-09T00:15:00.000Z",
+          "sourceAsOf": "2026-10-15T05:13:31.876Z",
+          "gameProvenance": [],
+          "thirdDown": {
+            "offense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null,
+              "buckets": {
+                "short": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "medium": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "long": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                }
+              }
+            },
+            "defense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null,
+              "buckets": {
+                "short": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "medium": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "long": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                }
+              }
+            }
+          },
+          "redZone": {
+            "offense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            },
+            "defense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            }
+          },
+          "league": {
+            "cutoff": "2026-10-09T00:15:00.000Z",
+            "sourceAsOf": "2026-10-15T05:13:31.876Z",
+            "maxWeek": null,
+            "latestCompletion": null,
+            "thirdDown": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            },
+            "redZone": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            }
+          }
         }
       },
       "KC": {
@@ -143826,6 +153039,89 @@ const NFLVERSE_TEAM_METRICS = {
             "statusKnown": false
           },
           "issues": []
+        },
+        "situational": {
+          "team": "KC",
+          "schemaVersion": 1,
+          "season": 2026,
+          "predictionWeek": 5,
+          "cutoff": "2026-10-09T00:15:00.000Z",
+          "sourceAsOf": "2026-10-15T05:13:31.876Z",
+          "gameProvenance": [],
+          "thirdDown": {
+            "offense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null,
+              "buckets": {
+                "short": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "medium": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "long": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                }
+              }
+            },
+            "defense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null,
+              "buckets": {
+                "short": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "medium": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "long": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                }
+              }
+            }
+          },
+          "redZone": {
+            "offense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            },
+            "defense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            }
+          },
+          "league": {
+            "cutoff": "2026-10-09T00:15:00.000Z",
+            "sourceAsOf": "2026-10-15T05:13:31.876Z",
+            "maxWeek": null,
+            "latestCompletion": null,
+            "thirdDown": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            },
+            "redZone": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            }
+          }
         }
       },
       "MIN": {
@@ -145085,6 +154381,89 @@ const NFLVERSE_TEAM_METRICS = {
             "statusKnown": false
           },
           "issues": []
+        },
+        "situational": {
+          "team": "MIN",
+          "schemaVersion": 1,
+          "season": 2026,
+          "predictionWeek": 5,
+          "cutoff": "2026-10-09T00:15:00.000Z",
+          "sourceAsOf": "2026-10-15T05:13:31.876Z",
+          "gameProvenance": [],
+          "thirdDown": {
+            "offense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null,
+              "buckets": {
+                "short": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "medium": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "long": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                }
+              }
+            },
+            "defense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null,
+              "buckets": {
+                "short": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "medium": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "long": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                }
+              }
+            }
+          },
+          "redZone": {
+            "offense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            },
+            "defense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            }
+          },
+          "league": {
+            "cutoff": "2026-10-09T00:15:00.000Z",
+            "sourceAsOf": "2026-10-15T05:13:31.876Z",
+            "maxWeek": null,
+            "latestCompletion": null,
+            "thirdDown": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            },
+            "redZone": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            }
+          }
         }
       },
       "GB": {
@@ -146400,6 +155779,89 @@ const NFLVERSE_TEAM_METRICS = {
             "statusKnown": false
           },
           "issues": []
+        },
+        "situational": {
+          "team": "GB",
+          "schemaVersion": 1,
+          "season": 2026,
+          "predictionWeek": 5,
+          "cutoff": "2026-10-09T00:15:00.000Z",
+          "sourceAsOf": "2026-10-15T05:13:31.876Z",
+          "gameProvenance": [],
+          "thirdDown": {
+            "offense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null,
+              "buckets": {
+                "short": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "medium": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "long": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                }
+              }
+            },
+            "defense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null,
+              "buckets": {
+                "short": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "medium": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "long": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                }
+              }
+            }
+          },
+          "redZone": {
+            "offense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            },
+            "defense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            }
+          },
+          "league": {
+            "cutoff": "2026-10-09T00:15:00.000Z",
+            "sourceAsOf": "2026-10-15T05:13:31.876Z",
+            "maxWeek": null,
+            "latestCompletion": null,
+            "thirdDown": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            },
+            "redZone": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            }
+          }
         }
       },
       "MIA": {
@@ -147687,6 +157149,89 @@ const NFLVERSE_TEAM_METRICS = {
             "statusKnown": false
           },
           "issues": []
+        },
+        "situational": {
+          "team": "MIA",
+          "schemaVersion": 1,
+          "season": 2026,
+          "predictionWeek": 5,
+          "cutoff": "2026-10-09T00:15:00.000Z",
+          "sourceAsOf": "2026-10-15T05:13:31.876Z",
+          "gameProvenance": [],
+          "thirdDown": {
+            "offense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null,
+              "buckets": {
+                "short": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "medium": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "long": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                }
+              }
+            },
+            "defense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null,
+              "buckets": {
+                "short": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "medium": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "long": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                }
+              }
+            }
+          },
+          "redZone": {
+            "offense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            },
+            "defense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            }
+          },
+          "league": {
+            "cutoff": "2026-10-09T00:15:00.000Z",
+            "sourceAsOf": "2026-10-15T05:13:31.876Z",
+            "maxWeek": null,
+            "latestCompletion": null,
+            "thirdDown": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            },
+            "redZone": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            }
+          }
         }
       },
       "LV": {
@@ -149002,6 +158547,89 @@ const NFLVERSE_TEAM_METRICS = {
             "statusKnown": false
           },
           "issues": []
+        },
+        "situational": {
+          "team": "LV",
+          "schemaVersion": 1,
+          "season": 2026,
+          "predictionWeek": 5,
+          "cutoff": "2026-10-09T00:15:00.000Z",
+          "sourceAsOf": "2026-10-15T05:13:31.876Z",
+          "gameProvenance": [],
+          "thirdDown": {
+            "offense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null,
+              "buckets": {
+                "short": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "medium": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "long": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                }
+              }
+            },
+            "defense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null,
+              "buckets": {
+                "short": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "medium": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "long": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                }
+              }
+            }
+          },
+          "redZone": {
+            "offense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            },
+            "defense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            }
+          },
+          "league": {
+            "cutoff": "2026-10-09T00:15:00.000Z",
+            "sourceAsOf": "2026-10-15T05:13:31.876Z",
+            "maxWeek": null,
+            "latestCompletion": null,
+            "thirdDown": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            },
+            "redZone": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            }
+          }
         }
       },
       "SEA": {
@@ -150303,6 +159931,89 @@ const NFLVERSE_TEAM_METRICS = {
             "statusKnown": false
           },
           "issues": []
+        },
+        "situational": {
+          "team": "SEA",
+          "schemaVersion": 1,
+          "season": 2026,
+          "predictionWeek": 5,
+          "cutoff": "2026-10-09T00:15:00.000Z",
+          "sourceAsOf": "2026-10-15T05:13:31.876Z",
+          "gameProvenance": [],
+          "thirdDown": {
+            "offense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null,
+              "buckets": {
+                "short": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "medium": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "long": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                }
+              }
+            },
+            "defense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null,
+              "buckets": {
+                "short": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "medium": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "long": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                }
+              }
+            }
+          },
+          "redZone": {
+            "offense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            },
+            "defense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            }
+          },
+          "league": {
+            "cutoff": "2026-10-09T00:15:00.000Z",
+            "sourceAsOf": "2026-10-15T05:13:31.876Z",
+            "maxWeek": null,
+            "latestCompletion": null,
+            "thirdDown": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            },
+            "redZone": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            }
+          }
         }
       },
       "NE": {
@@ -151618,6 +161329,89 @@ const NFLVERSE_TEAM_METRICS = {
             "statusKnown": false
           },
           "issues": []
+        },
+        "situational": {
+          "team": "NE",
+          "schemaVersion": 1,
+          "season": 2026,
+          "predictionWeek": 5,
+          "cutoff": "2026-10-09T00:15:00.000Z",
+          "sourceAsOf": "2026-10-15T05:13:31.876Z",
+          "gameProvenance": [],
+          "thirdDown": {
+            "offense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null,
+              "buckets": {
+                "short": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "medium": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "long": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                }
+              }
+            },
+            "defense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null,
+              "buckets": {
+                "short": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "medium": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "long": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                }
+              }
+            }
+          },
+          "redZone": {
+            "offense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            },
+            "defense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            }
+          },
+          "league": {
+            "cutoff": "2026-10-09T00:15:00.000Z",
+            "sourceAsOf": "2026-10-15T05:13:31.876Z",
+            "maxWeek": null,
+            "latestCompletion": null,
+            "thirdDown": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            },
+            "redZone": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            }
+          }
         }
       },
       "DET": {
@@ -152919,6 +162713,89 @@ const NFLVERSE_TEAM_METRICS = {
             "statusKnown": false
           },
           "issues": []
+        },
+        "situational": {
+          "team": "DET",
+          "schemaVersion": 1,
+          "season": 2026,
+          "predictionWeek": 5,
+          "cutoff": "2026-10-09T00:15:00.000Z",
+          "sourceAsOf": "2026-10-15T05:13:31.876Z",
+          "gameProvenance": [],
+          "thirdDown": {
+            "offense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null,
+              "buckets": {
+                "short": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "medium": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "long": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                }
+              }
+            },
+            "defense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null,
+              "buckets": {
+                "short": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "medium": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "long": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                }
+              }
+            }
+          },
+          "redZone": {
+            "offense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            },
+            "defense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            }
+          },
+          "league": {
+            "cutoff": "2026-10-09T00:15:00.000Z",
+            "sourceAsOf": "2026-10-15T05:13:31.876Z",
+            "maxWeek": null,
+            "latestCompletion": null,
+            "thirdDown": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            },
+            "redZone": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            }
+          }
         }
       },
       "NO": {
@@ -154276,6 +164153,89 @@ const NFLVERSE_TEAM_METRICS = {
             "statusKnown": false
           },
           "issues": []
+        },
+        "situational": {
+          "team": "NO",
+          "schemaVersion": 1,
+          "season": 2026,
+          "predictionWeek": 5,
+          "cutoff": "2026-10-09T00:15:00.000Z",
+          "sourceAsOf": "2026-10-15T05:13:31.876Z",
+          "gameProvenance": [],
+          "thirdDown": {
+            "offense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null,
+              "buckets": {
+                "short": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "medium": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "long": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                }
+              }
+            },
+            "defense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null,
+              "buckets": {
+                "short": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "medium": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "long": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                }
+              }
+            }
+          },
+          "redZone": {
+            "offense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            },
+            "defense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            }
+          },
+          "league": {
+            "cutoff": "2026-10-09T00:15:00.000Z",
+            "sourceAsOf": "2026-10-15T05:13:31.876Z",
+            "maxWeek": null,
+            "latestCompletion": null,
+            "thirdDown": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            },
+            "redZone": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            }
+          }
         }
       },
       "NYJ": {
@@ -155605,6 +165565,89 @@ const NFLVERSE_TEAM_METRICS = {
             "statusKnown": false
           },
           "issues": []
+        },
+        "situational": {
+          "team": "NYJ",
+          "schemaVersion": 1,
+          "season": 2026,
+          "predictionWeek": 5,
+          "cutoff": "2026-10-09T00:15:00.000Z",
+          "sourceAsOf": "2026-10-15T05:13:31.876Z",
+          "gameProvenance": [],
+          "thirdDown": {
+            "offense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null,
+              "buckets": {
+                "short": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "medium": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "long": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                }
+              }
+            },
+            "defense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null,
+              "buckets": {
+                "short": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "medium": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "long": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                }
+              }
+            }
+          },
+          "redZone": {
+            "offense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            },
+            "defense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            }
+          },
+          "league": {
+            "cutoff": "2026-10-09T00:15:00.000Z",
+            "sourceAsOf": "2026-10-15T05:13:31.876Z",
+            "maxWeek": null,
+            "latestCompletion": null,
+            "thirdDown": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            },
+            "redZone": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            }
+          }
         }
       },
       "TEN": {
@@ -156892,6 +166935,89 @@ const NFLVERSE_TEAM_METRICS = {
             "statusKnown": false
           },
           "issues": []
+        },
+        "situational": {
+          "team": "TEN",
+          "schemaVersion": 1,
+          "season": 2026,
+          "predictionWeek": 5,
+          "cutoff": "2026-10-09T00:15:00.000Z",
+          "sourceAsOf": "2026-10-15T05:13:31.876Z",
+          "gameProvenance": [],
+          "thirdDown": {
+            "offense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null,
+              "buckets": {
+                "short": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "medium": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "long": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                }
+              }
+            },
+            "defense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null,
+              "buckets": {
+                "short": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "medium": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "long": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                }
+              }
+            }
+          },
+          "redZone": {
+            "offense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            },
+            "defense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            }
+          },
+          "league": {
+            "cutoff": "2026-10-09T00:15:00.000Z",
+            "sourceAsOf": "2026-10-15T05:13:31.876Z",
+            "maxWeek": null,
+            "latestCompletion": null,
+            "thirdDown": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            },
+            "redZone": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            }
+          }
         }
       },
       "LAR": {
@@ -158179,6 +168305,89 @@ const NFLVERSE_TEAM_METRICS = {
             "statusKnown": false
           },
           "issues": []
+        },
+        "situational": {
+          "team": "LAR",
+          "schemaVersion": 1,
+          "season": 2026,
+          "predictionWeek": 5,
+          "cutoff": "2026-10-09T00:15:00.000Z",
+          "sourceAsOf": "2026-10-15T05:13:31.876Z",
+          "gameProvenance": [],
+          "thirdDown": {
+            "offense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null,
+              "buckets": {
+                "short": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "medium": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "long": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                }
+              }
+            },
+            "defense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null,
+              "buckets": {
+                "short": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "medium": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "long": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                }
+              }
+            }
+          },
+          "redZone": {
+            "offense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            },
+            "defense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            }
+          },
+          "league": {
+            "cutoff": "2026-10-09T00:15:00.000Z",
+            "sourceAsOf": "2026-10-15T05:13:31.876Z",
+            "maxWeek": null,
+            "latestCompletion": null,
+            "thirdDown": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            },
+            "redZone": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            }
+          }
         }
       },
       "SF": {
@@ -159620,6 +169829,89 @@ const NFLVERSE_TEAM_METRICS = {
             "statusKnown": false
           },
           "issues": []
+        },
+        "situational": {
+          "team": "SF",
+          "schemaVersion": 1,
+          "season": 2026,
+          "predictionWeek": 5,
+          "cutoff": "2026-10-09T00:15:00.000Z",
+          "sourceAsOf": "2026-10-15T05:13:31.876Z",
+          "gameProvenance": [],
+          "thirdDown": {
+            "offense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null,
+              "buckets": {
+                "short": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "medium": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "long": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                }
+              }
+            },
+            "defense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null,
+              "buckets": {
+                "short": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "medium": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "long": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                }
+              }
+            }
+          },
+          "redZone": {
+            "offense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            },
+            "defense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            }
+          },
+          "league": {
+            "cutoff": "2026-10-09T00:15:00.000Z",
+            "sourceAsOf": "2026-10-15T05:13:31.876Z",
+            "maxWeek": null,
+            "latestCompletion": null,
+            "thirdDown": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            },
+            "redZone": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            }
+          }
         }
       },
       "TB": {
@@ -160837,6 +171129,89 @@ const NFLVERSE_TEAM_METRICS = {
             "statusKnown": false
           },
           "issues": []
+        },
+        "situational": {
+          "team": "TB",
+          "schemaVersion": 1,
+          "season": 2026,
+          "predictionWeek": 5,
+          "cutoff": "2026-10-09T00:15:00.000Z",
+          "sourceAsOf": "2026-10-15T05:13:31.876Z",
+          "gameProvenance": [],
+          "thirdDown": {
+            "offense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null,
+              "buckets": {
+                "short": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "medium": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "long": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                }
+              }
+            },
+            "defense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null,
+              "buckets": {
+                "short": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "medium": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "long": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                }
+              }
+            }
+          },
+          "redZone": {
+            "offense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            },
+            "defense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            }
+          },
+          "league": {
+            "cutoff": "2026-10-09T00:15:00.000Z",
+            "sourceAsOf": "2026-10-15T05:13:31.876Z",
+            "maxWeek": null,
+            "latestCompletion": null,
+            "thirdDown": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            },
+            "redZone": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            }
+          }
         }
       },
       "CIN": {
@@ -162054,6 +172429,89 @@ const NFLVERSE_TEAM_METRICS = {
             "statusKnown": false
           },
           "issues": []
+        },
+        "situational": {
+          "team": "CIN",
+          "schemaVersion": 1,
+          "season": 2026,
+          "predictionWeek": 5,
+          "cutoff": "2026-10-09T00:15:00.000Z",
+          "sourceAsOf": "2026-10-15T05:13:31.876Z",
+          "gameProvenance": [],
+          "thirdDown": {
+            "offense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null,
+              "buckets": {
+                "short": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "medium": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "long": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                }
+              }
+            },
+            "defense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null,
+              "buckets": {
+                "short": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "medium": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "long": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                }
+              }
+            }
+          },
+          "redZone": {
+            "offense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            },
+            "defense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            }
+          },
+          "league": {
+            "cutoff": "2026-10-09T00:15:00.000Z",
+            "sourceAsOf": "2026-10-15T05:13:31.876Z",
+            "maxWeek": null,
+            "latestCompletion": null,
+            "thirdDown": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            },
+            "redZone": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            }
+          }
         }
       },
       "WSH": {
@@ -163299,6 +173757,89 @@ const NFLVERSE_TEAM_METRICS = {
             "statusKnown": false
           },
           "issues": []
+        },
+        "situational": {
+          "team": "WSH",
+          "schemaVersion": 1,
+          "season": 2026,
+          "predictionWeek": 5,
+          "cutoff": "2026-10-09T00:15:00.000Z",
+          "sourceAsOf": "2026-10-15T05:13:31.876Z",
+          "gameProvenance": [],
+          "thirdDown": {
+            "offense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null,
+              "buckets": {
+                "short": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "medium": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "long": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                }
+              }
+            },
+            "defense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null,
+              "buckets": {
+                "short": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "medium": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "long": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                }
+              }
+            }
+          },
+          "redZone": {
+            "offense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            },
+            "defense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            }
+          },
+          "league": {
+            "cutoff": "2026-10-09T00:15:00.000Z",
+            "sourceAsOf": "2026-10-15T05:13:31.876Z",
+            "maxWeek": null,
+            "latestCompletion": null,
+            "thirdDown": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            },
+            "redZone": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            }
+          }
         }
       },
       "PHI": {
@@ -164544,6 +175085,89 @@ const NFLVERSE_TEAM_METRICS = {
             "statusKnown": false
           },
           "issues": []
+        },
+        "situational": {
+          "team": "PHI",
+          "schemaVersion": 1,
+          "season": 2026,
+          "predictionWeek": 5,
+          "cutoff": "2026-10-09T00:15:00.000Z",
+          "sourceAsOf": "2026-10-15T05:13:31.876Z",
+          "gameProvenance": [],
+          "thirdDown": {
+            "offense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null,
+              "buckets": {
+                "short": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "medium": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "long": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                }
+              }
+            },
+            "defense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null,
+              "buckets": {
+                "short": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "medium": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                },
+                "long": {
+                  "opportunities": 0,
+                  "conversions": 0,
+                  "rate": null
+                }
+              }
+            }
+          },
+          "redZone": {
+            "offense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            },
+            "defense": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            }
+          },
+          "league": {
+            "cutoff": "2026-10-09T00:15:00.000Z",
+            "sourceAsOf": "2026-10-15T05:13:31.876Z",
+            "maxWeek": null,
+            "latestCompletion": null,
+            "thirdDown": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            },
+            "redZone": {
+              "opportunities": 0,
+              "conversions": 0,
+              "rate": null
+            }
+          }
         }
       }
     },
@@ -165862,6 +176486,140 @@ const NFLVERSE_TEAM_METRICS = {
             "statusKnown": false
           },
           "issues": []
+        },
+        "situational": {
+          "team": "ARI",
+          "schemaVersion": 1,
+          "season": 2026,
+          "predictionWeek": 6,
+          "cutoff": "2026-10-16T00:15:00.000Z",
+          "sourceAsOf": "2026-10-15T05:13:31.876Z",
+          "gameProvenance": [
+            {
+              "key": "2026:1:ARI:LAC",
+              "providerId": "1392229",
+              "week": 1,
+              "away": "ARI",
+              "home": "LAC",
+              "kickoff": "2026-09-13T20:25:00.000Z",
+              "completedAsOf": "2026-10-15T04:00:03.480Z",
+              "gameId": "2026_01_ARI_LAC"
+            },
+            {
+              "key": "2026:2:ARI:SEA",
+              "providerId": "1392244",
+              "week": 2,
+              "away": "SEA",
+              "home": "ARI",
+              "kickoff": "2026-09-20T20:25:00.000Z",
+              "completedAsOf": "2026-10-15T04:00:04.055Z",
+              "gameId": "2026_02_SEA_ARI"
+            },
+            {
+              "key": "2026:3:ARI:SF",
+              "providerId": "1392258",
+              "week": 3,
+              "away": "ARI",
+              "home": "SF",
+              "kickoff": "2026-09-27T20:05:00.000Z",
+              "completedAsOf": "2026-10-15T04:00:10.587Z",
+              "gameId": "2026_03_ARI_SF"
+            },
+            {
+              "key": "2026:4:ARI:NYG",
+              "providerId": "1392269",
+              "week": 4,
+              "away": "ARI",
+              "home": "NYG",
+              "kickoff": "2026-10-04T17:00:00.000Z",
+              "completedAsOf": "2026-10-15T04:00:20.040Z",
+              "gameId": "2026_04_ARI_NYG"
+            },
+            {
+              "key": "2026:5:ARI:DET",
+              "providerId": "1392291",
+              "week": 5,
+              "away": "DET",
+              "home": "ARI",
+              "kickoff": "2026-10-11T20:25:00.000Z",
+              "completedAsOf": "2026-10-15T04:00:26.502Z",
+              "gameId": "2026_05_DET_ARI"
+            }
+          ],
+          "thirdDown": {
+            "offense": {
+              "opportunities": 73,
+              "conversions": 30,
+              "rate": 0.410958904109589,
+              "buckets": {
+                "short": {
+                  "opportunities": 26,
+                  "conversions": 15,
+                  "rate": 0.5769230769230769
+                },
+                "medium": {
+                  "opportunities": 14,
+                  "conversions": 6,
+                  "rate": 0.42857142857142855
+                },
+                "long": {
+                  "opportunities": 33,
+                  "conversions": 9,
+                  "rate": 0.2727272727272727
+                }
+              }
+            },
+            "defense": {
+              "opportunities": 57,
+              "conversions": 24,
+              "rate": 0.42105263157894735,
+              "buckets": {
+                "short": {
+                  "opportunities": 12,
+                  "conversions": 5,
+                  "rate": 0.4166666666666667
+                },
+                "medium": {
+                  "opportunities": 15,
+                  "conversions": 8,
+                  "rate": 0.5333333333333333
+                },
+                "long": {
+                  "opportunities": 30,
+                  "conversions": 11,
+                  "rate": 0.36666666666666664
+                }
+              }
+            }
+          },
+          "redZone": {
+            "offense": {
+              "opportunities": 17,
+              "conversions": 11,
+              "rate": 0.6470588235294118
+            },
+            "defense": {
+              "opportunities": 18,
+              "conversions": 14,
+              "rate": 0.7777777777777778
+            }
+          },
+          "league": {
+            "cutoff": "2026-10-16T00:15:00.000Z",
+            "sourceAsOf": "2026-10-15T05:13:31.876Z",
+            "maxWeek": 5,
+            "latestCompletion": "2026-10-15T04:00:26.502Z",
+            "thirdDown": {
+              "opportunities": 1996,
+              "conversions": 795,
+              "rate": 0.3982965931863727
+            },
+            "redZone": {
+              "opportunities": 520,
+              "conversions": 322,
+              "rate": 0.6192307692307693
+            }
+          }
         }
       },
       "LAC": {
@@ -167164,6 +177922,140 @@ const NFLVERSE_TEAM_METRICS = {
             "statusKnown": false
           },
           "issues": []
+        },
+        "situational": {
+          "team": "LAC",
+          "schemaVersion": 1,
+          "season": 2026,
+          "predictionWeek": 6,
+          "cutoff": "2026-10-16T00:15:00.000Z",
+          "sourceAsOf": "2026-10-15T05:13:31.876Z",
+          "gameProvenance": [
+            {
+              "key": "2026:1:ARI:LAC",
+              "providerId": "1392229",
+              "week": 1,
+              "away": "ARI",
+              "home": "LAC",
+              "kickoff": "2026-09-13T20:25:00.000Z",
+              "completedAsOf": "2026-10-15T04:00:03.480Z",
+              "gameId": "2026_01_ARI_LAC"
+            },
+            {
+              "key": "2026:2:LAC:LV",
+              "providerId": "1392242",
+              "week": 2,
+              "away": "LV",
+              "home": "LAC",
+              "kickoff": "2026-09-20T20:05:00.000Z",
+              "completedAsOf": "2026-10-15T04:00:04.055Z",
+              "gameId": "2026_02_LV_LAC"
+            },
+            {
+              "key": "2026:3:BUF:LAC",
+              "providerId": "1392249",
+              "week": 3,
+              "away": "LAC",
+              "home": "BUF",
+              "kickoff": "2026-09-27T17:00:00.000Z",
+              "completedAsOf": "2026-10-15T04:00:10.587Z",
+              "gameId": "2026_03_LAC_BUF"
+            },
+            {
+              "key": "2026:4:LAC:SEA",
+              "providerId": "1392277",
+              "week": 4,
+              "away": "LAC",
+              "home": "SEA",
+              "kickoff": "2026-10-04T20:25:00.000Z",
+              "completedAsOf": "2026-10-15T04:00:20.040Z",
+              "gameId": "2026_04_LAC_SEA"
+            },
+            {
+              "key": "2026:5:DEN:LAC",
+              "providerId": "1392289",
+              "week": 5,
+              "away": "DEN",
+              "home": "LAC",
+              "kickoff": "2026-10-11T20:05:00.000Z",
+              "completedAsOf": "2026-10-15T04:00:26.502Z",
+              "gameId": "2026_05_DEN_LAC"
+            }
+          ],
+          "thirdDown": {
+            "offense": {
+              "opportunities": 66,
+              "conversions": 23,
+              "rate": 0.3484848484848485,
+              "buckets": {
+                "short": {
+                  "opportunities": 17,
+                  "conversions": 11,
+                  "rate": 0.6470588235294118
+                },
+                "medium": {
+                  "opportunities": 12,
+                  "conversions": 3,
+                  "rate": 0.25
+                },
+                "long": {
+                  "opportunities": 37,
+                  "conversions": 9,
+                  "rate": 0.24324324324324326
+                }
+              }
+            },
+            "defense": {
+              "opportunities": 62,
+              "conversions": 20,
+              "rate": 0.3225806451612903,
+              "buckets": {
+                "short": {
+                  "opportunities": 14,
+                  "conversions": 4,
+                  "rate": 0.2857142857142857
+                },
+                "medium": {
+                  "opportunities": 15,
+                  "conversions": 8,
+                  "rate": 0.5333333333333333
+                },
+                "long": {
+                  "opportunities": 33,
+                  "conversions": 8,
+                  "rate": 0.24242424242424243
+                }
+              }
+            }
+          },
+          "redZone": {
+            "offense": {
+              "opportunities": 13,
+              "conversions": 8,
+              "rate": 0.6153846153846154
+            },
+            "defense": {
+              "opportunities": 20,
+              "conversions": 11,
+              "rate": 0.55
+            }
+          },
+          "league": {
+            "cutoff": "2026-10-16T00:15:00.000Z",
+            "sourceAsOf": "2026-10-15T05:13:31.876Z",
+            "maxWeek": 5,
+            "latestCompletion": "2026-10-15T04:00:26.502Z",
+            "thirdDown": {
+              "opportunities": 1996,
+              "conversions": 795,
+              "rate": 0.3982965931863727
+            },
+            "redZone": {
+              "opportunities": 520,
+              "conversions": 322,
+              "rate": 0.6192307692307693
+            }
+          }
         }
       },
       "PIT": {
@@ -168466,6 +179358,140 @@ const NFLVERSE_TEAM_METRICS = {
             "statusKnown": false
           },
           "issues": []
+        },
+        "situational": {
+          "team": "PIT",
+          "schemaVersion": 1,
+          "season": 2026,
+          "predictionWeek": 6,
+          "cutoff": "2026-10-16T00:15:00.000Z",
+          "sourceAsOf": "2026-10-15T05:13:31.876Z",
+          "gameProvenance": [
+            {
+              "key": "2026:1:ATL:PIT",
+              "providerId": "1392222",
+              "week": 1,
+              "away": "ATL",
+              "home": "PIT",
+              "kickoff": "2026-09-13T17:00:00.000Z",
+              "completedAsOf": "2026-10-15T04:00:03.480Z",
+              "gameId": "2026_01_ATL_PIT"
+            },
+            {
+              "key": "2026:2:NE:PIT",
+              "providerId": "1392236",
+              "week": 2,
+              "away": "PIT",
+              "home": "NE",
+              "kickoff": "2026-09-20T17:00:00.000Z",
+              "completedAsOf": "2026-10-15T04:00:04.055Z",
+              "gameId": "2026_02_PIT_NE"
+            },
+            {
+              "key": "2026:3:CIN:PIT",
+              "providerId": "1392255",
+              "week": 3,
+              "away": "CIN",
+              "home": "PIT",
+              "kickoff": "2026-09-27T17:00:00.000Z",
+              "completedAsOf": "2026-10-15T04:00:10.587Z",
+              "gameId": "2026_03_CIN_PIT"
+            },
+            {
+              "key": "2026:4:CLE:PIT",
+              "providerId": "1392264",
+              "week": 4,
+              "away": "PIT",
+              "home": "CLE",
+              "kickoff": "2026-10-02T00:15:00.000Z",
+              "completedAsOf": "2026-10-15T04:00:20.040Z",
+              "gameId": "2026_04_PIT_CLE"
+            },
+            {
+              "key": "2026:5:IND:PIT",
+              "providerId": "1392287",
+              "week": 5,
+              "away": "IND",
+              "home": "PIT",
+              "kickoff": "2026-10-11T17:00:00.000Z",
+              "completedAsOf": "2026-10-15T04:00:26.502Z",
+              "gameId": "2026_05_IND_PIT"
+            }
+          ],
+          "thirdDown": {
+            "offense": {
+              "opportunities": 60,
+              "conversions": 20,
+              "rate": 0.3333333333333333,
+              "buckets": {
+                "short": {
+                  "opportunities": 17,
+                  "conversions": 12,
+                  "rate": 0.7058823529411765
+                },
+                "medium": {
+                  "opportunities": 22,
+                  "conversions": 4,
+                  "rate": 0.18181818181818182
+                },
+                "long": {
+                  "opportunities": 21,
+                  "conversions": 4,
+                  "rate": 0.19047619047619047
+                }
+              }
+            },
+            "defense": {
+              "opportunities": 61,
+              "conversions": 20,
+              "rate": 0.32786885245901637,
+              "buckets": {
+                "short": {
+                  "opportunities": 23,
+                  "conversions": 12,
+                  "rate": 0.5217391304347826
+                },
+                "medium": {
+                  "opportunities": 11,
+                  "conversions": 5,
+                  "rate": 0.45454545454545453
+                },
+                "long": {
+                  "opportunities": 27,
+                  "conversions": 3,
+                  "rate": 0.1111111111111111
+                }
+              }
+            }
+          },
+          "redZone": {
+            "offense": {
+              "opportunities": 12,
+              "conversions": 7,
+              "rate": 0.5833333333333334
+            },
+            "defense": {
+              "opportunities": 8,
+              "conversions": 4,
+              "rate": 0.5
+            }
+          },
+          "league": {
+            "cutoff": "2026-10-16T00:15:00.000Z",
+            "sourceAsOf": "2026-10-15T05:13:31.876Z",
+            "maxWeek": 5,
+            "latestCompletion": "2026-10-15T04:00:26.502Z",
+            "thirdDown": {
+              "opportunities": 1996,
+              "conversions": 795,
+              "rate": 0.3982965931863727
+            },
+            "redZone": {
+              "opportunities": 520,
+              "conversions": 322,
+              "rate": 0.6192307692307693
+            }
+          }
         }
       },
       "ATL": {
@@ -169796,6 +180822,140 @@ const NFLVERSE_TEAM_METRICS = {
             "statusKnown": false
           },
           "issues": []
+        },
+        "situational": {
+          "team": "ATL",
+          "schemaVersion": 1,
+          "season": 2026,
+          "predictionWeek": 6,
+          "cutoff": "2026-10-16T00:15:00.000Z",
+          "sourceAsOf": "2026-10-15T05:13:31.876Z",
+          "gameProvenance": [
+            {
+              "key": "2026:1:ATL:PIT",
+              "providerId": "1392222",
+              "week": 1,
+              "away": "ATL",
+              "home": "PIT",
+              "kickoff": "2026-09-13T17:00:00.000Z",
+              "completedAsOf": "2026-10-15T04:00:03.480Z",
+              "gameId": "2026_01_ATL_PIT"
+            },
+            {
+              "key": "2026:2:ATL:CAR",
+              "providerId": "1392233",
+              "week": 2,
+              "away": "CAR",
+              "home": "ATL",
+              "kickoff": "2026-09-20T17:00:00.000Z",
+              "completedAsOf": "2026-10-15T04:00:04.055Z",
+              "gameId": "2026_02_CAR_ATL"
+            },
+            {
+              "key": "2026:3:ATL:GB",
+              "providerId": "1392248",
+              "week": 3,
+              "away": "ATL",
+              "home": "GB",
+              "kickoff": "2026-09-25T00:15:00.000Z",
+              "completedAsOf": "2026-10-15T04:00:10.587Z",
+              "gameId": "2026_03_ATL_GB"
+            },
+            {
+              "key": "2026:4:ATL:NO",
+              "providerId": "1392279",
+              "week": 4,
+              "away": "ATL",
+              "home": "NO",
+              "kickoff": "2026-10-06T00:15:00.000Z",
+              "completedAsOf": "2026-10-15T04:00:20.040Z",
+              "gameId": "2026_04_ATL_NO"
+            },
+            {
+              "key": "2026:5:ATL:BAL",
+              "providerId": "1392293",
+              "week": 5,
+              "away": "BAL",
+              "home": "ATL",
+              "kickoff": "2026-10-12T00:20:00.000Z",
+              "completedAsOf": "2026-10-15T04:00:26.502Z",
+              "gameId": "2026_05_BAL_ATL"
+            }
+          ],
+          "thirdDown": {
+            "offense": {
+              "opportunities": 60,
+              "conversions": 25,
+              "rate": 0.4166666666666667,
+              "buckets": {
+                "short": {
+                  "opportunities": 17,
+                  "conversions": 12,
+                  "rate": 0.7058823529411765
+                },
+                "medium": {
+                  "opportunities": 17,
+                  "conversions": 4,
+                  "rate": 0.23529411764705882
+                },
+                "long": {
+                  "opportunities": 26,
+                  "conversions": 9,
+                  "rate": 0.34615384615384615
+                }
+              }
+            },
+            "defense": {
+              "opportunities": 70,
+              "conversions": 29,
+              "rate": 0.4142857142857143,
+              "buckets": {
+                "short": {
+                  "opportunities": 21,
+                  "conversions": 14,
+                  "rate": 0.6666666666666666
+                },
+                "medium": {
+                  "opportunities": 19,
+                  "conversions": 6,
+                  "rate": 0.3157894736842105
+                },
+                "long": {
+                  "opportunities": 30,
+                  "conversions": 9,
+                  "rate": 0.3
+                }
+              }
+            }
+          },
+          "redZone": {
+            "offense": {
+              "opportunities": 13,
+              "conversions": 9,
+              "rate": 0.6923076923076923
+            },
+            "defense": {
+              "opportunities": 20,
+              "conversions": 12,
+              "rate": 0.6
+            }
+          },
+          "league": {
+            "cutoff": "2026-10-16T00:15:00.000Z",
+            "sourceAsOf": "2026-10-15T05:13:31.876Z",
+            "maxWeek": 5,
+            "latestCompletion": "2026-10-15T04:00:26.502Z",
+            "thirdDown": {
+              "opportunities": 1996,
+              "conversions": 795,
+              "rate": 0.3982965931863727
+            },
+            "redZone": {
+              "opportunities": 520,
+              "conversions": 322,
+              "rate": 0.6192307692307693
+            }
+          }
         }
       },
       "IND": {
@@ -171056,6 +182216,140 @@ const NFLVERSE_TEAM_METRICS = {
             "statusKnown": false
           },
           "issues": []
+        },
+        "situational": {
+          "team": "IND",
+          "schemaVersion": 1,
+          "season": 2026,
+          "predictionWeek": 6,
+          "cutoff": "2026-10-16T00:15:00.000Z",
+          "sourceAsOf": "2026-10-15T05:13:31.876Z",
+          "gameProvenance": [
+            {
+              "key": "2026:1:BAL:IND",
+              "providerId": "1392221",
+              "week": 1,
+              "away": "BAL",
+              "home": "IND",
+              "kickoff": "2026-09-13T17:00:00.000Z",
+              "completedAsOf": "2026-10-15T04:00:03.480Z",
+              "gameId": "2026_01_BAL_IND"
+            },
+            {
+              "key": "2026:2:IND:KC",
+              "providerId": "1392246",
+              "week": 2,
+              "away": "IND",
+              "home": "KC",
+              "kickoff": "2026-09-21T00:20:00.000Z",
+              "completedAsOf": "2026-10-15T04:00:04.055Z",
+              "gameId": "2026_02_IND_KC"
+            },
+            {
+              "key": "2026:3:HOU:IND",
+              "providerId": "1392252",
+              "week": 3,
+              "away": "HOU",
+              "home": "IND",
+              "kickoff": "2026-09-27T17:00:00.000Z",
+              "completedAsOf": "2026-10-15T04:00:10.587Z",
+              "gameId": "2026_03_HOU_IND"
+            },
+            {
+              "key": "2026:4:IND:WSH",
+              "providerId": "1392265",
+              "week": 4,
+              "away": "IND",
+              "home": "WSH",
+              "kickoff": "2026-10-04T13:30:00.000Z",
+              "completedAsOf": "2026-10-15T04:00:20.040Z",
+              "gameId": "2026_04_IND_WAS"
+            },
+            {
+              "key": "2026:5:IND:PIT",
+              "providerId": "1392287",
+              "week": 5,
+              "away": "IND",
+              "home": "PIT",
+              "kickoff": "2026-10-11T17:00:00.000Z",
+              "completedAsOf": "2026-10-15T04:00:26.502Z",
+              "gameId": "2026_05_IND_PIT"
+            }
+          ],
+          "thirdDown": {
+            "offense": {
+              "opportunities": 67,
+              "conversions": 24,
+              "rate": 0.3582089552238806,
+              "buckets": {
+                "short": {
+                  "opportunities": 23,
+                  "conversions": 14,
+                  "rate": 0.6086956521739131
+                },
+                "medium": {
+                  "opportunities": 19,
+                  "conversions": 7,
+                  "rate": 0.3684210526315789
+                },
+                "long": {
+                  "opportunities": 25,
+                  "conversions": 3,
+                  "rate": 0.12
+                }
+              }
+            },
+            "defense": {
+              "opportunities": 58,
+              "conversions": 18,
+              "rate": 0.3103448275862069,
+              "buckets": {
+                "short": {
+                  "opportunities": 12,
+                  "conversions": 6,
+                  "rate": 0.5
+                },
+                "medium": {
+                  "opportunities": 13,
+                  "conversions": 6,
+                  "rate": 0.46153846153846156
+                },
+                "long": {
+                  "opportunities": 33,
+                  "conversions": 6,
+                  "rate": 0.18181818181818182
+                }
+              }
+            }
+          },
+          "redZone": {
+            "offense": {
+              "opportunities": 15,
+              "conversions": 10,
+              "rate": 0.6666666666666666
+            },
+            "defense": {
+              "opportunities": 16,
+              "conversions": 10,
+              "rate": 0.625
+            }
+          },
+          "league": {
+            "cutoff": "2026-10-16T00:15:00.000Z",
+            "sourceAsOf": "2026-10-15T05:13:31.876Z",
+            "maxWeek": 5,
+            "latestCompletion": "2026-10-15T04:00:26.502Z",
+            "thirdDown": {
+              "opportunities": 1996,
+              "conversions": 795,
+              "rate": 0.3982965931863727
+            },
+            "redZone": {
+              "opportunities": 520,
+              "conversions": 322,
+              "rate": 0.6192307692307693
+            }
+          }
         }
       },
       "BAL": {
@@ -172330,6 +183624,140 @@ const NFLVERSE_TEAM_METRICS = {
             "statusKnown": false
           },
           "issues": []
+        },
+        "situational": {
+          "team": "BAL",
+          "schemaVersion": 1,
+          "season": 2026,
+          "predictionWeek": 6,
+          "cutoff": "2026-10-16T00:15:00.000Z",
+          "sourceAsOf": "2026-10-15T05:13:31.876Z",
+          "gameProvenance": [
+            {
+              "key": "2026:1:BAL:IND",
+              "providerId": "1392221",
+              "week": 1,
+              "away": "BAL",
+              "home": "IND",
+              "kickoff": "2026-09-13T17:00:00.000Z",
+              "completedAsOf": "2026-10-15T04:00:03.480Z",
+              "gameId": "2026_01_BAL_IND"
+            },
+            {
+              "key": "2026:2:BAL:NO",
+              "providerId": "1392239",
+              "week": 2,
+              "away": "NO",
+              "home": "BAL",
+              "kickoff": "2026-09-20T17:00:00.000Z",
+              "completedAsOf": "2026-10-15T04:00:04.055Z",
+              "gameId": "2026_02_NO_BAL"
+            },
+            {
+              "key": "2026:3:BAL:DAL",
+              "providerId": "1392260",
+              "week": 3,
+              "away": "BAL",
+              "home": "DAL",
+              "kickoff": "2026-09-27T20:25:00.000Z",
+              "completedAsOf": "2026-10-15T04:00:10.587Z",
+              "gameId": "2026_03_BAL_DAL"
+            },
+            {
+              "key": "2026:4:BAL:TEN",
+              "providerId": "1392272",
+              "week": 4,
+              "away": "TEN",
+              "home": "BAL",
+              "kickoff": "2026-10-04T17:00:00.000Z",
+              "completedAsOf": "2026-10-15T04:00:20.040Z",
+              "gameId": "2026_04_TEN_BAL"
+            },
+            {
+              "key": "2026:5:ATL:BAL",
+              "providerId": "1392293",
+              "week": 5,
+              "away": "BAL",
+              "home": "ATL",
+              "kickoff": "2026-10-12T00:20:00.000Z",
+              "completedAsOf": "2026-10-15T04:00:26.502Z",
+              "gameId": "2026_05_BAL_ATL"
+            }
+          ],
+          "thirdDown": {
+            "offense": {
+              "opportunities": 50,
+              "conversions": 20,
+              "rate": 0.4,
+              "buckets": {
+                "short": {
+                  "opportunities": 15,
+                  "conversions": 9,
+                  "rate": 0.6
+                },
+                "medium": {
+                  "opportunities": 17,
+                  "conversions": 8,
+                  "rate": 0.47058823529411764
+                },
+                "long": {
+                  "opportunities": 18,
+                  "conversions": 3,
+                  "rate": 0.16666666666666666
+                }
+              }
+            },
+            "defense": {
+              "opportunities": 65,
+              "conversions": 27,
+              "rate": 0.4153846153846154,
+              "buckets": {
+                "short": {
+                  "opportunities": 17,
+                  "conversions": 9,
+                  "rate": 0.5294117647058824
+                },
+                "medium": {
+                  "opportunities": 17,
+                  "conversions": 4,
+                  "rate": 0.23529411764705882
+                },
+                "long": {
+                  "opportunities": 31,
+                  "conversions": 14,
+                  "rate": 0.45161290322580644
+                }
+              }
+            }
+          },
+          "redZone": {
+            "offense": {
+              "opportunities": 19,
+              "conversions": 14,
+              "rate": 0.7368421052631579
+            },
+            "defense": {
+              "opportunities": 19,
+              "conversions": 11,
+              "rate": 0.5789473684210527
+            }
+          },
+          "league": {
+            "cutoff": "2026-10-16T00:15:00.000Z",
+            "sourceAsOf": "2026-10-15T05:13:31.876Z",
+            "maxWeek": 5,
+            "latestCompletion": "2026-10-15T04:00:26.502Z",
+            "thirdDown": {
+              "opportunities": 1996,
+              "conversions": 795,
+              "rate": 0.3982965931863727
+            },
+            "redZone": {
+              "opportunities": 520,
+              "conversions": 322,
+              "rate": 0.6192307692307693
+            }
+          }
         }
       },
       "BUF": {
@@ -173548,6 +184976,140 @@ const NFLVERSE_TEAM_METRICS = {
             "statusKnown": false
           },
           "issues": []
+        },
+        "situational": {
+          "team": "BUF",
+          "schemaVersion": 1,
+          "season": 2026,
+          "predictionWeek": 6,
+          "cutoff": "2026-10-16T00:15:00.000Z",
+          "sourceAsOf": "2026-10-15T05:13:31.876Z",
+          "gameProvenance": [
+            {
+              "key": "2026:1:BUF:HOU",
+              "providerId": "1392225",
+              "week": 1,
+              "away": "BUF",
+              "home": "HOU",
+              "kickoff": "2026-09-13T17:00:00.000Z",
+              "completedAsOf": "2026-10-15T04:00:03.480Z",
+              "gameId": "2026_01_BUF_HOU"
+            },
+            {
+              "key": "2026:2:BUF:DET",
+              "providerId": "1392232",
+              "week": 2,
+              "away": "DET",
+              "home": "BUF",
+              "kickoff": "2026-09-18T00:15:00.000Z",
+              "completedAsOf": "2026-10-15T04:00:04.055Z",
+              "gameId": "2026_02_DET_BUF"
+            },
+            {
+              "key": "2026:3:BUF:LAC",
+              "providerId": "1392249",
+              "week": 3,
+              "away": "LAC",
+              "home": "BUF",
+              "kickoff": "2026-09-27T17:00:00.000Z",
+              "completedAsOf": "2026-10-15T04:00:10.587Z",
+              "gameId": "2026_03_LAC_BUF"
+            },
+            {
+              "key": "2026:4:BUF:NE",
+              "providerId": "1392266",
+              "week": 4,
+              "away": "NE",
+              "home": "BUF",
+              "kickoff": "2026-10-04T17:00:00.000Z",
+              "completedAsOf": "2026-10-15T04:00:20.040Z",
+              "gameId": "2026_04_NE_BUF"
+            },
+            {
+              "key": "2026:5:BUF:LAR",
+              "providerId": "1392294",
+              "week": 5,
+              "away": "BUF",
+              "home": "LAR",
+              "kickoff": "2026-10-13T00:15:00.000Z",
+              "completedAsOf": "2026-10-15T04:00:26.502Z",
+              "gameId": "2026_05_BUF_LA"
+            }
+          ],
+          "thirdDown": {
+            "offense": {
+              "opportunities": 51,
+              "conversions": 26,
+              "rate": 0.5098039215686274,
+              "buckets": {
+                "short": {
+                  "opportunities": 12,
+                  "conversions": 8,
+                  "rate": 0.6666666666666666
+                },
+                "medium": {
+                  "opportunities": 17,
+                  "conversions": 11,
+                  "rate": 0.6470588235294118
+                },
+                "long": {
+                  "opportunities": 22,
+                  "conversions": 7,
+                  "rate": 0.3181818181818182
+                }
+              }
+            },
+            "defense": {
+              "opportunities": 67,
+              "conversions": 29,
+              "rate": 0.43283582089552236,
+              "buckets": {
+                "short": {
+                  "opportunities": 24,
+                  "conversions": 15,
+                  "rate": 0.625
+                },
+                "medium": {
+                  "opportunities": 12,
+                  "conversions": 4,
+                  "rate": 0.3333333333333333
+                },
+                "long": {
+                  "opportunities": 31,
+                  "conversions": 10,
+                  "rate": 0.3225806451612903
+                }
+              }
+            }
+          },
+          "redZone": {
+            "offense": {
+              "opportunities": 23,
+              "conversions": 17,
+              "rate": 0.7391304347826086
+            },
+            "defense": {
+              "opportunities": 22,
+              "conversions": 17,
+              "rate": 0.7727272727272727
+            }
+          },
+          "league": {
+            "cutoff": "2026-10-16T00:15:00.000Z",
+            "sourceAsOf": "2026-10-15T05:13:31.876Z",
+            "maxWeek": 5,
+            "latestCompletion": "2026-10-15T04:00:26.502Z",
+            "thirdDown": {
+              "opportunities": 1996,
+              "conversions": 795,
+              "rate": 0.3982965931863727
+            },
+            "redZone": {
+              "opportunities": 520,
+              "conversions": 322,
+              "rate": 0.6192307692307693
+            }
+          }
         }
       },
       "HOU": {
@@ -174920,6 +186482,140 @@ const NFLVERSE_TEAM_METRICS = {
             "statusKnown": false
           },
           "issues": []
+        },
+        "situational": {
+          "team": "HOU",
+          "schemaVersion": 1,
+          "season": 2026,
+          "predictionWeek": 6,
+          "cutoff": "2026-10-16T00:15:00.000Z",
+          "sourceAsOf": "2026-10-15T05:13:31.876Z",
+          "gameProvenance": [
+            {
+              "key": "2026:1:BUF:HOU",
+              "providerId": "1392225",
+              "week": 1,
+              "away": "BUF",
+              "home": "HOU",
+              "kickoff": "2026-09-13T17:00:00.000Z",
+              "completedAsOf": "2026-10-15T04:00:03.480Z",
+              "gameId": "2026_01_BUF_HOU"
+            },
+            {
+              "key": "2026:2:CIN:HOU",
+              "providerId": "1392240",
+              "week": 2,
+              "away": "CIN",
+              "home": "HOU",
+              "kickoff": "2026-09-20T17:00:00.000Z",
+              "completedAsOf": "2026-10-15T04:00:04.055Z",
+              "gameId": "2026_02_CIN_HOU"
+            },
+            {
+              "key": "2026:3:HOU:IND",
+              "providerId": "1392252",
+              "week": 3,
+              "away": "HOU",
+              "home": "IND",
+              "kickoff": "2026-09-27T17:00:00.000Z",
+              "completedAsOf": "2026-10-15T04:00:10.587Z",
+              "gameId": "2026_03_HOU_IND"
+            },
+            {
+              "key": "2026:4:DAL:HOU",
+              "providerId": "1392273",
+              "week": 4,
+              "away": "DAL",
+              "home": "HOU",
+              "kickoff": "2026-10-04T17:00:00.000Z",
+              "completedAsOf": "2026-10-15T04:00:20.040Z",
+              "gameId": "2026_04_DAL_HOU"
+            },
+            {
+              "key": "2026:5:HOU:TEN",
+              "providerId": "1392282",
+              "week": 5,
+              "away": "HOU",
+              "home": "TEN",
+              "kickoff": "2026-10-11T17:00:00.000Z",
+              "completedAsOf": "2026-10-15T04:00:26.502Z",
+              "gameId": "2026_05_HOU_TEN"
+            }
+          ],
+          "thirdDown": {
+            "offense": {
+              "opportunities": 65,
+              "conversions": 25,
+              "rate": 0.38461538461538464,
+              "buckets": {
+                "short": {
+                  "opportunities": 21,
+                  "conversions": 14,
+                  "rate": 0.6666666666666666
+                },
+                "medium": {
+                  "opportunities": 7,
+                  "conversions": 2,
+                  "rate": 0.2857142857142857
+                },
+                "long": {
+                  "opportunities": 37,
+                  "conversions": 9,
+                  "rate": 0.24324324324324326
+                }
+              }
+            },
+            "defense": {
+              "opportunities": 64,
+              "conversions": 24,
+              "rate": 0.375,
+              "buckets": {
+                "short": {
+                  "opportunities": 12,
+                  "conversions": 8,
+                  "rate": 0.6666666666666666
+                },
+                "medium": {
+                  "opportunities": 21,
+                  "conversions": 10,
+                  "rate": 0.47619047619047616
+                },
+                "long": {
+                  "opportunities": 31,
+                  "conversions": 6,
+                  "rate": 0.1935483870967742
+                }
+              }
+            }
+          },
+          "redZone": {
+            "offense": {
+              "opportunities": 19,
+              "conversions": 10,
+              "rate": 0.5263157894736842
+            },
+            "defense": {
+              "opportunities": 13,
+              "conversions": 8,
+              "rate": 0.6153846153846154
+            }
+          },
+          "league": {
+            "cutoff": "2026-10-16T00:15:00.000Z",
+            "sourceAsOf": "2026-10-15T05:13:31.876Z",
+            "maxWeek": 5,
+            "latestCompletion": "2026-10-15T04:00:26.502Z",
+            "thirdDown": {
+              "opportunities": 1996,
+              "conversions": 795,
+              "rate": 0.3982965931863727
+            },
+            "redZone": {
+              "opportunities": 520,
+              "conversions": 322,
+              "rate": 0.6192307692307693
+            }
+          }
         }
       },
       "CHI": {
@@ -176236,6 +187932,140 @@ const NFLVERSE_TEAM_METRICS = {
             "statusKnown": false
           },
           "issues": []
+        },
+        "situational": {
+          "team": "CHI",
+          "schemaVersion": 1,
+          "season": 2026,
+          "predictionWeek": 6,
+          "cutoff": "2026-10-16T00:15:00.000Z",
+          "sourceAsOf": "2026-10-15T05:13:31.876Z",
+          "gameProvenance": [
+            {
+              "key": "2026:1:CAR:CHI",
+              "providerId": "1392223",
+              "week": 1,
+              "away": "CHI",
+              "home": "CAR",
+              "kickoff": "2026-09-13T17:00:00.000Z",
+              "completedAsOf": "2026-10-15T04:00:03.480Z",
+              "gameId": "2026_01_CHI_CAR"
+            },
+            {
+              "key": "2026:2:CHI:MIN",
+              "providerId": "1392234",
+              "week": 2,
+              "away": "MIN",
+              "home": "CHI",
+              "kickoff": "2026-09-20T17:00:00.000Z",
+              "completedAsOf": "2026-10-15T04:00:04.055Z",
+              "gameId": "2026_02_MIN_CHI"
+            },
+            {
+              "key": "2026:3:CHI:PHI",
+              "providerId": "1392263",
+              "week": 3,
+              "away": "PHI",
+              "home": "CHI",
+              "kickoff": "2026-09-29T00:15:00.000Z",
+              "completedAsOf": "2026-10-15T04:00:10.587Z",
+              "gameId": "2026_03_PHI_CHI"
+            },
+            {
+              "key": "2026:4:CHI:NYJ",
+              "providerId": "1392267",
+              "week": 4,
+              "away": "NYJ",
+              "home": "CHI",
+              "kickoff": "2026-10-04T17:00:00.000Z",
+              "completedAsOf": "2026-10-15T04:00:20.040Z",
+              "gameId": "2026_04_NYJ_CHI"
+            },
+            {
+              "key": "2026:5:CHI:GB",
+              "providerId": "1392290",
+              "week": 5,
+              "away": "CHI",
+              "home": "GB",
+              "kickoff": "2026-10-11T17:00:00.000Z",
+              "completedAsOf": "2026-10-15T04:00:26.502Z",
+              "gameId": "2026_05_CHI_GB"
+            }
+          ],
+          "thirdDown": {
+            "offense": {
+              "opportunities": 70,
+              "conversions": 31,
+              "rate": 0.44285714285714284,
+              "buckets": {
+                "short": {
+                  "opportunities": 26,
+                  "conversions": 12,
+                  "rate": 0.46153846153846156
+                },
+                "medium": {
+                  "opportunities": 23,
+                  "conversions": 14,
+                  "rate": 0.6086956521739131
+                },
+                "long": {
+                  "opportunities": 21,
+                  "conversions": 5,
+                  "rate": 0.23809523809523808
+                }
+              }
+            },
+            "defense": {
+              "opportunities": 50,
+              "conversions": 13,
+              "rate": 0.26,
+              "buckets": {
+                "short": {
+                  "opportunities": 14,
+                  "conversions": 6,
+                  "rate": 0.42857142857142855
+                },
+                "medium": {
+                  "opportunities": 12,
+                  "conversions": 5,
+                  "rate": 0.4166666666666667
+                },
+                "long": {
+                  "opportunities": 24,
+                  "conversions": 2,
+                  "rate": 0.08333333333333333
+                }
+              }
+            }
+          },
+          "redZone": {
+            "offense": {
+              "opportunities": 21,
+              "conversions": 9,
+              "rate": 0.42857142857142855
+            },
+            "defense": {
+              "opportunities": 12,
+              "conversions": 7,
+              "rate": 0.5833333333333334
+            }
+          },
+          "league": {
+            "cutoff": "2026-10-16T00:15:00.000Z",
+            "sourceAsOf": "2026-10-15T05:13:31.876Z",
+            "maxWeek": 5,
+            "latestCompletion": "2026-10-15T04:00:26.502Z",
+            "thirdDown": {
+              "opportunities": 1996,
+              "conversions": 795,
+              "rate": 0.3982965931863727
+            },
+            "redZone": {
+              "opportunities": 520,
+              "conversions": 322,
+              "rate": 0.6192307692307693
+            }
+          }
         }
       },
       "CAR": {
@@ -177537,6 +189367,130 @@ const NFLVERSE_TEAM_METRICS = {
             "statusKnown": false
           },
           "issues": []
+        },
+        "situational": {
+          "team": "CAR",
+          "schemaVersion": 1,
+          "season": 2026,
+          "predictionWeek": 6,
+          "cutoff": "2026-10-16T00:15:00.000Z",
+          "sourceAsOf": "2026-10-15T05:13:31.876Z",
+          "gameProvenance": [
+            {
+              "key": "2026:1:CAR:CHI",
+              "providerId": "1392223",
+              "week": 1,
+              "away": "CHI",
+              "home": "CAR",
+              "kickoff": "2026-09-13T17:00:00.000Z",
+              "completedAsOf": "2026-10-15T04:00:03.480Z",
+              "gameId": "2026_01_CHI_CAR"
+            },
+            {
+              "key": "2026:2:ATL:CAR",
+              "providerId": "1392233",
+              "week": 2,
+              "away": "CAR",
+              "home": "ATL",
+              "kickoff": "2026-09-20T17:00:00.000Z",
+              "completedAsOf": "2026-10-15T04:00:04.055Z",
+              "gameId": "2026_02_CAR_ATL"
+            },
+            {
+              "key": "2026:3:CAR:CLE",
+              "providerId": "1392250",
+              "week": 3,
+              "away": "CAR",
+              "home": "CLE",
+              "kickoff": "2026-09-27T17:00:00.000Z",
+              "completedAsOf": "2026-10-15T04:00:10.587Z",
+              "gameId": "2026_03_CAR_CLE"
+            },
+            {
+              "key": "2026:4:CAR:DET",
+              "providerId": "1392278",
+              "week": 4,
+              "away": "DET",
+              "home": "CAR",
+              "kickoff": "2026-10-05T00:20:00.000Z",
+              "completedAsOf": "2026-10-15T04:00:20.040Z",
+              "gameId": "2026_04_DET_CAR"
+            }
+          ],
+          "thirdDown": {
+            "offense": {
+              "opportunities": 50,
+              "conversions": 19,
+              "rate": 0.38,
+              "buckets": {
+                "short": {
+                  "opportunities": 14,
+                  "conversions": 6,
+                  "rate": 0.42857142857142855
+                },
+                "medium": {
+                  "opportunities": 9,
+                  "conversions": 5,
+                  "rate": 0.5555555555555556
+                },
+                "long": {
+                  "opportunities": 27,
+                  "conversions": 8,
+                  "rate": 0.2962962962962963
+                }
+              }
+            },
+            "defense": {
+              "opportunities": 54,
+              "conversions": 23,
+              "rate": 0.42592592592592593,
+              "buckets": {
+                "short": {
+                  "opportunities": 13,
+                  "conversions": 7,
+                  "rate": 0.5384615384615384
+                },
+                "medium": {
+                  "opportunities": 17,
+                  "conversions": 8,
+                  "rate": 0.47058823529411764
+                },
+                "long": {
+                  "opportunities": 24,
+                  "conversions": 8,
+                  "rate": 0.3333333333333333
+                }
+              }
+            }
+          },
+          "redZone": {
+            "offense": {
+              "opportunities": 17,
+              "conversions": 11,
+              "rate": 0.6470588235294118
+            },
+            "defense": {
+              "opportunities": 11,
+              "conversions": 8,
+              "rate": 0.7272727272727273
+            }
+          },
+          "league": {
+            "cutoff": "2026-10-16T00:15:00.000Z",
+            "sourceAsOf": "2026-10-15T05:13:31.876Z",
+            "maxWeek": 5,
+            "latestCompletion": "2026-10-15T04:00:26.502Z",
+            "thirdDown": {
+              "opportunities": 1996,
+              "conversions": 795,
+              "rate": 0.3982965931863727
+            },
+            "redZone": {
+              "opportunities": 520,
+              "conversions": 322,
+              "rate": 0.6192307692307693
+            }
+          }
         }
       },
       "CLE": {
@@ -178853,6 +190807,140 @@ const NFLVERSE_TEAM_METRICS = {
             "statusKnown": false
           },
           "issues": []
+        },
+        "situational": {
+          "team": "CLE",
+          "schemaVersion": 1,
+          "season": 2026,
+          "predictionWeek": 6,
+          "cutoff": "2026-10-16T00:15:00.000Z",
+          "sourceAsOf": "2026-10-15T05:13:31.876Z",
+          "gameProvenance": [
+            {
+              "key": "2026:1:CLE:JAX",
+              "providerId": "1392224",
+              "week": 1,
+              "away": "CLE",
+              "home": "JAX",
+              "kickoff": "2026-09-13T17:00:00.000Z",
+              "completedAsOf": "2026-10-15T04:00:03.480Z",
+              "gameId": "2026_01_CLE_JAX"
+            },
+            {
+              "key": "2026:2:CLE:TB",
+              "providerId": "1392238",
+              "week": 2,
+              "away": "CLE",
+              "home": "TB",
+              "kickoff": "2026-09-20T17:00:00.000Z",
+              "completedAsOf": "2026-10-15T04:00:04.055Z",
+              "gameId": "2026_02_CLE_TB"
+            },
+            {
+              "key": "2026:3:CAR:CLE",
+              "providerId": "1392250",
+              "week": 3,
+              "away": "CAR",
+              "home": "CLE",
+              "kickoff": "2026-09-27T17:00:00.000Z",
+              "completedAsOf": "2026-10-15T04:00:10.587Z",
+              "gameId": "2026_03_CAR_CLE"
+            },
+            {
+              "key": "2026:4:CLE:PIT",
+              "providerId": "1392264",
+              "week": 4,
+              "away": "PIT",
+              "home": "CLE",
+              "kickoff": "2026-10-02T00:15:00.000Z",
+              "completedAsOf": "2026-10-15T04:00:20.040Z",
+              "gameId": "2026_04_PIT_CLE"
+            },
+            {
+              "key": "2026:5:CLE:NYJ",
+              "providerId": "1392286",
+              "week": 5,
+              "away": "CLE",
+              "home": "NYJ",
+              "kickoff": "2026-10-11T17:00:00.000Z",
+              "completedAsOf": "2026-10-15T04:00:26.502Z",
+              "gameId": "2026_05_CLE_NYJ"
+            }
+          ],
+          "thirdDown": {
+            "offense": {
+              "opportunities": 62,
+              "conversions": 19,
+              "rate": 0.3064516129032258,
+              "buckets": {
+                "short": {
+                  "opportunities": 15,
+                  "conversions": 9,
+                  "rate": 0.6
+                },
+                "medium": {
+                  "opportunities": 12,
+                  "conversions": 5,
+                  "rate": 0.4166666666666667
+                },
+                "long": {
+                  "opportunities": 35,
+                  "conversions": 5,
+                  "rate": 0.14285714285714285
+                }
+              }
+            },
+            "defense": {
+              "opportunities": 70,
+              "conversions": 28,
+              "rate": 0.4,
+              "buckets": {
+                "short": {
+                  "opportunities": 23,
+                  "conversions": 15,
+                  "rate": 0.6521739130434783
+                },
+                "medium": {
+                  "opportunities": 12,
+                  "conversions": 4,
+                  "rate": 0.3333333333333333
+                },
+                "long": {
+                  "opportunities": 35,
+                  "conversions": 9,
+                  "rate": 0.2571428571428571
+                }
+              }
+            }
+          },
+          "redZone": {
+            "offense": {
+              "opportunities": 11,
+              "conversions": 5,
+              "rate": 0.45454545454545453
+            },
+            "defense": {
+              "opportunities": 14,
+              "conversions": 7,
+              "rate": 0.5
+            }
+          },
+          "league": {
+            "cutoff": "2026-10-16T00:15:00.000Z",
+            "sourceAsOf": "2026-10-15T05:13:31.876Z",
+            "maxWeek": 5,
+            "latestCompletion": "2026-10-15T04:00:26.502Z",
+            "thirdDown": {
+              "opportunities": 1996,
+              "conversions": 795,
+              "rate": 0.3982965931863727
+            },
+            "redZone": {
+              "opportunities": 520,
+              "conversions": 322,
+              "rate": 0.6192307692307693
+            }
+          }
         }
       },
       "JAX": {
@@ -180127,6 +192215,140 @@ const NFLVERSE_TEAM_METRICS = {
             "statusKnown": false
           },
           "issues": []
+        },
+        "situational": {
+          "team": "JAX",
+          "schemaVersion": 1,
+          "season": 2026,
+          "predictionWeek": 6,
+          "cutoff": "2026-10-16T00:15:00.000Z",
+          "sourceAsOf": "2026-10-15T05:13:31.876Z",
+          "gameProvenance": [
+            {
+              "key": "2026:1:CLE:JAX",
+              "providerId": "1392224",
+              "week": 1,
+              "away": "CLE",
+              "home": "JAX",
+              "kickoff": "2026-09-13T17:00:00.000Z",
+              "completedAsOf": "2026-10-15T04:00:03.480Z",
+              "gameId": "2026_01_CLE_JAX"
+            },
+            {
+              "key": "2026:2:DEN:JAX",
+              "providerId": "1392241",
+              "week": 2,
+              "away": "JAX",
+              "home": "DEN",
+              "kickoff": "2026-09-20T20:05:00.000Z",
+              "completedAsOf": "2026-10-15T04:00:04.055Z",
+              "gameId": "2026_02_JAX_DEN"
+            },
+            {
+              "key": "2026:3:JAX:NE",
+              "providerId": "1392257",
+              "week": 3,
+              "away": "NE",
+              "home": "JAX",
+              "kickoff": "2026-09-27T17:00:00.000Z",
+              "completedAsOf": "2026-10-15T04:00:10.587Z",
+              "gameId": "2026_03_NE_JAX"
+            },
+            {
+              "key": "2026:4:CIN:JAX",
+              "providerId": "1392268",
+              "week": 4,
+              "away": "JAX",
+              "home": "CIN",
+              "kickoff": "2026-10-04T17:00:00.000Z",
+              "completedAsOf": "2026-10-15T04:00:20.040Z",
+              "gameId": "2026_04_JAX_CIN"
+            },
+            {
+              "key": "2026:5:JAX:PHI",
+              "providerId": "1392281",
+              "week": 5,
+              "away": "PHI",
+              "home": "JAX",
+              "kickoff": "2026-10-11T13:30:00.000Z",
+              "completedAsOf": "2026-10-15T04:00:26.502Z",
+              "gameId": "2026_05_PHI_JAX"
+            }
+          ],
+          "thirdDown": {
+            "offense": {
+              "opportunities": 60,
+              "conversions": 28,
+              "rate": 0.4666666666666667,
+              "buckets": {
+                "short": {
+                  "opportunities": 16,
+                  "conversions": 12,
+                  "rate": 0.75
+                },
+                "medium": {
+                  "opportunities": 13,
+                  "conversions": 7,
+                  "rate": 0.5384615384615384
+                },
+                "long": {
+                  "opportunities": 31,
+                  "conversions": 9,
+                  "rate": 0.2903225806451613
+                }
+              }
+            },
+            "defense": {
+              "opportunities": 57,
+              "conversions": 20,
+              "rate": 0.3508771929824561,
+              "buckets": {
+                "short": {
+                  "opportunities": 18,
+                  "conversions": 6,
+                  "rate": 0.3333333333333333
+                },
+                "medium": {
+                  "opportunities": 9,
+                  "conversions": 4,
+                  "rate": 0.4444444444444444
+                },
+                "long": {
+                  "opportunities": 30,
+                  "conversions": 10,
+                  "rate": 0.3333333333333333
+                }
+              }
+            }
+          },
+          "redZone": {
+            "offense": {
+              "opportunities": 15,
+              "conversions": 10,
+              "rate": 0.6666666666666666
+            },
+            "defense": {
+              "opportunities": 15,
+              "conversions": 5,
+              "rate": 0.3333333333333333
+            }
+          },
+          "league": {
+            "cutoff": "2026-10-16T00:15:00.000Z",
+            "sourceAsOf": "2026-10-15T05:13:31.876Z",
+            "maxWeek": 5,
+            "latestCompletion": "2026-10-15T04:00:26.502Z",
+            "thirdDown": {
+              "opportunities": 1996,
+              "conversions": 795,
+              "rate": 0.3982965931863727
+            },
+            "redZone": {
+              "opportunities": 520,
+              "conversions": 322,
+              "rate": 0.6192307692307693
+            }
+          }
         }
       },
       "DAL": {
@@ -181443,6 +193665,140 @@ const NFLVERSE_TEAM_METRICS = {
             "statusKnown": false
           },
           "issues": []
+        },
+        "situational": {
+          "team": "DAL",
+          "schemaVersion": 1,
+          "season": 2026,
+          "predictionWeek": 6,
+          "cutoff": "2026-10-16T00:15:00.000Z",
+          "sourceAsOf": "2026-10-15T05:13:31.876Z",
+          "gameProvenance": [
+            {
+              "key": "2026:1:DAL:NYG",
+              "providerId": "1392230",
+              "week": 1,
+              "away": "DAL",
+              "home": "NYG",
+              "kickoff": "2026-09-14T00:20:00.000Z",
+              "completedAsOf": "2026-10-15T04:00:03.480Z",
+              "gameId": "2026_01_DAL_NYG"
+            },
+            {
+              "key": "2026:2:DAL:WSH",
+              "providerId": "1392243",
+              "week": 2,
+              "away": "WSH",
+              "home": "DAL",
+              "kickoff": "2026-09-20T20:25:00.000Z",
+              "completedAsOf": "2026-10-15T04:00:04.055Z",
+              "gameId": "2026_02_WAS_DAL"
+            },
+            {
+              "key": "2026:3:BAL:DAL",
+              "providerId": "1392260",
+              "week": 3,
+              "away": "BAL",
+              "home": "DAL",
+              "kickoff": "2026-09-27T20:25:00.000Z",
+              "completedAsOf": "2026-10-15T04:00:10.587Z",
+              "gameId": "2026_03_BAL_DAL"
+            },
+            {
+              "key": "2026:4:DAL:HOU",
+              "providerId": "1392273",
+              "week": 4,
+              "away": "DAL",
+              "home": "HOU",
+              "kickoff": "2026-10-04T17:00:00.000Z",
+              "completedAsOf": "2026-10-15T04:00:20.040Z",
+              "gameId": "2026_04_DAL_HOU"
+            },
+            {
+              "key": "2026:5:DAL:TB",
+              "providerId": "1392280",
+              "week": 5,
+              "away": "TB",
+              "home": "DAL",
+              "kickoff": "2026-10-09T00:15:00.000Z",
+              "completedAsOf": "2026-10-15T04:00:26.502Z",
+              "gameId": "2026_05_TB_DAL"
+            }
+          ],
+          "thirdDown": {
+            "offense": {
+              "opportunities": 59,
+              "conversions": 29,
+              "rate": 0.4915254237288136,
+              "buckets": {
+                "short": {
+                  "opportunities": 19,
+                  "conversions": 13,
+                  "rate": 0.6842105263157895
+                },
+                "medium": {
+                  "opportunities": 20,
+                  "conversions": 8,
+                  "rate": 0.4
+                },
+                "long": {
+                  "opportunities": 20,
+                  "conversions": 8,
+                  "rate": 0.4
+                }
+              }
+            },
+            "defense": {
+              "opportunities": 55,
+              "conversions": 30,
+              "rate": 0.5454545454545454,
+              "buckets": {
+                "short": {
+                  "opportunities": 21,
+                  "conversions": 14,
+                  "rate": 0.6666666666666666
+                },
+                "medium": {
+                  "opportunities": 15,
+                  "conversions": 9,
+                  "rate": 0.6
+                },
+                "long": {
+                  "opportunities": 19,
+                  "conversions": 7,
+                  "rate": 0.3684210526315789
+                }
+              }
+            }
+          },
+          "redZone": {
+            "offense": {
+              "opportunities": 19,
+              "conversions": 15,
+              "rate": 0.7894736842105263
+            },
+            "defense": {
+              "opportunities": 21,
+              "conversions": 15,
+              "rate": 0.7142857142857143
+            }
+          },
+          "league": {
+            "cutoff": "2026-10-16T00:15:00.000Z",
+            "sourceAsOf": "2026-10-15T05:13:31.876Z",
+            "maxWeek": 5,
+            "latestCompletion": "2026-10-15T04:00:26.502Z",
+            "thirdDown": {
+              "opportunities": 1996,
+              "conversions": 795,
+              "rate": 0.3982965931863727
+            },
+            "redZone": {
+              "opportunities": 520,
+              "conversions": 322,
+              "rate": 0.6192307692307693
+            }
+          }
         }
       },
       "NYG": {
@@ -182787,6 +195143,140 @@ const NFLVERSE_TEAM_METRICS = {
             "statusKnown": false
           },
           "issues": []
+        },
+        "situational": {
+          "team": "NYG",
+          "schemaVersion": 1,
+          "season": 2026,
+          "predictionWeek": 6,
+          "cutoff": "2026-10-16T00:15:00.000Z",
+          "sourceAsOf": "2026-10-15T05:13:31.876Z",
+          "gameProvenance": [
+            {
+              "key": "2026:1:DAL:NYG",
+              "providerId": "1392230",
+              "week": 1,
+              "away": "DAL",
+              "home": "NYG",
+              "kickoff": "2026-09-14T00:20:00.000Z",
+              "completedAsOf": "2026-10-15T04:00:03.480Z",
+              "gameId": "2026_01_DAL_NYG"
+            },
+            {
+              "key": "2026:2:LAR:NYG",
+              "providerId": "1392247",
+              "week": 2,
+              "away": "NYG",
+              "home": "LAR",
+              "kickoff": "2026-09-22T00:15:00.000Z",
+              "completedAsOf": "2026-10-15T04:00:04.055Z",
+              "gameId": "2026_02_NYG_LA"
+            },
+            {
+              "key": "2026:3:NYG:TEN",
+              "providerId": "1392254",
+              "week": 3,
+              "away": "TEN",
+              "home": "NYG",
+              "kickoff": "2026-09-27T17:00:00.000Z",
+              "completedAsOf": "2026-10-15T04:00:10.587Z",
+              "gameId": "2026_03_TEN_NYG"
+            },
+            {
+              "key": "2026:4:ARI:NYG",
+              "providerId": "1392269",
+              "week": 4,
+              "away": "ARI",
+              "home": "NYG",
+              "kickoff": "2026-10-04T17:00:00.000Z",
+              "completedAsOf": "2026-10-15T04:00:20.040Z",
+              "gameId": "2026_04_ARI_NYG"
+            },
+            {
+              "key": "2026:5:NYG:WSH",
+              "providerId": "1392288",
+              "week": 5,
+              "away": "NYG",
+              "home": "WSH",
+              "kickoff": "2026-10-11T17:00:00.000Z",
+              "completedAsOf": "2026-10-15T04:00:26.502Z",
+              "gameId": "2026_05_NYG_WAS"
+            }
+          ],
+          "thirdDown": {
+            "offense": {
+              "opportunities": 69,
+              "conversions": 31,
+              "rate": 0.4492753623188406,
+              "buckets": {
+                "short": {
+                  "opportunities": 19,
+                  "conversions": 12,
+                  "rate": 0.631578947368421
+                },
+                "medium": {
+                  "opportunities": 11,
+                  "conversions": 6,
+                  "rate": 0.5454545454545454
+                },
+                "long": {
+                  "opportunities": 39,
+                  "conversions": 13,
+                  "rate": 0.3333333333333333
+                }
+              }
+            },
+            "defense": {
+              "opportunities": 56,
+              "conversions": 26,
+              "rate": 0.4642857142857143,
+              "buckets": {
+                "short": {
+                  "opportunities": 13,
+                  "conversions": 11,
+                  "rate": 0.8461538461538461
+                },
+                "medium": {
+                  "opportunities": 16,
+                  "conversions": 8,
+                  "rate": 0.5
+                },
+                "long": {
+                  "opportunities": 27,
+                  "conversions": 7,
+                  "rate": 0.25925925925925924
+                }
+              }
+            }
+          },
+          "redZone": {
+            "offense": {
+              "opportunities": 14,
+              "conversions": 9,
+              "rate": 0.6428571428571429
+            },
+            "defense": {
+              "opportunities": 13,
+              "conversions": 10,
+              "rate": 0.7692307692307693
+            }
+          },
+          "league": {
+            "cutoff": "2026-10-16T00:15:00.000Z",
+            "sourceAsOf": "2026-10-15T05:13:31.876Z",
+            "maxWeek": 5,
+            "latestCompletion": "2026-10-15T04:00:26.502Z",
+            "thirdDown": {
+              "opportunities": 1996,
+              "conversions": 795,
+              "rate": 0.3982965931863727
+            },
+            "redZone": {
+              "opportunities": 520,
+              "conversions": 322,
+              "rate": 0.6192307692307693
+            }
+          }
         }
       },
       "DEN": {
@@ -184089,6 +196579,140 @@ const NFLVERSE_TEAM_METRICS = {
             "statusKnown": false
           },
           "issues": []
+        },
+        "situational": {
+          "team": "DEN",
+          "schemaVersion": 1,
+          "season": 2026,
+          "predictionWeek": 6,
+          "cutoff": "2026-10-16T00:15:00.000Z",
+          "sourceAsOf": "2026-10-15T05:13:31.876Z",
+          "gameProvenance": [
+            {
+              "key": "2026:1:DEN:KC",
+              "providerId": "1392231",
+              "week": 1,
+              "away": "DEN",
+              "home": "KC",
+              "kickoff": "2026-09-15T00:15:00.000Z",
+              "completedAsOf": "2026-10-15T04:00:03.480Z",
+              "gameId": "2026_01_DEN_KC"
+            },
+            {
+              "key": "2026:2:DEN:JAX",
+              "providerId": "1392241",
+              "week": 2,
+              "away": "JAX",
+              "home": "DEN",
+              "kickoff": "2026-09-20T20:05:00.000Z",
+              "completedAsOf": "2026-10-15T04:00:04.055Z",
+              "gameId": "2026_02_JAX_DEN"
+            },
+            {
+              "key": "2026:3:DEN:LAR",
+              "providerId": "1392262",
+              "week": 3,
+              "away": "LAR",
+              "home": "DEN",
+              "kickoff": "2026-09-28T00:20:00.000Z",
+              "completedAsOf": "2026-10-15T04:00:10.587Z",
+              "gameId": "2026_03_LA_DEN"
+            },
+            {
+              "key": "2026:4:DEN:SF",
+              "providerId": "1392276",
+              "week": 4,
+              "away": "DEN",
+              "home": "SF",
+              "kickoff": "2026-10-04T20:25:00.000Z",
+              "completedAsOf": "2026-10-15T04:00:20.040Z",
+              "gameId": "2026_04_DEN_SF"
+            },
+            {
+              "key": "2026:5:DEN:LAC",
+              "providerId": "1392289",
+              "week": 5,
+              "away": "DEN",
+              "home": "LAC",
+              "kickoff": "2026-10-11T20:05:00.000Z",
+              "completedAsOf": "2026-10-15T04:00:26.502Z",
+              "gameId": "2026_05_DEN_LAC"
+            }
+          ],
+          "thirdDown": {
+            "offense": {
+              "opportunities": 64,
+              "conversions": 22,
+              "rate": 0.34375,
+              "buckets": {
+                "short": {
+                  "opportunities": 20,
+                  "conversions": 12,
+                  "rate": 0.6
+                },
+                "medium": {
+                  "opportunities": 15,
+                  "conversions": 4,
+                  "rate": 0.26666666666666666
+                },
+                "long": {
+                  "opportunities": 29,
+                  "conversions": 6,
+                  "rate": 0.20689655172413793
+                }
+              }
+            },
+            "defense": {
+              "opportunities": 72,
+              "conversions": 33,
+              "rate": 0.4583333333333333,
+              "buckets": {
+                "short": {
+                  "opportunities": 25,
+                  "conversions": 20,
+                  "rate": 0.8
+                },
+                "medium": {
+                  "opportunities": 17,
+                  "conversions": 4,
+                  "rate": 0.23529411764705882
+                },
+                "long": {
+                  "opportunities": 30,
+                  "conversions": 9,
+                  "rate": 0.3
+                }
+              }
+            }
+          },
+          "redZone": {
+            "offense": {
+              "opportunities": 15,
+              "conversions": 9,
+              "rate": 0.6
+            },
+            "defense": {
+              "opportunities": 16,
+              "conversions": 8,
+              "rate": 0.5
+            }
+          },
+          "league": {
+            "cutoff": "2026-10-16T00:15:00.000Z",
+            "sourceAsOf": "2026-10-15T05:13:31.876Z",
+            "maxWeek": 5,
+            "latestCompletion": "2026-10-15T04:00:26.502Z",
+            "thirdDown": {
+              "opportunities": 1996,
+              "conversions": 795,
+              "rate": 0.3982965931863727
+            },
+            "redZone": {
+              "opportunities": 520,
+              "conversions": 322,
+              "rate": 0.6192307692307693
+            }
+          }
         }
       },
       "KC": {
@@ -185376,6 +198000,130 @@ const NFLVERSE_TEAM_METRICS = {
             "statusKnown": false
           },
           "issues": []
+        },
+        "situational": {
+          "team": "KC",
+          "schemaVersion": 1,
+          "season": 2026,
+          "predictionWeek": 6,
+          "cutoff": "2026-10-16T00:15:00.000Z",
+          "sourceAsOf": "2026-10-15T05:13:31.876Z",
+          "gameProvenance": [
+            {
+              "key": "2026:1:DEN:KC",
+              "providerId": "1392231",
+              "week": 1,
+              "away": "DEN",
+              "home": "KC",
+              "kickoff": "2026-09-15T00:15:00.000Z",
+              "completedAsOf": "2026-10-15T04:00:03.480Z",
+              "gameId": "2026_01_DEN_KC"
+            },
+            {
+              "key": "2026:2:IND:KC",
+              "providerId": "1392246",
+              "week": 2,
+              "away": "IND",
+              "home": "KC",
+              "kickoff": "2026-09-21T00:20:00.000Z",
+              "completedAsOf": "2026-10-15T04:00:04.055Z",
+              "gameId": "2026_02_IND_KC"
+            },
+            {
+              "key": "2026:3:KC:MIA",
+              "providerId": "1392253",
+              "week": 3,
+              "away": "KC",
+              "home": "MIA",
+              "kickoff": "2026-09-27T17:00:00.000Z",
+              "completedAsOf": "2026-10-15T04:00:10.587Z",
+              "gameId": "2026_03_KC_MIA"
+            },
+            {
+              "key": "2026:4:KC:LV",
+              "providerId": "1392275",
+              "week": 4,
+              "away": "KC",
+              "home": "LV",
+              "kickoff": "2026-10-04T20:25:00.000Z",
+              "completedAsOf": "2026-10-15T04:00:20.040Z",
+              "gameId": "2026_04_KC_LV"
+            }
+          ],
+          "thirdDown": {
+            "offense": {
+              "opportunities": 49,
+              "conversions": 22,
+              "rate": 0.4489795918367347,
+              "buckets": {
+                "short": {
+                  "opportunities": 20,
+                  "conversions": 12,
+                  "rate": 0.6
+                },
+                "medium": {
+                  "opportunities": 10,
+                  "conversions": 5,
+                  "rate": 0.5
+                },
+                "long": {
+                  "opportunities": 19,
+                  "conversions": 5,
+                  "rate": 0.2631578947368421
+                }
+              }
+            },
+            "defense": {
+              "opportunities": 54,
+              "conversions": 20,
+              "rate": 0.37037037037037035,
+              "buckets": {
+                "short": {
+                  "opportunities": 9,
+                  "conversions": 5,
+                  "rate": 0.5555555555555556
+                },
+                "medium": {
+                  "opportunities": 19,
+                  "conversions": 10,
+                  "rate": 0.5263157894736842
+                },
+                "long": {
+                  "opportunities": 26,
+                  "conversions": 5,
+                  "rate": 0.19230769230769232
+                }
+              }
+            }
+          },
+          "redZone": {
+            "offense": {
+              "opportunities": 19,
+              "conversions": 12,
+              "rate": 0.631578947368421
+            },
+            "defense": {
+              "opportunities": 10,
+              "conversions": 5,
+              "rate": 0.5
+            }
+          },
+          "league": {
+            "cutoff": "2026-10-16T00:15:00.000Z",
+            "sourceAsOf": "2026-10-15T05:13:31.876Z",
+            "maxWeek": 5,
+            "latestCompletion": "2026-10-15T04:00:26.502Z",
+            "thirdDown": {
+              "opportunities": 1996,
+              "conversions": 795,
+              "rate": 0.3982965931863727
+            },
+            "redZone": {
+              "opportunities": 520,
+              "conversions": 322,
+              "rate": 0.6192307692307693
+            }
+          }
         }
       },
       "MIN": {
@@ -186636,6 +199384,140 @@ const NFLVERSE_TEAM_METRICS = {
             "statusKnown": false
           },
           "issues": []
+        },
+        "situational": {
+          "team": "MIN",
+          "schemaVersion": 1,
+          "season": 2026,
+          "predictionWeek": 6,
+          "cutoff": "2026-10-16T00:15:00.000Z",
+          "sourceAsOf": "2026-10-15T05:13:31.876Z",
+          "gameProvenance": [
+            {
+              "key": "2026:1:GB:MIN",
+              "providerId": "1392227",
+              "week": 1,
+              "away": "GB",
+              "home": "MIN",
+              "kickoff": "2026-09-13T20:25:00.000Z",
+              "completedAsOf": "2026-10-15T04:00:03.480Z",
+              "gameId": "2026_01_GB_MIN"
+            },
+            {
+              "key": "2026:2:CHI:MIN",
+              "providerId": "1392234",
+              "week": 2,
+              "away": "MIN",
+              "home": "CHI",
+              "kickoff": "2026-09-20T17:00:00.000Z",
+              "completedAsOf": "2026-10-15T04:00:04.055Z",
+              "gameId": "2026_02_MIN_CHI"
+            },
+            {
+              "key": "2026:3:MIN:TB",
+              "providerId": "1392259",
+              "week": 3,
+              "away": "MIN",
+              "home": "TB",
+              "kickoff": "2026-09-27T20:05:00.000Z",
+              "completedAsOf": "2026-10-15T04:00:10.587Z",
+              "gameId": "2026_03_MIN_TB"
+            },
+            {
+              "key": "2026:4:MIA:MIN",
+              "providerId": "1392274",
+              "week": 4,
+              "away": "MIA",
+              "home": "MIN",
+              "kickoff": "2026-10-04T20:05:00.000Z",
+              "completedAsOf": "2026-10-15T04:00:20.040Z",
+              "gameId": "2026_04_MIA_MIN"
+            },
+            {
+              "key": "2026:5:MIN:NO",
+              "providerId": "1392285",
+              "week": 5,
+              "away": "MIN",
+              "home": "NO",
+              "kickoff": "2026-10-11T17:00:00.000Z",
+              "completedAsOf": "2026-10-15T04:00:26.502Z",
+              "gameId": "2026_05_MIN_NO"
+            }
+          ],
+          "thirdDown": {
+            "offense": {
+              "opportunities": 75,
+              "conversions": 30,
+              "rate": 0.4,
+              "buckets": {
+                "short": {
+                  "opportunities": 19,
+                  "conversions": 12,
+                  "rate": 0.631578947368421
+                },
+                "medium": {
+                  "opportunities": 22,
+                  "conversions": 11,
+                  "rate": 0.5
+                },
+                "long": {
+                  "opportunities": 34,
+                  "conversions": 7,
+                  "rate": 0.20588235294117646
+                }
+              }
+            },
+            "defense": {
+              "opportunities": 63,
+              "conversions": 14,
+              "rate": 0.2222222222222222,
+              "buckets": {
+                "short": {
+                  "opportunities": 12,
+                  "conversions": 6,
+                  "rate": 0.5
+                },
+                "medium": {
+                  "opportunities": 15,
+                  "conversions": 5,
+                  "rate": 0.3333333333333333
+                },
+                "long": {
+                  "opportunities": 36,
+                  "conversions": 3,
+                  "rate": 0.08333333333333333
+                }
+              }
+            }
+          },
+          "redZone": {
+            "offense": {
+              "opportunities": 11,
+              "conversions": 5,
+              "rate": 0.45454545454545453
+            },
+            "defense": {
+              "opportunities": 12,
+              "conversions": 3,
+              "rate": 0.25
+            }
+          },
+          "league": {
+            "cutoff": "2026-10-16T00:15:00.000Z",
+            "sourceAsOf": "2026-10-15T05:13:31.876Z",
+            "maxWeek": 5,
+            "latestCompletion": "2026-10-15T04:00:26.502Z",
+            "thirdDown": {
+              "opportunities": 1996,
+              "conversions": 795,
+              "rate": 0.3982965931863727
+            },
+            "redZone": {
+              "opportunities": 520,
+              "conversions": 322,
+              "rate": 0.6192307692307693
+            }
+          }
         }
       },
       "GB": {
@@ -187966,6 +200848,140 @@ const NFLVERSE_TEAM_METRICS = {
             "statusKnown": false
           },
           "issues": []
+        },
+        "situational": {
+          "team": "GB",
+          "schemaVersion": 1,
+          "season": 2026,
+          "predictionWeek": 6,
+          "cutoff": "2026-10-16T00:15:00.000Z",
+          "sourceAsOf": "2026-10-15T05:13:31.876Z",
+          "gameProvenance": [
+            {
+              "key": "2026:1:GB:MIN",
+              "providerId": "1392227",
+              "week": 1,
+              "away": "GB",
+              "home": "MIN",
+              "kickoff": "2026-09-13T20:25:00.000Z",
+              "completedAsOf": "2026-10-15T04:00:03.480Z",
+              "gameId": "2026_01_GB_MIN"
+            },
+            {
+              "key": "2026:2:GB:NYJ",
+              "providerId": "1392237",
+              "week": 2,
+              "away": "GB",
+              "home": "NYJ",
+              "kickoff": "2026-09-20T17:00:00.000Z",
+              "completedAsOf": "2026-10-15T04:00:04.055Z",
+              "gameId": "2026_02_GB_NYJ"
+            },
+            {
+              "key": "2026:3:ATL:GB",
+              "providerId": "1392248",
+              "week": 3,
+              "away": "ATL",
+              "home": "GB",
+              "kickoff": "2026-09-25T00:15:00.000Z",
+              "completedAsOf": "2026-10-15T04:00:10.587Z",
+              "gameId": "2026_03_ATL_GB"
+            },
+            {
+              "key": "2026:4:GB:TB",
+              "providerId": "1392271",
+              "week": 4,
+              "away": "GB",
+              "home": "TB",
+              "kickoff": "2026-10-04T17:00:00.000Z",
+              "completedAsOf": "2026-10-15T04:00:20.040Z",
+              "gameId": "2026_04_GB_TB"
+            },
+            {
+              "key": "2026:5:CHI:GB",
+              "providerId": "1392290",
+              "week": 5,
+              "away": "CHI",
+              "home": "GB",
+              "kickoff": "2026-10-11T17:00:00.000Z",
+              "completedAsOf": "2026-10-15T04:00:26.502Z",
+              "gameId": "2026_05_CHI_GB"
+            }
+          ],
+          "thirdDown": {
+            "offense": {
+              "opportunities": 57,
+              "conversions": 16,
+              "rate": 0.2807017543859649,
+              "buckets": {
+                "short": {
+                  "opportunities": 15,
+                  "conversions": 9,
+                  "rate": 0.6
+                },
+                "medium": {
+                  "opportunities": 12,
+                  "conversions": 2,
+                  "rate": 0.16666666666666666
+                },
+                "long": {
+                  "opportunities": 30,
+                  "conversions": 5,
+                  "rate": 0.16666666666666666
+                }
+              }
+            },
+            "defense": {
+              "opportunities": 69,
+              "conversions": 31,
+              "rate": 0.4492753623188406,
+              "buckets": {
+                "short": {
+                  "opportunities": 18,
+                  "conversions": 11,
+                  "rate": 0.6111111111111112
+                },
+                "medium": {
+                  "opportunities": 17,
+                  "conversions": 11,
+                  "rate": 0.6470588235294118
+                },
+                "long": {
+                  "opportunities": 34,
+                  "conversions": 9,
+                  "rate": 0.2647058823529412
+                }
+              }
+            }
+          },
+          "redZone": {
+            "offense": {
+              "opportunities": 18,
+              "conversions": 9,
+              "rate": 0.5
+            },
+            "defense": {
+              "opportunities": 18,
+              "conversions": 13,
+              "rate": 0.7222222222222222
+            }
+          },
+          "league": {
+            "cutoff": "2026-10-16T00:15:00.000Z",
+            "sourceAsOf": "2026-10-15T05:13:31.876Z",
+            "maxWeek": 5,
+            "latestCompletion": "2026-10-15T04:00:26.502Z",
+            "thirdDown": {
+              "opportunities": 1996,
+              "conversions": 795,
+              "rate": 0.3982965931863727
+            },
+            "redZone": {
+              "opportunities": 520,
+              "conversions": 322,
+              "rate": 0.6192307692307693
+            }
+          }
         }
       },
       "MIA": {
@@ -189254,6 +202270,140 @@ const NFLVERSE_TEAM_METRICS = {
             "statusKnown": false
           },
           "issues": []
+        },
+        "situational": {
+          "team": "MIA",
+          "schemaVersion": 1,
+          "season": 2026,
+          "predictionWeek": 6,
+          "cutoff": "2026-10-16T00:15:00.000Z",
+          "sourceAsOf": "2026-10-15T05:13:31.876Z",
+          "gameProvenance": [
+            {
+              "key": "2026:1:LV:MIA",
+              "providerId": "1392226",
+              "week": 1,
+              "away": "MIA",
+              "home": "LV",
+              "kickoff": "2026-09-13T20:25:00.000Z",
+              "completedAsOf": "2026-10-15T04:00:03.480Z",
+              "gameId": "2026_01_MIA_LV"
+            },
+            {
+              "key": "2026:2:MIA:SF",
+              "providerId": "1392245",
+              "week": 2,
+              "away": "MIA",
+              "home": "SF",
+              "kickoff": "2026-09-20T20:25:00.000Z",
+              "completedAsOf": "2026-10-15T04:00:04.055Z",
+              "gameId": "2026_02_MIA_SF"
+            },
+            {
+              "key": "2026:3:KC:MIA",
+              "providerId": "1392253",
+              "week": 3,
+              "away": "KC",
+              "home": "MIA",
+              "kickoff": "2026-09-27T17:00:00.000Z",
+              "completedAsOf": "2026-10-15T04:00:10.587Z",
+              "gameId": "2026_03_KC_MIA"
+            },
+            {
+              "key": "2026:4:MIA:MIN",
+              "providerId": "1392274",
+              "week": 4,
+              "away": "MIA",
+              "home": "MIN",
+              "kickoff": "2026-10-04T20:05:00.000Z",
+              "completedAsOf": "2026-10-15T04:00:20.040Z",
+              "gameId": "2026_04_MIA_MIN"
+            },
+            {
+              "key": "2026:5:CIN:MIA",
+              "providerId": "1392283",
+              "week": 5,
+              "away": "CIN",
+              "home": "MIA",
+              "kickoff": "2026-10-11T17:00:00.000Z",
+              "completedAsOf": "2026-10-15T04:00:26.502Z",
+              "gameId": "2026_05_CIN_MIA"
+            }
+          ],
+          "thirdDown": {
+            "offense": {
+              "opportunities": 63,
+              "conversions": 26,
+              "rate": 0.4126984126984127,
+              "buckets": {
+                "short": {
+                  "opportunities": 10,
+                  "conversions": 7,
+                  "rate": 0.7
+                },
+                "medium": {
+                  "opportunities": 20,
+                  "conversions": 12,
+                  "rate": 0.6
+                },
+                "long": {
+                  "opportunities": 33,
+                  "conversions": 7,
+                  "rate": 0.21212121212121213
+                }
+              }
+            },
+            "defense": {
+              "opportunities": 56,
+              "conversions": 30,
+              "rate": 0.5357142857142857,
+              "buckets": {
+                "short": {
+                  "opportunities": 19,
+                  "conversions": 16,
+                  "rate": 0.8421052631578947
+                },
+                "medium": {
+                  "opportunities": 15,
+                  "conversions": 11,
+                  "rate": 0.7333333333333333
+                },
+                "long": {
+                  "opportunities": 22,
+                  "conversions": 3,
+                  "rate": 0.13636363636363635
+                }
+              }
+            }
+          },
+          "redZone": {
+            "offense": {
+              "opportunities": 13,
+              "conversions": 6,
+              "rate": 0.46153846153846156
+            },
+            "defense": {
+              "opportunities": 22,
+              "conversions": 14,
+              "rate": 0.6363636363636364
+            }
+          },
+          "league": {
+            "cutoff": "2026-10-16T00:15:00.000Z",
+            "sourceAsOf": "2026-10-15T05:13:31.876Z",
+            "maxWeek": 5,
+            "latestCompletion": "2026-10-15T04:00:26.502Z",
+            "thirdDown": {
+              "opportunities": 1996,
+              "conversions": 795,
+              "rate": 0.3982965931863727
+            },
+            "redZone": {
+              "opportunities": 520,
+              "conversions": 322,
+              "rate": 0.6192307692307693
+            }
+          }
         }
       },
       "LV": {
@@ -190570,6 +203720,140 @@ const NFLVERSE_TEAM_METRICS = {
             "statusKnown": false
           },
           "issues": []
+        },
+        "situational": {
+          "team": "LV",
+          "schemaVersion": 1,
+          "season": 2026,
+          "predictionWeek": 6,
+          "cutoff": "2026-10-16T00:15:00.000Z",
+          "sourceAsOf": "2026-10-15T05:13:31.876Z",
+          "gameProvenance": [
+            {
+              "key": "2026:1:LV:MIA",
+              "providerId": "1392226",
+              "week": 1,
+              "away": "MIA",
+              "home": "LV",
+              "kickoff": "2026-09-13T20:25:00.000Z",
+              "completedAsOf": "2026-10-15T04:00:03.480Z",
+              "gameId": "2026_01_MIA_LV"
+            },
+            {
+              "key": "2026:2:LAC:LV",
+              "providerId": "1392242",
+              "week": 2,
+              "away": "LV",
+              "home": "LAC",
+              "kickoff": "2026-09-20T20:05:00.000Z",
+              "completedAsOf": "2026-10-15T04:00:04.055Z",
+              "gameId": "2026_02_LV_LAC"
+            },
+            {
+              "key": "2026:3:LV:NO",
+              "providerId": "1392261",
+              "week": 3,
+              "away": "LV",
+              "home": "NO",
+              "kickoff": "2026-09-27T20:25:00.000Z",
+              "completedAsOf": "2026-10-15T04:00:10.587Z",
+              "gameId": "2026_03_LV_NO"
+            },
+            {
+              "key": "2026:4:KC:LV",
+              "providerId": "1392275",
+              "week": 4,
+              "away": "KC",
+              "home": "LV",
+              "kickoff": "2026-10-04T20:25:00.000Z",
+              "completedAsOf": "2026-10-15T04:00:20.040Z",
+              "gameId": "2026_04_KC_LV"
+            },
+            {
+              "key": "2026:5:LV:NE",
+              "providerId": "1392284",
+              "week": 5,
+              "away": "LV",
+              "home": "NE",
+              "kickoff": "2026-10-11T17:00:00.000Z",
+              "completedAsOf": "2026-10-15T04:00:26.502Z",
+              "gameId": "2026_05_LV_NE"
+            }
+          ],
+          "thirdDown": {
+            "offense": {
+              "opportunities": 64,
+              "conversions": 26,
+              "rate": 0.40625,
+              "buckets": {
+                "short": {
+                  "opportunities": 14,
+                  "conversions": 8,
+                  "rate": 0.5714285714285714
+                },
+                "medium": {
+                  "opportunities": 20,
+                  "conversions": 11,
+                  "rate": 0.55
+                },
+                "long": {
+                  "opportunities": 30,
+                  "conversions": 7,
+                  "rate": 0.23333333333333334
+                }
+              }
+            },
+            "defense": {
+              "opportunities": 63,
+              "conversions": 27,
+              "rate": 0.42857142857142855,
+              "buckets": {
+                "short": {
+                  "opportunities": 23,
+                  "conversions": 14,
+                  "rate": 0.6086956521739131
+                },
+                "medium": {
+                  "opportunities": 13,
+                  "conversions": 6,
+                  "rate": 0.46153846153846156
+                },
+                "long": {
+                  "opportunities": 27,
+                  "conversions": 7,
+                  "rate": 0.25925925925925924
+                }
+              }
+            }
+          },
+          "redZone": {
+            "offense": {
+              "opportunities": 20,
+              "conversions": 12,
+              "rate": 0.6
+            },
+            "defense": {
+              "opportunities": 18,
+              "conversions": 13,
+              "rate": 0.7222222222222222
+            }
+          },
+          "league": {
+            "cutoff": "2026-10-16T00:15:00.000Z",
+            "sourceAsOf": "2026-10-15T05:13:31.876Z",
+            "maxWeek": 5,
+            "latestCompletion": "2026-10-15T04:00:26.502Z",
+            "thirdDown": {
+              "opportunities": 1996,
+              "conversions": 795,
+              "rate": 0.3982965931863727
+            },
+            "redZone": {
+              "opportunities": 520,
+              "conversions": 322,
+              "rate": 0.6192307692307693
+            }
+          }
         }
       },
       "SEA": {
@@ -191872,6 +205156,140 @@ const NFLVERSE_TEAM_METRICS = {
             "statusKnown": false
           },
           "issues": []
+        },
+        "situational": {
+          "team": "SEA",
+          "schemaVersion": 1,
+          "season": 2026,
+          "predictionWeek": 6,
+          "cutoff": "2026-10-16T00:15:00.000Z",
+          "sourceAsOf": "2026-10-15T05:13:31.876Z",
+          "gameProvenance": [
+            {
+              "key": "2026:1:NE:SEA",
+              "providerId": "1392216",
+              "week": 1,
+              "away": "NE",
+              "home": "SEA",
+              "kickoff": "2026-09-10T00:20:00.000Z",
+              "completedAsOf": "2026-10-15T04:00:03.480Z",
+              "gameId": "2026_01_NE_SEA"
+            },
+            {
+              "key": "2026:2:ARI:SEA",
+              "providerId": "1392244",
+              "week": 2,
+              "away": "SEA",
+              "home": "ARI",
+              "kickoff": "2026-09-20T20:25:00.000Z",
+              "completedAsOf": "2026-10-15T04:00:04.055Z",
+              "gameId": "2026_02_SEA_ARI"
+            },
+            {
+              "key": "2026:3:SEA:WSH",
+              "providerId": "1392256",
+              "week": 3,
+              "away": "SEA",
+              "home": "WSH",
+              "kickoff": "2026-09-27T17:00:00.000Z",
+              "completedAsOf": "2026-10-15T04:00:10.587Z",
+              "gameId": "2026_03_SEA_WAS"
+            },
+            {
+              "key": "2026:4:LAC:SEA",
+              "providerId": "1392277",
+              "week": 4,
+              "away": "LAC",
+              "home": "SEA",
+              "kickoff": "2026-10-04T20:25:00.000Z",
+              "completedAsOf": "2026-10-15T04:00:20.040Z",
+              "gameId": "2026_04_LAC_SEA"
+            },
+            {
+              "key": "2026:5:SEA:SF",
+              "providerId": "1392292",
+              "week": 5,
+              "away": "SF",
+              "home": "SEA",
+              "kickoff": "2026-10-11T20:25:00.000Z",
+              "completedAsOf": "2026-10-15T04:00:26.502Z",
+              "gameId": "2026_05_SF_SEA"
+            }
+          ],
+          "thirdDown": {
+            "offense": {
+              "opportunities": 57,
+              "conversions": 17,
+              "rate": 0.2982456140350877,
+              "buckets": {
+                "short": {
+                  "opportunities": 12,
+                  "conversions": 5,
+                  "rate": 0.4166666666666667
+                },
+                "medium": {
+                  "opportunities": 13,
+                  "conversions": 6,
+                  "rate": 0.46153846153846156
+                },
+                "long": {
+                  "opportunities": 32,
+                  "conversions": 6,
+                  "rate": 0.1875
+                }
+              }
+            },
+            "defense": {
+              "opportunities": 68,
+              "conversions": 20,
+              "rate": 0.29411764705882354,
+              "buckets": {
+                "short": {
+                  "opportunities": 15,
+                  "conversions": 6,
+                  "rate": 0.4
+                },
+                "medium": {
+                  "opportunities": 22,
+                  "conversions": 5,
+                  "rate": 0.22727272727272727
+                },
+                "long": {
+                  "opportunities": 31,
+                  "conversions": 9,
+                  "rate": 0.2903225806451613
+                }
+              }
+            }
+          },
+          "redZone": {
+            "offense": {
+              "opportunities": 18,
+              "conversions": 11,
+              "rate": 0.6111111111111112
+            },
+            "defense": {
+              "opportunities": 12,
+              "conversions": 9,
+              "rate": 0.75
+            }
+          },
+          "league": {
+            "cutoff": "2026-10-16T00:15:00.000Z",
+            "sourceAsOf": "2026-10-15T05:13:31.876Z",
+            "maxWeek": 5,
+            "latestCompletion": "2026-10-15T04:00:26.502Z",
+            "thirdDown": {
+              "opportunities": 1996,
+              "conversions": 795,
+              "rate": 0.3982965931863727
+            },
+            "redZone": {
+              "opportunities": 520,
+              "conversions": 322,
+              "rate": 0.6192307692307693
+            }
+          }
         }
       },
       "NE": {
@@ -193216,6 +206634,140 @@ const NFLVERSE_TEAM_METRICS = {
             "statusKnown": false
           },
           "issues": []
+        },
+        "situational": {
+          "team": "NE",
+          "schemaVersion": 1,
+          "season": 2026,
+          "predictionWeek": 6,
+          "cutoff": "2026-10-16T00:15:00.000Z",
+          "sourceAsOf": "2026-10-15T05:13:31.876Z",
+          "gameProvenance": [
+            {
+              "key": "2026:1:NE:SEA",
+              "providerId": "1392216",
+              "week": 1,
+              "away": "NE",
+              "home": "SEA",
+              "kickoff": "2026-09-10T00:20:00.000Z",
+              "completedAsOf": "2026-10-15T04:00:03.480Z",
+              "gameId": "2026_01_NE_SEA"
+            },
+            {
+              "key": "2026:2:NE:PIT",
+              "providerId": "1392236",
+              "week": 2,
+              "away": "PIT",
+              "home": "NE",
+              "kickoff": "2026-09-20T17:00:00.000Z",
+              "completedAsOf": "2026-10-15T04:00:04.055Z",
+              "gameId": "2026_02_PIT_NE"
+            },
+            {
+              "key": "2026:3:JAX:NE",
+              "providerId": "1392257",
+              "week": 3,
+              "away": "NE",
+              "home": "JAX",
+              "kickoff": "2026-09-27T17:00:00.000Z",
+              "completedAsOf": "2026-10-15T04:00:10.587Z",
+              "gameId": "2026_03_NE_JAX"
+            },
+            {
+              "key": "2026:4:BUF:NE",
+              "providerId": "1392266",
+              "week": 4,
+              "away": "NE",
+              "home": "BUF",
+              "kickoff": "2026-10-04T17:00:00.000Z",
+              "completedAsOf": "2026-10-15T04:00:20.040Z",
+              "gameId": "2026_04_NE_BUF"
+            },
+            {
+              "key": "2026:5:LV:NE",
+              "providerId": "1392284",
+              "week": 5,
+              "away": "LV",
+              "home": "NE",
+              "kickoff": "2026-10-11T17:00:00.000Z",
+              "completedAsOf": "2026-10-15T04:00:26.502Z",
+              "gameId": "2026_05_LV_NE"
+            }
+          ],
+          "thirdDown": {
+            "offense": {
+              "opportunities": 62,
+              "conversions": 24,
+              "rate": 0.3870967741935484,
+              "buckets": {
+                "short": {
+                  "opportunities": 20,
+                  "conversions": 11,
+                  "rate": 0.55
+                },
+                "medium": {
+                  "opportunities": 16,
+                  "conversions": 8,
+                  "rate": 0.5
+                },
+                "long": {
+                  "opportunities": 26,
+                  "conversions": 5,
+                  "rate": 0.19230769230769232
+                }
+              }
+            },
+            "defense": {
+              "opportunities": 60,
+              "conversions": 23,
+              "rate": 0.38333333333333336,
+              "buckets": {
+                "short": {
+                  "opportunities": 14,
+                  "conversions": 8,
+                  "rate": 0.5714285714285714
+                },
+                "medium": {
+                  "opportunities": 26,
+                  "conversions": 9,
+                  "rate": 0.34615384615384615
+                },
+                "long": {
+                  "opportunities": 20,
+                  "conversions": 6,
+                  "rate": 0.3
+                }
+              }
+            }
+          },
+          "redZone": {
+            "offense": {
+              "opportunities": 16,
+              "conversions": 9,
+              "rate": 0.5625
+            },
+            "defense": {
+              "opportunities": 16,
+              "conversions": 10,
+              "rate": 0.625
+            }
+          },
+          "league": {
+            "cutoff": "2026-10-16T00:15:00.000Z",
+            "sourceAsOf": "2026-10-15T05:13:31.876Z",
+            "maxWeek": 5,
+            "latestCompletion": "2026-10-15T04:00:26.502Z",
+            "thirdDown": {
+              "opportunities": 1996,
+              "conversions": 795,
+              "rate": 0.3982965931863727
+            },
+            "redZone": {
+              "opportunities": 520,
+              "conversions": 322,
+              "rate": 0.6192307692307693
+            }
+          }
         }
       },
       "DET": {
@@ -194518,6 +208070,140 @@ const NFLVERSE_TEAM_METRICS = {
             "statusKnown": false
           },
           "issues": []
+        },
+        "situational": {
+          "team": "DET",
+          "schemaVersion": 1,
+          "season": 2026,
+          "predictionWeek": 6,
+          "cutoff": "2026-10-16T00:15:00.000Z",
+          "sourceAsOf": "2026-10-15T05:13:31.876Z",
+          "gameProvenance": [
+            {
+              "key": "2026:1:DET:NO",
+              "providerId": "1392219",
+              "week": 1,
+              "away": "NO",
+              "home": "DET",
+              "kickoff": "2026-09-13T17:00:00.000Z",
+              "completedAsOf": "2026-10-15T04:00:03.480Z",
+              "gameId": "2026_01_NO_DET"
+            },
+            {
+              "key": "2026:2:BUF:DET",
+              "providerId": "1392232",
+              "week": 2,
+              "away": "DET",
+              "home": "BUF",
+              "kickoff": "2026-09-18T00:15:00.000Z",
+              "completedAsOf": "2026-10-15T04:00:04.055Z",
+              "gameId": "2026_02_DET_BUF"
+            },
+            {
+              "key": "2026:3:DET:NYJ",
+              "providerId": "1392251",
+              "week": 3,
+              "away": "NYJ",
+              "home": "DET",
+              "kickoff": "2026-09-27T17:00:00.000Z",
+              "completedAsOf": "2026-10-15T04:00:10.587Z",
+              "gameId": "2026_03_NYJ_DET"
+            },
+            {
+              "key": "2026:4:CAR:DET",
+              "providerId": "1392278",
+              "week": 4,
+              "away": "DET",
+              "home": "CAR",
+              "kickoff": "2026-10-05T00:20:00.000Z",
+              "completedAsOf": "2026-10-15T04:00:20.040Z",
+              "gameId": "2026_04_DET_CAR"
+            },
+            {
+              "key": "2026:5:ARI:DET",
+              "providerId": "1392291",
+              "week": 5,
+              "away": "DET",
+              "home": "ARI",
+              "kickoff": "2026-10-11T20:25:00.000Z",
+              "completedAsOf": "2026-10-15T04:00:26.502Z",
+              "gameId": "2026_05_DET_ARI"
+            }
+          ],
+          "thirdDown": {
+            "offense": {
+              "opportunities": 59,
+              "conversions": 22,
+              "rate": 0.3728813559322034,
+              "buckets": {
+                "short": {
+                  "opportunities": 16,
+                  "conversions": 7,
+                  "rate": 0.4375
+                },
+                "medium": {
+                  "opportunities": 14,
+                  "conversions": 7,
+                  "rate": 0.5
+                },
+                "long": {
+                  "opportunities": 29,
+                  "conversions": 8,
+                  "rate": 0.27586206896551724
+                }
+              }
+            },
+            "defense": {
+              "opportunities": 70,
+              "conversions": 36,
+              "rate": 0.5142857142857142,
+              "buckets": {
+                "short": {
+                  "opportunities": 25,
+                  "conversions": 17,
+                  "rate": 0.68
+                },
+                "medium": {
+                  "opportunities": 15,
+                  "conversions": 8,
+                  "rate": 0.5333333333333333
+                },
+                "long": {
+                  "opportunities": 30,
+                  "conversions": 11,
+                  "rate": 0.36666666666666664
+                }
+              }
+            }
+          },
+          "redZone": {
+            "offense": {
+              "opportunities": 22,
+              "conversions": 17,
+              "rate": 0.7727272727272727
+            },
+            "defense": {
+              "opportunities": 21,
+              "conversions": 17,
+              "rate": 0.8095238095238095
+            }
+          },
+          "league": {
+            "cutoff": "2026-10-16T00:15:00.000Z",
+            "sourceAsOf": "2026-10-15T05:13:31.876Z",
+            "maxWeek": 5,
+            "latestCompletion": "2026-10-15T04:00:26.502Z",
+            "thirdDown": {
+              "opportunities": 1996,
+              "conversions": 795,
+              "rate": 0.3982965931863727
+            },
+            "redZone": {
+              "opportunities": 520,
+              "conversions": 322,
+              "rate": 0.6192307692307693
+            }
+          }
         }
       },
       "NO": {
@@ -195848,6 +209534,140 @@ const NFLVERSE_TEAM_METRICS = {
             "statusKnown": false
           },
           "issues": []
+        },
+        "situational": {
+          "team": "NO",
+          "schemaVersion": 1,
+          "season": 2026,
+          "predictionWeek": 6,
+          "cutoff": "2026-10-16T00:15:00.000Z",
+          "sourceAsOf": "2026-10-15T05:13:31.876Z",
+          "gameProvenance": [
+            {
+              "key": "2026:1:DET:NO",
+              "providerId": "1392219",
+              "week": 1,
+              "away": "NO",
+              "home": "DET",
+              "kickoff": "2026-09-13T17:00:00.000Z",
+              "completedAsOf": "2026-10-15T04:00:03.480Z",
+              "gameId": "2026_01_NO_DET"
+            },
+            {
+              "key": "2026:2:BAL:NO",
+              "providerId": "1392239",
+              "week": 2,
+              "away": "NO",
+              "home": "BAL",
+              "kickoff": "2026-09-20T17:00:00.000Z",
+              "completedAsOf": "2026-10-15T04:00:04.055Z",
+              "gameId": "2026_02_NO_BAL"
+            },
+            {
+              "key": "2026:3:LV:NO",
+              "providerId": "1392261",
+              "week": 3,
+              "away": "LV",
+              "home": "NO",
+              "kickoff": "2026-09-27T20:25:00.000Z",
+              "completedAsOf": "2026-10-15T04:00:10.587Z",
+              "gameId": "2026_03_LV_NO"
+            },
+            {
+              "key": "2026:4:ATL:NO",
+              "providerId": "1392279",
+              "week": 4,
+              "away": "ATL",
+              "home": "NO",
+              "kickoff": "2026-10-06T00:15:00.000Z",
+              "completedAsOf": "2026-10-15T04:00:20.040Z",
+              "gameId": "2026_04_ATL_NO"
+            },
+            {
+              "key": "2026:5:MIN:NO",
+              "providerId": "1392285",
+              "week": 5,
+              "away": "MIN",
+              "home": "NO",
+              "kickoff": "2026-10-11T17:00:00.000Z",
+              "completedAsOf": "2026-10-15T04:00:26.502Z",
+              "gameId": "2026_05_MIN_NO"
+            }
+          ],
+          "thirdDown": {
+            "offense": {
+              "opportunities": 72,
+              "conversions": 33,
+              "rate": 0.4583333333333333,
+              "buckets": {
+                "short": {
+                  "opportunities": 21,
+                  "conversions": 16,
+                  "rate": 0.7619047619047619
+                },
+                "medium": {
+                  "opportunities": 17,
+                  "conversions": 7,
+                  "rate": 0.4117647058823529
+                },
+                "long": {
+                  "opportunities": 34,
+                  "conversions": 10,
+                  "rate": 0.29411764705882354
+                }
+              }
+            },
+            "defense": {
+              "opportunities": 58,
+              "conversions": 29,
+              "rate": 0.5,
+              "buckets": {
+                "short": {
+                  "opportunities": 19,
+                  "conversions": 13,
+                  "rate": 0.6842105263157895
+                },
+                "medium": {
+                  "opportunities": 16,
+                  "conversions": 9,
+                  "rate": 0.5625
+                },
+                "long": {
+                  "opportunities": 23,
+                  "conversions": 7,
+                  "rate": 0.30434782608695654
+                }
+              }
+            }
+          },
+          "redZone": {
+            "offense": {
+              "opportunities": 17,
+              "conversions": 13,
+              "rate": 0.7647058823529411
+            },
+            "defense": {
+              "opportunities": 21,
+              "conversions": 14,
+              "rate": 0.6666666666666666
+            }
+          },
+          "league": {
+            "cutoff": "2026-10-16T00:15:00.000Z",
+            "sourceAsOf": "2026-10-15T05:13:31.876Z",
+            "maxWeek": 5,
+            "latestCompletion": "2026-10-15T04:00:26.502Z",
+            "thirdDown": {
+              "opportunities": 1996,
+              "conversions": 795,
+              "rate": 0.3982965931863727
+            },
+            "redZone": {
+              "opportunities": 520,
+              "conversions": 322,
+              "rate": 0.6192307692307693
+            }
+          }
         }
       },
       "NYJ": {
@@ -197150,6 +210970,140 @@ const NFLVERSE_TEAM_METRICS = {
             "statusKnown": false
           },
           "issues": []
+        },
+        "situational": {
+          "team": "NYJ",
+          "schemaVersion": 1,
+          "season": 2026,
+          "predictionWeek": 6,
+          "cutoff": "2026-10-16T00:15:00.000Z",
+          "sourceAsOf": "2026-10-15T05:13:31.876Z",
+          "gameProvenance": [
+            {
+              "key": "2026:1:NYJ:TEN",
+              "providerId": "1392220",
+              "week": 1,
+              "away": "NYJ",
+              "home": "TEN",
+              "kickoff": "2026-09-13T17:00:00.000Z",
+              "completedAsOf": "2026-10-15T04:00:03.480Z",
+              "gameId": "2026_01_NYJ_TEN"
+            },
+            {
+              "key": "2026:2:GB:NYJ",
+              "providerId": "1392237",
+              "week": 2,
+              "away": "GB",
+              "home": "NYJ",
+              "kickoff": "2026-09-20T17:00:00.000Z",
+              "completedAsOf": "2026-10-15T04:00:04.055Z",
+              "gameId": "2026_02_GB_NYJ"
+            },
+            {
+              "key": "2026:3:DET:NYJ",
+              "providerId": "1392251",
+              "week": 3,
+              "away": "NYJ",
+              "home": "DET",
+              "kickoff": "2026-09-27T17:00:00.000Z",
+              "completedAsOf": "2026-10-15T04:00:10.587Z",
+              "gameId": "2026_03_NYJ_DET"
+            },
+            {
+              "key": "2026:4:CHI:NYJ",
+              "providerId": "1392267",
+              "week": 4,
+              "away": "NYJ",
+              "home": "CHI",
+              "kickoff": "2026-10-04T17:00:00.000Z",
+              "completedAsOf": "2026-10-15T04:00:20.040Z",
+              "gameId": "2026_04_NYJ_CHI"
+            },
+            {
+              "key": "2026:5:CLE:NYJ",
+              "providerId": "1392286",
+              "week": 5,
+              "away": "CLE",
+              "home": "NYJ",
+              "kickoff": "2026-10-11T17:00:00.000Z",
+              "completedAsOf": "2026-10-15T04:00:26.502Z",
+              "gameId": "2026_05_CLE_NYJ"
+            }
+          ],
+          "thirdDown": {
+            "offense": {
+              "opportunities": 66,
+              "conversions": 24,
+              "rate": 0.36363636363636365,
+              "buckets": {
+                "short": {
+                  "opportunities": 16,
+                  "conversions": 9,
+                  "rate": 0.5625
+                },
+                "medium": {
+                  "opportunities": 16,
+                  "conversions": 7,
+                  "rate": 0.4375
+                },
+                "long": {
+                  "opportunities": 34,
+                  "conversions": 8,
+                  "rate": 0.23529411764705882
+                }
+              }
+            },
+            "defense": {
+              "opportunities": 61,
+              "conversions": 21,
+              "rate": 0.3442622950819672,
+              "buckets": {
+                "short": {
+                  "opportunities": 21,
+                  "conversions": 11,
+                  "rate": 0.5238095238095238
+                },
+                "medium": {
+                  "opportunities": 15,
+                  "conversions": 7,
+                  "rate": 0.4666666666666667
+                },
+                "long": {
+                  "opportunities": 25,
+                  "conversions": 3,
+                  "rate": 0.12
+                }
+              }
+            }
+          },
+          "redZone": {
+            "offense": {
+              "opportunities": 12,
+              "conversions": 6,
+              "rate": 0.5
+            },
+            "defense": {
+              "opportunities": 18,
+              "conversions": 9,
+              "rate": 0.5
+            }
+          },
+          "league": {
+            "cutoff": "2026-10-16T00:15:00.000Z",
+            "sourceAsOf": "2026-10-15T05:13:31.876Z",
+            "maxWeek": 5,
+            "latestCompletion": "2026-10-15T04:00:26.502Z",
+            "thirdDown": {
+              "opportunities": 1996,
+              "conversions": 795,
+              "rate": 0.3982965931863727
+            },
+            "redZone": {
+              "opportunities": 520,
+              "conversions": 322,
+              "rate": 0.6192307692307693
+            }
+          }
         }
       },
       "TEN": {
@@ -198438,6 +212392,140 @@ const NFLVERSE_TEAM_METRICS = {
             "statusKnown": false
           },
           "issues": []
+        },
+        "situational": {
+          "team": "TEN",
+          "schemaVersion": 1,
+          "season": 2026,
+          "predictionWeek": 6,
+          "cutoff": "2026-10-16T00:15:00.000Z",
+          "sourceAsOf": "2026-10-15T05:13:31.876Z",
+          "gameProvenance": [
+            {
+              "key": "2026:1:NYJ:TEN",
+              "providerId": "1392220",
+              "week": 1,
+              "away": "NYJ",
+              "home": "TEN",
+              "kickoff": "2026-09-13T17:00:00.000Z",
+              "completedAsOf": "2026-10-15T04:00:03.480Z",
+              "gameId": "2026_01_NYJ_TEN"
+            },
+            {
+              "key": "2026:2:PHI:TEN",
+              "providerId": "1392235",
+              "week": 2,
+              "away": "PHI",
+              "home": "TEN",
+              "kickoff": "2026-09-20T17:00:00.000Z",
+              "completedAsOf": "2026-10-15T04:00:04.055Z",
+              "gameId": "2026_02_PHI_TEN"
+            },
+            {
+              "key": "2026:3:NYG:TEN",
+              "providerId": "1392254",
+              "week": 3,
+              "away": "TEN",
+              "home": "NYG",
+              "kickoff": "2026-09-27T17:00:00.000Z",
+              "completedAsOf": "2026-10-15T04:00:10.587Z",
+              "gameId": "2026_03_TEN_NYG"
+            },
+            {
+              "key": "2026:4:BAL:TEN",
+              "providerId": "1392272",
+              "week": 4,
+              "away": "TEN",
+              "home": "BAL",
+              "kickoff": "2026-10-04T17:00:00.000Z",
+              "completedAsOf": "2026-10-15T04:00:20.040Z",
+              "gameId": "2026_04_TEN_BAL"
+            },
+            {
+              "key": "2026:5:HOU:TEN",
+              "providerId": "1392282",
+              "week": 5,
+              "away": "HOU",
+              "home": "TEN",
+              "kickoff": "2026-10-11T17:00:00.000Z",
+              "completedAsOf": "2026-10-15T04:00:26.502Z",
+              "gameId": "2026_05_HOU_TEN"
+            }
+          ],
+          "thirdDown": {
+            "offense": {
+              "opportunities": 59,
+              "conversions": 21,
+              "rate": 0.3559322033898305,
+              "buckets": {
+                "short": {
+                  "opportunities": 13,
+                  "conversions": 9,
+                  "rate": 0.6923076923076923
+                },
+                "medium": {
+                  "opportunities": 15,
+                  "conversions": 8,
+                  "rate": 0.5333333333333333
+                },
+                "long": {
+                  "opportunities": 31,
+                  "conversions": 4,
+                  "rate": 0.12903225806451613
+                }
+              }
+            },
+            "defense": {
+              "opportunities": 64,
+              "conversions": 25,
+              "rate": 0.390625,
+              "buckets": {
+                "short": {
+                  "opportunities": 12,
+                  "conversions": 7,
+                  "rate": 0.5833333333333334
+                },
+                "medium": {
+                  "opportunities": 17,
+                  "conversions": 8,
+                  "rate": 0.47058823529411764
+                },
+                "long": {
+                  "opportunities": 35,
+                  "conversions": 10,
+                  "rate": 0.2857142857142857
+                }
+              }
+            }
+          },
+          "redZone": {
+            "offense": {
+              "opportunities": 13,
+              "conversions": 6,
+              "rate": 0.46153846153846156
+            },
+            "defense": {
+              "opportunities": 16,
+              "conversions": 10,
+              "rate": 0.625
+            }
+          },
+          "league": {
+            "cutoff": "2026-10-16T00:15:00.000Z",
+            "sourceAsOf": "2026-10-15T05:13:31.876Z",
+            "maxWeek": 5,
+            "latestCompletion": "2026-10-15T04:00:26.502Z",
+            "thirdDown": {
+              "opportunities": 1996,
+              "conversions": 795,
+              "rate": 0.3982965931863727
+            },
+            "redZone": {
+              "opportunities": 520,
+              "conversions": 322,
+              "rate": 0.6192307692307693
+            }
+          }
         }
       },
       "LAR": {
@@ -199726,6 +213814,140 @@ const NFLVERSE_TEAM_METRICS = {
             "statusKnown": false
           },
           "issues": []
+        },
+        "situational": {
+          "team": "LAR",
+          "schemaVersion": 1,
+          "season": 2026,
+          "predictionWeek": 6,
+          "cutoff": "2026-10-16T00:15:00.000Z",
+          "sourceAsOf": "2026-10-15T05:13:31.876Z",
+          "gameProvenance": [
+            {
+              "key": "2026:1:LAR:SF",
+              "providerId": "1392217",
+              "week": 1,
+              "away": "SF",
+              "home": "LAR",
+              "kickoff": "2026-09-11T00:35:00.000Z",
+              "completedAsOf": "2026-10-15T04:00:03.480Z",
+              "gameId": "2026_01_SF_LA"
+            },
+            {
+              "key": "2026:2:LAR:NYG",
+              "providerId": "1392247",
+              "week": 2,
+              "away": "NYG",
+              "home": "LAR",
+              "kickoff": "2026-09-22T00:15:00.000Z",
+              "completedAsOf": "2026-10-15T04:00:04.055Z",
+              "gameId": "2026_02_NYG_LA"
+            },
+            {
+              "key": "2026:3:DEN:LAR",
+              "providerId": "1392262",
+              "week": 3,
+              "away": "LAR",
+              "home": "DEN",
+              "kickoff": "2026-09-28T00:20:00.000Z",
+              "completedAsOf": "2026-10-15T04:00:10.587Z",
+              "gameId": "2026_03_LA_DEN"
+            },
+            {
+              "key": "2026:4:LAR:PHI",
+              "providerId": "1392270",
+              "week": 4,
+              "away": "LAR",
+              "home": "PHI",
+              "kickoff": "2026-10-04T17:00:00.000Z",
+              "completedAsOf": "2026-10-15T04:00:20.040Z",
+              "gameId": "2026_04_LA_PHI"
+            },
+            {
+              "key": "2026:5:BUF:LAR",
+              "providerId": "1392294",
+              "week": 5,
+              "away": "BUF",
+              "home": "LAR",
+              "kickoff": "2026-10-13T00:15:00.000Z",
+              "completedAsOf": "2026-10-15T04:00:26.502Z",
+              "gameId": "2026_05_BUF_LA"
+            }
+          ],
+          "thirdDown": {
+            "offense": {
+              "opportunities": 64,
+              "conversions": 29,
+              "rate": 0.453125,
+              "buckets": {
+                "short": {
+                  "opportunities": 22,
+                  "conversions": 17,
+                  "rate": 0.7727272727272727
+                },
+                "medium": {
+                  "opportunities": 16,
+                  "conversions": 4,
+                  "rate": 0.25
+                },
+                "long": {
+                  "opportunities": 26,
+                  "conversions": 8,
+                  "rate": 0.3076923076923077
+                }
+              }
+            },
+            "defense": {
+              "opportunities": 58,
+              "conversions": 19,
+              "rate": 0.3275862068965517,
+              "buckets": {
+                "short": {
+                  "opportunities": 22,
+                  "conversions": 10,
+                  "rate": 0.45454545454545453
+                },
+                "medium": {
+                  "opportunities": 15,
+                  "conversions": 5,
+                  "rate": 0.3333333333333333
+                },
+                "long": {
+                  "opportunities": 21,
+                  "conversions": 4,
+                  "rate": 0.19047619047619047
+                }
+              }
+            }
+          },
+          "redZone": {
+            "offense": {
+              "opportunities": 20,
+              "conversions": 13,
+              "rate": 0.65
+            },
+            "defense": {
+              "opportunities": 17,
+              "conversions": 11,
+              "rate": 0.6470588235294118
+            }
+          },
+          "league": {
+            "cutoff": "2026-10-16T00:15:00.000Z",
+            "sourceAsOf": "2026-10-15T05:13:31.876Z",
+            "maxWeek": 5,
+            "latestCompletion": "2026-10-15T04:00:26.502Z",
+            "thirdDown": {
+              "opportunities": 1996,
+              "conversions": 795,
+              "rate": 0.3982965931863727
+            },
+            "redZone": {
+              "opportunities": 520,
+              "conversions": 322,
+              "rate": 0.6192307692307693
+            }
+          }
         }
       },
       "SF": {
@@ -201154,6 +215376,140 @@ const NFLVERSE_TEAM_METRICS = {
             "statusKnown": false
           },
           "issues": []
+        },
+        "situational": {
+          "team": "SF",
+          "schemaVersion": 1,
+          "season": 2026,
+          "predictionWeek": 6,
+          "cutoff": "2026-10-16T00:15:00.000Z",
+          "sourceAsOf": "2026-10-15T05:13:31.876Z",
+          "gameProvenance": [
+            {
+              "key": "2026:1:LAR:SF",
+              "providerId": "1392217",
+              "week": 1,
+              "away": "SF",
+              "home": "LAR",
+              "kickoff": "2026-09-11T00:35:00.000Z",
+              "completedAsOf": "2026-10-15T04:00:03.480Z",
+              "gameId": "2026_01_SF_LA"
+            },
+            {
+              "key": "2026:2:MIA:SF",
+              "providerId": "1392245",
+              "week": 2,
+              "away": "MIA",
+              "home": "SF",
+              "kickoff": "2026-09-20T20:25:00.000Z",
+              "completedAsOf": "2026-10-15T04:00:04.055Z",
+              "gameId": "2026_02_MIA_SF"
+            },
+            {
+              "key": "2026:3:ARI:SF",
+              "providerId": "1392258",
+              "week": 3,
+              "away": "ARI",
+              "home": "SF",
+              "kickoff": "2026-09-27T20:05:00.000Z",
+              "completedAsOf": "2026-10-15T04:00:10.587Z",
+              "gameId": "2026_03_ARI_SF"
+            },
+            {
+              "key": "2026:4:DEN:SF",
+              "providerId": "1392276",
+              "week": 4,
+              "away": "DEN",
+              "home": "SF",
+              "kickoff": "2026-10-04T20:25:00.000Z",
+              "completedAsOf": "2026-10-15T04:00:20.040Z",
+              "gameId": "2026_04_DEN_SF"
+            },
+            {
+              "key": "2026:5:SEA:SF",
+              "providerId": "1392292",
+              "week": 5,
+              "away": "SF",
+              "home": "SEA",
+              "kickoff": "2026-10-11T20:25:00.000Z",
+              "completedAsOf": "2026-10-15T04:00:26.502Z",
+              "gameId": "2026_05_SF_SEA"
+            }
+          ],
+          "thirdDown": {
+            "offense": {
+              "opportunities": 52,
+              "conversions": 27,
+              "rate": 0.5192307692307693,
+              "buckets": {
+                "short": {
+                  "opportunities": 21,
+                  "conversions": 13,
+                  "rate": 0.6190476190476191
+                },
+                "medium": {
+                  "opportunities": 16,
+                  "conversions": 7,
+                  "rate": 0.4375
+                },
+                "long": {
+                  "opportunities": 15,
+                  "conversions": 7,
+                  "rate": 0.4666666666666667
+                }
+              }
+            },
+            "defense": {
+              "opportunities": 71,
+              "conversions": 29,
+              "rate": 0.4084507042253521,
+              "buckets": {
+                "short": {
+                  "opportunities": 20,
+                  "conversions": 16,
+                  "rate": 0.8
+                },
+                "medium": {
+                  "opportunities": 13,
+                  "conversions": 7,
+                  "rate": 0.5384615384615384
+                },
+                "long": {
+                  "opportunities": 38,
+                  "conversions": 6,
+                  "rate": 0.15789473684210525
+                }
+              }
+            }
+          },
+          "redZone": {
+            "offense": {
+              "opportunities": 17,
+              "conversions": 15,
+              "rate": 0.8823529411764706
+            },
+            "defense": {
+              "opportunities": 14,
+              "conversions": 7,
+              "rate": 0.5
+            }
+          },
+          "league": {
+            "cutoff": "2026-10-16T00:15:00.000Z",
+            "sourceAsOf": "2026-10-15T05:13:31.876Z",
+            "maxWeek": 5,
+            "latestCompletion": "2026-10-15T04:00:26.502Z",
+            "thirdDown": {
+              "opportunities": 1996,
+              "conversions": 795,
+              "rate": 0.3982965931863727
+            },
+            "redZone": {
+              "opportunities": 520,
+              "conversions": 322,
+              "rate": 0.6192307692307693
+            }
+          }
         }
       },
       "TB": {
@@ -202372,6 +216728,140 @@ const NFLVERSE_TEAM_METRICS = {
             "statusKnown": false
           },
           "issues": []
+        },
+        "situational": {
+          "team": "TB",
+          "schemaVersion": 1,
+          "season": 2026,
+          "predictionWeek": 6,
+          "cutoff": "2026-10-16T00:15:00.000Z",
+          "sourceAsOf": "2026-10-15T05:13:31.876Z",
+          "gameProvenance": [
+            {
+              "key": "2026:1:CIN:TB",
+              "providerId": "1392218",
+              "week": 1,
+              "away": "TB",
+              "home": "CIN",
+              "kickoff": "2026-09-13T17:00:00.000Z",
+              "completedAsOf": "2026-10-15T04:00:03.480Z",
+              "gameId": "2026_01_TB_CIN"
+            },
+            {
+              "key": "2026:2:CLE:TB",
+              "providerId": "1392238",
+              "week": 2,
+              "away": "CLE",
+              "home": "TB",
+              "kickoff": "2026-09-20T17:00:00.000Z",
+              "completedAsOf": "2026-10-15T04:00:04.055Z",
+              "gameId": "2026_02_CLE_TB"
+            },
+            {
+              "key": "2026:3:MIN:TB",
+              "providerId": "1392259",
+              "week": 3,
+              "away": "MIN",
+              "home": "TB",
+              "kickoff": "2026-09-27T20:05:00.000Z",
+              "completedAsOf": "2026-10-15T04:00:10.587Z",
+              "gameId": "2026_03_MIN_TB"
+            },
+            {
+              "key": "2026:4:GB:TB",
+              "providerId": "1392271",
+              "week": 4,
+              "away": "GB",
+              "home": "TB",
+              "kickoff": "2026-10-04T17:00:00.000Z",
+              "completedAsOf": "2026-10-15T04:00:20.040Z",
+              "gameId": "2026_04_GB_TB"
+            },
+            {
+              "key": "2026:5:DAL:TB",
+              "providerId": "1392280",
+              "week": 5,
+              "away": "TB",
+              "home": "DAL",
+              "kickoff": "2026-10-09T00:15:00.000Z",
+              "completedAsOf": "2026-10-15T04:00:26.502Z",
+              "gameId": "2026_05_TB_DAL"
+            }
+          ],
+          "thirdDown": {
+            "offense": {
+              "opportunities": 68,
+              "conversions": 26,
+              "rate": 0.38235294117647056,
+              "buckets": {
+                "short": {
+                  "opportunities": 22,
+                  "conversions": 14,
+                  "rate": 0.6363636363636364
+                },
+                "medium": {
+                  "opportunities": 12,
+                  "conversions": 5,
+                  "rate": 0.4166666666666667
+                },
+                "long": {
+                  "opportunities": 34,
+                  "conversions": 7,
+                  "rate": 0.20588235294117646
+                }
+              }
+            },
+            "defense": {
+              "opportunities": 61,
+              "conversions": 21,
+              "rate": 0.3442622950819672,
+              "buckets": {
+                "short": {
+                  "opportunities": 19,
+                  "conversions": 14,
+                  "rate": 0.7368421052631579
+                },
+                "medium": {
+                  "opportunities": 16,
+                  "conversions": 2,
+                  "rate": 0.125
+                },
+                "long": {
+                  "opportunities": 26,
+                  "conversions": 5,
+                  "rate": 0.19230769230769232
+                }
+              }
+            }
+          },
+          "redZone": {
+            "offense": {
+              "opportunities": 16,
+              "conversions": 8,
+              "rate": 0.5
+            },
+            "defense": {
+              "opportunities": 13,
+              "conversions": 7,
+              "rate": 0.5384615384615384
+            }
+          },
+          "league": {
+            "cutoff": "2026-10-16T00:15:00.000Z",
+            "sourceAsOf": "2026-10-15T05:13:31.876Z",
+            "maxWeek": 5,
+            "latestCompletion": "2026-10-15T04:00:26.502Z",
+            "thirdDown": {
+              "opportunities": 1996,
+              "conversions": 795,
+              "rate": 0.3982965931863727
+            },
+            "redZone": {
+              "opportunities": 520,
+              "conversions": 322,
+              "rate": 0.6192307692307693
+            }
+          }
         }
       },
       "CIN": {
@@ -203604,6 +218094,140 @@ const NFLVERSE_TEAM_METRICS = {
             "statusKnown": false
           },
           "issues": []
+        },
+        "situational": {
+          "team": "CIN",
+          "schemaVersion": 1,
+          "season": 2026,
+          "predictionWeek": 6,
+          "cutoff": "2026-10-16T00:15:00.000Z",
+          "sourceAsOf": "2026-10-15T05:13:31.876Z",
+          "gameProvenance": [
+            {
+              "key": "2026:1:CIN:TB",
+              "providerId": "1392218",
+              "week": 1,
+              "away": "TB",
+              "home": "CIN",
+              "kickoff": "2026-09-13T17:00:00.000Z",
+              "completedAsOf": "2026-10-15T04:00:03.480Z",
+              "gameId": "2026_01_TB_CIN"
+            },
+            {
+              "key": "2026:2:CIN:HOU",
+              "providerId": "1392240",
+              "week": 2,
+              "away": "CIN",
+              "home": "HOU",
+              "kickoff": "2026-09-20T17:00:00.000Z",
+              "completedAsOf": "2026-10-15T04:00:04.055Z",
+              "gameId": "2026_02_CIN_HOU"
+            },
+            {
+              "key": "2026:3:CIN:PIT",
+              "providerId": "1392255",
+              "week": 3,
+              "away": "CIN",
+              "home": "PIT",
+              "kickoff": "2026-09-27T17:00:00.000Z",
+              "completedAsOf": "2026-10-15T04:00:10.587Z",
+              "gameId": "2026_03_CIN_PIT"
+            },
+            {
+              "key": "2026:4:CIN:JAX",
+              "providerId": "1392268",
+              "week": 4,
+              "away": "JAX",
+              "home": "CIN",
+              "kickoff": "2026-10-04T17:00:00.000Z",
+              "completedAsOf": "2026-10-15T04:00:20.040Z",
+              "gameId": "2026_04_JAX_CIN"
+            },
+            {
+              "key": "2026:5:CIN:MIA",
+              "providerId": "1392283",
+              "week": 5,
+              "away": "CIN",
+              "home": "MIA",
+              "kickoff": "2026-10-11T17:00:00.000Z",
+              "completedAsOf": "2026-10-15T04:00:26.502Z",
+              "gameId": "2026_05_CIN_MIA"
+            }
+          ],
+          "thirdDown": {
+            "offense": {
+              "opportunities": 66,
+              "conversions": 33,
+              "rate": 0.5,
+              "buckets": {
+                "short": {
+                  "opportunities": 23,
+                  "conversions": 15,
+                  "rate": 0.6521739130434783
+                },
+                "medium": {
+                  "opportunities": 17,
+                  "conversions": 8,
+                  "rate": 0.47058823529411764
+                },
+                "long": {
+                  "opportunities": 26,
+                  "conversions": 10,
+                  "rate": 0.38461538461538464
+                }
+              }
+            },
+            "defense": {
+              "opportunities": 63,
+              "conversions": 29,
+              "rate": 0.4603174603174603,
+              "buckets": {
+                "short": {
+                  "opportunities": 15,
+                  "conversions": 13,
+                  "rate": 0.8666666666666667
+                },
+                "medium": {
+                  "opportunities": 16,
+                  "conversions": 8,
+                  "rate": 0.5
+                },
+                "long": {
+                  "opportunities": 32,
+                  "conversions": 8,
+                  "rate": 0.25
+                }
+              }
+            }
+          },
+          "redZone": {
+            "offense": {
+              "opportunities": 17,
+              "conversions": 9,
+              "rate": 0.5294117647058824
+            },
+            "defense": {
+              "opportunities": 18,
+              "conversions": 8,
+              "rate": 0.4444444444444444
+            }
+          },
+          "league": {
+            "cutoff": "2026-10-16T00:15:00.000Z",
+            "sourceAsOf": "2026-10-15T05:13:31.876Z",
+            "maxWeek": 5,
+            "latestCompletion": "2026-10-15T04:00:26.502Z",
+            "thirdDown": {
+              "opportunities": 1996,
+              "conversions": 795,
+              "rate": 0.3982965931863727
+            },
+            "redZone": {
+              "opportunities": 520,
+              "conversions": 322,
+              "rate": 0.6192307692307693
+            }
+          }
         }
       },
       "WSH": {
@@ -204850,6 +219474,140 @@ const NFLVERSE_TEAM_METRICS = {
             "statusKnown": false
           },
           "issues": []
+        },
+        "situational": {
+          "team": "WSH",
+          "schemaVersion": 1,
+          "season": 2026,
+          "predictionWeek": 6,
+          "cutoff": "2026-10-16T00:15:00.000Z",
+          "sourceAsOf": "2026-10-15T05:13:31.876Z",
+          "gameProvenance": [
+            {
+              "key": "2026:1:PHI:WSH",
+              "providerId": "1392228",
+              "week": 1,
+              "away": "WSH",
+              "home": "PHI",
+              "kickoff": "2026-09-13T20:25:00.000Z",
+              "completedAsOf": "2026-10-15T04:00:03.480Z",
+              "gameId": "2026_01_WAS_PHI"
+            },
+            {
+              "key": "2026:2:DAL:WSH",
+              "providerId": "1392243",
+              "week": 2,
+              "away": "WSH",
+              "home": "DAL",
+              "kickoff": "2026-09-20T20:25:00.000Z",
+              "completedAsOf": "2026-10-15T04:00:04.055Z",
+              "gameId": "2026_02_WAS_DAL"
+            },
+            {
+              "key": "2026:3:SEA:WSH",
+              "providerId": "1392256",
+              "week": 3,
+              "away": "SEA",
+              "home": "WSH",
+              "kickoff": "2026-09-27T17:00:00.000Z",
+              "completedAsOf": "2026-10-15T04:00:10.587Z",
+              "gameId": "2026_03_SEA_WAS"
+            },
+            {
+              "key": "2026:4:IND:WSH",
+              "providerId": "1392265",
+              "week": 4,
+              "away": "IND",
+              "home": "WSH",
+              "kickoff": "2026-10-04T13:30:00.000Z",
+              "completedAsOf": "2026-10-15T04:00:20.040Z",
+              "gameId": "2026_04_IND_WAS"
+            },
+            {
+              "key": "2026:5:NYG:WSH",
+              "providerId": "1392288",
+              "week": 5,
+              "away": "NYG",
+              "home": "WSH",
+              "kickoff": "2026-10-11T17:00:00.000Z",
+              "completedAsOf": "2026-10-15T04:00:26.502Z",
+              "gameId": "2026_05_NYG_WAS"
+            }
+          ],
+          "thirdDown": {
+            "offense": {
+              "opportunities": 69,
+              "conversions": 22,
+              "rate": 0.3188405797101449,
+              "buckets": {
+                "short": {
+                  "opportunities": 14,
+                  "conversions": 9,
+                  "rate": 0.6428571428571429
+                },
+                "medium": {
+                  "opportunities": 13,
+                  "conversions": 4,
+                  "rate": 0.3076923076923077
+                },
+                "long": {
+                  "opportunities": 42,
+                  "conversions": 9,
+                  "rate": 0.21428571428571427
+                }
+              }
+            },
+            "defense": {
+              "opportunities": 66,
+              "conversions": 29,
+              "rate": 0.4393939393939394,
+              "buckets": {
+                "short": {
+                  "opportunities": 21,
+                  "conversions": 14,
+                  "rate": 0.6666666666666666
+                },
+                "medium": {
+                  "opportunities": 14,
+                  "conversions": 8,
+                  "rate": 0.5714285714285714
+                },
+                "long": {
+                  "opportunities": 31,
+                  "conversions": 7,
+                  "rate": 0.22580645161290322
+                }
+              }
+            }
+          },
+          "redZone": {
+            "offense": {
+              "opportunities": 14,
+              "conversions": 8,
+              "rate": 0.5714285714285714
+            },
+            "defense": {
+              "opportunities": 18,
+              "conversions": 15,
+              "rate": 0.8333333333333334
+            }
+          },
+          "league": {
+            "cutoff": "2026-10-16T00:15:00.000Z",
+            "sourceAsOf": "2026-10-15T05:13:31.876Z",
+            "maxWeek": 5,
+            "latestCompletion": "2026-10-15T04:00:26.502Z",
+            "thirdDown": {
+              "opportunities": 1996,
+              "conversions": 795,
+              "rate": 0.3982965931863727
+            },
+            "redZone": {
+              "opportunities": 520,
+              "conversions": 322,
+              "rate": 0.6192307692307693
+            }
+          }
         }
       },
       "PHI": {
@@ -206124,8 +220882,889 @@ const NFLVERSE_TEAM_METRICS = {
             "statusKnown": false
           },
           "issues": []
+        },
+        "situational": {
+          "team": "PHI",
+          "schemaVersion": 1,
+          "season": 2026,
+          "predictionWeek": 6,
+          "cutoff": "2026-10-16T00:15:00.000Z",
+          "sourceAsOf": "2026-10-15T05:13:31.876Z",
+          "gameProvenance": [
+            {
+              "key": "2026:1:PHI:WSH",
+              "providerId": "1392228",
+              "week": 1,
+              "away": "WSH",
+              "home": "PHI",
+              "kickoff": "2026-09-13T20:25:00.000Z",
+              "completedAsOf": "2026-10-15T04:00:03.480Z",
+              "gameId": "2026_01_WAS_PHI"
+            },
+            {
+              "key": "2026:2:PHI:TEN",
+              "providerId": "1392235",
+              "week": 2,
+              "away": "PHI",
+              "home": "TEN",
+              "kickoff": "2026-09-20T17:00:00.000Z",
+              "completedAsOf": "2026-10-15T04:00:04.055Z",
+              "gameId": "2026_02_PHI_TEN"
+            },
+            {
+              "key": "2026:3:CHI:PHI",
+              "providerId": "1392263",
+              "week": 3,
+              "away": "PHI",
+              "home": "CHI",
+              "kickoff": "2026-09-29T00:15:00.000Z",
+              "completedAsOf": "2026-10-15T04:00:10.587Z",
+              "gameId": "2026_03_PHI_CHI"
+            },
+            {
+              "key": "2026:4:LAR:PHI",
+              "providerId": "1392270",
+              "week": 4,
+              "away": "LAR",
+              "home": "PHI",
+              "kickoff": "2026-10-04T17:00:00.000Z",
+              "completedAsOf": "2026-10-15T04:00:20.040Z",
+              "gameId": "2026_04_LA_PHI"
+            },
+            {
+              "key": "2026:5:JAX:PHI",
+              "providerId": "1392281",
+              "week": 5,
+              "away": "PHI",
+              "home": "JAX",
+              "kickoff": "2026-10-11T13:30:00.000Z",
+              "completedAsOf": "2026-10-15T04:00:26.502Z",
+              "gameId": "2026_05_PHI_JAX"
+            }
+          ],
+          "thirdDown": {
+            "offense": {
+              "opportunities": 68,
+              "conversions": 25,
+              "rate": 0.36764705882352944,
+              "buckets": {
+                "short": {
+                  "opportunities": 14,
+                  "conversions": 5,
+                  "rate": 0.35714285714285715
+                },
+                "medium": {
+                  "opportunities": 18,
+                  "conversions": 10,
+                  "rate": 0.5555555555555556
+                },
+                "long": {
+                  "opportunities": 36,
+                  "conversions": 10,
+                  "rate": 0.2777777777777778
+                }
+              }
+            },
+            "defense": {
+              "opportunities": 73,
+              "conversions": 28,
+              "rate": 0.3835616438356164,
+              "buckets": {
+                "short": {
+                  "opportunities": 23,
+                  "conversions": 16,
+                  "rate": 0.6956521739130435
+                },
+                "medium": {
+                  "opportunities": 10,
+                  "conversions": 4,
+                  "rate": 0.4
+                },
+                "long": {
+                  "opportunities": 40,
+                  "conversions": 8,
+                  "rate": 0.2
+                }
+              }
+            }
+          },
+          "redZone": {
+            "offense": {
+              "opportunities": 14,
+              "conversions": 9,
+              "rate": 0.6428571428571429
+            },
+            "defense": {
+              "opportunities": 18,
+              "conversions": 10,
+              "rate": 0.5555555555555556
+            }
+          },
+          "league": {
+            "cutoff": "2026-10-16T00:15:00.000Z",
+            "sourceAsOf": "2026-10-15T05:13:31.876Z",
+            "maxWeek": 5,
+            "latestCompletion": "2026-10-15T04:00:26.502Z",
+            "thirdDown": {
+              "opportunities": 1996,
+              "conversions": 795,
+              "rate": 0.3982965931863727
+            },
+            "redZone": {
+              "opportunities": 520,
+              "conversions": 322,
+              "rate": 0.6192307692307693
+            }
+          }
         }
       }
+    }
+  },
+  "situationalAuditsByWeek": {
+    "2": {
+      "coverage": {
+        "season": {
+          "present": true,
+          "nonNull": 13842,
+          "rows": 13842
+        },
+        "season_type": {
+          "present": true,
+          "nonNull": 13842,
+          "rows": 13842
+        },
+        "week": {
+          "present": true,
+          "nonNull": 13842,
+          "rows": 13842
+        },
+        "game_id": {
+          "present": true,
+          "nonNull": 13842,
+          "rows": 13842
+        },
+        "play_id": {
+          "present": true,
+          "nonNull": 13842,
+          "rows": 13842
+        },
+        "posteam": {
+          "present": true,
+          "nonNull": 13089,
+          "rows": 13842
+        },
+        "defteam": {
+          "present": true,
+          "nonNull": 13089,
+          "rows": 13842
+        },
+        "play_type": {
+          "present": true,
+          "nonNull": 13438,
+          "rows": 13842
+        },
+        "down": {
+          "present": true,
+          "nonNull": 11613,
+          "rows": 13842
+        },
+        "ydstogo": {
+          "present": true,
+          "nonNull": 13842,
+          "rows": 13842
+        },
+        "third_down_converted": {
+          "present": true,
+          "nonNull": 13426,
+          "rows": 13842
+        },
+        "third_down_failed": {
+          "present": true,
+          "nonNull": 13426,
+          "rows": 13842
+        },
+        "fixed_drive": {
+          "present": true,
+          "nonNull": 13842,
+          "rows": 13842
+        },
+        "fixed_drive_result": {
+          "present": true,
+          "nonNull": 13840,
+          "rows": 13842
+        },
+        "yardline_100": {
+          "present": true,
+          "nonNull": 12855,
+          "rows": 13842
+        },
+        "touchdown": {
+          "present": true,
+          "nonNull": 13426,
+          "rows": 13842
+        },
+        "td_team": {
+          "present": true,
+          "nonNull": 411,
+          "rows": 13842
+        },
+        "penalty": {
+          "present": true,
+          "nonNull": 13426,
+          "rows": 13842
+        },
+        "no_play": {
+          "present": false,
+          "nonNull": 0,
+          "rows": 13842
+        },
+        "game_status": {
+          "present": false,
+          "nonNull": 0,
+          "rows": 13842
+        },
+        "game_date": {
+          "present": true,
+          "nonNull": 13842,
+          "rows": 13842
+        },
+        "yards_gained": {
+          "present": true,
+          "nonNull": 13426,
+          "rows": 13842
+        },
+        "desc": {
+          "present": true,
+          "nonNull": 13842,
+          "rows": 13842
+        },
+        "drive": {
+          "present": true,
+          "nonNull": 13691,
+          "rows": 13842
+        },
+        "drive_result": {
+          "present": false,
+          "nonNull": 0,
+          "rows": 13842
+        },
+        "drive_end_transition": {
+          "present": true,
+          "nonNull": 13691,
+          "rows": 13842
+        },
+        "drive_ended_with_score": {
+          "present": true,
+          "nonNull": 13691,
+          "rows": 13842
+        }
+      },
+      "eligibleGames": 0,
+      "eligiblePlays": 0,
+      "excluded": {
+        "duplicatePlays": 0,
+        "mismatchedGames": 0,
+        "unresolvedThirdDowns": 0,
+        "unresolvedRedZoneDrives": 0
+      },
+      "sourceAsOf": "2026-10-15T05:13:31.876Z",
+      "cutoff": "2026-09-18T00:15:00.000Z"
+    },
+    "3": {
+      "coverage": {
+        "season": {
+          "present": true,
+          "nonNull": 13842,
+          "rows": 13842
+        },
+        "season_type": {
+          "present": true,
+          "nonNull": 13842,
+          "rows": 13842
+        },
+        "week": {
+          "present": true,
+          "nonNull": 13842,
+          "rows": 13842
+        },
+        "game_id": {
+          "present": true,
+          "nonNull": 13842,
+          "rows": 13842
+        },
+        "play_id": {
+          "present": true,
+          "nonNull": 13842,
+          "rows": 13842
+        },
+        "posteam": {
+          "present": true,
+          "nonNull": 13089,
+          "rows": 13842
+        },
+        "defteam": {
+          "present": true,
+          "nonNull": 13089,
+          "rows": 13842
+        },
+        "play_type": {
+          "present": true,
+          "nonNull": 13438,
+          "rows": 13842
+        },
+        "down": {
+          "present": true,
+          "nonNull": 11613,
+          "rows": 13842
+        },
+        "ydstogo": {
+          "present": true,
+          "nonNull": 13842,
+          "rows": 13842
+        },
+        "third_down_converted": {
+          "present": true,
+          "nonNull": 13426,
+          "rows": 13842
+        },
+        "third_down_failed": {
+          "present": true,
+          "nonNull": 13426,
+          "rows": 13842
+        },
+        "fixed_drive": {
+          "present": true,
+          "nonNull": 13842,
+          "rows": 13842
+        },
+        "fixed_drive_result": {
+          "present": true,
+          "nonNull": 13840,
+          "rows": 13842
+        },
+        "yardline_100": {
+          "present": true,
+          "nonNull": 12855,
+          "rows": 13842
+        },
+        "touchdown": {
+          "present": true,
+          "nonNull": 13426,
+          "rows": 13842
+        },
+        "td_team": {
+          "present": true,
+          "nonNull": 411,
+          "rows": 13842
+        },
+        "penalty": {
+          "present": true,
+          "nonNull": 13426,
+          "rows": 13842
+        },
+        "no_play": {
+          "present": false,
+          "nonNull": 0,
+          "rows": 13842
+        },
+        "game_status": {
+          "present": false,
+          "nonNull": 0,
+          "rows": 13842
+        },
+        "game_date": {
+          "present": true,
+          "nonNull": 13842,
+          "rows": 13842
+        },
+        "yards_gained": {
+          "present": true,
+          "nonNull": 13426,
+          "rows": 13842
+        },
+        "desc": {
+          "present": true,
+          "nonNull": 13842,
+          "rows": 13842
+        },
+        "drive": {
+          "present": true,
+          "nonNull": 13691,
+          "rows": 13842
+        },
+        "drive_result": {
+          "present": false,
+          "nonNull": 0,
+          "rows": 13842
+        },
+        "drive_end_transition": {
+          "present": true,
+          "nonNull": 13691,
+          "rows": 13842
+        },
+        "drive_ended_with_score": {
+          "present": true,
+          "nonNull": 13691,
+          "rows": 13842
+        }
+      },
+      "eligibleGames": 0,
+      "eligiblePlays": 0,
+      "excluded": {
+        "duplicatePlays": 0,
+        "mismatchedGames": 0,
+        "unresolvedThirdDowns": 0,
+        "unresolvedRedZoneDrives": 0
+      },
+      "sourceAsOf": "2026-10-15T05:13:31.876Z",
+      "cutoff": "2026-09-25T00:15:00.000Z"
+    },
+    "4": {
+      "coverage": {
+        "season": {
+          "present": true,
+          "nonNull": 13842,
+          "rows": 13842
+        },
+        "season_type": {
+          "present": true,
+          "nonNull": 13842,
+          "rows": 13842
+        },
+        "week": {
+          "present": true,
+          "nonNull": 13842,
+          "rows": 13842
+        },
+        "game_id": {
+          "present": true,
+          "nonNull": 13842,
+          "rows": 13842
+        },
+        "play_id": {
+          "present": true,
+          "nonNull": 13842,
+          "rows": 13842
+        },
+        "posteam": {
+          "present": true,
+          "nonNull": 13089,
+          "rows": 13842
+        },
+        "defteam": {
+          "present": true,
+          "nonNull": 13089,
+          "rows": 13842
+        },
+        "play_type": {
+          "present": true,
+          "nonNull": 13438,
+          "rows": 13842
+        },
+        "down": {
+          "present": true,
+          "nonNull": 11613,
+          "rows": 13842
+        },
+        "ydstogo": {
+          "present": true,
+          "nonNull": 13842,
+          "rows": 13842
+        },
+        "third_down_converted": {
+          "present": true,
+          "nonNull": 13426,
+          "rows": 13842
+        },
+        "third_down_failed": {
+          "present": true,
+          "nonNull": 13426,
+          "rows": 13842
+        },
+        "fixed_drive": {
+          "present": true,
+          "nonNull": 13842,
+          "rows": 13842
+        },
+        "fixed_drive_result": {
+          "present": true,
+          "nonNull": 13840,
+          "rows": 13842
+        },
+        "yardline_100": {
+          "present": true,
+          "nonNull": 12855,
+          "rows": 13842
+        },
+        "touchdown": {
+          "present": true,
+          "nonNull": 13426,
+          "rows": 13842
+        },
+        "td_team": {
+          "present": true,
+          "nonNull": 411,
+          "rows": 13842
+        },
+        "penalty": {
+          "present": true,
+          "nonNull": 13426,
+          "rows": 13842
+        },
+        "no_play": {
+          "present": false,
+          "nonNull": 0,
+          "rows": 13842
+        },
+        "game_status": {
+          "present": false,
+          "nonNull": 0,
+          "rows": 13842
+        },
+        "game_date": {
+          "present": true,
+          "nonNull": 13842,
+          "rows": 13842
+        },
+        "yards_gained": {
+          "present": true,
+          "nonNull": 13426,
+          "rows": 13842
+        },
+        "desc": {
+          "present": true,
+          "nonNull": 13842,
+          "rows": 13842
+        },
+        "drive": {
+          "present": true,
+          "nonNull": 13691,
+          "rows": 13842
+        },
+        "drive_result": {
+          "present": false,
+          "nonNull": 0,
+          "rows": 13842
+        },
+        "drive_end_transition": {
+          "present": true,
+          "nonNull": 13691,
+          "rows": 13842
+        },
+        "drive_ended_with_score": {
+          "present": true,
+          "nonNull": 13691,
+          "rows": 13842
+        }
+      },
+      "eligibleGames": 0,
+      "eligiblePlays": 0,
+      "excluded": {
+        "duplicatePlays": 0,
+        "mismatchedGames": 0,
+        "unresolvedThirdDowns": 0,
+        "unresolvedRedZoneDrives": 0
+      },
+      "sourceAsOf": "2026-10-15T05:13:31.876Z",
+      "cutoff": "2026-10-02T00:15:00.000Z"
+    },
+    "5": {
+      "coverage": {
+        "season": {
+          "present": true,
+          "nonNull": 13842,
+          "rows": 13842
+        },
+        "season_type": {
+          "present": true,
+          "nonNull": 13842,
+          "rows": 13842
+        },
+        "week": {
+          "present": true,
+          "nonNull": 13842,
+          "rows": 13842
+        },
+        "game_id": {
+          "present": true,
+          "nonNull": 13842,
+          "rows": 13842
+        },
+        "play_id": {
+          "present": true,
+          "nonNull": 13842,
+          "rows": 13842
+        },
+        "posteam": {
+          "present": true,
+          "nonNull": 13089,
+          "rows": 13842
+        },
+        "defteam": {
+          "present": true,
+          "nonNull": 13089,
+          "rows": 13842
+        },
+        "play_type": {
+          "present": true,
+          "nonNull": 13438,
+          "rows": 13842
+        },
+        "down": {
+          "present": true,
+          "nonNull": 11613,
+          "rows": 13842
+        },
+        "ydstogo": {
+          "present": true,
+          "nonNull": 13842,
+          "rows": 13842
+        },
+        "third_down_converted": {
+          "present": true,
+          "nonNull": 13426,
+          "rows": 13842
+        },
+        "third_down_failed": {
+          "present": true,
+          "nonNull": 13426,
+          "rows": 13842
+        },
+        "fixed_drive": {
+          "present": true,
+          "nonNull": 13842,
+          "rows": 13842
+        },
+        "fixed_drive_result": {
+          "present": true,
+          "nonNull": 13840,
+          "rows": 13842
+        },
+        "yardline_100": {
+          "present": true,
+          "nonNull": 12855,
+          "rows": 13842
+        },
+        "touchdown": {
+          "present": true,
+          "nonNull": 13426,
+          "rows": 13842
+        },
+        "td_team": {
+          "present": true,
+          "nonNull": 411,
+          "rows": 13842
+        },
+        "penalty": {
+          "present": true,
+          "nonNull": 13426,
+          "rows": 13842
+        },
+        "no_play": {
+          "present": false,
+          "nonNull": 0,
+          "rows": 13842
+        },
+        "game_status": {
+          "present": false,
+          "nonNull": 0,
+          "rows": 13842
+        },
+        "game_date": {
+          "present": true,
+          "nonNull": 13842,
+          "rows": 13842
+        },
+        "yards_gained": {
+          "present": true,
+          "nonNull": 13426,
+          "rows": 13842
+        },
+        "desc": {
+          "present": true,
+          "nonNull": 13842,
+          "rows": 13842
+        },
+        "drive": {
+          "present": true,
+          "nonNull": 13691,
+          "rows": 13842
+        },
+        "drive_result": {
+          "present": false,
+          "nonNull": 0,
+          "rows": 13842
+        },
+        "drive_end_transition": {
+          "present": true,
+          "nonNull": 13691,
+          "rows": 13842
+        },
+        "drive_ended_with_score": {
+          "present": true,
+          "nonNull": 13691,
+          "rows": 13842
+        }
+      },
+      "eligibleGames": 0,
+      "eligiblePlays": 0,
+      "excluded": {
+        "duplicatePlays": 0,
+        "mismatchedGames": 0,
+        "unresolvedThirdDowns": 0,
+        "unresolvedRedZoneDrives": 0
+      },
+      "sourceAsOf": "2026-10-15T05:13:31.876Z",
+      "cutoff": "2026-10-09T00:15:00.000Z"
+    },
+    "6": {
+      "coverage": {
+        "season": {
+          "present": true,
+          "nonNull": 13842,
+          "rows": 13842
+        },
+        "season_type": {
+          "present": true,
+          "nonNull": 13842,
+          "rows": 13842
+        },
+        "week": {
+          "present": true,
+          "nonNull": 13842,
+          "rows": 13842
+        },
+        "game_id": {
+          "present": true,
+          "nonNull": 13842,
+          "rows": 13842
+        },
+        "play_id": {
+          "present": true,
+          "nonNull": 13842,
+          "rows": 13842
+        },
+        "posteam": {
+          "present": true,
+          "nonNull": 13089,
+          "rows": 13842
+        },
+        "defteam": {
+          "present": true,
+          "nonNull": 13089,
+          "rows": 13842
+        },
+        "play_type": {
+          "present": true,
+          "nonNull": 13438,
+          "rows": 13842
+        },
+        "down": {
+          "present": true,
+          "nonNull": 11613,
+          "rows": 13842
+        },
+        "ydstogo": {
+          "present": true,
+          "nonNull": 13842,
+          "rows": 13842
+        },
+        "third_down_converted": {
+          "present": true,
+          "nonNull": 13426,
+          "rows": 13842
+        },
+        "third_down_failed": {
+          "present": true,
+          "nonNull": 13426,
+          "rows": 13842
+        },
+        "fixed_drive": {
+          "present": true,
+          "nonNull": 13842,
+          "rows": 13842
+        },
+        "fixed_drive_result": {
+          "present": true,
+          "nonNull": 13840,
+          "rows": 13842
+        },
+        "yardline_100": {
+          "present": true,
+          "nonNull": 12855,
+          "rows": 13842
+        },
+        "touchdown": {
+          "present": true,
+          "nonNull": 13426,
+          "rows": 13842
+        },
+        "td_team": {
+          "present": true,
+          "nonNull": 411,
+          "rows": 13842
+        },
+        "penalty": {
+          "present": true,
+          "nonNull": 13426,
+          "rows": 13842
+        },
+        "no_play": {
+          "present": false,
+          "nonNull": 0,
+          "rows": 13842
+        },
+        "game_status": {
+          "present": false,
+          "nonNull": 0,
+          "rows": 13842
+        },
+        "game_date": {
+          "present": true,
+          "nonNull": 13842,
+          "rows": 13842
+        },
+        "yards_gained": {
+          "present": true,
+          "nonNull": 13426,
+          "rows": 13842
+        },
+        "desc": {
+          "present": true,
+          "nonNull": 13842,
+          "rows": 13842
+        },
+        "drive": {
+          "present": true,
+          "nonNull": 13691,
+          "rows": 13842
+        },
+        "drive_result": {
+          "present": false,
+          "nonNull": 0,
+          "rows": 13842
+        },
+        "drive_end_transition": {
+          "present": true,
+          "nonNull": 13691,
+          "rows": 13842
+        },
+        "drive_ended_with_score": {
+          "present": true,
+          "nonNull": 13691,
+          "rows": 13842
+        }
+      },
+      "eligibleGames": 79,
+      "eligiblePlays": 13089,
+      "excluded": {
+        "duplicatePlays": 0,
+        "mismatchedGames": 0,
+        "unresolvedThirdDowns": 1,
+        "unresolvedRedZoneDrives": 4
+      },
+      "sourceAsOf": "2026-10-15T05:13:31.876Z",
+      "cutoff": "2026-10-16T00:15:00.000Z"
     }
   }
 };

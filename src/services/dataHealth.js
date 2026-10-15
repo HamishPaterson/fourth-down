@@ -9,6 +9,7 @@ const VISIBLE_LAYERS = new Set([
   "driveEfficiency", "situationalEfficiency", "snapParticipation",
   "expectedLineup", "turnoverRegression", "pace",
   "rushMatchup", "passMatchup", "successMatchup", "explosiveMatchup",
+  "thirdDownMatchup", "redZoneMatchup",
 ]);
 
 export function readDataHealthSnapshots() {

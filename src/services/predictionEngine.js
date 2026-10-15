@@ -3,10 +3,12 @@
 import { getTeamRatings } from "./teamRatings.js";
 import { getHomeFieldAdvantage } from "./homeFieldAdvantage.js";
 import { buildExpectedPlayMix, buildMatchupIntelligence, pressureSignal, explainMatchupSignal } from "./matchupIntelligence.js";
+import { buildSituationalMatchups, explainSituationalSignal } from "./situationalMatchups.js";
 
 const RATING_BASELINE = 75;
 const BASE_PASS_RATIO = 0.6;
 const CORRELATED_MATCHUP_LAYERS = ["rushMatchup", "passMatchup", "successMatchup", "explosiveMatchup"];
+const SITUATIONAL_MATCHUP_LAYERS = ["thirdDownMatchup", "redZoneMatchup"];
 
 const NFL_DIVISIONS = {
   "AFC East": ["BUF", "MIA", "NE", "NYJ"],
@@ -42,28 +44,45 @@ export function predictMatchup(awayCode, homeCode, options = {}) {
   const playMix = buildExpectedPlayMix({ away, home, teamMetrics: data,
     playerMetrics: options.playerMetrics, prediction: baseline, season: options.season, week: Number(options.week) });
   const intelligence = buildMatchupIntelligence({ away, home, teamMetrics: data, playMix });
-  const modelLayers = { ...options.modelLayers, ...intelligence.layers };
-  const result = predictCore(away, home, { ...options, modelLayers });
+  const phase1Layers = { ...options.modelLayers, ...intelligence.layers };
+  const phase1 = predictCore(away, home, { ...options, modelLayers: phase1Layers });
+  const situational = buildSituationalMatchups({ away, home, teamMetrics: data,
+    season: options.season, week: Number(options.week), kickoff: options.kickoff });
+  const modelLayers = { ...phase1Layers, ...situational.layers };
+  const result = situational.available ? predictCore(away, home, { ...options, modelLayers }) : phase1;
   const signals = [...intelligence.signals,
-    pressureSignal({ away, home, teamMetrics: data, layer: result.modelLayers.pressureMatchup })]
+    pressureSignal({ away, home, teamMetrics: data, layer: phase1.modelLayers.pressureMatchup })]
     .map((signal) => {
       const without = predictCore(away, home, { ...options, modelLayers: {
-        ...modelLayers, [signal.layer]: { active: false, available: false, awayPoints: 0, homePoints: 0 },
+        ...phase1Layers, [signal.layer]: { active: false, available: false, awayPoints: 0, homePoints: 0 },
       } });
       return explainMatchupSignal({ ...signal,
-        homePoints: result.modelLayers[signal.layer].homePoints,
-        awayPoints: result.modelLayers[signal.layer].awayPoints,
-      }, result.continuousMargin - without.continuousMargin);
+        homePoints: phase1.modelLayers[signal.layer].homePoints,
+        awayPoints: phase1.modelLayers[signal.layer].awayPoints,
+      }, phase1.continuousMargin - without.continuousMargin);
     });
+  const situationalSignals = situational.signals.map((signal) => {
+    const without = signal.available ? predictCore(away, home, { ...options, modelLayers: {
+      ...modelLayers, [signal.layer]: { active: false, available: false, awayPoints: 0, homePoints: 0 },
+    } }) : result;
+    return explainSituationalSignal({ ...signal,
+      homePoints: result.modelLayers[signal.layer]?.homePoints || 0,
+      awayPoints: result.modelLayers[signal.layer]?.awayPoints || 0,
+    }, result.continuousMargin - without.continuousMargin);
+  });
   return {
     ...result,
     away: { ...result.away, expectedPlayMix: playMix.away },
     home: { ...result.home, expectedPlayMix: playMix.home },
     matchupIntelligence: {
       phase: 1,
-      available: signals.some((signal) => signal.available), signals, playMix,
+      available: signals.some((signal) => signal.available) || situational.available,
+      signals: [...signals, ...situationalSignals.filter((signal) => signal.available)], playMix,
       incrementalMargin: round3(result.continuousMargin - baseline.continuousMargin),
       maxPreSimulationMargin: 1,
+      situational: { ...situational, signals: situationalSignals,
+        finalMarginAblation: round3(result.continuousMargin - phase1.continuousMargin),
+        phase1Margin: phase1.continuousMargin },
       limitations: ["Explosives combine pass and rush.", "Pressure is a hit/sack proxy, not charted pressure or blitz performance.",
         "Separate passing/rushing success and neutral-situation tendency are unavailable.",
         "NFLverse metric-specific adjustment is distinct from the score-based Opponent-Network.",
@@ -503,6 +522,7 @@ export function createModelLayers(input = {}) {
     "expectedLineup",
     "pace",
     ...CORRELATED_MATCHUP_LAYERS,
+    ...SITUATIONAL_MATCHUP_LAYERS,
   ];
 
   const totalMovingLayers = new Set(["scoringBaseline", "pace"]);
@@ -1053,7 +1073,7 @@ function createSeededRandom(seedValue) {
 
 function calculateWinProbability(projectedMargin, modelLayers, market) {
   const layers = Object.entries(modelLayers || {})
-    .filter(([name, layer]) => !CORRELATED_MATCHUP_LAYERS.includes(name) &&
+    .filter(([name, layer]) => !CORRELATED_MATCHUP_LAYERS.includes(name) && !SITUATIONAL_MATCHUP_LAYERS.includes(name) &&
       layer && typeof layer === "object" && "confidence" in layer)
     .map(([, layer]) => layer);
   const available = layers.filter((layer) => layer.available !== false && Number(layer.confidence) > 0);
