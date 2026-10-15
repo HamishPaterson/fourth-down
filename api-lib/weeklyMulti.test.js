@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { createWeeklyMultiCurrentHandler, createWeeklyMultiLockHandler, fetchScheduleGamesForWindow, getDisplayLockCycle, getLockCycle, resolveDisplayWeekContext, resolveLockWeekContext } from "./weeklyMulti.js";
+import { createWeeklyMultiCurrentHandler, createWeeklyMultiLockHandler, fetchScheduleGamesForWindow, getDisplayLockCycle, getLockCycle, resolveDisplayWeekContext, resolveLockWeekContext, WEEKLY_MULTI_TIME_ZONE } from "./weeklyMulti.js";
 import { createScheduleHandler } from "../api/nfl/schedule.js";
 
 const THURSDAY = Date.UTC(2026, 9, 8, 0, 0, 0);
@@ -216,14 +216,34 @@ test("unknown weeklyMultiMode values cannot fall through to the schedule route",
   assert.deepEqual(res.body, { error: "Unknown weekly multi mode" });
 });
 
-test("Vercel rewrites preserve both Weekly Best Multi URLs and exactly one lock cron", () => {
+test("Vercel rewrites preserve Weekly Multi URLs with on-time locking and deadline finalization", () => {
   const config = JSON.parse(readFileSync(new URL("../vercel.json", import.meta.url), "utf8"));
   assert.deepEqual(config.rewrites, [
     { source: "/api/weekly-multi/current", destination: "/api/nfl/schedule?weeklyMultiMode=current" },
     { source: "/api/weekly-multi/lock", destination: "/api/nfl/schedule?weeklyMultiMode=lock" },
+    { source: "/api/weekly-multi/prepare", destination: "/api/nfl/schedule?weeklyMultiMode=prepare" },
   ]);
   const lockCrons = config.crons.filter((cron) => cron.path === "/api/weekly-multi/lock");
-  assert.deepEqual(lockCrons, [{ path: "/api/weekly-multi/lock", schedule: "0 1 * * *" }]);
+  assert.deepEqual(lockCrons, [
+    { path: "/api/weekly-multi/lock", schedule: "0 0 * * *" },
+    { path: "/api/weekly-multi/lock", schedule: "0 1 * * *" },
+  ]);
+});
+
+test("configured AEST lock is 10:00 on Thursday, including daylight-saving season", () => {
+  for (const day of ["2026-10-15", "2027-01-07", "2026-06-04"]) {
+    const lock = new Date(`${day}T00:00:00Z`);
+    const parts = Object.fromEntries(new Intl.DateTimeFormat("en-AU", {
+      timeZone: WEEKLY_MULTI_TIME_ZONE, weekday: "long", hour: "2-digit", minute: "2-digit", hourCycle: "h23",
+    }).formatToParts(lock).map(({ type, value }) => [type, value]));
+    assert.equal(parts.weekday, "Thursday");
+    assert.equal(parts.hour, "10");
+    assert.equal(parts.minute, "00");
+    assert.equal(getLockCycle(new Date(lock.getTime() - 60000)).eligible, false);
+    assert.equal(getLockCycle(lock).eligible, true);
+    assert.equal(getLockCycle(new Date(lock.getTime() + 60000)).eligible, true);
+    assert.equal(getDisplayLockCycle(new Date(lock.getTime() - 60000)).lockAt, lock.getTime());
+  }
 });
 
 test("lock and display cycles follow UTC Thursday and Wednesday boundaries", () => {
@@ -587,7 +607,7 @@ test("read route does not fall back to an older saved week when the active week 
   const res = response();
   await handler({ method: "GET", query: { weeklyMultiMode: "current" } }, res);
   assert.equal(res.body.status, "not ready");
-  assert.match(res.body.message, /not ready yet/i);
+  assert.match(res.body.message, /No shared Weekly Best Multi has been locked for Week 5/);
   assert.deepEqual(calls, [["lock_at", new Date(THURSDAY).toISOString()]]);
 });
 

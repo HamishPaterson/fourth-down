@@ -519,14 +519,6 @@ export default function MatchupPrediction({ awayCode, homeCode, kickoff, weather
     ? applyOfficialSnapshot(officialPayload, officialSnapshot)
     : localPrediction;
   const { away, home, winner, margin, confidence, total } = prediction;
-  const rows = [
-    ["Passing TDs", away.passingTD, home.passingTD],
-    ["Rushing TDs", away.rushingTD, home.rushingTD],
-    ["Defensive TDs (Pick 6)", away.defensiveTD, home.defensiveTD],
-    ["Field goals", away.fieldGoals, home.fieldGoals],
-    ["Extra points", away.extraPoints, home.extraPoints],
-    ["2-pt conversions", away.twoPoint, home.twoPoint],
-  ];
   const winnerLabel = winner === null ? "Projected tie" : `${winner} by ${margin}`;
   const impact = prediction.weather;
   const scheduleImpact = prediction.schedule;
@@ -705,13 +697,6 @@ export default function MatchupPrediction({ awayCode, homeCode, kickoff, weather
         <span>{winnerLabel}</span>
         <span>{winner ? `${winner} win probability ${Math.round(prediction.winnerWinProbability * 100)}%` : "Win probability 50% each"}</span>
         <span>Projected total {total}</span>
-      </div>
-
-      <div className="team-statistics-table matchup-stats-table prediction-table">
-        <div className="team-statistics-row team-statistics-header"><strong>{away.code}</strong><span>Scoring</span><strong>{home.code}</strong></div>
-        {rows.map(([label, awayValue, homeValue]) => (
-          <div className="team-statistics-row matchup-stat-row" key={label}><strong>{awayValue}</strong><span>{label}</span><strong>{homeValue}</strong></div>
-        ))}
       </div>
 
       <MatchupIntelligencePanel prediction={prediction} />

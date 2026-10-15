@@ -20,6 +20,51 @@ create table if not exists public.weekly_best_multis (
   constraint weekly_best_multis_status_consistency check (partial = (status = 'partial'))
 );
 
+-- Additive upgrade for deployments that still have the earlier Multi schema.
+-- Existing locked rows and legs are not rewritten or deleted.
+alter table public.weekly_best_multis
+  add column if not exists model_probability_threshold numeric(5, 4),
+  add column if not exists partial boolean,
+  add column if not exists generated_late boolean,
+  add column if not exists odds_late boolean,
+  add column if not exists odds_updated_at timestamptz,
+  add column if not exists odds_refreshed_at timestamptz,
+  add column if not exists odds_cache_status text,
+  add column if not exists reason text,
+  add column if not exists reason_counts jsonb;
+
+create unique index if not exists weekly_best_multis_pipeline_season_week_key
+  on public.weekly_best_multis (season, week);
+
+do $$
+declare
+  item record;
+begin
+  -- Legacy-only bookkeeping must not require new callers to send audit arrays.
+  if exists (select 1 from information_schema.columns where table_schema = 'public'
+    and table_name = 'weekly_best_multis' and column_name = 'candidate_pool') then
+    alter table public.weekly_best_multis alter column candidate_pool set default '[]'::jsonb;
+  end if;
+  if exists (select 1 from information_schema.columns where table_schema = 'public'
+    and table_name = 'weekly_best_multis' and column_name = 'replacement_history') then
+    alter table public.weekly_best_multis alter column replacement_history set default '[]'::jsonb;
+  end if;
+  -- Preserve older allowed states while also accepting honest partial locks.
+  for item in
+    select c.conname, pg_get_expr(c.conbin, c.conrelid) as expression
+    from pg_constraint c
+    where c.conrelid = 'public.weekly_best_multis'::regclass and c.contype = 'c'
+      and c.conkey = array[(select attnum from pg_attribute
+        where attrelid = c.conrelid and attname = 'status')]::smallint[]
+      and pg_get_expr(c.conbin, c.conrelid) not like '%partial%'
+  loop
+    execute format('alter table public.weekly_best_multis drop constraint %I', item.conname);
+    execute format('alter table public.weekly_best_multis add constraint %I check ((%s) or status = ''partial'')',
+      item.conname, item.expression);
+  end loop;
+end;
+$$;
+
 alter table public.weekly_best_multis enable row level security;
 
 revoke all on table public.weekly_best_multis from anon, authenticated, service_role;
@@ -51,3 +96,5 @@ drop trigger if exists weekly_best_multis_prevent_mutation on public.weekly_best
 create trigger weekly_best_multis_prevent_mutation
   before update or delete on public.weekly_best_multis
 	for each row execute function public.prevent_weekly_best_multi_mutation();
+
+notify pgrst, 'reload schema';

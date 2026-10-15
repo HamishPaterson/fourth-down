@@ -1,4 +1,4 @@
-import { createWeeklyMultiCurrentHandler, createWeeklyMultiLockHandler } from "../../api-lib/weeklyMulti.js";
+import { createWeeklyMultiCurrentHandler } from "../../api-lib/weeklyMulti.js";
 
 const API_URL =
   "https://api.balldontlie.io/nfl/v1/games";
@@ -35,7 +35,10 @@ const TEAM_DIVISION = Object.fromEntries(
 
 export function createScheduleHandler({
   currentHandler = createWeeklyMultiCurrentHandler(),
-  lockHandler = createWeeklyMultiLockHandler(),
+  lockHandler = async (req, res) => {
+    const { createWeeklyMultiPreparationHandler } = await import("../../api-lib/weeklyMultiPreparation.js");
+    return createWeeklyMultiPreparationHandler()(req, res);
+  },
   scheduleHandler = handleScheduleRequest,
 } = {}) {
   return async function handler(req, res) {
@@ -51,7 +54,7 @@ export function createScheduleHandler({
         res.setHeader("Cache-Control", `public, s-maxage=${cacheSeconds}, stale-while-revalidate=${cacheSeconds}`);
         return result;
       }
-      if (query.weeklyMultiMode === "lock") return lockHandler(req, res);
+      if (["lock", "prepare"].includes(query.weeklyMultiMode)) return lockHandler(req, res);
       return res.status(404).json({ error: "Unknown weekly multi mode" });
     }
     return scheduleHandler(req, res);

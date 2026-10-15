@@ -14,6 +14,8 @@ const LEG_COUNT = 5;
 const START_PROBABILITY = 0.65;
 const FLOOR_PROBABILITY = 0.55;
 const PROBABILITY_STEP = 0.025;
+// Thursday 10:00 AEST (Australia/Brisbane, no daylight saving) is 00:00 UTC.
+export const WEEKLY_MULTI_TIME_ZONE = "Australia/Brisbane";
 const TEAM_ALIASES = { WAS: "WSH", LA: "LAR", OAK: "LV", SD: "LAC", STL: "LAR" };
 
 export function createWeeklyMultiClient() {
@@ -155,6 +157,7 @@ async function resolveScheduleWeek(lockAt, fetchGames = fetchScheduleGamesForWin
     lockAt: new Date(lockAt).toISOString(),
     deadlineAt: new Date(lockAt + RETRY_WINDOW_MS).toISOString(),
     retryDeadline: lockAt + RETRY_WINDOW_MS,
+    games: inWindow.filter((game) => Number(game.season) === season && Number(game.week) === week),
   };
 }
 
@@ -638,7 +641,7 @@ export function createWeeklyMultiCurrentHandler(overrides = {}) {
         season: context.season,
         week: context.week,
         lockAt: context.lockAt,
-        message: "Weekly Best Multi is not ready yet. Please check back later.",
+        message: `No shared Weekly Best Multi has been locked for Week ${context.week}. Scheduled locking requires fresh, complete saved predictions and eligible Best Bets with current odds.`,
       });
     } catch (error) {
       console.error("Weekly Best Multi read failed", error);
@@ -746,7 +749,7 @@ export function createWeeklyMultiLockHandler(overrides = {}) {
       const selection = buildWeeklyMultiSelection(snapshots, freshOdds ? oddsPayload : null, context, now);
       const dataReady = snapshots.length > 0 && freshOdds;
       const notReadyReason = !dataReady
-        ? snapshots.length === 0 ? "No current complete prediction snapshots with fresh odds are available" : "Fresh stored odds snapshots are unavailable"
+        ? snapshots.length === 0 ? "No fresh, current-model complete saved predictions are available" : "Fresh stored odds snapshots are unavailable"
         : selection.complete ? null : "Fewer than five eligible legs qualify at the 55% probability floor";
 
       if (dryRun) {

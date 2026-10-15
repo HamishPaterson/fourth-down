@@ -15,6 +15,7 @@ import {
 } from "../services/predictionLedger.js";
 import { findOddsForGame, getNflOddsWithProps } from "../services/oddsApi.js";
 import { getFullGamePrediction } from "../services/gamePredictionService.js";
+import { buildPredictionSnapshot } from "../services/predictionSnapshot.js";
 import { getPlayerRating, resolveFullPlayerName } from "../services/playerRatings.js";
 import { getStadiumWeather } from "../services/weatherApi.js";
 
@@ -413,68 +414,7 @@ async function buildFullPredictionRow(game, oddsEvents, signal) {
     week: Number(game.week),
     signal,
   });
-  const prediction = fullResult.prediction;
-  const marketAway = finiteNumberOrNull(prediction.market?.awayExpected);
-  const marketHome = finiteNumberOrNull(prediction.market?.homeExpected);
-  const oddsPick =
-    marketAway === null || marketHome === null
-      ? null
-      : marketAway > marketHome
-        ? game.away
-        : marketHome > marketAway
-          ? game.home
-          : null;
-
-  return {
-    id: `${Number(game.week) || 0}:${game.away}:${game.home}:${game.sourceDate || "unknown"}`,
-    source: "shared-full-model",
-    dataQuality: {
-      ...fullResult.dataQuality,
-      modelVersion: CURRENT_MODEL_VERSION,
-      modelKey: CURRENT_MODEL_KEY,
-      predictionPayload: prediction,
-      weather: fullResult.weather || game.weather || null,
-      bestBets: fullResult.bestBets || null,
-      bestBetsPayload: fullResult.bestBets || null,
-    },
-    playerProjections: fullResult.playerProjections || null,
-    bestBets: fullResult.bestBets || null,
-    game: {
-      ...game,
-      weather: fullResult.weather || game.weather || null,
-      oddsEvent,
-    },
-    week: Number(game.week),
-    kickoff: game.sourceDate,
-    awayCode: game.away,
-    homeCode: game.home,
-    fourthDownPick: prediction.winner,
-    fourthDownAwayScore: prediction.away.score,
-    fourthDownHomeScore: prediction.home.score,
-    oddsPick,
-    marketAwayScore: marketAway,
-    marketHomeScore: marketHome,
-    fourthDownAwayWinProbability: prediction.awayWinProbability,
-    fourthDownHomeWinProbability: prediction.homeWinProbability,
-    fourthDownWinnerProbability: prediction.winnerWinProbability,
-    projectedTie: Boolean(prediction.projectedTie),
-    continuousMargin: finiteNumberOrNull(prediction.continuousMargin),
-    confidenceScore: prediction.confidenceScore,
-    confidenceLabel: prediction.confidence,
-    marketGameTotal: finiteNumberOrNull(prediction.market?.total),
-    marketSpread: finiteNumberOrNull(prediction.market?.homeSpread),
-    modelVersion: CURRENT_MODEL_VERSION,
-    modelKey: CURRENT_MODEL_KEY,
-    predictionPayload: prediction,
-    generatedAt: fullResult.generatedAt || new Date().toISOString(),
-    savedBeforeKickoff:
-      Number.isFinite(new Date(game.sourceDate).getTime()) &&
-      Date.now() < new Date(game.sourceDate).getTime(),
-    snapshotAt: new Date().toISOString(),
-    actualAwayScore: null,
-    actualHomeScore: null,
-    actualWinner: null,
-  };
+  return buildPredictionSnapshot(game, fullResult, oddsEvent);
 }
 
 function buildMarketFallback(game, oddsEvents, error) {
@@ -1162,6 +1102,7 @@ function useWeeklyParlay(predictions) {
       locked: true,
       status: response.status,
       placeholder: false,
+      reason: record.reason || null,
     };
     return gradeLockedWeeklyParlay(parlay, [...readPredictionLedger(), ...(predictions || [])]);
   }, [response, predictions]);
@@ -1269,12 +1210,15 @@ function WeeklyParlay({ parlay, week }) {
           )}
           {parlay?.status === "not ready" ? (
             <p style={{ margin: 0, color: "rgba(255,255,255,.64)", fontSize: "12px" }}>
-              Weekly Best Multi is not ready yet. Please check back later.
+              {parlay.reason || "Weekly Best Multi is not ready yet. Please check back later."}
             </p>
           ) : !parlay?.placeholder && parlay?.status !== "missed" && (
             <p style={{ margin: 0, color: "rgba(255,255,255,.64)", fontSize: "12px" }}>
               Up to {WEEKLY_PARLAY_LEG_COUNT} best-value legs with positive edge. The model-probability gate relaxes from {formatPercent(WEEKLY_PARLAY_MODEL_PROBABILITY_MIN)} to {formatPercent(WEEKLY_PARLAY_MODEL_PROBABILITY_FLOOR)} only when needed.
             </p>
+          )}
+          {parlay?.reason && parlay?.status !== "not ready" && (
+            <p className="prediction-note">{parlay.reason}</p>
           )}
           {parlay?.modelProbabilityThreshold !== null && parlay?.modelProbabilityThreshold !== undefined && (
             <small style={{ display: "block", marginTop: "5px", color: "rgba(255,255,255,.46)", fontSize: "9px" }}>

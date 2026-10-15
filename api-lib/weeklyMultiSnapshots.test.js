@@ -8,6 +8,7 @@ import {
   getStoredOddsUrls,
   mergeStoredOdds,
   predictionSnapshotsForWeek,
+  resolveLockWeekContext,
 } from "./weeklyMulti.js";
 
 const THURSDAY = Date.UTC(2026, 9, 8, 0, 0, 0);
@@ -88,7 +89,7 @@ function response() {
   return { statusCode: null, body: null, headers: {}, setHeader(name, value) { this.headers[name] = value; }, status(code) { this.statusCode = code; return this; }, json(body) { this.body = body; return this; } };
 }
 
-function lockClient({ existing = null, predictions = GAMES.map(predictionRow) } = {}) {
+function lockClient({ existing = null, predictions = GAMES.map(predictionRow), insertError = null } = {}) {
   const calls = [];
   return {
     calls,
@@ -101,7 +102,7 @@ function lockClient({ existing = null, predictions = GAMES.map(predictionRow) } 
             async maybeSingle() { return { data: existing, error: null }; },
             insert(record) {
               calls.push(["insert", record]);
-              return { select() { return this; }, async single() { return { data: record, error: null }; } };
+              return { select() { return this; }, async single() { return { data: insertError ? null : record, error: insertError }; } };
             },
           };
         }
@@ -254,6 +255,78 @@ test("the lock only runs at the scheduled lock moment", async () => {
   });
   assert.equal(res.body.status, "not yet locked");
   assert.equal(inserts(database).length, 0);
+});
+
+test("mocked AEST clock locks at exactly 10:00, never 09:59, and remains eligible at 10:01", async () => {
+  for (const minutes of [-1, 0, 1]) {
+    const now = new Date(THURSDAY + minutes * 60000);
+    const context = await resolveLockWeekContext(now, { fetchGames: async () => [
+      { season: 2026, week: 5, date: CONTEXT.firstKickoffAt },
+    ] });
+    const { res, database } = await runLock({ now, context, fetchOdds: storedOddsFetch() });
+    assert.equal(res.body.status, minutes < 0 ? "not yet locked" : "locked");
+    assert.equal(inserts(database).length, minutes < 0 ? 0 : 1);
+  }
+});
+
+test("old September snapshots cannot fabricate current-week legs; insufficient inputs are explicit", async () => {
+  const predictions = GAMES.map(predictionRow).map((row) => ({
+    ...row, model_version: 6,
+    data_quality: { snapshot: { ...row.data_quality.snapshot, generatedAt: "2026-09-30T06:52:29.613Z" } },
+  }));
+  assert.equal(predictionSnapshotsForWeek(predictions, CONTEXT, NOW).length, 0);
+  for (const minutes of [0, 30]) {
+    const { res } = await runLock({
+      database: lockClient({ predictions }), now: new Date(THURSDAY + minutes * 60000),
+      fetchOdds: storedOddsFetch(),
+    });
+    assert.equal(res.body.status, minutes === 0 ? "not ready" : "generated late");
+    if (minutes === 30) assert.equal(res.body.record.partial, true);
+    assert.match(res.body.reason || res.body.record.reason, /No fresh, current-model complete saved predictions/);
+    assert.equal(res.body.legCount ?? res.body.record.legs.length, 0);
+  }
+});
+
+test("persistence failure is an explicit server error, not a successful lock", async () => {
+  const original = console.error, logs = [];
+  console.error = (...args) => logs.push(args);
+  try {
+    const { res } = await runLock({
+      database: lockClient({ insertError: { code: "storage-failure", message: "write failed" } }),
+      fetchOdds: storedOddsFetch(),
+    });
+    assert.equal(res.statusCode, 500);
+    assert.deepEqual(res.body, { error: "Weekly Best Multi lock failed" });
+    assert.equal(logs[0][0], "Weekly Best Multi lock failed");
+  } finally { console.error = original; }
+});
+
+test("two clients and refresh read the identical authoritative lock, unaffected by newer odds or an old week", async () => {
+  const { res: locked, database } = await runLock({ fetchOdds: storedOddsFetch() });
+  const saved = locked.body.record;
+  const previous = { ...saved, week: 4, lock_at: new Date(THURSDAY - 7 * 24 * HOUR).toISOString() };
+  let reads = 0;
+  const createClient = () => ({
+    from() {
+      let lockAt;
+      return { select() { return this; }, eq(column, value) { assert.equal(column, "lock_at"); lockAt = value; return this; },
+        async maybeSingle() { reads++; return { data: [previous, saved].find((row) => row.lock_at === lockAt), error: null }; } };
+    },
+  });
+  const results = [];
+  for (let client = 0; client < 3; client++) {
+    const res = response();
+    await createWeeklyMultiCurrentHandler({
+      createClient, getNow: () => new Date(THURSDAY + (client + 1) * 60000),
+      resolveDisplayContext: async () => assert.fail("a stored lock must not be reconstructed"),
+      fetchGames: async () => assert.fail("no schedule or odds needed for an unstarted stored lock"),
+    })({ method: "GET" }, res);
+    assert.equal(res.statusCode, 200);
+    results.push(res.body.record);
+  }
+  assert.equal(reads, 3);
+  assert.equal(inserts(database).length, 1);
+  assert.deepEqual(results, [saved, saved, saved]);
 });
 
 test("an unresolved locked multi survives week rollover and snapshot refreshes", async () => {

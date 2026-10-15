@@ -1,6 +1,7 @@
 import { createClient } from "@supabase/supabase-js";
 import NFLVERSE_PLAYER_METRICS from "../../data/nflverse-player-metrics.js";
 import { playerMetricsResponse } from "../../api-lib/playerMetrics.js";
+import { completePrediction, retainPrediction } from "../../api-lib/predictionEligibility.js";
 
 const STATS_URL =
   "https://api.balldontlie.io/nfl/v1/stats";
@@ -1686,10 +1687,8 @@ async function saveSnapshots(supabase, request, response) {
     const incomingHasFinal = hasFinalResult(incoming);
     const existingHasFinal = hasFinalResult(existingSnapshot);
 
-    // The first complete official prediction becomes the shared source of truth.
-    // Other devices may calculate locally, but they cannot replace an existing
-    // official score before kickoff. Final results can still be added later.
-    if (hasPrediction(existingSnapshot) && !incomingHasFinal) {
+    // Preserve complete predictions, not merely the first pair of saved scores.
+    if (!incomingHasFinal && retainPrediction(existingSnapshot, incoming, new Date(now))) {
       saved.push(existingSnapshot);
       continue;
     }
@@ -1699,7 +1698,9 @@ async function saveSnapshots(supabase, request, response) {
       continue;
     }
 
-    let merged = mergeSnapshots(existingSnapshot, incoming);
+    let merged = completePrediction(incoming) && !completePrediction(existingSnapshot)
+      ? { ...existingSnapshot, ...incoming }
+      : mergeSnapshots(existingSnapshot, incoming);
 
     if (existingHasFinal && !incomingHasFinal) {
       merged = mergeSnapshots(incoming, existingSnapshot);
@@ -1710,14 +1711,10 @@ async function saveSnapshots(supabase, request, response) {
       merged.frozenAt = existing?.frozen_at || incoming.frozenAt || incoming.snapshotAt || incoming.kickoff;
     }
 
-    const databaseRow = snapshotToDatabase(merged, existing?.id);
-    const { data, error } = await supabase
-      .from("prediction_snapshots")
-      .upsert(databaseRow, {
-        onConflict: "season,week,away_code,home_code",
-      })
-      .select("*")
-      .single();
+    delete merged.authoritative;
+    // A browser cannot remove a server-owned marker, including when adding results.
+    if (existingSnapshot?.authoritative) merged.authoritative = true;
+    const { data, error } = await writePredictionVersion(supabase, merged, existing);
 
     if (error) {
       rejected.push({ gameKey: incoming.gameKey, reason: error.message });
@@ -1855,7 +1852,21 @@ function createServerClient() {
   });
 }
 
-function snapshotToDatabase(snapshot, existingId) {
+export async function writePredictionVersion(client, snapshot, existing) {
+  const row = snapshotToDatabase(normaliseSnapshot(snapshot), existing?.id);
+  const table = client.from("prediction_snapshots");
+  let query;
+  if (existing) {
+    query = table.update(row).eq("id", existing.id);
+    query = existing.updated_at ? query.eq("updated_at", existing.updated_at) : query.is("updated_at", null);
+  } else {
+    query = table.insert(row);
+  }
+  const { data, error } = await query.select("*").maybeSingle();
+  return { data, error: error || (!data ? { code: "CONCURRENT_WRITE", message: "Prediction changed concurrently; retry the refresh" } : null) };
+}
+
+export function snapshotToDatabase(snapshot, existingId) {
   const now = new Date().toISOString();
   const kickoffTime = new Date(snapshot.kickoff).getTime();
   const frozenAt = snapshot.frozenAt ||
@@ -1900,7 +1911,7 @@ function snapshotToDatabase(snapshot, existingId) {
   };
 }
 
-function databaseToSnapshot(row) {
+export function databaseToSnapshot(row) {
   const stored = row?.data_quality?.snapshot || {};
 
   return normaliseSnapshot({

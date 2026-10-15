@@ -18,7 +18,7 @@ export async function getFullGamePrediction(game, oddsEvent, options = {}) {
   const away = normalizeCode(game.away);
   const home = normalizeCode(game.home);
   const oddsFingerprint = createOddsFingerprint(oddsEvent);
-  const key = `${season}:${week}:${away}:${home}:${FULL_MODEL_KEY}:${oddsFingerprint}`;
+  const key = `${options.loadInputs ? "server:" : ""}${season}:${week}:${away}:${home}:${FULL_MODEL_KEY}:${oddsFingerprint}`;
   const cached = cache.get(key);
 
   if (!options.forceRefresh && cached && Date.now() - cached.savedAt < CACHE_MS) {
@@ -35,6 +35,7 @@ export async function getFullGamePrediction(game, oddsEvent, options = {}) {
     away,
     home,
     signal: options.signal,
+    loadInputs: options.loadInputs,
   })
     .then((value) => {
       cache.set(key, { value, savedAt: Date.now() });
@@ -68,13 +69,13 @@ function createOddsFingerprint(event) {
   return `${event?.id || "no-event"}:${books.length}:${marketCount}:${outcomeCount}`;
 }
 
-async function createPrediction({ game, oddsEvent, season, week, away, home, signal }) {
+async function createPrediction({ game, oddsEvent, season, week, away, home, signal, loadInputs }) {
   const weather = await resolveGameWeather(game, home, signal);
   const gameWithWeather = {
     ...game,
     weather,
   };
-  const tasks = {
+  const tasks = loadInputs ? loadInputs({ away, home, season, week, signal }) : {
     standings: optionalCall("getStandings", [signal]),
     personnel: optionalCall("getQbRosterHealth", [away, home, season, signal, week]),
     kicker: optionalCall("getKickerStats", [away, home, season - 1, signal]),

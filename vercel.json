@@ -6,6 +6,10 @@
     },
     "api/nfl/odds.js": {
       "maxDuration": 60
+    },
+    "api/nfl/schedule.js": {
+      "maxDuration": 60,
+      "includeFiles": "api/nfl/ea_player_records.json"
     }
   },
   "rewrites": [
@@ -16,12 +20,24 @@
     {
       "source": "/api/weekly-multi/lock",
       "destination": "/api/nfl/schedule?weeklyMultiMode=lock"
+    },
+    {
+      "source": "/api/weekly-multi/prepare",
+      "destination": "/api/nfl/schedule?weeklyMultiMode=prepare"
     }
   ],
   "crons": [
     {
       "path": "/api/weekly-multi/lock",
+      "schedule": "0 0 * * *"
+    },
+    {
+      "path": "/api/weekly-multi/lock",
       "schedule": "0 1 * * *"
+    },
+    {
+      "path": "/api/weekly-multi/prepare",
+      "schedule": "0 23 * * *"
     },
     {
       "path": "/api/nfl/odds?refreshMarket=moneyline",
@@ -65,7 +81,7 @@
     },
     {
       "path": "/api/nfl/odds?refreshMarket=player_rush_attempts",
-      "schedule": "0 23 * * *"
+      "schedule": "0 10 * * *"
     },
     {
       "path": "/api/nfl/odds?refreshMarket=player_rush_reception_yds",
