@@ -1,13 +1,20 @@
 import { resolveFullPlayerName } from "./playerRatings.js";
+import { resolveTeamCode } from "./oddsApi.js";
+import { validDepthLineup } from "../../api-lib/depthCharts.js";
+import { validateOddsEvents, QUOTE_VALIDATION_VERSION } from "./quoteValidation.js";
+export const BEST_BETS_CANDIDATE_VERSION = 3;
 const MIN_GAME_EDGE = 0.045;
 const MIN_GAME_EV = 0.03;
 const MIN_PROP_EDGE = 0.045;
 const MIN_PROP_EV = 0.03;
 
-export function buildBestBets({ game, prediction, playerProjections, oddsEvent, dataQuality }) {
-  const markets = flattenMarkets(oddsEvent);
-  const coreDataReady = ["playByPlay", "teamForm", "personnel"]
-    .every((key) => dataQuality?.[key] !== false);
+export function buildBestBets({ game, prediction, playerProjections, oddsEvent, dataQuality, teamMetrics, asOf, quoteAsOf = new Date(), audit = false }) {
+  const validation = validateOddsEvents(oddsEvent ? [oddsEvent] : [], { now: new Date(quoteAsOf) });
+  const markets = flattenMarkets(validation.events[0]);
+  const personnelReady = dataQuality?.personnel !== false ||
+    verifiedBetLineups(game, teamMetrics, dataQuality, asOf);
+  const coreDataReady = personnelReady &&
+    ["playByPlay", "teamForm"].every((key) => dataQuality?.[key] !== false);
   const marketDiagnostics = {
     bookmakerCount: Array.isArray(oddsEvent?.bookmakers) ? oddsEvent.bookmakers.length : 0,
     marketCount: markets.length,
@@ -45,6 +52,9 @@ export function buildBestBets({ game, prediction, playerProjections, oddsEvent, 
 
   const selectedPlayerBets = selectDiversePlayerProps(qualifiedPlayerBets, 6);
   const selectedGameBets = selectDiverseGameBets(qualifiedGameBets, 1);
+  const candidates = [...qualifiedGameBets, ...qualifiedPlayerBets]
+    .sort((a, b) => b.expectedValue - a.expectedValue || b.edge - a.edge ||
+      b.modelProbability - a.modelProbability || (betIdentity(a) < betIdentity(b) ? -1 : betIdentity(a) > betIdentity(b) ? 1 : 0));
 
   // Player markets are deliberately placed first. Game markets are capped at
   // one recommendation, preventing moneyline, spread and total from
@@ -56,12 +66,31 @@ export function buildBestBets({ game, prediction, playerProjections, oddsEvent, 
     .slice(0, 8)
     .map((bet, index) => ({ ...bet, rank: index + 1 }));
   const highlights = selectHighlights(recommendations, allCandidates);
+  const coreRejections = [
+    ...(!personnelReady ? ["unverified_personnel"] : []),
+    ...["playByPlay", "teamForm"].filter((key) => dataQuality?.[key] === false).map((key) => `missing_${key}`),
+  ];
+  const assessments = audit ? [
+    ...playerBets.rejections.map((row) => ({ ...row, rejectionReasons: [...row.rejectionReasons, ...coreRejections] })),
+    ...[...gameBets.recommendations, ...playerBets.recommendations].map((bet) => ({
+      ...bet, rejectionReasons: [
+        ...coreRejections,
+        ...(bet.edge < (bet.category === "Game" ? MIN_GAME_EDGE : MIN_PROP_EDGE) ? ["edge_below_0.045"] : []),
+        ...(bet.expectedValue < (bet.category === "Game" ? MIN_GAME_EV : MIN_PROP_EV) ? ["ev_below_0.03"] : []),
+      ],
+      persistedCandidate: candidates.some((candidate) => betIdentity(candidate) === betIdentity(bet)),
+      displayedRecommendation: recommendations.some((candidate) => betIdentity(candidate) === betIdentity(bet)),
+    })),
+  ] : null;
 
   return {
     available: markets.length > 0,
     assessed,
     marketDiagnostics: {
       ...marketDiagnostics,
+      quoteValidationVersion: QUOTE_VALIDATION_VERSION,
+      quarantinedOffers: validation.quarantined.length,
+      personnelSource: dataQuality?.personnel !== false ? "personnel" : personnelReady ? "verified-weekly-depth" : "unverified",
       rawPlayerMarkets: markets.filter((market) => isPlayerMarket(market.marketKey)).length,
       consensusPlayerMarkets: consensusPlayerMarkets.length,
       playerMarkets: playerBets.playerMarkets,
@@ -77,6 +106,10 @@ export function buildBestBets({ game, prediction, playerProjections, oddsEvent, 
     qualified: recommendations.length,
     rejected: Math.max(0, assessed - recommendations.length),
     generatedAt: new Date().toISOString(),
+    candidateVersion: BEST_BETS_CANDIDATE_VERSION,
+    candidates,
+    quarantinedOffers: validation.quarantined,
+    ...(audit ? { assessments } : {}),
     recommendations,
     message: recommendations.length
       ? null
@@ -86,23 +119,37 @@ export function buildBestBets({ game, prediction, playerProjections, oddsEvent, 
   };
 }
 
+function verifiedBetLineups(game, teamMetrics, dataQuality, asOf) {
+  const cutoff = dataQuality?.personnelTiming?.cutoff;
+  const observed = Date.parse(asOf);
+  return Number.isFinite(observed) && ["away", "home"].every((side) => {
+    const source = teamMetrics?.[side];
+    const lineup = source?.expectedLineup;
+    return source?.team === game?.[side] && validDepthLineup(lineup, game?.week, game?.season) &&
+      lineup.cutoff === cutoff && Date.parse(lineup.snapshotAt) <= observed &&
+      observed <= Date.parse(cutoff);
+  });
+}
+
 function buildGameBets(game, prediction, markets, dataQuality) {
   const result = [];
   let assessed = 0;
   const away = normalizeTeam(game?.away || prediction?.away?.code);
   const home = normalizeTeam(game?.home || prediction?.home?.code);
-  const modelAway = number(prediction?.awayWinProbability, 0.5);
-  const modelHome = number(prediction?.homeWinProbability, 0.5);
-  const modelMarginHome = number(prediction?.home?.expectedPoints, prediction?.home?.score) -
-    number(prediction?.away?.expectedPoints, prediction?.away?.score);
-  const modelTotal = number(prediction?.home?.expectedPoints, prediction?.home?.score) +
-    number(prediction?.away?.expectedPoints, prediction?.away?.score);
+  const modelAway = nullable(prediction?.awayWinProbability);
+  const modelHome = nullable(prediction?.homeWinProbability);
+  const homePoints = nullable(prediction?.home?.expectedPoints ?? prediction?.home?.score);
+  const awayPoints = nullable(prediction?.away?.expectedPoints ?? prediction?.away?.score);
+  const scoresAvailable = homePoints !== null && awayPoints !== null;
+  const modelMarginHome = scoresAvailable ? homePoints - awayPoints : null;
+  const modelTotal = scoresAvailable ? homePoints + awayPoints : null;
   const quality = overallQuality(dataQuality, prediction);
 
   const h2h = markets.filter((row) => row.marketKey === "h2h");
   const awayMoney = bestOutcome(h2h, (row) => teamMatches(row.name, away));
   const homeMoney = bestOutcome(h2h, (row) => teamMatches(row.name, home));
-  if (awayMoney && homeMoney) {
+  if (awayMoney && homeMoney && modelAway !== null && modelHome !== null &&
+      modelAway >= 0 && modelAway <= 1 && modelHome >= 0 && modelHome <= 1) {
     assessed += 2;
     const noVig = noVigPair(awayMoney.price, homeMoney.price);
     result.push(gameBet("Moneyline", away, awayMoney, modelAway, noVig.first, quality,
@@ -114,7 +161,7 @@ function buildGameBets(game, prediction, markets, dataQuality) {
   const spreads = markets.filter((row) => row.marketKey === "spreads");
   for (const [team, opponent, modelMargin] of [[away, home, -modelMarginHome], [home, away, modelMarginHome]]) {
     const row = bestOutcome(spreads, (item) => teamMatches(item.name, team));
-    if (!row || !Number.isFinite(row.point)) continue;
+    if (!row || !Number.isFinite(row.point) || !scoresAvailable) continue;
     assessed += 1;
     const coverMargin = modelMargin + row.point;
     const probability = logisticProbability(coverMargin, 6.5);
@@ -126,7 +173,7 @@ function buildGameBets(game, prediction, markets, dataQuality) {
   const totals = markets.filter((row) => row.marketKey === "totals");
   for (const side of ["Over", "Under"]) {
     const row = bestOutcome(totals, (item) => normalize(item.name) === side.toLowerCase());
-    if (!row || !Number.isFinite(row.point)) continue;
+    if (!row || !Number.isFinite(row.point) || !scoresAvailable) continue;
     assessed += 1;
     const difference = side === "Over" ? modelTotal - row.point : row.point - modelTotal;
     const probability = logisticProbability(difference, 8.5);
@@ -200,6 +247,8 @@ function selectAnytimeTdScorer({ playerProjections, markets, playerBetCandidates
       reason: `Fourth Down gives ${topPlayer.playerName} a ${percent(topPlayer.probability)} chance to score a touchdown.`,
       risk: playerRisk(topPlayer.player, "player_anytime_td", topPlayer.roleConfidence),
       updatedAt: directPricedMarket.updatedAt,
+      quoteValidation: directPricedMarket.quoteValidation,
+      quoteId: directPricedMarket.quoteSource?.id || null,
     });
   }
 
@@ -386,6 +435,7 @@ function isFullPlayerName(value) {
 
 function buildPlayerBets(playerProjections, markets) {
   const result = [];
+  const rejections = [];
   let assessed = 0;
   let matchedPlayerMarkets = 0;
   const players = collectProjectedPlayers(playerProjections);
@@ -406,21 +456,38 @@ function buildPlayerBets(playerProjections, markets) {
 
   for (const market of markets) {
     const config = fields[market.marketKey];
-    if (!config || !market.playerName) continue;
+    const rejection = (rejectionReasons, details = {}) => rejections.push({
+      market: config?.[2] || market.marketKey, rawMarketType: market.rawMarketType,
+      playerName: market.playerName, selection: market.name, line: market.point,
+      price: market.price, sportsbook: market.sportsbook, ...details, rejectionReasons,
+    });
+    if (!config || !market.playerName) {
+      rejection([!config ? "unsupported_market" : "missing_player_identity"]);
+      continue;
+    }
     const player = players.find((item) =>
       namesMatch(canonicalPlayerName(getPlayerName(item)), canonicalPlayerName(market.playerName))
     );
-    if (!player) continue;
+    if (!player) { rejection(["unmatched_player"]); continue; }
     const displayName = resolvePlayerDisplayName(player, market.playerName);
-    if (!isPlausiblePlayerPropLine(market.marketKey, market.point)) continue;
+    if (!isPlausiblePlayerPropLine(market.marketKey, market.point)) {
+      rejection(["implausible_line"]); continue;
+    }
     matchedPlayerMarkets += 1;
     const roleConfidence = normaliseConfidence(player.roleConfidence ?? player.confidence ?? player.role?.confidence);
     const quality = normaliseConfidence(player.dataQuality ?? player.quality ?? player.dataQualityScore);
-    if (roleConfidence < 0.55 || quality < 0.5) continue;
+    const rejected = [
+      ...(roleConfidence < 0.55 ? ["role_confidence_below_0.55"] : []),
+      ...(quality < 0.5 ? ["data_quality_below_0.50"] : []),
+    ];
+    if (rejected.length) {
+      rejection(rejected, { roleConfidence, dataQuality: quality, modelProjection: findMetric(player, config[0]) });
+      continue;
+    }
     assessed += 1;
     const [field, deviation, marketLabel, unitLabel] = config;
     const projection = findMetric(player, field);
-    if (!Number.isFinite(projection)) continue;
+    if (!Number.isFinite(projection)) { rejection(["missing_projection"]); continue; }
     let modelProbability;
     let selection;
     let line = market.point;
@@ -456,6 +523,8 @@ function buildPlayerBets(playerProjections, markets) {
       reason: differenceText,
       risk: playerRisk(player, market.marketKey, roleConfidence),
       updatedAt: market.updatedAt,
+      quoteValidation: market.quoteValidation,
+      quoteId: market.quoteSource?.id || null,
     });
     if (bet) result.push(bet);
   }
@@ -465,6 +534,7 @@ function buildPlayerBets(playerProjections, markets) {
     playerMarkets,
     matchedPlayerMarkets,
     projectedPlayers: players.length,
+    rejections,
     providerPlayerNames: [...new Set(markets.filter((market) => isPlayerMarket(market.marketKey)).map((market) => market.playerName).filter(Boolean))].slice(0, 20),
     projectionPlayerNames: players.map(getPlayerName).filter(Boolean).slice(0, 20),
   };
@@ -544,7 +614,7 @@ function findMetric(player, field) {
     anytimeTouchdownProbability: ["anytimeTouchdownProbability", "anytime_touchdown_probability", "touchdownProbability"],
   };
   for (const key of aliases[field] || [field]) {
-    const value = Number(player?.[key]);
+    const value = nullable(player?.[key]);
     if (Number.isFinite(value)) return value;
   }
   if (field === "rushingReceivingYards") {
@@ -773,6 +843,7 @@ function gameBet(market, selection, row, modelProbability, marketProbability, qu
   return buildBet({
     category: "Game",
     market,
+    teamCode: ["Moneyline", "Spread"].includes(market) ? selection.split(" ")[0] : null,
     selection,
     line: row.point,
     price: row.price,
@@ -785,12 +856,15 @@ function gameBet(market, selection, row, modelProbability, marketProbability, qu
     reason,
     risk: "Market movement, injuries and late lineup changes can reduce the edge",
     updatedAt: row.updatedAt,
+    quoteValidation: row.quoteValidation,
+    quoteId: row.quoteSource?.id || null,
   });
 }
 
 function buildBet(input) {
-  const price = number(input.price, NaN);
-  if (!Number.isFinite(price)) return null;
+  const price = nullable(input.price);
+  if (!Number.isFinite(price) || price === 0 || !Number.isFinite(input.modelProbability) ||
+      !Number.isFinite(input.marketProbability)) return null;
   const decimalOdds = americanToDecimal(price);
   const edge = input.modelProbability - input.marketProbability;
   const expectedValue = input.modelProbability * (decimalOdds - 1) - (1 - input.modelProbability);
@@ -840,6 +914,7 @@ function flattenMarkets(event) {
           : [];
 
       for (const outcome of outcomes) {
+        if (outcome.quoteValidation?.status === "quarantined") continue;
         rows.push({
           marketKey: normaliseMarketKey(market.key || market.marketKey || market.type),
           rawMarketType: outcome.rawMarketType || market.rawMarketType || market.type || market.key || null,
@@ -854,13 +929,15 @@ function flattenMarkets(event) {
           point: nullable(outcome.point ?? outcome.line),
           price: normaliseAmericanPrice(outcome.price ?? outcome.odds ?? outcome.american),
           sportsbook: book.title || book.name || book.key || "Market",
-          updatedAt: market.last_update || market.updatedAt || book.last_update || book.updatedAt || null,
+          updatedAt: outcome.updatedAt || market.last_update || market.updatedAt || book.last_update || book.updatedAt || null,
+          quoteValidation: outcome.quoteValidation,
+          quoteSource: outcome.quoteSource,
         });
       }
     }
   }
 
-  return rows.filter((row) => row.marketKey && Number.isFinite(row.price));
+  return rows.filter((row) => row.marketKey && Number.isFinite(row.price) && row.price !== 0);
 }
 
 function normaliseMarketKey(value) {
@@ -907,7 +984,7 @@ function overallQuality(dataQuality, prediction) {
   const coverage = values.length ? values.filter(Boolean).length / values.length : 0.5;
   return clamp((coverage + number(prediction?.confidenceScore, 0.5)) / 2, 0.25, 0.95);
 }
-function teamMatches(name, code) { return normalize(name).includes(normalize(code)) || normalizeTeam(name) === code; }
+function teamMatches(name, code) { return resolveTeamCode(name) === resolveTeamCode(code); }
 function normalizeTeam(value) {
   const text = normalize(value); const names = { arizonacardinals:"ARI", atlantafalcons:"ATL", baltimoreravens:"BAL", buffalobills:"BUF", carolinapanthers:"CAR", chicagobears:"CHI", cincinnatibengals:"CIN", clevelandbrowns:"CLE", dallascowboys:"DAL", denverbroncos:"DEN", detroitlions:"DET", greenbaypackers:"GB", houstontexans:"HOU", indianapoliscolts:"IND", jacksonvillejaguars:"JAX", kansascitychiefs:"KC", lasvegasraiders:"LV", losangeleschargers:"LAC", losangelesrams:"LAR", miamidolphins:"MIA", minnesotavikings:"MIN", newenglandpatriots:"NE", neworleanssaints:"NO", newyorkgiants:"NYG", newyorkjets:"NYJ", philadelphiaeagles:"PHI", pittsburghsteelers:"PIT", sanfrancisco49ers:"SF", seattleseahawks:"SEA", tampabaybuccaneers:"TB", tennesseetitans:"TEN", washingtoncommanders:"WSH" };
   return names[text] || String(value || "").toUpperCase();

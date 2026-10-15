@@ -192,11 +192,13 @@ async function createPrediction({ game, oddsEvent, season, week, away, home, sig
   });
   dataQuality.playerProjections = playerProjections.available === true;
   const bestBets = buildBestBets({
-    game: gameWithWeather,
+    game: { ...gameWithWeather, season, week, away, home },
     prediction,
     playerProjections,
     oddsEvent,
     dataQuality,
+    teamMetrics: values.playByPlay,
+    asOf: new Date().toISOString(),
   });
   dataQuality.bestBets = bestBets.available === true;
   return {

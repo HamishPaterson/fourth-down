@@ -2,7 +2,7 @@ import {
   createWeeklyMultiClient, createWeeklyMultiLockHandler, resolveLockWeekContext,
   predictionSnapshotsForWeek, secureBearerMatches, buildWeeklyMultiSelection,
 } from "./weeklyMulti.js";
-import { createServerPredictionGenerator, readPredictionOdds, saveAuthoritativePrediction } from "./serverPredictions.js";
+import { createServerPredictionGenerator, readPredictionOdds, saveAuthoritativePrediction, refreshSavedBestBets } from "./serverPredictions.js";
 import { completePrediction } from "./predictionEligibility.js";
 import { FULL_MODEL_VERSION } from "../src/services/gamePredictionService.js";
 
@@ -67,7 +67,7 @@ export function createWeeklyMultiPreparationHandler(overrides = {}) {
           const saved = prepared.get(`${game.visitor_team?.abbreviation}:${game.home_team?.abbreviation}:${Date.parse(game.date)}`);
           if (saved) {
             status.reusedPredictions++;
-            return saved;
+            return (overrides.refreshBestBets || refreshSavedBestBets)(saved, odds, now);
           }
           const snapshot = await generate({
             season: context.season, week: context.week,

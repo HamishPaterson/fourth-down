@@ -723,7 +723,7 @@ function BestBetsPanel({ bestBets, kickoff, awayCode, homeCode }) {
                 <span className="best-bet-price">{formatAustralianOdds(bet.decimalOdds, bet.price)}</span>
               </div>
               <div className="best-bet-metrics">
-                <span><small>Model</small><strong>{formatPercent(bet.modelProbability)}</strong></span>
+                <span><small>Model probability</small><strong>{formatPercent(bet.modelProbability)}</strong></span>
                 <span><small>Market</small><strong>{formatPercent(bet.marketProbability)}</strong></span>
                 <span><small>Edge</small><strong>+{formatPercent(bet.edge)}</strong></span>
                 <span><small>Est. EV</small><strong>+{formatPercent(bet.expectedValue)}</strong></span>
@@ -821,7 +821,7 @@ function AnytimeTdScorer({ scorer, awayCode, homeCode }) {
         </span>
       </div>
       <div className="best-bet-metrics" style={{ gridTemplateColumns: "repeat(3, 1fr)" }}>
-        <span><small>TD chance</small><strong>{formatPercent(modelProbability)}</strong></span>
+        <span><small>Model probability</small><strong>{formatPercent(modelProbability)}</strong></span>
         <span><small>Confidence</small><strong>{scorer?.confidenceLevel || "Cautious"}</strong></span>
         <span><small>Price</small><strong>{hasPrice ? formatAustralianOdds(scorer.decimalOdds, scorer.price) : "Unavailable"}</strong></span>
       </div>
@@ -849,7 +849,7 @@ function BestBetHighlights({ highlights, awayCode, homeCode }) {
           {bet ? (
             <>
               <strong>{formatFullPlayerSelection(bet.selection)}</strong>
-              <span>{formatAustralianOdds(bet.decimalOdds, bet.price)} · {formatPercent(bet.modelProbability)} model chance</span>
+              <span>{formatAustralianOdds(bet.decimalOdds, bet.price)} · Model probability {formatPercent(bet.modelProbability)}</span>
               <p>{bet.highlightExplanation}</p>
 
             </>
@@ -1227,7 +1227,7 @@ export function WeeklyParlay({ parlay, week }) {
           </strong>
           {parlay?.modelProbability !== null && parlay?.modelProbability !== undefined && (
             <span style={{ display: "block", marginTop: "6px", color: "rgba(255,255,255,.55)", fontSize: "9px" }}>
-              {formatPercent(parlay.modelProbability)} model chance
+              Model probability {formatPercent(parlay.modelProbability)}
             </span>
           )}
         </div>}

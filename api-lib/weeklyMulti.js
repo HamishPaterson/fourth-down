@@ -3,6 +3,7 @@ import { SNAPSHOT_MAX_AGE_MS } from "./oddsSnapshots.js";
 import { isPlayerLeg, settleLockedLegs } from "./weeklyMultiSettlement.js";
 import { findOddsForGame, resolveTeamCode } from "../src/services/oddsApi.js";
 import { usableDecimalOdds } from "../src/services/oddsDisplay.js";
+import { validateOddsEvents } from "../src/services/quoteValidation.js";
 
 const BALLDONTLIE_GAMES_URL = "https://api.balldontlie.io/nfl/v1/games";
 // Odds now come from once-a-day stored snapshots, so quote age is bounded by
@@ -270,7 +271,8 @@ function isFreshPrediction(snapshot, context, now) {
 export function buildWeeklyMultiSelection(snapshots, oddsPayload, context, now = new Date()) {
   const reasonCounts = { stalePrediction: 0, staleOdds: 0, fallbackOdds: 0, invalidCandidates: 0 };
   const candidates = [];
-  const oddsEvents = Array.isArray(oddsPayload?.events) ? oddsPayload.events : [];
+  const quoteAudit = validateOddsEvents(Array.isArray(oddsPayload?.events) ? oddsPayload.events : [], { now });
+  const oddsEvents = quoteAudit.events;
   for (const snapshot of snapshots || []) {
     const bestBetsPayload = snapshot.bestBets || snapshot.dataQuality?.bestBetsPayload;
     const scorer = bestBetsPayload?.anytimeTdScorer;
@@ -308,9 +310,13 @@ export function buildWeeklyMultiSelection(snapshots, oddsPayload, context, now =
       reasonCounts.fallbackOdds += 1;
       continue;
     }
-    const bets = [...(bestBetsPayload?.recommendations || [])];
+    const bets = [...(bestBetsPayload?.candidates || bestBetsPayload?.recommendations || [])];
     if (scorer?.source === "priced-market") bets.push(scorer);
     for (const bet of bets) {
+      if (bet.quoteValidation?.status === "quarantined") {
+        reasonCounts.invalidCandidates += 1;
+        continue;
+      }
       const decimalOdds = getDecimalOddsValue(bet);
       const modelProbability = Number(bet.modelProbability);
       const quoteTime = new Date(bet.updatedAt || 0).getTime();
@@ -357,13 +363,12 @@ export function buildWeeklyMultiSelection(snapshots, oddsPayload, context, now =
     const byMatchup = new Map();
     const families = new Set();
     const eligible = ranked.filter((candidate) => candidate.modelProbability >= threshold);
-    for (const phase of ["priced-families", "priced", "model-only"]) {
+    for (const phase of ["priced", "model-only"]) {
       for (const candidate of eligible) {
         if (Boolean(candidate.modelOnly) !== (phase === "model-only")) continue;
         const family = candidate.marketFamily;
         if (byMatchup.size >= LEG_COUNT || byMatchup.has(candidate.matchupKey)) continue;
         if (family === "anytime-td" && families.has(family)) continue;
-        if (phase === "priced-families" && families.has(family)) continue;
         byMatchup.set(candidate.matchupKey, candidate);
         families.add(family);
       }
@@ -386,6 +391,7 @@ export function buildWeeklyMultiSelection(snapshots, oddsPayload, context, now =
     oddsRefreshedAt: oddsPayload?.refreshedAt || null,
     oddsLate,
     reasonCounts,
+    quarantinedOffers: quoteAudit.quarantined,
     candidateCounts: Object.fromEntries([...new Set(ranked.map((candidate) => candidate.marketFamily))].sort()
       .map((family) => [family, ranked.filter((candidate) => candidate.marketFamily === family && candidate.modelProbability >= FLOOR_PROBABILITY).length])),
   };
@@ -516,14 +522,20 @@ function hasCurrentBookMarket(event, bet) {
   const suppliedLine = bet.line ?? bet.point ?? bet.handicap;
   const line = suppliedLine === null || suppliedLine === undefined ? null : Number(suppliedLine);
   return matches.some((market) => (market.outcomes || []).some((outcome) => {
+    if (outcome.quoteValidation?.status !== "validated") return false;
+    if (bet.quoteId && outcome.quoteSource?.id !== bet.quoteId) return false;
+    if (bet.price !== null && bet.price !== undefined && bet.price !== "" &&
+        (!Number.isFinite(Number(bet.price)) || Number(bet.price) !== Number(outcome.price))) return false;
     const name = normalizeText(outcome.name || outcome.selection || "");
     const point = outcome.point ?? outcome.line;
     const isTeamMarket = ["moneyline", "spread"].includes(canonicalMarketKey(bet.market));
     const player = isTeamMarket ? "" : normalizeText(outcome.playerName || outcome.description || "");
     const playerMatch = player && selection.startsWith(player + name);
-    const selectionMatch = isTeamMarket ? resolveTeamCode(outcome.name) === resolveTeamCode(bet.selection)
+    const selectionMatch = isTeamMarket ? resolveTeamCode(outcome.name) === resolveTeamCode(bet.teamCode || bet.selection.split(" ")[0])
       : player ? playerMatch : name && (name === selection || selection.startsWith(name));
-    return selectionMatch && (line === null || Number(point) === line);
+    const decimal = usableDecimalOdds(null, outcome.price);
+    const matchingPrice = decimal !== null && Math.abs(decimal - getDecimalOddsValue(bet)) <= .0051;
+    return selectionMatch && matchingPrice && (line === null || Number(point) === line);
   }));
 }
 
@@ -536,7 +548,7 @@ function canonicalMarketKey(value) {
   const groups = {
     moneyline: ["moneyline", "h2h"],
     spread: ["spread", "spreads", "pointspread"],
-    total: ["total", "totals", "totalpoints"],
+    total: ["total", "totals", "totalpoints", "gametotal"],
     passingYards: ["passingyards", "playerpassyds", "playerpassingyards"],
     passingAttempts: ["passingattempts", "playerpassattempts", "playerpassingattempts"],
     passingTouchdowns: ["passingtouchdowns", "playerpasstds", "playerpassingtouchdowns"],

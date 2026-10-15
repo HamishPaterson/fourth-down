@@ -211,7 +211,9 @@ async function handleCoreFromSnapshots(res, deps) {
   const summary = summarizeSnapshots(snapshots, CORE_MARKETS, now);
   const byMarket = new Map(snapshots.map((snapshot) => [snapshot.market, snapshot]));
   const rows = CORE_MARKETS.flatMap((market) =>
-    hasSnapshotData(byMarket.get(market)) ? snapshotRows(byMarket.get(market)) : []
+    hasSnapshotData(byMarket.get(market)) ? snapshotRows(byMarket.get(market)).map(row => ({
+      ...row, snapshotFetchedAt: byMarket.get(market).fetched_at,
+    })) : []
   );
   // Snapshots are already filtered; the full-game check stays as a safety net.
   const eligibleRows = rows.filter(isEligibleOddsRow);
@@ -542,7 +544,9 @@ async function handlePropsFromSnapshots(res, deps) {
   const summary = summarizeSnapshots(snapshots, PLAYER_MARKETS, now);
   const byMarket = new Map(snapshots.map((snapshot) => [snapshot.market, snapshot]));
   const rows = PLAYER_MARKETS.flatMap((market) =>
-    hasSnapshotData(byMarket.get(market)) ? snapshotRows(byMarket.get(market)) : []
+    hasSnapshotData(byMarket.get(market)) ? snapshotRows(byMarket.get(market)).map(row => ({
+      ...row, snapshotFetchedAt: byMarket.get(market).fetched_at,
+    })) : []
   );
   const eligibleRows = rows.filter(isEligibleOddsRow);
   const events = buildEvents(eligibleRows);
@@ -1138,10 +1142,14 @@ function buildEvents(rows) {
       });
     }
 
-    addOddsRow(
-      eventMap.get(eventId),
-      row
-    );
+    const event = eventMap.get(eventId);
+    // Books can timestamp the same provider event a minute apart. Use its
+    // earliest kickoff across markets, not whichever row happened to arrive first.
+    if (Number.isFinite(kickoffMs(row)) &&
+        (!Number.isFinite(Date.parse(event.commence_time)) || kickoffMs(row) < Date.parse(event.commence_time))) {
+      event.commence_time = row.event_start_time;
+    }
+    addOddsRow(event, row);
   }
 
   return [...eventMap.values()]
@@ -1260,21 +1268,42 @@ function addOddsRow(event, row) {
   const americanPrice =
     getAmericanPrice(row);
 
-  if (
-    !outcomeName ||
-    americanPrice === null
-  ) {
+  if (!outcomeName) {
     return;
   }
 
   const outcome = {
     name: outcomeName,
     price: americanPrice,
-    playerName: getPlayerName(row),
+    playerName: marketKey.startsWith("player_") ? getPlayerName(row) : null,
     playerId: row.player_id || row.participant_id || row.athlete_id || null,
     description: row.description || row.player_name || null,
     rawMarketType: row.market_type || row.market || row.market_key || null,
     period: getMarketPeriod(row),
+    updatedAt: row.timestamp || null,
+    quoteSource: {
+      provider: SNAPSHOT_PROVIDER,
+      id: row.id || null,
+      eventId: String(row.event_id),
+      eventUuid: row.event_uuid || null,
+      playerName: marketKey.startsWith("player_") ? getPlayerName(row) : null,
+      playerId: row.player_id || row.participant_id || row.athlete_id || null,
+      market: row.market_type || row.market || row.market_key || null,
+      marketId: row.market_id || null,
+      selectionId: row.selection_id || null,
+      side: row.selection_type || row.side || row.over_under || null,
+      line: row.line ?? row.point ?? row.points ?? row.handicap ?? row.total ?? null,
+      decimalOdds: row.odds_decimal ?? row.decimal_odds ?? row.decimal ?? row.odds?.decimal ?? row.best_odds?.decimal ?? null,
+      americanOdds: row.odds_american ?? row.american_odds ?? row.american ?? row.price ?? row.odds?.american ?? row.best_odds?.american ?? null,
+      period: row.period || row.period_type || row.segment || row.scope || null,
+      isMainLine: row.is_main_line ?? null,
+      isAlternateLine: row.is_alternate_line ?? null,
+      isLive: row.is_live ?? null,
+      isActive: row.is_active ?? null,
+      isStale: row.is_stale_pregame_price ?? null,
+      timestamp: row.timestamp || null,
+      fetchedAt: row.snapshotFetchedAt || null,
+    },
   };
 
   if (

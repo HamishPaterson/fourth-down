@@ -11,6 +11,29 @@ import { buildPredictionSnapshot } from "../src/services/predictionSnapshot.js";
 import { findOddsForGame } from "../src/services/oddsApi.js";
 import { completePrediction, retainPrediction } from "./predictionEligibility.js";
 import { mergeStoredOdds, isFreshOddsPayload } from "./weeklyMulti.js";
+import dataset from "../api/nfl/nflverse-team-metrics.js";
+import { buildBestBets, BEST_BETS_CANDIDATE_VERSION } from "../src/services/bestBetsService.js";
+
+export function refreshSavedBestBets(snapshot, odds, now) {
+  if (snapshot.bestBets?.candidateVersion === BEST_BETS_CANDIDATE_VERSION &&
+      Array.isArray(snapshot.bestBets.candidates)) return snapshot;
+  if (!completePrediction(snapshot) || Date.parse(snapshot.kickoff) <= now.getTime()) {
+    throw new Error("Candidate repair requires a complete pre-kickoff prediction");
+  }
+  const event = findOddsForGame(odds.events, snapshot);
+  if (!event?.bookmakers?.length) throw new Error(`Stored odds missing for ${snapshot.awayCode} at ${snapshot.homeCode}`);
+  const game = { ...snapshot.game, season: snapshot.season, week: snapshot.week, away: snapshot.awayCode, home: snapshot.homeCode };
+  const teamMetrics = Number(dataset.season) === snapshot.season ? {
+    away: { team: snapshot.awayCode, ...dataset.metricsByWeek?.[snapshot.week]?.[snapshot.awayCode] },
+    home: { team: snapshot.homeCode, ...dataset.metricsByWeek?.[snapshot.week]?.[snapshot.homeCode] },
+  } : null;
+  const bestBets = buildBestBets({
+    game, prediction: snapshot.predictionPayload, playerProjections: snapshot.playerProjections,
+    oddsEvent: event, dataQuality: snapshot.dataQuality, teamMetrics, asOf: snapshot.generatedAt, quoteAsOf: now,
+  });
+  return { ...snapshot, bestBets,
+    dataQuality: { ...snapshot.dataQuality, bestBets, bestBetsPayload: bestBets } };
+}
 
 export async function invoke(handler, query = {}, options = {}) {
   let status = 200, body;

@@ -27,19 +27,21 @@ const CONTEXT = {
 };
 
 const bet = (market, selection, extra = {}) => ({
-  category: "Game", market, selection, sportsbook: "BK", decimalOdds: 2, modelProbability: 0.7, updatedAt: QUOTE_AT, ...extra,
+  category: "Game", market, selection, sportsbook: "BK",
+  decimalOdds: ["Moneyline", "Anytime touchdown"].includes(market) ? 2 : 1.909,
+  modelProbability: 0.7, updatedAt: QUOTE_AT, ...extra,
 });
 const book = (markets) => ({ key: "bk", title: "BK", last_update: QUOTE_AT, markets });
 const ml = book([{ key: "h2h", outcomes: [{ name: "ARI", price: 100 }] }]);
 const spread = book([{ key: "spreads", outcomes: [{ name: "BUF", point: -3.5, price: -110 }] }]);
 const total = book([{ key: "totals", outcomes: [{ name: "Over", point: 44.5, price: -110 }] }]);
-const passYds = book([{ key: "player_pass_yds", outcomes: [{ name: "Over", point: 250.5, price: -110 }] }]);
+const passYds = book([{ key: "player_pass_yds", outcomes: [{ name: "Over", playerName: "Named Quarterback", point: 250.5, price: -110 }] }]);
 
 const GAMES = [
   { away: "ARI", home: "LAR", id: "e1", bets: [bet("Moneyline", "ARI")], core: ml },
   { away: "BUF", home: "MIA", id: "e2", bets: [bet("Spread", "BUF", { line: -3.5 })], core: spread },
   { away: "DAL", home: "NYG", id: "e3", bets: [bet("Total", "Over", { line: 44.5 })], core: total },
-  { away: "KC", home: "DEN", id: "e4", bets: [bet("player_pass_yds", "Over", { line: 250.5, category: "Player" })], props: passYds },
+  { away: "KC", home: "DEN", id: "e4", bets: [bet("player_pass_yds", "Named Quarterback Over 250.5 passing yards", { line: 250.5, category: "Player" })], props: passYds },
   { away: "SEA", home: "SF", id: "e5", bets: [], scorer: { source: "model-only", selection: "K. Walker anytime TD", modelProbability: 0.7, roleConfidence: 1, decimalOdds: null } },
 ];
 
@@ -184,7 +186,7 @@ test("invalid or weak role confidence cannot admit a TD to create diversity", ()
   }
 });
 
-test("priced candidates prefer different market families, retain positive edge and remain deterministic", () => {
+test("priced candidates retain positive edge and remain deterministic without family quotas", () => {
   const games = GAMES.map((game) => ({ ...game, bets: [...game.bets] }));
   games[1].bets.unshift(bet("Moneyline", "BUF", { modelProbability: .8 }));
   games[1].core = book([...spread.markets, { key: "h2h", outcomes: [{ name: "BUF", price: 100 }] }]);
@@ -225,9 +227,12 @@ test("multiple Anytime TD offers, priced or unpriced, cannot consume more than o
 
 test("ranking is unchanged for priced input and model-only legs rank after priced legs", () => {
   const games = [
-    { ...GAMES[0], bets: [bet("Moneyline", "ARI", { decimalOdds: 2.2, modelProbability: 0.7 })] },
-    { ...GAMES[1], bets: [bet("Spread", "BUF", { line: -3.5, decimalOdds: 2.0, modelProbability: 0.8 })] },
-    { ...GAMES[2], bets: [bet("Total", "Over", { line: 44.5, decimalOdds: 1.9, modelProbability: 0.9 })] },
+    { ...GAMES[0], bets: [bet("Moneyline", "ARI", { decimalOdds: 2.2, modelProbability: 0.7 })],
+      core: book([{ key: "h2h", outcomes: [{ name: "ARI", price: 120 }] }]) },
+    { ...GAMES[1], bets: [bet("Spread", "BUF", { line: -3.5, decimalOdds: 2.0, modelProbability: 0.8 })],
+      core: book([{ key: "spreads", outcomes: [{ name: "BUF", point: -3.5, price: 100 }] }]) },
+    { ...GAMES[2], bets: [bet("Total", "Over", { line: 44.5, decimalOdds: 1.9, modelProbability: 0.9 })],
+      core: book([{ key: "totals", outcomes: [{ name: "Over", point: 44.5, price: -111 }] }]) },
   ];
   const selection = select(games);
   assert.deepEqual(selection.legs.map((leg) => leg.awayCode), ["DAL", "BUF", "ARI"]);

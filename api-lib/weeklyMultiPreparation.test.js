@@ -11,6 +11,7 @@ import players from "../data/nflverse-player-metrics.js";
 import { playerMetricsResponse } from "./playerMetrics.js";
 import { compareTeams } from "../api/nfl/play-by-play.js";
 import { FULL_MODEL_VERSION, FULL_MODEL_KEY } from "../src/services/gamePredictionService.js";
+import { BEST_BETS_CANDIDATE_VERSION } from "../src/services/bestBetsService.js";
 
 const LOCK = Date.parse("2026-10-15T00:00:00Z");
 const KICKOFF = "2026-10-16T00:15:00Z";
@@ -32,6 +33,10 @@ const context = (week = 6, lock = LOCK) => ({
     visitor_team: { abbreviation: away }, home_team: { abbreviation: home } })),
 });
 function fixture(game, now) {
+  const recommendations = [{
+    market: "Moneyline", selection: game.away, modelProbability: .7, decimalOdds: 2,
+    sportsbook: "Book", updatedAt: now.toISOString(),
+  }];
   return {
     season: game.season, week: game.week, kickoff: game.sourceDate, awayCode: game.away, homeCode: game.home,
     fourthDownPick: game.away, fourthDownAwayScore: 24, fourthDownHomeScore: 20,
@@ -40,10 +45,8 @@ function fixture(game, now) {
     playerProjections: { available: true },
     dataQuality: { sources: { odds: { available: true } } },
     generatedAt: now.toISOString(), snapshotAt: now.toISOString(),
-    bestBets: { assessed: 4, recommendations: [{
-      market: "Moneyline", selection: game.away, modelProbability: .7, decimalOdds: 2,
-      sportsbook: "Book", updatedAt: now.toISOString(),
-    }], anytimeTdScorer: { source: "model-only", selection: "Validated Full Player anytime TD", modelProbability: .68, roleConfidence: 1 } },
+    bestBets: { candidateVersion: BEST_BETS_CANDIDATE_VERSION, assessed: 4, recommendations, candidates: recommendations,
+      anytimeTdScorer: { source: "model-only", selection: "Validated Full Player anytime TD", modelProbability: .68, roleConfidence: 1 } },
   };
 }
 function odds(now) {
@@ -252,6 +255,7 @@ test("no qualifying candidates yields an honest empty partial at the deadline, n
   const { res } = await run({ now, generatePrediction: async (game) => {
     const snapshot = fixture(game, now);
     snapshot.bestBets.recommendations = [];
+    snapshot.bestBets.candidates = [];
     snapshot.bestBets.anytimeTdScorer = null;
     return snapshot;
   } });
@@ -263,7 +267,10 @@ test("no qualifying candidates yields an honest empty partial at the deadline, n
 test("a model-only TD remains eligible alongside priced Best Bets after shared persistence", async () => {
   const { res } = await run({ generatePrediction: async (game) => {
     const snapshot = fixture(game, new Date(LOCK));
-    if (game.away === "SEA") snapshot.bestBets.recommendations = [];
+    if (game.away === "SEA") {
+      snapshot.bestBets.recommendations = [];
+      snapshot.bestBets.candidates = [];
+    }
     return snapshot;
   } });
   assert.equal(res.body.record.legs.length, 5);

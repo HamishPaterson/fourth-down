@@ -126,20 +126,61 @@ databases. It adds the lock metadata columns without rewriting any existing
 records, enforces the season/week unique key, retains immutability and reloads
 the PostgREST schema cache. Orchestration checks this schema before generating
 predictions, so an outdated deployment fails explicitly without needless refreshes.
-Retries reuse eligible complete authoritative predictions rather than generating
-new candidates or replacing them with newer odds.
+Retries reuse eligible complete authoritative predictions. Legacy Best Bets
+payloads can receive a server-only candidate-version upgrade using stored odds,
+the same saved projections and verified exact-week depth charts; scores, model
+version and prediction generation timestamp do not change. Frozen/post-kickoff
+records and existing Multis cannot receive this upgrade.
 Safe stage/count/freshness/status logs expose failed preparation and persistence.
 Reading the page only polls shared storage; it does not generate or lock a Multi.
 All devices read the immutable `weekly_best_multis` record. The unique
 season/week constraint and duplicate-insert recovery keep concurrent invocations
 on the same record; neither a page refresh nor new odds reconstructs it.
 
-Selection prefers eligible priced candidates across moneyline, spread, total,
-passing, rushing and receiving market families, then other priced candidates.
+Best Bets persists its full qualified candidate set separately from its capped
+display recommendations. Weekly Multi ranks that complete pool by EV, edge and
+model probability, without per-family quotas: multiple receiving or rushing
+props may coexist from different games. Moneyline matching uses exact canonical
+team identity, never a substring such as NE inside New York Jets.
+Verified point-in-time depth charts for both teams satisfy candidate personnel
+readiness when live injury/performance enrichment is unavailable; they do not
+claim injury coverage or change the saved scoring model. Missing, future-dated
+or wrong-week depth evidence still withholds bets, and player role/data-quality
+floors and minimum edge/EV are unchanged.
+Player-prop model probabilities currently use fixed logistic scales and require
+future point-in-time calibration against full-game results and historical lines.
+They are mechanically reproducible model estimates, not historically calibrated
+win rates or proven hit rates.
+Stored offers retain allowlisted provider quote IDs, original decimal/American
+prices, line, period, activity/main-line flags and quote/fetch timestamps.
+Best Bets candidate version 3 validates offers before consensus selection or EV
+ranking; Weekly Multi independently validates the current matching offer and
+requires its actual price to match the saved candidate.
+Quarantined offers remain in `bestBets.quarantinedOffers` with specific reasons
+and evidence, but never enter displayed recommendations or the qualified pool.
+No provider price is rewritten and there is no maximum-odds cap.
+
+Pair validation requires matching event/player/market/period/classification,
+line and provider market ID where supplied. Missing sides are rejected when a
+source explicitly requires pairs, or at least two observed groups are paired
+and at least 80% of that book/market's groups contain both sides; a normally
+one-sided feed is not treated as a missing-pair error. Gross paired implied
+probability sums below 0.90 or above 1.25 are quarantined (stored Week 6 pairs
+range from 1.0559 to 1.0656). Decimal/American conversion allows 0.0051 decimal
+rounding tolerance. Same-line cross-book outliers require two independent peers
+agreeing within five probability points, a discrepancy over twenty points and
+at least a threefold probability ratio. Different lines are never equivalent:
+ladder inversions require a lower Over/higher Under with over twenty points
+less implied probability and at least three times the decimal payout.
+Alternate/main and period scopes are kept separate. Inactive/live, unsupported,
+invalid-priced, stale (over 30 hours) or future-dated (over one minute) offers
+are withheld; missing legacy metadata is not represented as provider-verified.
 There is at most one Anytime TD leg and one leg per game. An unpriced TD is
 evaluated using TD probability times role confidence, ranks after priced value
 bets, and never receives invented odds, edge or EV. Probability gates still
-relax from 65% to 55%; insufficient candidates produce an honest partial.
+relax from 65% to 55%. Normal success requires exactly five distinct-game legs;
+proven input/market insufficiency is reported as an exceptional honest partial,
+never padded to five.
 Missing or invalid leg odds display "Odds unavailable"; combined odds remain
 "Pending" until every leg has a usable finite price.
 

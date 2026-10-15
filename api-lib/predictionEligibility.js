@@ -1,4 +1,5 @@
 import { FULL_MODEL_VERSION, FULL_MODEL_KEY } from "../src/services/gamePredictionService.js";
+import { BEST_BETS_CANDIDATE_VERSION } from "../src/services/bestBetsService.js";
 
 const number = (value) => value !== null && value !== undefined && value !== "" && Number.isFinite(Number(value));
 
@@ -25,6 +26,17 @@ export function retainPrediction(existing, incoming, now, authoritative = false)
   if (!completePrediction(existing)) return !completePrediction(incoming);
   if (!completePrediction(incoming)) return true;
   const age = now.getTime() - new Date(existing.generatedAt).getTime();
-  if (authoritative) return existing.authoritative === true && age >= 0 && age <= 24 * 60 * 60 * 1000;
+  if (authoritative) {
+    const candidateUpgrade = incoming.bestBets?.candidateVersion === BEST_BETS_CANDIDATE_VERSION &&
+      (existing.bestBets?.candidateVersion !== BEST_BETS_CANDIDATE_VERSION || !Array.isArray(existing.bestBets?.candidates)) &&
+      Array.isArray(incoming.bestBets.candidates) &&
+      ["season", "week", "awayCode", "homeCode", "kickoff", "generatedAt", "modelVersion", "modelKey",
+        "fourthDownPick", "fourthDownAwayScore", "fourthDownHomeScore",
+        "fourthDownAwayWinProbability", "fourthDownHomeWinProbability", "confidenceScore",
+        "predictionPayload", "playerProjections"]
+        .every((key) => key === "modelVersion" ? Number(existing[key]) === Number(incoming[key])
+          : JSON.stringify(existing[key]) === JSON.stringify(incoming[key]));
+    return !candidateUpgrade && existing.authoritative === true && age >= 0 && age <= 24 * 60 * 60 * 1000;
+  }
   return true;
 }
