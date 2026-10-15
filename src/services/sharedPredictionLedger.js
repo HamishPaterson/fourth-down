@@ -7,7 +7,7 @@ export async function fetchSharedPredictionLedger(options = {}) {
   if (options.week) params.set("week", String(options.week));
 
   const response = await fetch(
-    params.size ? `${ENDPOINT}?${params.toString()}` : ENDPOINT,
+    params.size ? `${ENDPOINT}&${params.toString()}` : ENDPOINT,
     {
       signal: options.signal,
       cache: "no-store",

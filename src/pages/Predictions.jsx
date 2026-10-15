@@ -13,7 +13,8 @@ import {
   CURRENT_MODEL_KEY,
   CURRENT_MODEL_VERSION,
 } from "../services/predictionLedger.js";
-import { findOddsForGame, getNflOddsWithProps } from "../services/oddsApi.js";
+import { findOddsForGame, getCoreMarket, getNflOddsWithProps } from "../services/oddsApi.js";
+import { combinedDecimalOdds, formatAustralianOdds, usableDecimalOdds } from "../services/oddsDisplay.js";
 import { getFullGamePrediction } from "../services/gamePredictionService.js";
 import { buildPredictionSnapshot } from "../services/predictionSnapshot.js";
 import { getPlayerRating, resolveFullPlayerName } from "../services/playerRatings.js";
@@ -190,7 +191,7 @@ export default function Predictions({ onOpen }) {
               hasSavedPrediction(saved) &&
               (
                 gameHasStarted ||
-                (isCurrentCompletePrediction(saved) && hasClearPlayerPropLabels(saved))
+                isCurrentCompletePrediction(saved)
               )
             ) {
               return {
@@ -440,7 +441,7 @@ function buildMarketFallback(game, oddsEvents, error) {
     fourthDownPick: winner,
     fourthDownAwayScore: awayScore === null ? null : Math.round(awayScore),
     fourthDownHomeScore: homeScore === null ? null : Math.round(homeScore),
-    oddsPick: winner,
+    oddsPick: market.pick,
     marketAwayScore: awayScore,
     marketHomeScore: homeScore,
     actualAwayScore: null,
@@ -450,7 +451,7 @@ function buildMarketFallback(game, oddsEvents, error) {
   };
 }
 
-function PredictionCard({ prediction, onOpen }) {
+export function PredictionCard({ prediction, onOpen }) {
   const [activeTab, setActiveTab] = useState("prediction");
   const awayTheme = getTeamTheme(prediction.awayCode);
   const homeTheme = getTeamTheme(prediction.homeCode);
@@ -545,6 +546,8 @@ function PredictionCard({ prediction, onOpen }) {
           <strong>
             {displayScore(awayScore)} - {displayScore(homeScore)}
           </strong>
+          {!isFinal && awayScore !== null && homeScore !== null && Number.isFinite(Number(awayScore)) && Number.isFinite(Number(homeScore)) &&
+            <small>Projected total {Number(awayScore) + Number(homeScore)}</small>}
           <span>
             {isFinal
               ? `${prediction.actualWinner} WON`
@@ -662,7 +665,7 @@ function PredictionCard({ prediction, onOpen }) {
             fontWeight: 800,
             cursor: "pointer",
           }}
-          onClick={() => onOpen(prediction.game)}
+          onClick={() => onOpen({ ...prediction.game, savedPrediction: prediction })}
         >
           Open matchup
         </button>
@@ -796,11 +799,7 @@ function displayBetFamily(bet) {
 function AnytimeTdScorer({ scorer, awayCode, homeCode }) {
   const selection = scorer?.selection || "No eligible scorer projection";
   const modelProbability = Number(scorer?.modelProbability || 0);
-  const decimalOdds = Number(scorer?.decimalOdds);
-  const americanPrice = Number(scorer?.price);
-  const hasPrice =
-    (Number.isFinite(decimalOdds) && decimalOdds > 1) ||
-    (Number.isFinite(americanPrice) && americanPrice !== 0);
+  const hasPrice = usableDecimalOdds(scorer?.decimalOdds, scorer?.price) !== null;
 
   return (
     <article
@@ -932,17 +931,6 @@ function formatFullPlayerSelection(value) {
   return `${resolved || playerName}${suffix}`;
 }
 
-function formatAustralianOdds(decimalOdds, americanPrice) {
-  let decimal = decimalOdds === null || decimalOdds === undefined || decimalOdds === "" ? NaN : Number(decimalOdds);
-  if (!Number.isFinite(decimal)) {
-    const price = Number(americanPrice);
-    if (!Number.isFinite(price)) return "Odds unavailable";
-    decimal = price > 0
-      ? 1 + price / 100
-      : 1 + 100 / Math.abs(price);
-  }
-  return `$${decimal.toFixed(2)}`;
-}
 function formatPercent(value) { return `${(Number(value || 0) * 100).toFixed(1)}%`; }
 function formatOddsTime(value) {
   const date = new Date(value);
@@ -1095,7 +1083,7 @@ function useWeeklyParlay(predictions) {
       ...record,
       week: record.week,
       legs,
-      decimalOdds: legs.length && legs.every((leg) => Number(leg.decimalOdds) > 1) ? legs.reduce((total, leg) => total * Number(leg.decimalOdds), 1) : null,
+      decimalOdds: combinedDecimalOdds(legs),
       modelProbability: legs.length ? legs.reduce((total, leg) => total * Number(leg.modelProbability || 0), 1) : null,
       modelProbabilityThreshold: Number(record.model_probability_threshold),
       complete: !record.partial && legs.length === WEEKLY_PARLAY_LEG_COUNT,
@@ -1151,16 +1139,10 @@ function resolveSelectedTeam(leg) {
 }
 
 function getDecimalOddsValue(bet) {
-  if (bet?.decimalOdds !== null && bet?.decimalOdds !== undefined && bet?.decimalOdds !== "") {
-    const decimal = Number(bet.decimalOdds);
-    if (Number.isFinite(decimal)) return decimal;
-  }
-  const american = Number(bet?.price);
-  if (!Number.isFinite(american) || american === 0) return null;
-  return american > 0 ? 1 + american / 100 : 1 + 100 / Math.abs(american);
+  return usableDecimalOdds(bet?.decimalOdds, bet?.price);
 }
 
-function WeeklyParlay({ parlay, week }) {
+export function WeeklyParlay({ parlay, week }) {
   const legs = parlay?.legs || [];
   const statusLabels = [
     parlay?.generated_late ? "Generated late" : null,
@@ -1214,7 +1196,7 @@ function WeeklyParlay({ parlay, week }) {
             </p>
           ) : !parlay?.placeholder && parlay?.status !== "missed" && (
             <p style={{ margin: 0, color: "rgba(255,255,255,.64)", fontSize: "12px" }}>
-              Up to {WEEKLY_PARLAY_LEG_COUNT} best-value legs with positive edge. The model-probability gate relaxes from {formatPercent(WEEKLY_PARLAY_MODEL_PROBABILITY_MIN)} to {formatPercent(WEEKLY_PARLAY_MODEL_PROBABILITY_FLOOR)} only when needed.
+              Up to {WEEKLY_PARLAY_LEG_COUNT} eligible legs across market families, with at most one Anytime TD. Priced legs require positive edge; unpriced TD uses role-adjusted probability. The probability gate relaxes from {formatPercent(WEEKLY_PARLAY_MODEL_PROBABILITY_MIN)} to {formatPercent(WEEKLY_PARLAY_MODEL_PROBABILITY_FLOOR)} only when needed.
             </p>
           )}
           {parlay?.reason && parlay?.status !== "not ready" && (
@@ -1241,7 +1223,7 @@ function WeeklyParlay({ parlay, week }) {
             COMBINED ODDS
           </small>
           <strong style={{ display: "block", marginTop: "3px", color: "#b9ff55", fontSize: "1.55rem", lineHeight: 1.05 }}>
-            {parlay?.decimalOdds ? `$${parlay.decimalOdds.toFixed(2)}` : "Pending"}
+            {Number.isFinite(parlay?.decimalOdds) && parlay.decimalOdds > 1 ? `$${parlay.decimalOdds.toFixed(2)}` : "Pending"}
           </strong>
           {parlay?.modelProbability !== null && parlay?.modelProbability !== undefined && (
             <span style={{ display: "block", marginTop: "6px", color: "rgba(255,255,255,.55)", fontSize: "9px" }}>
@@ -1301,7 +1283,7 @@ function WeeklyParlay({ parlay, week }) {
                   {formatFullPlayerSelection(bet.selection)}
                 </strong>
                 <span style={{ display: "block", marginTop: "4px", color: "rgba(255,255,255,.48)", fontSize: "9px" }}>
-                  {bet.sportsbook || "Best available price"}
+                  {bet.sportsbook || "No bookmaker price"}
                 </span>
                 {result !== "pending" && (
                   <strong style={{ display: "block", marginTop: "6px", color: resultColour, fontSize: "11px", textTransform: "uppercase" }}>
@@ -1388,15 +1370,15 @@ function PredictionSummary({ icon, label, value }) {
 
 function enrichSavedPredictionWithCurrentMarket(saved, game, oddsEvents) {
   const oddsEvent = findOddsForGame(oddsEvents, game);
-  const market = getMarketExpectedScores(oddsEvent);
+  const market = getCoreMarket(oddsEvent);
   const hasMarket = market.away !== null && market.home !== null;
-  const oddsPick = hasMarket
+  const oddsPick = market.pick || (hasMarket
     ? market.away > market.home
       ? game.away
       : market.home > market.away
         ? game.home
         : null
-    : saved.oddsPick || null;
+    : saved.oddsPick || null);
   const storedWeather =
     saved?.game?.weather ||
     saved?.dataQuality?.weather ||
@@ -1411,6 +1393,8 @@ function enrichSavedPredictionWithCurrentMarket(saved, game, oddsEvents) {
     oddsPick,
     marketAwayScore: hasMarket ? market.away : saved.marketAwayScore,
     marketHomeScore: hasMarket ? market.home : saved.marketHomeScore,
+    marketGameTotal: market.total ?? saved.marketGameTotal,
+    marketSpread: market.homeSpread ?? saved.marketSpread,
     game: {
       ...game,
       weather: game.weather || storedWeather,
@@ -1719,30 +1703,7 @@ function mapScheduleGame(apiGame) {
 }
 
 function getMarketExpectedScores(event) {
-  if (!event?.bookmakers?.length) return { away: null, home: null };
-
-  for (const bookmaker of event.bookmakers) {
-    const spread = bookmaker.markets?.find((market) => market.key === "spreads");
-    const totals = bookmaker.markets?.find((market) => market.key === "totals");
-    const homeOutcome = spread?.outcomes?.find(
-      (outcome) =>
-        normalizeName(outcome.name) === normalizeName(event.home_team)
-    );
-    const overOutcome = totals?.outcomes?.find(
-      (outcome) => String(outcome.name || "").toLowerCase() === "over"
-    );
-    const homeSpread = finiteNumberOrNull(homeOutcome?.point);
-    const total = finiteNumberOrNull(overOutcome?.point);
-
-    if (homeSpread !== null && total !== null) {
-      return {
-        away: (total + homeSpread) / 2,
-        home: (total - homeSpread) / 2,
-      };
-    }
-  }
-
-  return { away: null, home: null };
+  return getCoreMarket(event);
 }
 
 async function mapWithConcurrency(items, limit, mapper) {

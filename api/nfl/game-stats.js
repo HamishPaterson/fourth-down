@@ -1574,43 +1574,58 @@ function roundThree(value) {
 }
 
 // Shared Supabase prediction ledger actions.
-async function handlePredictionLedger(request, response) {
-  setLedgerHeaders(response);
+const handlePredictionLedger = createPredictionLedgerHandler();
 
-  if (request.method === "OPTIONS") {
-    return response.status(204).end();
-  }
+export function createPredictionLedgerHandler({ createClient = createServerClient } = {}) {
+  return async function predictionLedgerHandler(request, response) {
+    setLedgerHeaders(response);
 
-  let supabase;
-  try {
-    supabase = createServerClient();
-  } catch (error) {
-    return response.status(500).json({ error: error.message });
-  }
-
-  if (request.method === "GET") {
-    return readSnapshots(supabase, request, response);
-  }
-
-  if (request.method === "POST") {
-    if (!isSameOriginRequest(request)) {
-      return response.status(403).json({ error: "Cross-origin writes are not allowed" });
+    if (request.method === "OPTIONS") {
+      return response.status(204).end();
     }
 
-    if (String(request.query?.mode || "").toLowerCase() === "grade") {
-      return gradeSnapshots(supabase, request, response);
+    let supabase;
+    try {
+      supabase = createClient();
+    } catch {
+      console.error("Prediction ledger storage unavailable");
+      return response.status(500).json({ error: "Prediction ledger storage unavailable" });
     }
 
-    return saveSnapshots(supabase, request, response);
-  }
+    try {
+      if (request.method === "GET") {
+        return await readSnapshots(supabase, request, response);
+      }
 
-  response.setHeader("Allow", "GET, POST, OPTIONS");
-  return response.status(405).json({ error: "Method not allowed" });
+      if (request.method === "POST") {
+        if (!isSameOriginRequest(request)) {
+          return response.status(403).json({ error: "Cross-origin writes are not allowed" });
+        }
+
+        if (String(request.query?.mode || "").toLowerCase() === "grade") {
+          return await gradeSnapshots(supabase, request, response);
+        }
+
+        return await saveSnapshots(supabase, request, response);
+      }
+
+      response.setHeader("Allow", "GET, POST, OPTIONS");
+      return response.status(405).json({ error: "Method not allowed" });
+    } catch {
+      console.error("Prediction ledger request failed");
+      if (response.headersSent) return;
+      return response.status(500).json({ error: "Prediction ledger request failed" });
+    }
+  };
 }
 
 async function readSnapshots(supabase, request, response) {
   const season = ledgerIntegerOrNull(request.query?.season);
   const week = ledgerIntegerOrNull(request.query?.week);
+  if ((request.query?.season !== undefined && (season === null || season < 2000)) ||
+    (request.query?.week !== undefined && (week === null || week < 1 || week > 18))) {
+    return response.status(400).json({ error: "Invalid prediction season or week" });
+  }
 
   let query = supabase
     .from("prediction_snapshots")
@@ -1647,23 +1662,28 @@ async function saveSnapshots(supabase, request, response) {
   }
 
   const valid = supplied
-    .map(normaliseSnapshot)
-    .filter((snapshot) =>
-      snapshot.season &&
-      snapshot.week &&
+    .map((snapshot) => ({ ...normaliseSnapshot(snapshot), authoritative: false, shared: false }));
+  if (valid.some((snapshot) => !(
+      snapshot.season >= 2000 &&
+      snapshot.week >= 1 && snapshot.week <= 18 &&
       snapshot.awayCode &&
       snapshot.homeCode &&
-      snapshot.kickoff
-    );
-
-  if (!valid.length) {
-    return response.status(400).json({ error: "No valid prediction snapshots supplied" });
+      snapshot.awayCode !== snapshot.homeCode &&
+      snapshot.kickoff && Number.isFinite(Date.parse(snapshot.kickoff))
+    ))) {
+    return response.status(400).json({ error: "Invalid prediction snapshot supplied" });
   }
 
   const saved = [];
   const rejected = [];
 
+  const distinct = new Map();
   for (const incoming of valid) {
+    const key = `${incoming.season}:${incoming.week}:${incoming.awayCode}:${incoming.homeCode}`;
+    const existing = distinct.get(key);
+    if (!existing || !retainPrediction(existing, incoming, new Date())) distinct.set(key, incoming);
+  }
+  for (const incoming of distinct.values()) {
     const { data: existing, error: existingError } = await supabase
       .from("prediction_snapshots")
       .select("*")

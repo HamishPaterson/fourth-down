@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { afterEach, beforeEach, test } from "node:test";
 import { handleOddsRequest, getCurrentWeekWindow } from "../api/nfl/odds.js";
 import { SNAPSHOT_TABLE } from "./oddsSnapshots.js";
+import { findOddsForGame, getCoreMarket } from "../src/services/oddsApi.js";
 
 const SECRET = "test-cron-secret";
 const NOW = Date.UTC(2026, 8, 10, 12, 0, 0);
@@ -145,6 +146,43 @@ async function readCore(client, now = NOW) {
 }
 
 const get = (client, market) => client.store.get(["nfl", 2026, WINDOW.week, market].join("|"));
+
+test("stored CAR/PHI rows survive the odds endpoint and attach genuine core markets without provider calls", async () => {
+  const now = Date.parse("2026-10-15T02:00:00Z");
+  const base = {
+    event_id: "nfl_eagles_panthers_2026-10-18_b2", event_start_time: "2026-10-18T17:00Z",
+    away_team: "Carolina Panthers", home_team: "Philadelphia Eagles", sportsbook: "draftkings",
+  };
+  const marketRows = {
+    moneyline: [
+      row({ ...base, selection: "CAR Panthers", odds_american: -105 }),
+      row({ ...base, selection: "PHI Eagles", odds_american: -115 }),
+    ],
+    point_spread: [
+      row({ ...base, market_type: "point_spread", selection: "CAR Panthers", line: -1.5, odds_american: 102 }),
+      row({ ...base, market_type: "point_spread", selection: "PHI Eagles", line: 1.5, odds_american: -122 }),
+    ],
+    total_points: [
+      row({ ...base, market_type: "total_points", selection: "Over", line: 40.5 }),
+      row({ ...base, market_type: "total_points", selection: "Under", line: 40.5 }),
+    ],
+  };
+  const client = createFakeClient(Object.entries(marketRows).map(([market, rows]) => snapshot(market, rows, {
+    week: 6, fetched_at: "2026-10-14T16:23:08Z",
+  })));
+  const res = await readCore(client, now);
+  assert.equal(res.statusCode, 200);
+  assert.equal(fetchCalls.length, 0);
+  const matched = findOddsForGame(res.body.events, { away: "CAR", home: "PHI", id: "1392302", kickoff: "2026-10-18T17:00:00Z" });
+  assert.equal(matched.id, base.event_id);
+  assert.equal(matched.away_team_code, "CAR");
+  assert.equal(matched.home_team_code, "PHI");
+  assert.deepEqual(matched.bookmakers[0].markets.map((m) => m.key).sort(), ["h2h", "spreads", "totals"]);
+  assert.equal(getCoreMarket(matched).pick, "PHI");
+  assert.equal(getCoreMarket(matched).total, 40.5);
+  assert.equal(getCoreMarket(matched).homeSpread, 1.5);
+  assert.equal(findOddsForGame(res.body.events, { away: "CAR", home: "PHI", kickoff: "2026-11-18T17:00Z" }), null);
+});
 
 test("moneyline refresh writes a snapshot", async () => {
   responder = () => ({ body: { data: moneylineRows } });

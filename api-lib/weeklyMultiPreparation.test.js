@@ -43,7 +43,7 @@ function fixture(game, now) {
     bestBets: { assessed: 4, recommendations: [{
       market: "Moneyline", selection: game.away, modelProbability: .7, decimalOdds: 2,
       sportsbook: "Book", updatedAt: now.toISOString(),
-    }], anytimeTdScorer: { source: "model-only", selection: "Validated Full Player anytime TD", modelProbability: .68 } },
+    }], anytimeTdScorer: { source: "model-only", selection: "Validated Full Player anytime TD", modelProbability: .68, roleConfidence: 1 } },
   };
 }
 function odds(now) {

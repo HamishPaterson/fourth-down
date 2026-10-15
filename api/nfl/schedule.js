@@ -45,14 +45,7 @@ export function createScheduleHandler({
     const query = req.query || {};
     if (Object.prototype.hasOwnProperty.call(query, "weeklyMultiMode")) {
       if (query.weeklyMultiMode === "current") {
-        const result = await currentHandler(req, res);
-        const status = res.statusCode || 200;
-        const body = res.body || {};
-        const cacheSeconds = status >= 200 && status < 300 && body.status && !["not ready", "unavailable", "missed"].includes(body.status)
-          ? 120
-          : 30;
-        res.setHeader("Cache-Control", `public, s-maxage=${cacheSeconds}, stale-while-revalidate=${cacheSeconds}`);
-        return result;
+        return currentHandler(req, res);
       }
       if (["lock", "prepare"].includes(query.weeklyMultiMode)) return lockHandler(req, res);
       return res.status(404).json({ error: "Unknown weekly multi mode" });

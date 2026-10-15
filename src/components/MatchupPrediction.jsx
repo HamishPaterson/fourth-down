@@ -1,14 +1,15 @@
 import { useEffect, useState } from "react";
 import { predictMatchup } from "../services/predictionEngine.js";
-import { getFullGamePrediction } from "../services/gamePredictionService.js";
-import { findOddsForGame, getNflOdds } from "../services/oddsApi.js";
+import { findOddsForGame, getCoreMarket, getNflOdds } from "../services/oddsApi.js";
+import { applyPredictionSnapshot } from "../services/predictionSnapshot.js";
 import { getStandings, getQbRosterHealth, getKickerStats, getTeamForm, getOpponentNetwork, getPlayByPlayMetrics } from "../services/nflApi.js";
 import {
   savePredictionSnapshot,
   refreshPredictionLedger,
   findPredictionSnapshot,
   isCurrentCompletePrediction,
-  getPredictionPayload,
+  readPredictionLedger,
+  choosePredictionSnapshot,
   CURRENT_MODEL_KEY,
   CURRENT_MODEL_VERSION,
 } from "../services/predictionLedger.js";
@@ -217,8 +218,14 @@ function normalizeCode(code) {
   return aliases[normalized] || normalized;
 }
 
-export default function MatchupPrediction({ awayCode, homeCode, kickoff, weather, oddsEvent, week, scheduleContext, actualAwayScore = null, actualHomeScore = null }) {
-  const [officialSnapshot, setOfficialSnapshot] = useState(null);
+export default function MatchupPrediction({ awayCode, homeCode, kickoff, weather, oddsEvent, savedPrediction, week, scheduleContext, actualAwayScore = null, actualHomeScore = null }) {
+  const season = Number(savedPrediction?.season) || 2026;
+  const matchingSnapshot = (rows) => findPredictionSnapshot(rows, Number(week) || 0, awayCode, homeCode, season);
+  const suppliedSnapshot = matchingSnapshot([savedPrediction].filter(Boolean));
+  const initialSnapshot = choosePredictionSnapshot(matchingSnapshot(readPredictionLedger()), suppliedSnapshot);
+  const [officialSnapshot, setOfficialSnapshot] = useState(() => isCurrentCompletePrediction(initialSnapshot) ? initialSnapshot : null);
+  const [predictionLoadError, setPredictionLoadError] = useState(() => isCurrentCompletePrediction(initialSnapshot)
+    ? "" : "Loading shared prediction. The preview is not an official saved prediction.");
   const marketSnapshotKey = buildMarketSnapshotKey(awayCode, homeCode, kickoff);
   const [savedOddsEvent, setSavedOddsEvent] = useState(() => readMarketSnapshot(marketSnapshotKey));
   const [loadedOddsEvent, setLoadedOddsEvent] = useState(null);
@@ -357,35 +364,40 @@ export default function MatchupPrediction({ awayCode, homeCode, kickoff, weather
     if (!awayCode || !homeCode) return undefined;
     const controller = new AbortController();
     let active = true;
+    const cached = matchingSnapshot(readPredictionLedger());
+    const seed = choosePredictionSnapshot(cached, suppliedSnapshot);
+    setOfficialSnapshot(isCurrentCompletePrediction(seed) ? seed : null);
+    setPredictionLoadError(isCurrentCompletePrediction(seed) ? "" : "Loading shared prediction. The preview is not an official saved prediction.");
     async function loadOfficialPrediction() {
       try {
-        const sharedRows = await refreshPredictionLedger({ signal: controller.signal });
-        const saved = findPredictionSnapshot(sharedRows, Number(week) || 0, awayCode, homeCode);
+        const sharedRows = await refreshPredictionLedger({ season, week: Number(week), signal: controller.signal });
+        const saved = matchingSnapshot(sharedRows);
         const kickoffTime = new Date(kickoff || 0).getTime();
         const started = Number.isFinite(kickoffTime) && kickoffTime > 0 && Date.now() >= kickoffTime;
         if (saved && (started || isCurrentCompletePrediction(saved))) {
-          if (active) setOfficialSnapshot(saved);
+          if (active) {
+            setOfficialSnapshot(choosePredictionSnapshot(seed, saved));
+            setPredictionLoadError("");
+          }
           return;
         }
         if (started) {
           if (active && saved) setOfficialSnapshot(saved);
           return;
         }
-        const full = await getFullGamePrediction(
-          { away: normalizeCode(awayCode), home: normalizeCode(homeCode), week: Number(week) || 1, sourceDate: kickoff, weather, scheduleContext },
-          marketEvent,
-          { season: kickoff ? new Date(kickoff).getUTCFullYear() : 2026, week: Number(week) || 1, signal: controller.signal }
-        );
-        const generated = createOfficialSnapshot(full, { awayCode: normalizeCode(awayCode), homeCode: normalizeCode(homeCode), week: Number(week) || 1, kickoff });
-        savePredictionSnapshot(generated);
-        if (active) setOfficialSnapshot(generated);
+        if (active) setPredictionLoadError("No complete shared prediction is available. The preview below is not an official saved prediction.");
       } catch (error) {
-        if (error?.name !== "AbortError") console.error("Official prediction loading failed", error);
+        if (error?.name !== "AbortError") {
+          console.error("Official prediction loading failed", error);
+          if (active) setPredictionLoadError(isCurrentCompletePrediction(seed)
+            ? "Shared refresh failed. Showing the saved prediction."
+            : "Shared prediction unavailable. The preview below is not an official saved prediction.");
+        }
       }
     }
     loadOfficialPrediction();
     return () => { active = false; controller.abort(); };
-  }, [awayCode, homeCode, kickoff, week, marketEvent, weather, scheduleContext]);
+  }, [awayCode, homeCode, kickoff, week, savedPrediction]);
 
   useEffect(() => {
     if (!awayCode || !homeCode) {
@@ -514,17 +526,17 @@ export default function MatchupPrediction({ awayCode, homeCode, kickoff, weather
       : undefined,
   });
 
-  const officialPayload = getPredictionPayload(officialSnapshot);
-  const prediction = officialPayload
-    ? applyOfficialSnapshot(officialPayload, officialSnapshot)
-    : localPrediction;
+  const prediction = applyPredictionSnapshot(officialSnapshot) || localPrediction;
   const { away, home, winner, margin, confidence, total } = prediction;
   const winnerLabel = winner === null ? "Projected tie" : `${winner} by ${margin}`;
   const impact = prediction.weather;
   const scheduleImpact = prediction.schedule;
   const rivalryImpact = prediction.rivalry;
   const explanation = buildPredictionExplanation(prediction, week, playByPlayData);
-  const comparison = buildOddsComparison(prediction);
+  const coreMarket = getCoreMarket(marketEvent);
+  const comparison = buildOddsComparison(coreMarket.away !== null && coreMarket.home !== null
+    ? { ...prediction, market: { ...prediction.market, active: true, awayExpected: coreMarket.away, homeExpected: coreMarket.home, total: coreMarket.total } }
+    : prediction);
   const hasActual =
     actualAwayScore !== null && actualAwayScore !== undefined && actualAwayScore !== "" &&
     actualHomeScore !== null && actualHomeScore !== undefined && actualHomeScore !== "" &&
@@ -532,7 +544,7 @@ export default function MatchupPrediction({ awayCode, homeCode, kickoff, weather
   const actualTotal = hasActual ? Number(actualAwayScore) + Number(actualHomeScore) : null;
 
   useEffect(() => {
-    if (!away?.code || !home?.code) return;
+    if (!away?.code || !home?.code || !hasActual || !officialSnapshot) return;
 
     const kickoffDate = kickoff ? new Date(kickoff) : null;
     const validKickoff = kickoffDate && !Number.isNaN(kickoffDate.getTime());
@@ -555,12 +567,13 @@ export default function MatchupPrediction({ awayCode, homeCode, kickoff, weather
       : null;
 
     savePredictionSnapshot({
+      ...officialSnapshot,
       id,
-      source: "matchup-full-model",
+      source: officialSnapshot.source,
       modelVersion: CURRENT_MODEL_VERSION,
       modelKey: CURRENT_MODEL_KEY,
       predictionPayload: prediction,
-      dataQuality: officialSnapshot?.dataQuality || { source: "matchup-shared-model" },
+      dataQuality: officialSnapshot.dataQuality,
       week: Number(week) || 0,
       kickoff: validKickoff ? kickoffDate.toISOString() : null,
       awayCode: away.code,
@@ -584,7 +597,7 @@ export default function MatchupPrediction({ awayCode, homeCode, kickoff, weather
       oddsCorrect: actualWinner && oddsPick ? actualWinner === oddsPick : null,
       gradedAt: actualWinner ? new Date().toISOString() : null,
     });
-  }, [away.code, home.code, away.score, home.score, winner, week, kickoff, comparison.available, comparison.marketAway, comparison.marketHome, hasActual, actualAwayScore, actualHomeScore, prediction.awayWinProbability, prediction.homeWinProbability, prediction.winnerWinProbability, prediction.confidenceScore, prediction.confidence, playerMatchup, personnel, teamForm, playByPlayData, opponentNetwork]);
+  }, [officialSnapshot, hasActual, actualAwayScore, actualHomeScore]);
   useEffect(() => {
     if (!away?.code || !home?.code || !prediction?.modelLayers) return;
 
@@ -682,6 +695,7 @@ export default function MatchupPrediction({ awayCode, homeCode, kickoff, weather
 
   return (
     <div className="matchup-prediction team-statistics matchup-team-statistics">
+      {predictionLoadError && <p role="status" className="prediction-note">{predictionLoadError}</p>}
       <div className="team-statistics-heading">
         <div><span className="eyebrow">MODEL PROJECTION</span><h3>Predicted result</h3></div>
         <span className="prediction-confidence">{confidence}</span>
@@ -814,61 +828,6 @@ export default function MatchupPrediction({ awayCode, homeCode, kickoff, weather
       {hasActual && comparisonCard}
     </div>
   );
-}
-
-function createOfficialSnapshot(full, context) {
-  const p = full.prediction;
-  const marketAway = finiteOrNull(p.market?.awayExpected);
-  const marketHome = finiteOrNull(p.market?.homeExpected);
-  const kickoffTime = new Date(context.kickoff || 0).getTime();
-  return {
-    id: `${context.week}:${context.awayCode}:${context.homeCode}:${context.kickoff || "unknown"}`,
-    source: "shared-full-model",
-    modelVersion: CURRENT_MODEL_VERSION,
-    modelKey: CURRENT_MODEL_KEY,
-    week: context.week,
-    kickoff: context.kickoff,
-    awayCode: context.awayCode,
-    homeCode: context.homeCode,
-    fourthDownPick: p.winner,
-    fourthDownAwayScore: p.away.score,
-    fourthDownHomeScore: p.home.score,
-    fourthDownAwayWinProbability: p.awayWinProbability,
-    fourthDownHomeWinProbability: p.homeWinProbability,
-    fourthDownWinnerProbability: p.winnerWinProbability,
-    oddsPick: marketAway === null || marketHome === null ? null : marketAway > marketHome ? context.awayCode : marketHome > marketAway ? context.homeCode : null,
-    marketAwayScore: marketAway,
-    marketHomeScore: marketHome,
-    marketGameTotal: finiteOrNull(p.market?.total),
-    marketSpread: finiteOrNull(p.market?.homeSpread),
-    predictionPayload: p,
-    playerProjections: full.playerProjections || null,
-    dataQuality: {
-      ...full.dataQuality,
-      modelVersion: CURRENT_MODEL_VERSION,
-      modelKey: CURRENT_MODEL_KEY,
-      predictionPayload: p,
-    },
-    generatedAt: full.generatedAt || new Date().toISOString(),
-    snapshotAt: new Date().toISOString(),
-    savedBeforeKickoff: Number.isFinite(kickoffTime) && Date.now() < kickoffTime,
-  };
-}
-
-function applyOfficialSnapshot(payload, snapshot) {
-  const awayScore = Number(snapshot.fourthDownAwayScore);
-  const homeScore = Number(snapshot.fourthDownHomeScore);
-  return {
-    ...payload,
-    away: { ...payload.away, score: awayScore },
-    home: { ...payload.home, score: homeScore },
-    winner: snapshot.fourthDownPick,
-    margin: Math.abs(awayScore - homeScore),
-    total: awayScore + homeScore,
-    awayWinProbability: Number(snapshot.fourthDownAwayWinProbability),
-    homeWinProbability: Number(snapshot.fourthDownHomeWinProbability),
-    winnerWinProbability: Number(snapshot.fourthDownWinnerProbability),
-  };
 }
 
 function finiteOrNull(value) {

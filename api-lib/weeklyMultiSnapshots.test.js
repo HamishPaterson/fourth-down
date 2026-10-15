@@ -40,7 +40,7 @@ const GAMES = [
   { away: "BUF", home: "MIA", id: "e2", bets: [bet("Spread", "BUF", { line: -3.5 })], core: spread },
   { away: "DAL", home: "NYG", id: "e3", bets: [bet("Total", "Over", { line: 44.5 })], core: total },
   { away: "KC", home: "DEN", id: "e4", bets: [bet("player_pass_yds", "Over", { line: 250.5, category: "Player" })], props: passYds },
-  { away: "SEA", home: "SF", id: "e5", bets: [], scorer: { source: "model-only", selection: "K. Walker anytime TD", modelProbability: 0.7, decimalOdds: null } },
+  { away: "SEA", home: "SF", id: "e5", bets: [], scorer: { source: "model-only", selection: "K. Walker anytime TD", modelProbability: 0.7, roleConfidence: 1, decimalOdds: null } },
 ];
 
 function snapshotFor(game, overrides = {}) {
@@ -159,6 +159,68 @@ test("moneyline, spread, total, player prop and model-only Anytime TD are all se
   assert.equal(td.decimalOdds, null);
   assert.equal(td.modelProbability, 0.7);
   assert.equal(td.selection, "K. Walker anytime TD");
+});
+
+test("five model-only TDs yield only the highest role-adjusted scorer and an honest partial at the floor", () => {
+  const games = GAMES.map((game, index) => ({ ...game, bets: [], scorer: {
+    source: "model-only", selection: `${game.away} Player anytime TD`,
+    modelProbability: .95 - index * .04, roleConfidence: index === 0 ? .6 : 1,
+  } }));
+  const selected = select(games);
+  assert.equal(selected.legs.length, 1);
+  assert.equal(selected.legs[0].awayCode, "BUF");
+  assert.ok(Math.abs(selected.legs[0].modelProbability - .91) < 1e-12);
+  assert.equal(selected.partial, true);
+  assert.equal(selected.threshold, .55);
+  assert.equal(selected.legs[0].edge, null);
+  assert.equal(selected.legs[0].expectedValue, null);
+  assert.equal(selected.legs[0].decimalOdds, null);
+});
+
+test("invalid or weak role confidence cannot admit a TD to create diversity", () => {
+  for (const roleConfidence of [undefined, null, 0, 1.1, NaN, .3]) {
+    const game = { ...GAMES[4], scorer: { ...GAMES[4].scorer, roleConfidence } };
+    assert.equal(select([game]).legs.length, 0);
+  }
+});
+
+test("priced candidates prefer different market families, retain positive edge and remain deterministic", () => {
+  const games = GAMES.map((game) => ({ ...game, bets: [...game.bets] }));
+  games[1].bets.unshift(bet("Moneyline", "BUF", { modelProbability: .8 }));
+  games[1].core = book([...spread.markets, { key: "h2h", outcomes: [{ name: "BUF", price: 100 }] }]);
+  const selected = select(games);
+  assert.equal(selected.legs.length, 5);
+  assert.equal(selected.legs.filter((l) => l.marketFamily === "anytime-td").length, 1);
+  assert.ok(selected.legs.filter((l) => !l.modelOnly).every((l) => l.edge > 0));
+  assert.deepEqual(select([...games].reverse()).legs, selected.legs);
+  assert.equal(new Set(selected.legs.map((l) => l.matchupKey)).size, 5);
+  games[2].bets[0] = bet("Total", "Over", { line: 44.5, modelProbability: .49 });
+  assert.ok(!select(games).legs.some((l) => l.awayCode === "DAL"));
+});
+
+test("readable player markets match exact stored market, player, direction and line without broad Over matches", () => {
+  const game = { ...GAMES[3], bets: [bet("Passing yards", "Named Quarterback Over 250.5 passing yards", {
+    line: 250.5, category: "Passing props",
+  })], props: book([{ key: "player_pass_yds", outcomes: [
+    { name: "Over", playerName: "Named Quarterback", point: 250.5, price: -110 },
+  ] }]) };
+  assert.equal(select([game]).legs.length, 1);
+  for (const change of [
+    { playerName: "Different Quarterback" }, { name: "Under" }, { point: 249.5 },
+  ]) {
+    const bad = structuredClone(game);
+    Object.assign(bad.props.markets[0].outcomes[0], change);
+    assert.equal(select([bad]).legs.length, 0);
+  }
+});
+
+test("multiple Anytime TD offers, priced or unpriced, cannot consume more than one game", () => {
+  const games = GAMES.map((g) => ({ ...g, bets: [], scorer: { ...GAMES[4].scorer, selection: `${g.away} Player anytime TD` } }));
+  games[0].bets = [bet("Anytime touchdown", "Named Player Yes", { modelProbability: .8 })];
+  games[0].core = book([{ key: "player_anytime_td", outcomes: [{ name: "Yes", playerName: "Named Player", price: 100 }] }]);
+  const result = select(games);
+  assert.equal(result.legs.length, 1);
+  assert.equal(result.legs[0].modelOnly, undefined);
 });
 
 test("ranking is unchanged for priced input and model-only legs rank after priced legs", () => {

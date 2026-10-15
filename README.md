@@ -134,6 +134,22 @@ All devices read the immutable `weekly_best_multis` record. The unique
 season/week constraint and duplicate-insert recovery keep concurrent invocations
 on the same record; neither a page refresh nor new odds reconstructs it.
 
+Selection prefers eligible priced candidates across moneyline, spread, total,
+passing, rushing and receiving market families, then other priced candidates.
+There is at most one Anytime TD leg and one leg per game. An unpriced TD is
+evaluated using TD probability times role confidence, ranks after priced value
+bets, and never receives invented odds, edge or EV. Probability gates still
+relax from 65% to 55%; insufficient candidates produce an honest partial.
+Missing or invalid leg odds display "Odds unavailable"; combined odds remain
+"Pending" until every leg has a usable finite price.
+
+Predictions and Matchup use the same complete shared prediction, including its
+version and timestamp. Displayed totals are the sum of the saved scores.
+Matchup does not generate or save pre-kickoff partial predictions. Current
+market displays use canonical team identity, orientation and kickoff matching;
+the market pick comes from genuine moneyline prices, not a spread-derived score.
+The read handler owns cache headers and sets them before sending its response.
+
 ## Point-in-time depth charts and personnel
 
 The nflverse depth archive uses `dt` snapshot timestamps, not prediction weeks.

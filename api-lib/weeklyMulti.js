@@ -1,6 +1,8 @@
 import { createClient } from "@supabase/supabase-js";
 import { SNAPSHOT_MAX_AGE_MS } from "./oddsSnapshots.js";
 import { isPlayerLeg, settleLockedLegs } from "./weeklyMultiSettlement.js";
+import { findOddsForGame, resolveTeamCode } from "../src/services/oddsApi.js";
+import { usableDecimalOdds } from "../src/services/oddsDisplay.js";
 
 const BALLDONTLIE_GAMES_URL = "https://api.balldontlie.io/nfl/v1/games";
 // Odds now come from once-a-day stored snapshots, so quote age is bounded by
@@ -272,9 +274,12 @@ export function buildWeeklyMultiSelection(snapshots, oddsPayload, context, now =
   for (const snapshot of snapshots || []) {
     const bestBetsPayload = snapshot.bestBets || snapshot.dataQuality?.bestBetsPayload;
     const scorer = bestBetsPayload?.anytimeTdScorer;
-    const scorerProbability = Number(scorer?.modelProbability);
+    const tdProbability = Number(scorer?.tdProbability ?? scorer?.modelProbability);
+    const roleConfidence = Number(scorer?.roleConfidence);
+    const scorerProbability = tdProbability * roleConfidence;
     // The model-only Anytime TD scorer has no bookmaker price by design.
-    if (scorer?.source === "model-only" && scorer.selection && scorerProbability > 0 && scorerProbability <= 1 &&
+    if (scorer?.source === "model-only" && scorer.selection && tdProbability > 0 && tdProbability <= 1 &&
+      roleConfidence > 0 && roleConfidence <= 1 && scorerProbability > 0 && scorerProbability <= 1 &&
       snapshot.awayCode && snapshot.homeCode) {
       candidates.push({
         ...scorer,
@@ -285,6 +290,8 @@ export function buildWeeklyMultiSelection(snapshots, oddsPayload, context, now =
         price: null,
         sportsbook: null,
         modelProbability: scorerProbability,
+        tdProbability,
+        marketFamily: "anytime-td",
         impliedProbability: null,
         edge: null,
         expectedValue: null,
@@ -296,7 +303,7 @@ export function buildWeeklyMultiSelection(snapshots, oddsPayload, context, now =
         oddsUpdatedAt: null,
       });
     }
-    const event = findOddsEvent(oddsEvents, snapshot.awayCode, snapshot.homeCode);
+    const event = findOddsForGame(oddsEvents, snapshot);
     if (!event || isFallbackEvent(event)) {
       reasonCounts.fallbackOdds += 1;
       continue;
@@ -321,6 +328,7 @@ export function buildWeeklyMultiSelection(snapshots, oddsPayload, context, now =
       if (edge <= 0) continue;
       candidates.push({
         ...bet,
+        marketFamily: weeklyMultiMarketFamily(bet),
         decimalOdds,
         modelProbability,
         impliedProbability,
@@ -347,9 +355,18 @@ export function buildWeeklyMultiSelection(snapshots, oddsPayload, context, now =
   let distinctMatchups = [];
   while (true) {
     const byMatchup = new Map();
-    for (const candidate of ranked) {
-      if (candidate.modelProbability < threshold) continue;
-      if (!byMatchup.has(candidate.matchupKey)) byMatchup.set(candidate.matchupKey, candidate);
+    const families = new Set();
+    const eligible = ranked.filter((candidate) => candidate.modelProbability >= threshold);
+    for (const phase of ["priced-families", "priced", "model-only"]) {
+      for (const candidate of eligible) {
+        if (Boolean(candidate.modelOnly) !== (phase === "model-only")) continue;
+        const family = candidate.marketFamily;
+        if (byMatchup.size >= LEG_COUNT || byMatchup.has(candidate.matchupKey)) continue;
+        if (family === "anytime-td" && families.has(family)) continue;
+        if (phase === "priced-families" && families.has(family)) continue;
+        byMatchup.set(candidate.matchupKey, candidate);
+        families.add(family);
+      }
     }
     distinctMatchups = [...byMatchup.values()].sort(compareCandidates);
     if (distinctMatchups.length >= LEG_COUNT || threshold <= FLOOR_PROBABILITY) break;
@@ -369,6 +386,8 @@ export function buildWeeklyMultiSelection(snapshots, oddsPayload, context, now =
     oddsRefreshedAt: oddsPayload?.refreshedAt || null,
     oddsLate,
     reasonCounts,
+    candidateCounts: Object.fromEntries([...new Set(ranked.map((candidate) => candidate.marketFamily))].sort()
+      .map((family) => [family, ranked.filter((candidate) => candidate.marketFamily === family && candidate.modelProbability >= FLOOR_PROBABILITY).length])),
   };
 }
 
@@ -424,8 +443,11 @@ export function mergeStoredOdds(core, props) {
   const cacheStatus = STATUS_ORDER[Math.max(...statuses.map((status) => Math.max(0, STATUS_ORDER.indexOf(status))))];
   const events = (core?.events || []).map((event) => ({ ...event, bookmakers: (event.bookmakers || []).map((book) => ({ ...book, markets: [...(book.markets || [])] })) }));
   for (const propEvent of props?.events || []) {
-    const target = events.find((event) => event.id === propEvent.id) ||
-      events.find((event) => findOddsEvent([event], propEvent.away_team_code || propEvent.away_team, propEvent.home_team_code || propEvent.home_team));
+    const target = findOddsForGame(events, {
+      away: propEvent.away_team_code || propEvent.away_team,
+      home: propEvent.home_team_code || propEvent.home_team,
+      kickoff: propEvent.commence_time,
+    });
     if (!target) continue;
     for (const propBook of propEvent.bookmakers || []) {
       const book = target.bookmakers.find((candidate) => candidate.key === propBook.key);
@@ -453,25 +475,17 @@ function candidateIdentity(candidate) {
 function compareCandidates(first, second) {
   const firstPriced = Number.isFinite(first.expectedValue);
   if (firstPriced !== Number.isFinite(second.expectedValue)) return firstPriced ? -1 : 1;
-  if (!firstPriced) return second.modelProbability - first.modelProbability;
-  return second.expectedValue - first.expectedValue || second.edge - first.edge || second.modelProbability - first.modelProbability;
+  const tie = () => {
+    const key = (candidate) => `${candidateIdentity(candidate)}:${normalizeText(candidate.sportsbook)}:${candidate.oddsUpdatedAt || ""}`;
+    const a = key(first), b = key(second);
+    return a < b ? -1 : a > b ? 1 : 0;
+  };
+  if (!firstPriced) return second.modelProbability - first.modelProbability || tie();
+  return second.expectedValue - first.expectedValue || second.edge - first.edge || second.modelProbability - first.modelProbability || tie();
 }
 
 function getDecimalOddsValue(bet) {
-  if (bet?.decimalOdds !== null && bet?.decimalOdds !== undefined && bet?.decimalOdds !== "") {
-    const decimal = Number(bet.decimalOdds);
-    if (Number.isFinite(decimal)) return decimal;
-  }
-  const american = Number(bet?.price);
-  if (!Number.isFinite(american) || american === 0) return null;
-  return american > 0 ? 1 + american / 100 : 1 + 100 / Math.abs(american);
-}
-
-function findOddsEvent(events, away, home) {
-  const awayCode = normalizeCode(away);
-  const homeCode = normalizeCode(home);
-  return events.find((event) => normalizeCode(event.away_team_code || event.away_code || event.away_team) === awayCode &&
-    normalizeCode(event.home_team_code || event.home_code || event.home_team) === homeCode) || null;
+  return usableDecimalOdds(bet?.decimalOdds, bet?.price);
 }
 
 function isFallbackEvent(event) {
@@ -499,21 +513,52 @@ function hasCurrentBookMarket(event, bet) {
   const matches = markets.filter((market) => marketLabelMatches(market.key, marketName));
   if (!matches.length) return false;
   const selection = normalizeText(bet.selection);
-  const line = Number(bet.line ?? bet.point ?? bet.handicap);
+  const suppliedLine = bet.line ?? bet.point ?? bet.handicap;
+  const line = suppliedLine === null || suppliedLine === undefined ? null : Number(suppliedLine);
   return matches.some((market) => (market.outcomes || []).some((outcome) => {
     const name = normalizeText(outcome.name || outcome.selection || "");
     const point = outcome.point ?? outcome.line;
-    return (name === selection || name.includes(selection) || selection.includes(name)) &&
-      (!Number.isFinite(line) || Number(point) === line);
+    const isTeamMarket = ["moneyline", "spread"].includes(canonicalMarketKey(bet.market));
+    const player = isTeamMarket ? "" : normalizeText(outcome.playerName || outcome.description || "");
+    const playerMatch = player && selection.startsWith(player + name);
+    const selectionMatch = isTeamMarket ? resolveTeamCode(outcome.name) === resolveTeamCode(bet.selection)
+      : player ? playerMatch : name && (name === selection || selection.startsWith(name));
+    return selectionMatch && (line === null || Number(point) === line);
   }));
 }
 
 function marketLabelMatches(key, label) {
-  const market = String(key || "").toLowerCase().replace(/[\s-]+/g, "_");
-  if (label.includes("moneyline")) return ["h2h", "moneyline", "money_line"].includes(market);
-  if (label.includes("spread")) return ["spreads", "spread", "point_spread"].includes(market);
-  if (label.includes("total")) return ["totals", "total", "total_points"].includes(market);
-  return market === label.replace(/[\s-]+/g, "_") || normalizeText(market) === normalizeText(label);
+  return canonicalMarketKey(key) === canonicalMarketKey(label);
+}
+
+function canonicalMarketKey(value) {
+  const text = normalizeText(value);
+  const groups = {
+    moneyline: ["moneyline", "h2h"],
+    spread: ["spread", "spreads", "pointspread"],
+    total: ["total", "totals", "totalpoints"],
+    passingYards: ["passingyards", "playerpassyds", "playerpassingyards"],
+    passingAttempts: ["passingattempts", "playerpassattempts", "playerpassingattempts"],
+    passingTouchdowns: ["passingtouchdowns", "playerpasstds", "playerpassingtouchdowns"],
+    completions: ["completions", "playercompletions", "playerpassingcompletions"],
+    rushingYards: ["rushingyards", "playerrushyds", "playerrushingyards"],
+    rushingAttempts: ["rushingattempts", "playerrushattempts", "playerrushingattempts"],
+    receivingYards: ["receivingyards", "playerreceptionyds", "playerreceivingyards"],
+    receptions: ["receptions", "playerreceptions"],
+    rushReceivingYards: ["rushreceivingyards", "playerrushreceptionyds", "playerrushingreceivingyards"],
+    anytimeTd: ["anytimetouchdown", "anytimetouchdowns", "anytimetd", "anytimetdscorer", "playeranytimetd"],
+  };
+  return Object.entries(groups).find(([, names]) => names.includes(text))?.[0] || text;
+}
+
+export function weeklyMultiMarketFamily(bet) {
+  const key = canonicalMarketKey(bet.market);
+  if (key === "anytimeTd") return "anytime-td";
+  if (["moneyline", "spread", "total"].includes(key)) return key;
+  if (["passingYards", "passingAttempts", "passingTouchdowns", "completions"].includes(key)) return "passing-props";
+  if (["rushingYards", "rushingAttempts"].includes(key)) return "rushing-props";
+  if (["receivingYards", "receptions", "rushReceivingYards"].includes(key)) return "receiving-props";
+  return "other";
 }
 
 function normalizeCode(value) {

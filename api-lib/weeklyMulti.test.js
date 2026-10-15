@@ -82,19 +82,25 @@ test("schedule entry preserves existing schedule behavior without weeklyMultiMod
     lockHandler: async () => assert.fail("lock handler must not run without the mode parameter"),
   });
 
-test("dispatcher caches successful current responses for 120 seconds", async () => {
+test("dispatcher preserves cache headers set by the current handler before sending", async () => {
   const handler = createScheduleHandler({
-    currentHandler: async (req, res) => res.status(200).json({ status: "locked" }),
+    currentHandler: async (req, res) => {
+      res.setHeader("Cache-Control", "public, s-maxage=120, stale-while-revalidate=120");
+      return res.status(200).json({ status: "locked" });
+    },
   });
   const res = response();
   await handler({ method: "GET", query: { weeklyMultiMode: "current" } }, res);
   assert.equal(res.headers["Cache-Control"], "public, s-maxage=120, stale-while-revalidate=120");
 });
 
-test("dispatcher caches not-ready and error current responses for no more than 30 seconds", async () => {
+test("dispatcher does not override not-ready or error caching owned by the read handler", async () => {
   for (const [status, body] of [[200, { status: "not ready" }], [500, { error: "failed" }]]) {
     const handler = createScheduleHandler({
-      currentHandler: async (req, res) => res.status(status).json(body),
+      currentHandler: async (req, res) => {
+        res.setHeader("Cache-Control", "public, s-maxage=30, stale-while-revalidate=30");
+        return res.status(status).json(body);
+      },
     });
     const res = response();
     await handler({ method: "GET", query: { weeklyMultiMode: "current" } }, res);

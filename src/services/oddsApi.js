@@ -115,14 +115,12 @@ function savePropsCache(events) {
 function mergePropEvents(coreEvents, propEvents) {
   if (!Array.isArray(propEvents) || propEvents.length === 0) return coreEvents;
 
-  const teamKey = (event) =>
-    `${String(event?.away_team || "").toLowerCase()}@${String(event?.home_team || "").toLowerCase()}`;
-  const byId = new Map(coreEvents.map((event) => [event.id, event]));
-  const byTeams = new Map(coreEvents.map((event) => [teamKey(event), event]));
   const additions = new Map();
 
   for (const propEvent of propEvents) {
-    const target = byId.get(propEvent.id) || byTeams.get(teamKey(propEvent));
+    const target = findOddsForGame(coreEvents, {
+      away: propEvent.away_team_code || propEvent.away_team, home: propEvent.home_team_code || propEvent.home_team, kickoff: propEvent.commence_time,
+    });
     if (!target) continue;
     additions.set(target, [...(additions.get(target) || []), ...(propEvent.bookmakers || [])]);
   }
@@ -244,19 +242,17 @@ export function findOddsForGame(events, game) {
   const awayCode = resolveTeamCode(game.away || game.awayCode || game.awayName);
   const homeCode = resolveTeamCode(game.home || game.homeCode || game.homeName);
 
-  const direct = events.find((event) =>
+  if (!awayCode || !homeCode || awayCode === homeCode) return null;
+  const kickoff = Date.parse(game.kickoff || game.sourceDate || game.commence_time || game.date);
+  const direct = events.filter((event) =>
     resolveTeamCode(event?.away_team_code || event?.away_code || event?.away_team) === awayCode &&
-    resolveTeamCode(event?.home_team_code || event?.home_code || event?.home_team) === homeCode
+    resolveTeamCode(event?.home_team_code || event?.home_code || event?.home_team) === homeCode &&
+    (!Number.isFinite(kickoff) || !event.commence_time || Date.parse(event.commence_time) === kickoff)
   );
-  if (direct) return direct;
-
-  return events.find((event) =>
-    resolveTeamCode(event?.away_team_code || event?.away_code || event?.away_team) === homeCode &&
-    resolveTeamCode(event?.home_team_code || event?.home_code || event?.home_team) === awayCode
-  ) || null;
+  return direct.length === 1 ? direct[0] : null;
 }
 
-function resolveTeamCode(value) {
+export function resolveTeamCode(value) {
   const name = normalizeName(value);
   const aliases = {
     ari: "ARI", arz: "ARI", arizona: "ARI", cardinals: "ARI", arizonacardinals: "ARI",
@@ -274,6 +270,41 @@ function resolveTeamCode(value) {
     if (name === normalizeName(code) + nickname) return code;
   }
   return normalizeTeamCode(value);
+}
+
+export function getCoreMarket(event) {
+  const awayCode = resolveTeamCode(event?.away_team_code || event?.away_team);
+  const homeCode = resolveTeamCode(event?.home_team_code || event?.home_team);
+  const spreads = [], totals = [], awayPrices = [], homePrices = [];
+  const finite = (value) => value !== null && value !== undefined && value !== "" && Number.isFinite(Number(value));
+  const median = (values) => {
+    if (!values.length) return null;
+    const sorted = [...values].sort((a, b) => a - b), middle = Math.floor(sorted.length / 2);
+    return sorted.length % 2 ? sorted[middle] : (sorted[middle - 1] + sorted[middle]) / 2;
+  };
+  for (const book of event?.bookmakers || []) {
+    const market = (key) => book.markets?.find((entry) => entry.key === key)?.outcomes || [];
+    const homeSpread = market("spreads").find((outcome) => resolveTeamCode(outcome.name) === homeCode)?.point;
+    const total = market("totals").find((outcome) => /^(over|under)$/i.test(outcome.name))?.point;
+    if (finite(homeSpread)) spreads.push(Number(homeSpread));
+    if (finite(total)) totals.push(Number(total));
+    for (const [code, prices] of [[awayCode, awayPrices], [homeCode, homePrices]]) {
+      const price = market("h2h").find((outcome) => resolveTeamCode(outcome.name) === code)?.price;
+      if (finite(price) && Number(price) !== 0) {
+        const american = Number(price);
+        prices.push(american > 0 ? 100 / (american + 100) : -american / (-american + 100));
+      }
+    }
+  }
+  const homeSpread = median(spreads), total = median(totals);
+  const awayProbability = median(awayPrices), homeProbability = median(homePrices);
+  return {
+    away: homeSpread !== null && total !== null ? (total + homeSpread) / 2 : null,
+    home: homeSpread !== null && total !== null ? (total - homeSpread) / 2 : null,
+    total, homeSpread,
+    pick: awayProbability !== null && homeProbability !== null && awayProbability !== homeProbability
+      ? awayProbability > homeProbability ? awayCode : homeCode : null,
+  };
 }
 
 function buildTeamAliases(code, suppliedName) {

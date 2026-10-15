@@ -1,4 +1,5 @@
 import { timingSafeEqual } from "node:crypto";
+import { resolveTeamCode } from "../../src/services/oddsApi.js";
 import {
   SNAPSHOT_PROVIDER,
   createSnapshotClient,
@@ -1131,6 +1132,8 @@ function buildEvents(rows) {
           row.event_start_time || null,
         home_team: homeTeam,
         away_team: awayTeam,
+        home_team_code: resolveTeamCode(homeTeam),
+        away_team_code: resolveTeamCode(awayTeam),
         bookmakers: [],
       });
     }

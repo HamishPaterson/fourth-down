@@ -349,5 +349,6 @@ test("both Matchup prediction paths receive context without rewriting saved snap
   const source = readFileSync(new URL("../src/components/MatchupPrediction.jsx", import.meta.url), "utf8");
   assert.match(source, /teamMetrics: playByPlayData/);
   assert.match(source, /<MatchupIntelligencePanel prediction=\{prediction\}/);
-  assert.match(source, /const prediction = officialPayload\s*\? applyOfficialSnapshot\(officialPayload, officialSnapshot\)\s*: localPrediction/);
+  assert.match(source, /const prediction = applyPredictionSnapshot\(officialSnapshot\) \|\| localPrediction/);
+  assert.doesNotMatch(source, /getFullGamePrediction|createOfficialSnapshot/);
 });

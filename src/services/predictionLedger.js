@@ -37,19 +37,19 @@ export async function refreshPredictionLedger(options = {}) {
     (await fetchSharedPredictionLedger(options)).map((row) => ({ ...row, shared: true }))
   );
   if (!sharedRows.length) return readPredictionLedger();
-  writeStoredRows(sharedRows, { dispatch: false });
+  const merged = mergeLedgerCollections(readStoredRows(), sharedRows);
+  writeStoredRows(merged, { dispatch: false });
   window.dispatchEvent(new Event("fourth-down-ledger-updated"));
-  return sharedRows;
+  return merged;
 }
 
 export async function migrateLocalPredictionLedger() {
   if (typeof window === "undefined") return [];
 
-  const localRows = readPredictionLedger();
-  if (!localRows.length) return [];
+  const localRows = readStoredRows().filter((row) => row.shared !== true && isCurrentCompletePrediction(row));
 
-  const saved = await saveSharedPredictionSnapshots(localRows);
-  const merged = mergeLedgerCollections(localRows, saved);
+  const saved = localRows.length ? await saveSharedPredictionSnapshots(localRows) : [];
+  const merged = mergeLedgerCollections(readStoredRows(), saved);
   writeStoredRows(merged, { dispatch: false });
   window.localStorage.setItem(
     "fourth-down:shared-ledger-migrated:v1",
@@ -111,8 +111,8 @@ export function getPredictionPayload(row) {
   return row?.predictionPayload ?? row?.dataQuality?.predictionPayload ?? null;
 }
 
-export function findPredictionSnapshot(rows, week, awayCode, homeCode) {
-  const key = ledgerMatchupKey({ season: 2026, week, awayCode, homeCode });
+export function findPredictionSnapshot(rows, week, awayCode, homeCode, season = 2026) {
+  const key = ledgerMatchupKey({ season, week, awayCode, homeCode });
   return (rows || []).find((row) => ledgerMatchupKey(row) === key) || null;
 }
 
@@ -129,7 +129,7 @@ function dedupeRows(rows) {
 export function savePredictionSnapshot(snapshot) {
   if (!snapshot || typeof window === "undefined") return;
 
-  const normalised = normaliseSnapshot(snapshot);
+  const normalised = normaliseSnapshot({ ...snapshot, shared: false, authoritative: false });
   if (!normalised.id || !normalised.awayCode || !normalised.homeCode) return;
 
   const rows = readStoredRows();
@@ -142,6 +142,7 @@ export function savePredictionSnapshot(snapshot) {
   );
 
   const existing = index >= 0 ? rows[index] : null;
+  if (existing && choosePredictionSnapshot(existing, normalised) === existing) return;
   const existingIsFinal = hasFinalResult(existing);
 
   const next = existingIsFinal
@@ -155,7 +156,7 @@ export function savePredictionSnapshot(snapshot) {
         fourthDownCorrect: existing?.fourthDownCorrect ?? null,
         oddsCorrect: existing?.oddsCorrect ?? null,
         gradedAt: existing?.gradedAt ?? null,
-        snapshotAt: existing?.snapshotAt || new Date().toISOString(),
+        snapshotAt: normalised.snapshotAt || new Date().toISOString(),
       };
 
   if (index >= 0) rows[index] = next;
@@ -263,35 +264,22 @@ function mergeRow(map, incoming) {
     return;
   }
 
-  const existingFinal = hasFinalResult(existing);
-  const incomingFinal = hasFinalResult(row);
+  const preferred = choosePredictionSnapshot(existing, row);
+  map.set(key, preferred === row ? { ...existing, ...row } : { ...row, ...existing });
+}
 
-  // A Supabase row is the authoritative official prediction. Local device
-  // calculations must never replace it, even when the local snapshot has a
-  // newer timestamp.
-  if (row.shared === true && existing.shared !== true) {
-    map.set(key, { ...existing, ...row });
-    return;
-  }
-
-  if (existing.shared === true && row.shared !== true) {
-    map.set(key, { ...row, ...existing });
-    return;
-  }
-
-  if (incomingFinal && !existingFinal) {
-    map.set(key, { ...existing, ...row });
-    return;
-  }
-
-  if (existingFinal && !incomingFinal) {
-    map.set(key, { ...row, ...existing });
-    return;
-  }
-
-  const existingTime = new Date(existing.snapshotAt || 0).getTime() || 0;
-  const incomingTime = new Date(row.snapshotAt || 0).getTime() || 0;
-  map.set(key, incomingTime >= existingTime ? { ...existing, ...row } : { ...row, ...existing });
+export function choosePredictionSnapshot(existing, incoming) {
+  if (!existing) return incoming;
+  if (!incoming) return existing;
+  if (hasFinalResult(existing)) return existing;
+  if (hasFinalResult(incoming)) return incoming;
+  const existingComplete = isCurrentCompletePrediction(existing);
+  const incomingComplete = isCurrentCompletePrediction(incoming);
+  if (existingComplete !== incomingComplete) return incomingComplete ? incoming : existing;
+  const sharedRank = (row) => row.shared === true ? row.authoritative === true ? 2 : 1 : 0;
+  if (sharedRank(existing) !== sharedRank(incoming)) return sharedRank(incoming) > sharedRank(existing) ? incoming : existing;
+  const time = (row) => Date.parse(row.updatedAt || row.generatedAt || row.snapshotAt || "") || 0;
+  return time(incoming) >= time(existing) ? incoming : existing;
 }
 
 function normaliseSnapshot(snapshot) {

@@ -340,6 +340,8 @@ export default function Matchup({ game, onBack }) {
         )}
 
         <MatchupPrediction
+          key={`${awayCode}:${homeCode}:${game.week}`}
+          savedPrediction={game.savedPrediction}
           awayCode={awayCode}
           homeCode={homeCode}
           kickoff={validKickoff ? kickoff.toISOString() : null}
