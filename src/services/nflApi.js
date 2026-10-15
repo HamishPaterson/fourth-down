@@ -157,10 +157,15 @@ export async function getOpponentNetwork(away, home, season, week, signal) {
     `/api/nfl/opponent-network?${params.toString()}`,
     { signal }
   );
-  const body = await response.json();
   if (!response.ok) {
-    throw new Error(body.error || `Opponent network request failed (${response.status})`);
+    throw new Error(response.status === 429 ? "Opponent network rate limited (429)"
+      : `Opponent network request failed (${response.status})`);
   }
+  const contentType = response.headers?.get("Content-Type");
+  if (contentType && !contentType.includes("application/json")) throw new Error("Opponent network returned non-JSON content");
+  let body;
+  try { body = await response.json(); } catch { throw new Error("Opponent network returned malformed JSON"); }
+  if (body?.dataStatus !== "available" && body?.dataStatus !== "neutral") throw new Error("Malformed opponent network response");
   return body;
 }
 

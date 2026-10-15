@@ -1,9 +1,10 @@
 import test, { beforeEach, afterEach } from "node:test";
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import handler, {
+import {
   NFL_TEAMS, prepareNetworkGames, solveOpponentNetwork, getRecentTeamGames,
   networkGameWeight, findCommonOpponents, teamPerformanceAgainst, calculateCommonOpponentEdge,
+  createOpponentNetworkHandler, loadWeeklyOpponentNetwork,
 } from "../api/nfl/opponent-network.js";
 import dataset from "../api/nfl/nflverse-team-metrics.js";
 import { compareTeams } from "../api/nfl/play-by-play.js";
@@ -39,7 +40,9 @@ async function invoke(query = {}, method = "GET") {
     setHeader(name, value) { this.headers[name] = value; },
     json(body) { this.body = body; return this; },
   };
-  await handler({ method, query: { season: "2026", week: "6", away: "SF", home: "KC", ...query } }, response);
+  await createOpponentNetworkHandler({ loadNetwork: (season, week) =>
+    loadWeeklyOpponentNetwork(season, week, { sleep: async () => {} }) })(
+    { method, query: { season: "2026", week: "6", away: "SF", home: "KC", ...query } }, response);
   return response;
 }
 const originalFetch = global.fetch;
@@ -258,18 +261,20 @@ test("missing history and week one use an unavailable neutral layer", async () =
   finiteValues(missing.body);
 });
 
-test("endpoint failures and incomplete pagination return explicit neutral fallback", async () => {
+test("endpoint failures and cyclic pagination return one explicit structured error", async () => {
   const originalError = console.error;
   const errors = [];
   console.error = (...args) => errors.push(args);
   try {
     global.fetch = async () => jsonResponse({ error: "Provider unavailable" }, false);
     const failed = await invoke();
-    assert.equal(failed.body.dataStatus, "neutral");
-    assert.match(failed.body.reason, /Provider unavailable/);
+    assert.equal(failed.statusCode, 502);
+    assert.equal(failed.body.dataStatus, "unavailable");
+    assert.match(failed.body.reason, /503/);
     global.fetch = async () => jsonResponse({ data: [sourceGame("g")], meta: { next_cursor: 1 } });
     const truncated = await invoke();
-    assert.match(truncated.body.reason, /pagination/);
+    assert.equal(truncated.statusCode, 502);
+    assert.match(truncated.body.reason, /repeated cursor/);
     assert.equal(errors.length, 2);
     finiteValues(truncated.body);
   } finally {

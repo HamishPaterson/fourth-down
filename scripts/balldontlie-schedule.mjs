@@ -10,21 +10,34 @@ export async function fetchSchedule(season, {
   now = Date.now,
   random = Math.random,
   warn = console.warn,
+  deadline = Infinity,
 } = {}) {
   const key = process.env.BALLDONTLIE_API_KEY;
   if (!key) throw new Error("BALLDONTLIE_API_KEY required for schedule provenance");
   const games = [];
+  const waitWithinBudget = async (milliseconds) => {
+    if (now() + milliseconds >= deadline) throw new Error("BALLDONTLIE schedule wait exceeds request deadline");
+    await sleep(milliseconds);
+  };
   const cursors = new Set();
   let cursor = null;
   for (let page = 1; page <= 20; page++) {
-    if (page > 1) await sleep(PAGE_DELAY_MS);
+    if (page > 1) await waitWithinBudget(PAGE_DELAY_MS);
     const url = new URL("https://api.balldontlie.io/nfl/v1/games");
     url.searchParams.set("seasons[]", String(season));
     url.searchParams.set("per_page", "100");
     if (cursor !== null) url.searchParams.set("cursor", String(cursor));
     let response;
     for (let retry = 0; ; retry++) {
-      response = await fetchImpl(url, { headers: { Authorization: key } });
+      if (now() >= deadline) throw new Error("BALLDONTLIE schedule request deadline exceeded");
+      try {
+        response = await fetchImpl(url, {
+          headers: { Authorization: key },
+          ...(Number.isFinite(deadline) ? { signal: AbortSignal.timeout(Math.max(1, Math.min(10000, deadline - now()))) } : {}),
+        });
+      } catch {
+        throw new Error(`BALLDONTLIE schedule page ${page} transport failed`);
+      }
       if (response.status !== 429) break;
       if (retry >= MAX_RETRIES) {
         throw new Error(`BALLDONTLIE schedule page ${page} failed (429): exhausted ${MAX_RETRIES} retries`);
@@ -40,11 +53,20 @@ export async function fetchSchedule(season, {
         : Math.min(8_000, 1000 * 2 ** retry + Math.floor(random() * 250));
       warn(`BALLDONTLIE schedule page ${page}: HTTP 429, retry ${retry + 1}/${MAX_RETRIES}, wait ${wait}ms`);
       await response.body?.cancel();
-      await sleep(wait);
+      await waitWithinBudget(wait);
     }
     if (!response.ok) throw new Error(`BALLDONTLIE schedule page ${page} failed (${response.status})`);
-    const body = await response.json();
-    if (!Array.isArray(body.data)) throw new Error("Invalid BALLDONTLIE schedule response");
+    const contentType = response.headers?.get("Content-Type");
+    if (contentType && !/\bapplication\/(?:[\w.+-]*\+)?json\b/i.test(contentType)) {
+      throw new Error(`BALLDONTLIE schedule page ${page} returned non-JSON content`);
+    }
+    let body;
+    try {
+      body = await response.json();
+    } catch {
+      throw new Error(`BALLDONTLIE schedule page ${page} returned malformed JSON`);
+    }
+    if (!Array.isArray(body?.data)) throw new Error("Invalid BALLDONTLIE schedule response");
     games.push(...body.data);
     cursor = body.meta?.next_cursor ?? null;
     if (cursor === null) return games;

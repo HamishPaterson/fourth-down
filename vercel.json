@@ -1,6 +1,13 @@
 {
   "framework": "vite",
   "functions": {
+    "api/nfl/opponent-network.js": {
+      "maxDuration": 60
+    },
+    "api/nfl/game-stats.js": {
+      "maxDuration": 60,
+      "includeFiles": "api/nfl/ea_player_records.json"
+    },
     "api/nfl/sleeper-players.js": {
       "includeFiles": "api/nfl/ea_player_records.json"
     },

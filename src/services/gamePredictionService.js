@@ -107,6 +107,11 @@ async function createPrediction({ game, oddsEvent, season, week, away, home, sig
     const name = names[index];
     dataQuality[name] = result.status === "fulfilled" && result.value !== null;
     values[name] = result.status === "fulfilled" ? result.value : null;
+    if (name === "opponentNetwork" && result.status === "rejected") {
+      const reason = result.reason instanceof Error ? result.reason.message : "Opponent network unavailable";
+      values[name] = { available: false, dataStatus: "unavailable", reason,
+        modelLayer: { ...neutralLayer(), reasons: [reason] } };
+    }
   });
 
   const standingsByCode = Object.fromEntries(

@@ -1,5 +1,6 @@
 import { FULL_MODEL_VERSION, FULL_MODEL_KEY } from "./gamePredictionService.js";
 import { getCoreMarket } from "./oddsApi.js";
+import { PREDICTION_FEATURE_VERSION, MATCHUP_INTELLIGENCE_SCHEMA_VERSION } from "./predictionFeatures.js";
 
 export function applyPredictionSnapshot(snapshot) {
   const payload = snapshot?.predictionPayload ?? snapshot?.dataQuality?.predictionPayload;
@@ -20,7 +21,10 @@ export function applyPredictionSnapshot(snapshot) {
 }
 
 export function buildPredictionSnapshot(game, fullResult, oddsEvent, now = new Date()) {
-  const prediction = fullResult.prediction;
+  const prediction = { ...fullResult.prediction,
+    matchupIntelligence: fullResult.prediction.matchupIntelligence ? {
+      ...fullResult.prediction.matchupIntelligence, schemaVersion: MATCHUP_INTELLIGENCE_SCHEMA_VERSION,
+    } : undefined };
   const marketAway = prediction.market?.awayExpected ?? null;
   const marketHome = prediction.market?.homeExpected ?? null;
   return {
@@ -39,6 +43,9 @@ export function buildPredictionSnapshot(game, fullResult, oddsEvent, now = new D
     projectedTie: Boolean(prediction.projectedTie), continuousMargin: prediction.continuousMargin ?? null,
     confidenceScore: prediction.confidenceScore, confidenceLabel: prediction.confidence,
     modelVersion: FULL_MODEL_VERSION, modelKey: FULL_MODEL_KEY,
+    predictionFeatureVersion: PREDICTION_FEATURE_VERSION,
+    opponentNetworkStatus: prediction.modelLayers?.opponentNetwork?.available === true &&
+      fullResult.dataQuality?.sources?.opponentNetwork?.available === true ? "available" : "unavailable",
     predictionPayload: prediction, playerProjections: fullResult.playerProjections,
     bestBets: fullResult.bestBets,
     dataQuality: {

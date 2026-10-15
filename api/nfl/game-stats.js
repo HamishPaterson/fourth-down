@@ -23,6 +23,10 @@ const TEAM_ALIASES = {
 };
 
 export default async function handler(req, res) {
+  if (String(req.query?.action || "").toLowerCase() === "refresh-predictions") {
+    const { createPredictionRefreshHandler } = await import("../../api-lib/predictionRefresh.js");
+    return createPredictionRefreshHandler()(req, res);
+  }
   if (String(req.query?.action || "").toLowerCase() === "player-metrics") {
     return handlePlayerMetrics(req, res);
   }
@@ -106,7 +110,7 @@ export default async function handler(req, res) {
     }
 
     const seasonGames =
-      await fetchSeasonGames(
+      req.predictionSeasonGames || await fetchSeasonGames(
         apiKey,
         season
       );

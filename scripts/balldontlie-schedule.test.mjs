@@ -4,7 +4,7 @@ import { fetchSchedule } from "./balldontlie-schedule.mjs";
 
 const ok = (data, cursor = null) => new Response(JSON.stringify({
   data, meta: { next_cursor: cursor },
-}), { status: 200 });
+}), { status: 200, headers: { "Content-Type": "application/json" } });
 const limited = (retryAfter) => new Response(null, {
   status: 429, headers: retryAfter === undefined ? {} : { "Retry-After": retryAfter },
 });
@@ -33,7 +33,7 @@ function harness(t, responses) {
     random: () => 0.5,
     warn: (message) => diagnostics.push(message),
   };
-  return { run: () => fetchSchedule(2026, options), calls, waits, diagnostics };
+  return { run: (overrides = {}) => fetchSchedule(2026, { ...options, ...overrides }), calls, waits, diagnostics };
 }
 
 test("normal pagination retains pages, requests sequentially and paces", async (t) => {
@@ -105,6 +105,45 @@ test("non-429 failures and malformed data fail without retry", async (t) => {
   await assert.rejects(h.run(), /page 1 failed \(403\)/);
   assert.equal(h.calls.length, 1);
   assert.deepEqual(h.waits, []);
-  const invalid = harness(t, [new Response('{"data":null}')]);
+  const invalid = harness(t, [new Response('{"data":null}', { headers: { "Content-Type": "application/json" } })]);
   await assert.rejects(invalid.run(), /Invalid BALLDONTLIE schedule response/);
+});
+
+test("non-JSON errors are checked before parsing; successful text and malformed JSON fail safely", async (t) => {
+  for (const response of [
+    new Response("<html>unavailable</html>", { status: 503 }),
+    new Response("<html>unavailable</html>", { headers: { "Content-Type": "text/html" } }),
+    new Response("{invalid", { headers: { "Content-Type": "application/json" } }),
+  ]) {
+    const h = harness(t, [response]);
+    await assert.rejects(h.run(), /503|non-JSON content|malformed JSON/);
+    assert.equal(h.calls.length, 1);
+    assert.doesNotMatch(h.diagnostics.join("\n"), /test-secret-not-for-output|Authorization/i);
+  }
+});
+
+test("429 text is never parsed as JSON and successful prior pages are retained", async (t) => {
+  const response = new Response("Too many requests", { status: 429, headers: { "Retry-After": "2" } });
+  response.json = () => { throw new Error("Must not parse 429"); };
+  const h = harness(t, [ok([{ id: 1 }], 100), response, ok([{ id: 2 }])]);
+  assert.deepEqual(await h.run(), [{ id: 1 }, { id: 2 }]);
+  assert.deepEqual(h.waits, [12500, 2000]);
+});
+
+test("server deadline fails explicitly instead of shortening Retry-After or returning partial pages", async (t) => {
+  const h = harness(t, [ok([{ id: 1 }], 100), limited("60")]);
+  await assert.rejects(h.run({ deadline: Date.parse("2026-10-15T00:00:55Z") }), /wait exceeds request deadline/);
+  assert.deepEqual(h.waits, [12500]);
+  assert.equal(h.calls.length, 2);
+});
+
+test("transport errors never expose authorization or secret-bearing exception messages", async (t) => {
+  const h = harness(t, []);
+  await assert.rejects(h.run({ fetchImpl: async () => {
+    throw new Error("Authorization: test-secret-not-for-output");
+  } }), (error) => {
+    assert.match(error.message, /transport failed/);
+    assert.doesNotMatch(error.message, /Authorization|test-secret-not-for-output/);
+    return true;
+  });
 });

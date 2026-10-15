@@ -2,7 +2,7 @@ import standings from "../api/nfl/standings.js";
 import personnel from "../api/nfl/qb-roster-health.js";
 import kicker from "../api/nfl/kicker-stats.js";
 import teamForm, { databaseToSnapshot, writePredictionVersion } from "../api/nfl/game-stats.js";
-import opponentNetwork from "../api/nfl/opponent-network.js";
+import opponentNetwork, { createOpponentNetworkHandler, validateWeeklyOpponentNetwork } from "../api/nfl/opponent-network.js";
 import playByPlay from "../api/nfl/play-by-play.js";
 import roster from "../api/nfl/sleeper-players.js";
 import { handleOddsRequest, getCurrentWeekWindow } from "../api/nfl/odds.js";
@@ -59,31 +59,43 @@ export async function readPredictionOdds(client, now, context) {
   return merged;
 }
 
-export function createServerPredictionGenerator({ loadInputs } = {}) {
+export function createServerPredictionInputLoader({ weeklyNetwork, sourceGames, weeklyCutoff } = {}) {
+  if (weeklyNetwork) validateWeeklyOpponentNetwork(weeklyNetwork, weeklyNetwork.season, weeklyNetwork.week);
+  const networkHandler = weeklyNetwork ? createOpponentNetworkHandler({
+    loadNetwork: async (season, week) => {
+      validateWeeklyOpponentNetwork(weeklyNetwork, season, week);
+      return weeklyNetwork;
+    },
+  }) : opponentNetwork;
   const shared = new Map();
   const once = (key, load) => {
     if (!shared.has(key)) shared.set(key, load());
     return shared.get(key);
   };
+  return ({ away, home, season, week }) => {
+    const query = { away, home, season, week };
+    return {
+      standings: once(`standings:${season}`, () => invoke(standings, { season }).then((body) => body.data)),
+      personnel: invoke(personnel, query, weeklyCutoff ? { predictionCutoff: weeklyCutoff } : {}),
+      kicker: invoke(kicker, { ...query, season: season - 1 }),
+      teamForm: invoke(teamForm, query, sourceGames ? { predictionSeasonGames: sourceGames } : {}),
+      opponentNetwork: invoke(networkHandler, query),
+      playByPlay: invoke(playByPlay, query),
+      playerMetrics: invoke(teamForm, { ...query, action: "player-metrics" }),
+      awayRoster: once(`roster:${away}`, () => invoke(roster, { team: away })),
+      homeRoster: once(`roster:${home}`, () => invoke(roster, { team: home })),
+    };
+  };
+}
+
+export function createServerPredictionGenerator(options = {}) {
+  const loadInputs = options.loadInputs || createServerPredictionInputLoader(options);
   return async (game, odds, now) => {
     const oddsEvent = findOddsForGame(odds.events, game);
     if (!oddsEvent?.bookmakers?.length) throw new Error(`Stored odds missing for ${game.away} at ${game.home}`);
     const result = await getFullGamePrediction(game, oddsEvent, {
       season: game.season, forceRefresh: true,
-      loadInputs: loadInputs || (({ away, home, season, week }) => {
-        const query = { away, home, season, week };
-        return {
-          standings: once(`standings:${season}`, () => invoke(standings, { season }).then((body) => body.data)),
-          personnel: invoke(personnel, query),
-          kicker: invoke(kicker, { ...query, season: season - 1 }),
-          teamForm: invoke(teamForm, query),
-          opponentNetwork: invoke(opponentNetwork, query),
-          playByPlay: invoke(playByPlay, query),
-          playerMetrics: invoke(teamForm, { ...query, action: "player-metrics" }),
-          awayRoster: once(`roster:${away}`, () => invoke(roster, { team: away })),
-          homeRoster: once(`roster:${home}`, () => invoke(roster, { team: home })),
-        };
-      }),
+      loadInputs,
     });
     const snapshot = buildPredictionSnapshot(game, result, oddsEvent, now);
     if (!completePrediction(snapshot) || !result.dataQuality.playByPlay) {

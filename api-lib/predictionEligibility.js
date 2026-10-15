@@ -1,5 +1,6 @@
 import { FULL_MODEL_VERSION, FULL_MODEL_KEY } from "../src/services/gamePredictionService.js";
 import { BEST_BETS_CANDIDATE_VERSION } from "../src/services/bestBetsService.js";
+import { predictionFeatureStatus } from "../src/services/predictionFeatures.js";
 
 const number = (value) => value !== null && value !== undefined && value !== "" && Number.isFinite(Number(value));
 
@@ -27,6 +28,10 @@ export function retainPrediction(existing, incoming, now, authoritative = false)
   if (!completePrediction(incoming)) return true;
   const age = now.getTime() - new Date(existing.generatedAt).getTime();
   if (authoritative) {
+    const currentFeatures = predictionFeatureStatus(existing).complete;
+    const incomingFeatures = predictionFeatureStatus(incoming).complete;
+    if (existing.authoritative && currentFeatures) return true;
+    if (!currentFeatures && incomingFeatures) return false;
     const candidateUpgrade = incoming.bestBets?.candidateVersion === BEST_BETS_CANDIDATE_VERSION &&
       (existing.bestBets?.candidateVersion !== BEST_BETS_CANDIDATE_VERSION || !Array.isArray(existing.bestBets?.candidates)) &&
       Array.isArray(incoming.bestBets.candidates) &&

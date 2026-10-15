@@ -1,5 +1,5 @@
-const GAMES_URL =
-  "https://api.balldontlie.io/nfl/v1/games";
+import process from "node:process";
+import { fetchSchedule } from "../../scripts/balldontlie-schedule.mjs";
 
 const TEAM_ALIASES = {
   WAS: "WSH",
@@ -20,7 +20,11 @@ export const NFL_TEAMS = [
   "NYJ", "PHI", "PIT", "SEA", "SF", "TB", "TEN", "WSH",
 ];
 
-export default async function handler(req, res) {
+export function createOpponentNetworkHandler({ loadNetwork = loadWeeklyOpponentNetwork } = {}) {
+  return (req, res) => handler(req, res, { loadNetwork });
+}
+
+export default async function handler(req, res, { loadNetwork = loadWeeklyOpponentNetwork } = {}) {
   if (req.method !== "GET") {
     return res.status(405).json({
       error: "Method not allowed",
@@ -75,13 +79,7 @@ export default async function handler(req, res) {
   }
 
   try {
-    const sourceGames =
-      await fetchSeasonGames(
-        apiKey,
-        season
-      );
-
-    const games = prepareNetworkGames(sourceGames, season, week);
+    const { games, ratings } = await loadNetwork(season, week);
 
     if (!games.length) {
       return sendNeutral(
@@ -93,12 +91,6 @@ export default async function handler(req, res) {
         "No completed games are available for the target week"
       );
     }
-
-    const ratings =
-      solveOpponentNetwork(
-        games,
-        week
-      );
 
     const awayRating =
       ratings[away] ||
@@ -265,100 +257,43 @@ export default async function handler(req, res) {
         new Date().toISOString(),
     });
   } catch (error) {
-    console.error(
-      "Opponent network failed",
-      error
-    );
-
-    return sendNeutral(
-      res,
-      season,
-      week,
-      away,
-      home,
-      error instanceof Error
-        ? error.message
-        : "Opponent network request failed"
-    );
+    const message = error instanceof Error ? error.message : "Opponent network request failed";
+    console.error("Opponent network failed:", message);
+    return res.status(502).json({
+      error: "Opponent network unavailable", code: "OPPONENT_NETWORK_UNAVAILABLE",
+      reason: message, season, week, away, home, dataStatus: "unavailable",
+    });
   }
 }
 
-async function fetchSeasonGames(
-  apiKey,
-  season
-) {
-  const games = [];
+export async function loadWeeklyOpponentNetwork(season, week, { sourceGames, cutoff, now = new Date(), ...fetchOptions } = {}) {
+  const source = sourceGames || await fetchSchedule(season, { deadline: Date.now() + 55000, ...fetchOptions });
+  const limit = cutoff ? Date.parse(cutoff) : null;
+  const eligible = limit === null ? source : source.filter((game) => {
+    const completed = Date.parse(game.completed_at || game.updated_at);
+    const kickoff = Date.parse(game.date);
+    return Number.isFinite(completed) && Number.isFinite(kickoff) &&
+      kickoff < limit && completed >= kickoff && completed < limit && completed <= now.getTime();
+  });
+  const games = prepareNetworkGames(eligible, season, week);
+  return { season, week, games, ratings: solveOpponentNetwork(games, week) };
+}
 
-  let cursor = null;
-  let requestCount = 0;
-
-  do {
-    const url =
-      new URL(GAMES_URL);
-
-    url.searchParams.set(
-      "seasons[]",
-      String(season)
-    );
-
-    url.searchParams.set(
-      "per_page",
-      "100"
-    );
-
-    if (cursor !== null) {
-      url.searchParams.set(
-        "cursor",
-        String(cursor)
-      );
-    }
-
-    const response =
-      await fetch(
-        url.toString(),
-        {
-          headers: {
-            Authorization:
-              apiKey,
-          },
-        }
-      );
-
-    const body =
-      await response.json();
-
-    if (!response.ok) {
-      throw new Error(
-        body?.error ||
-          body?.message ||
-          `Games request failed (${response.status})`
-      );
-    }
-
-    const pageGames =
-      Array.isArray(body?.data)
-        ? body.data
-        : [];
-
-    games.push(
-      ...pageGames
-    );
-
-    cursor =
-      body?.meta?.next_cursor ??
-      null;
-
-    requestCount += 1;
-  } while (
-    cursor !== null &&
-    requestCount < 20
-  );
-
-  if (cursor !== null) {
-    throw new Error("Opponent network games pagination exceeded 20 pages");
+export function validateWeeklyOpponentNetwork(network, season, week) {
+  if (network?.season !== season || network?.week !== week || !Array.isArray(network.games) || !network.games.length ||
+      !network.games.every((g) => g.season === season && g.week >= 1 && g.week < week)) {
+    throw new Error("Wrong-week or incomplete weekly opponent network");
   }
-
-  return games;
+  for (const code of NFL_TEAMS) {
+    const rating = network.ratings?.[code];
+    if (!rating || !["offense", "defense", "overall", "scheduleStrength", "games"]
+      .every((field) => typeof rating[field] === "number" && Number.isFinite(rating[field])) ||
+        !Number.isInteger(rating.games) || rating.games < 1) throw new Error(`Invalid weekly opponent network team ${code}`);
+  }
+  if (new Set(NFL_TEAMS.map((code) => network.ratings[code].overall)).size < 2) {
+    throw new Error("Weekly opponent network ratings are constant");
+  }
+  return network;
 }
 
 export function solveOpponentNetwork(
