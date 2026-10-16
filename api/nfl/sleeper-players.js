@@ -16,6 +16,7 @@ const CACHE_DURATION_MS =
 
 let playerCache = null;
 let playerCacheExpiresAt = 0;
+let playerCacheFetchedAt = null;
 let ratingsIndex = null;
 
 const TEAM_CODES = {
@@ -136,6 +137,14 @@ export default async function handler(req, res) {
       groups:
         groupPlayers(teamPlayers),
 
+      sourceAsOf: playerCacheFetchedAt,
+      leagueIdentityIndex: Object.values(allPlayers)
+        .filter((player) => player.gsis_id && player.team)
+        .map((player) => ({
+          gsisId: player.gsis_id,
+          team: normalizeTeamCode(player.team),
+        })),
+
       refreshedAt:
         new Date().toISOString(),
     });
@@ -196,6 +205,7 @@ async function getSleeperPlayers() {
   }
 
   playerCache = body;
+  playerCacheFetchedAt = new Date(now).toISOString();
 
   playerCacheExpiresAt =
     now + CACHE_DURATION_MS;
@@ -406,6 +416,7 @@ function mapPlayer(
 
   return {
     id: player.playerId,
+    gsisId: player.gsis_id || null,
 
     fullName:
       player.full_name ||

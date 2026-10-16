@@ -2,13 +2,14 @@ import { resolveFullPlayerName } from "./playerRatings.js";
 import { resolveTeamCode } from "./oddsApi.js";
 import { validDepthLineup } from "../../api-lib/depthCharts.js";
 import { validateOddsEvents, QUOTE_VALIDATION_VERSION } from "./quoteValidation.js";
+import { canonicalTeam } from "../../api-lib/personnelView.js";
 export const BEST_BETS_CANDIDATE_VERSION = 3;
 const MIN_GAME_EDGE = 0.045;
 const MIN_GAME_EV = 0.03;
 const MIN_PROP_EDGE = 0.045;
 const MIN_PROP_EV = 0.03;
 
-export function buildBestBets({ game, prediction, playerProjections, oddsEvent, dataQuality, teamMetrics, asOf, quoteAsOf = new Date(), audit = false }) {
+export function buildBestBets({ game, prediction, playerProjections, personnelViews, oddsEvent, dataQuality, teamMetrics, asOf, quoteAsOf = new Date(), audit = false }) {
   const validation = validateOddsEvents(oddsEvent ? [oddsEvent] : [], { now: new Date(quoteAsOf) });
   const markets = flattenMarkets(validation.events[0]);
   const personnelReady = dataQuality?.personnel !== false ||
@@ -21,10 +22,11 @@ export function buildBestBets({ game, prediction, playerProjections, oddsEvent, 
   };
   const gameBets = buildGameBets(game, prediction, markets, dataQuality);
   const consensusPlayerMarkets = selectConsensusPlayerMarkets(markets);
-  const playerBets = buildPlayerBets(playerProjections, consensusPlayerMarkets);
+  const playerBets = buildPlayerBets(playerProjections, consensusPlayerMarkets, personnelViews, game);
   const assessed = gameBets.assessed + playerBets.assessed;
   const anytimeTdScorer = selectAnytimeTdScorer({
     playerProjections,
+    personnelViews,
     markets,
     playerBetCandidates: playerBets.recommendations,
   });
@@ -191,12 +193,16 @@ function isAnytimeTdBet(bet) {
     /anytime\s*(td|touchdown)/i.test(String(bet?.selection || ""));
 }
 
-function selectAnytimeTdScorer({ playerProjections, markets, playerBetCandidates }) {
+function selectAnytimeTdScorer({ playerProjections, personnelViews, markets, playerBetCandidates }) {
   const players = collectProjectedPlayers(playerProjections)
-    .filter((player) => playerProjections?.available !== false && player.available !== false &&
-      player.eligible !== false &&
+    .filter((player) => {
+      const personnel = findPersonnelRecord(personnelViews, player);
+      return playerProjections?.available !== false && player.available !== false &&
+      player.eligible !== false && player.personnel?.eligible === true &&
+      personnel?.statusKnown && personnel.propEligible === true &&
       Number.isFinite(Number(player.roleConfidence ?? player.confidence ?? player.role?.confidence)) &&
-      Number(player.roleConfidence ?? player.confidence ?? player.role?.confidence) > 0)
+      Number(player.roleConfidence ?? player.confidence ?? player.role?.confidence) > 0;
+    })
     .map((player) => ({
       player,
       playerName: resolvePlayerDisplayName(player),
@@ -257,6 +263,9 @@ function selectAnytimeTdScorer({ playerProjections, markets, playerBetCandidates
       ...bestPriced,
       modelProbability: topPlayer.probability,
       source: "priced-market",
+      playerId: topPlayer.player.playerId,
+      personnelId: topPlayer.player.personnelId,
+      playerTeam: topPlayer.player.team,
       title: "Anytime TD scorer",
       confidenceLevel: bestPriced.confidenceLevel || confidenceLabel(bestPriced.confidenceScore || 0),
       explanation:
@@ -288,6 +297,9 @@ function selectAnytimeTdScorer({ playerProjections, markets, playerBetCandidates
 
   return {
     source: "model-only",
+    playerId: topPlayer.player.playerId,
+    personnelId: topPlayer.player.personnelId,
+    playerTeam: topPlayer.player.team,
     title: "Anytime TD scorer",
     selection: `${topPlayer.playerName} anytime TD`,
     modelProbability: round4(topPlayer.probability),
@@ -433,7 +445,7 @@ function isFullPlayerName(value) {
   return tokens[0].replace(/[^A-Za-z]/g, "").length > 1;
 }
 
-function buildPlayerBets(playerProjections, markets) {
+function buildPlayerBets(playerProjections, markets, personnelViews, game) {
   const result = [];
   const rejections = [];
   let assessed = 0;
@@ -469,6 +481,21 @@ function buildPlayerBets(playerProjections, markets) {
       namesMatch(canonicalPlayerName(getPlayerName(item)), canonicalPlayerName(market.playerName))
     );
     if (!player) { rejection(["unmatched_player"]); continue; }
+    const playerTeam = canonicalTeam(player.team);
+    if (![game?.away, game?.home].some((team) =>
+      canonicalTeam(normalizeTeam(team)) === playerTeam)) {
+      rejection(["player_team_mismatch"]);
+      continue;
+    }
+    const personnel = findPersonnelRecord(personnelViews, player);
+    if (!personnel || !personnel.statusKnown || personnel.propEligible !== true ||
+        !personnel.eligibleBeforeCutoff || personnel.identityConflict || personnel.sourceConflict) {
+      rejection([!personnel ? "missing_personnel_identity"
+        : !personnel.statusKnown ? "unknown_availability"
+          : personnel.status === "Doubtful" ? "doubtful"
+            : "unavailable_or_conflicted_personnel"]);
+      continue;
+    }
     const displayName = resolvePlayerDisplayName(player, market.playerName);
     if (!isPlausiblePlayerPropLine(market.marketKey, market.point)) {
       rejection(["implausible_line"]); continue;
@@ -526,8 +553,9 @@ function buildPlayerBets(playerProjections, markets) {
       quoteValidation: market.quoteValidation,
       quoteId: market.quoteSource?.id || null,
     });
-    if (bet) result.push(bet);
+    if (bet) result.push({ ...bet, playerId: player.playerId, personnelId: personnel.canonicalId, playerTeam: player.team });
   }
+
   return {
     assessed,
     recommendations: result,
@@ -540,6 +568,13 @@ function buildPlayerBets(playerProjections, markets) {
   };
 }
 
+function findPersonnelRecord(personnelViews, player) {
+  const view = player.team && personnelViews
+    ? Object.values(personnelViews).find((candidate) => canonicalTeam(candidate?.team) === canonicalTeam(player.team))
+    : null;
+  const id = player.personnelId || player.gsisId;
+  return id ? view?.players?.find((record) => record.canonicalId === id) : null;
+}
 
 function isPlausiblePlayerPropLine(marketKey, point) {
   if (marketKey === "player_anytime_td") return true;

@@ -10,6 +10,7 @@ import {
   predictionSnapshotsForWeek,
   resolveLockWeekContext,
 } from "./weeklyMulti.js";
+import { activePersonnelRecord, personnelViewFixture } from "./personnelTestHelpers.js";
 
 const THURSDAY = Date.UTC(2026, 9, 8, 0, 0, 0);
 const HOUR = 60 * 60 * 1000;
@@ -41,13 +42,42 @@ const GAMES = [
   { away: "ARI", home: "LAR", id: "e1", bets: [bet("Moneyline", "ARI")], core: ml },
   { away: "BUF", home: "MIA", id: "e2", bets: [bet("Spread", "BUF", { line: -3.5 })], core: spread },
   { away: "DAL", home: "NYG", id: "e3", bets: [bet("Total", "Over", { line: 44.5 })], core: total },
-  { away: "KC", home: "DEN", id: "e4", bets: [bet("player_pass_yds", "Named Quarterback Over 250.5 passing yards", { line: 250.5, category: "Player" })], props: passYds },
-  { away: "SEA", home: "SF", id: "e5", bets: [], scorer: { source: "model-only", selection: "K. Walker anytime TD", modelProbability: 0.7, roleConfidence: 1, decimalOdds: null } },
+  { away: "KC", home: "DEN", id: "e4", bets: [bet("player_pass_yds", "Named Quarterback Over 250.5 passing yards", {
+    line: 250.5, category: "Player", playerId: "named-qb", personnelId: "named-qb", playerTeam: "KC",
+  })], props: passYds },
+  { away: "SEA", home: "SF", id: "e5", bets: [], scorer: {
+    source: "model-only", selection: "K. Walker anytime TD", playerId: "td-player", personnelId: "td-player",
+    playerTeam: "SEA", modelProbability: 0.7, roleConfidence: 1, decimalOdds: null,
+  } },
 ];
 
 function snapshotFor(game, overrides = {}) {
+  const candidates = [...game.bets, ...(game.scorer ? [game.scorer] : [])];
+  const records = { away: [], home: [] };
+  for (const candidate of candidates) {
+    const team = candidate.playerTeam || candidate.teamCode;
+    const id = candidate.personnelId || candidate.playerId;
+    if (!team || !id || ![game.away, game.home].includes(team)) continue;
+    records[team === game.away ? "away" : "home"].push(activePersonnelRecord(id, team));
+  }
+  const cutoff = new Date(THURSDAY + 6 * HOUR).toISOString();
+  const generatedAt = new Date(THURSDAY - HOUR).toISOString();
   return {
     season: 2026, week: 5, kickoff: new Date(THURSDAY + 3 * HOUR).toISOString(), awayCode: game.away, homeCode: game.home,
+    modelVersion: 11,
+    modelKey: "full-v11-week5-data-gap-audit",
+    fourthDownPick: game.away,
+    fourthDownAwayScore: 24,
+    fourthDownHomeScore: 20,
+    fourthDownAwayWinProbability: 0.6,
+    fourthDownHomeWinProbability: 0.4,
+    predictionPayload: {},
+    generatedAt,
+    playerProjections: { available: true },
+    personnelViews: {
+      away: personnelViewFixture(game.away, 2026, 5, cutoff, records.away),
+      home: personnelViewFixture(game.home, 2026, 5, cutoff, records.home),
+    },
     bestBets: { recommendations: game.bets, anytimeTdScorer: game.scorer },
     dataQuality: { sources: { odds: { available: true } } },
     ...overrides,
@@ -62,6 +92,7 @@ function predictionRow(game) {
     data_quality: {
       snapshot: {
         modelKey: "full-v11-week5-data-gap-audit", predictionPayload: {}, generatedAt: new Date(THURSDAY - HOUR).toISOString(),
+        ...snapshotFor(game),
         bestBets: { recommendations: game.bets, anytimeTdScorer: game.scorer },
         dataQuality: { sources: { odds: { available: true } } },
       },
@@ -166,6 +197,7 @@ test("moneyline, spread, total, player prop and model-only Anytime TD are all se
 test("five model-only TDs yield only the highest role-adjusted scorer and an honest partial at the floor", () => {
   const games = GAMES.map((game, index) => ({ ...game, bets: [], scorer: {
     source: "model-only", selection: `${game.away} Player anytime TD`,
+    playerId: `${game.away}-td`, personnelId: `${game.away}-td`, playerTeam: game.away,
     modelProbability: .95 - index * .04, roleConfidence: index === 0 ? .6 : 1,
   } }));
   const selected = select(games);
@@ -203,6 +235,7 @@ test("priced candidates retain positive edge and remain deterministic without fa
 test("readable player markets match exact stored market, player, direction and line without broad Over matches", () => {
   const game = { ...GAMES[3], bets: [bet("Passing yards", "Named Quarterback Over 250.5 passing yards", {
     line: 250.5, category: "Passing props",
+    playerId: "named-qb", personnelId: "named-qb", playerTeam: "KC",
   })], props: book([{ key: "player_pass_yds", outcomes: [
     { name: "Over", playerName: "Named Quarterback", point: 250.5, price: -110 },
   ] }]) };
@@ -217,8 +250,13 @@ test("readable player markets match exact stored market, player, direction and l
 });
 
 test("multiple Anytime TD offers, priced or unpriced, cannot consume more than one game", () => {
-  const games = GAMES.map((g) => ({ ...g, bets: [], scorer: { ...GAMES[4].scorer, selection: `${g.away} Player anytime TD` } }));
-  games[0].bets = [bet("Anytime touchdown", "Named Player Yes", { modelProbability: .8 })];
+  const games = GAMES.map((g) => ({ ...g, bets: [], scorer: {
+    ...GAMES[4].scorer, selection: `${g.away} Player anytime TD`,
+    playerId: `${g.away}-td`, personnelId: `${g.away}-td`, playerTeam: g.away,
+  } }));
+  games[0].bets = [bet("Anytime touchdown", "Named Player Yes", {
+    modelProbability: .8, playerId: "named-player", personnelId: "named-player", playerTeam: "ARI",
+  })];
   games[0].core = book([{ key: "player_anytime_td", outcomes: [{ name: "Yes", playerName: "Named Player", price: 100 }] }]);
   const result = select(games);
   assert.equal(result.legs.length, 1);

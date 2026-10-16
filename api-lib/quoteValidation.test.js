@@ -4,6 +4,7 @@ import { validateOddsEvents } from "../src/services/quoteValidation.js";
 import { buildBestBets } from "../src/services/bestBetsService.js";
 import { buildWeeklyMultiSelection } from "./weeklyMulti.js";
 import { handleOddsRequest } from "../api/nfl/odds.js";
+import { activePersonnelRecord, personnelViewFixture } from "./personnelTestHelpers.js";
 
 const NOW = new Date("2026-10-15T03:16:31Z");
 const QUOTE = "2026-10-14T20:00:00Z";
@@ -46,22 +47,66 @@ function brokenLadder() {
   ]);
 }
 function input(oddsEvent = brokenLadder()) {
+  const playerProjections = ["Named Receiver", "Normal One", "Normal Two"].map((playerName, index) => ({
+    playerName,
+    playerId: `sea-player-${index}`,
+    personnelId: `sea-player-${index}`,
+    team: "SEA",
+    position: "WR",
+    receivingYards: 120,
+    rushingYards: 80,
+    roleConfidence: .9,
+    dataQuality: .9,
+    personnel: { eligible: true },
+  }));
+  const cutoff = "2026-10-18T17:00:00Z";
   return {
     game: { away: "SEA", home: "DEN", season: 2026, week: 6 },
     prediction: { away: { code: "SEA", score: 31 }, home: { code: "DEN", score: 20 },
       awayWinProbability: .8, homeWinProbability: .2, confidenceScore: .8 },
-    playerProjections: ["Named Receiver", "Normal One", "Normal Two"].map(playerName => ({
-      playerName, team: "SEA", position: "WR", receivingYards: 120, rushingYards: 80,
-      roleConfidence: .9, dataQuality: .9,
-    })),
+    playerProjections,
+    personnelViews: {
+      away: personnelViewFixture("SEA", 2026, 6, cutoff,
+        playerProjections.map((player) => activePersonnelRecord(player.personnelId, "SEA"))),
+      home: personnelViewFixture("DEN", 2026, 6, cutoff),
+    },
     oddsEvent, dataQuality: { playByPlay: true, teamForm: true, personnel: true,
       sources: { odds: { available: true } } },
     asOf: NOW.toISOString(), quoteAsOf: NOW,
   };
 }
 function saved(away, home, bestBets) {
-  return { season: 2026, week: 6, awayCode: away, homeCode: home, kickoff: KICKOFF,
-    bestBets, dataQuality: { sources: { odds: { available: true } } } };
+  const playerCandidates = [...(bestBets.candidates || []), ...(bestBets.anytimeTdScorer ? [bestBets.anytimeTdScorer] : [])];
+  const byTeam = { away: [], home: [] };
+  for (const candidate of playerCandidates) {
+    const team = candidate.playerTeam || candidate.teamCode;
+    const id = candidate.personnelId || candidate.playerId;
+    if (!team || !id) continue;
+    byTeam[team === away ? "away" : "home"].push(activePersonnelRecord(id, team));
+  }
+  const dataQuality = {
+    personnelTiming: { cutoff: KICKOFF },
+    sources: { odds: { available: true } },
+  };
+  return {
+    season: 2026, week: 6, awayCode: away, homeCode: home, kickoff: KICKOFF,
+    modelVersion: 11,
+    modelKey: "full-v11-week5-data-gap-audit",
+    fourthDownPick: away,
+    fourthDownAwayScore: 24,
+    fourthDownHomeScore: 20,
+    fourthDownAwayWinProbability: .6,
+    fourthDownHomeWinProbability: .4,
+    predictionPayload: {},
+    playerProjections: { available: true },
+    bestBets,
+    personnelViews: {
+      away: personnelViewFixture(away, 2026, 6, KICKOFF, byTeam.away),
+      home: personnelViewFixture(home, 2026, 6, KICKOFF, byTeam.home),
+    },
+    dataQuality,
+    generatedAt: new Date(NOW.getTime() - 60 * 60 * 1000).toISOString(),
+  };
 }
 
 test("unpaired +1500-style quote is quarantined with ladder evidence, never repriced", () => {
@@ -267,6 +312,14 @@ test("five legitimate mixed-family distinct-game legs survive; ordering is deter
     args.game = { ...args.game, away, home };
     args.prediction.away.code = away; args.prediction.home.code = home;
     for (const player of args.playerProjections) player.team = away;
+    args.personnelViews = {
+      away: personnelViewFixture("SEA", 2026, 6, KICKOFF),
+      home: personnelViewFixture("DEN", 2026, 6, KICKOFF),
+    };
+    args.personnelViews.away.team = away;
+    args.personnelViews.home.team = home;
+    args.personnelViews.away.players = args.playerProjections.map((player) =>
+      activePersonnelRecord(player.personnelId, away));
     if (i === 4) e.bookmakers[0].markets = [{ key: "h2h", outcomes: [
       { name: away, price: 100 }, { name: home, price: -110 },
     ] }];
@@ -276,7 +329,10 @@ test("five legitimate mixed-family distinct-game legs survive; ordering is deter
   }
   const payload = { cacheStatus: "fresh", events };
   const result = buildWeeklyMultiSelection(snapshots, payload, context, NOW);
-  assert.equal(result.legs.length, 5);
+  assert.equal(result.legs.length, 5, JSON.stringify({
+    legs: result.legs.map(({ market, selection, personnelId, reason }) => ({ market, selection, personnelId, reason })),
+    diagnostics: result,
+  }));
   assert.equal(new Set(result.legs.map(l => l.matchupKey)).size, 5);
   assert.equal(result.legs.filter(l => l.marketFamily === "receiving-props").length, 2);
   assert.equal(result.legs.filter(l => l.marketFamily === "rushing-props").length, 2);
@@ -365,12 +421,23 @@ test("validated odds preserve the 55% floor, positive edge, and maximum one role
     const e = event([book("book", pair("Normal One", 49.5, 100, -110))]);
     e.id = `${away}-${home}`; e.away_team = away; e.home_team = home;
     for (const row of e.bookmakers[0].markets[0].outcomes) row.quoteSource.eventId = e.id;
-    const best = buildBestBets(input(e));
+    const args = input(e);
+    args.game = { ...args.game, away, home };
+    args.prediction.away.code = away;
+    args.prediction.home.code = home;
+    args.playerProjections.forEach((player) => { player.team = away; });
+    args.personnelViews = {
+      away: personnelViewFixture(away, 2026, 6, KICKOFF,
+        args.playerProjections.map((player) => activePersonnelRecord(player.personnelId, away))),
+      home: personnelViewFixture(home, 2026, 6, KICKOFF),
+    };
+    const best = buildBestBets(args);
     best.candidates = best.candidates.map(b => ({ ...b, modelProbability: .55 }));
     events.push(e); snapshots.push(saved(away, home, best));
   }
   for (const [away, home] of [["CAR", "PHI"], ["DAL", "GB"]]) snapshots.push(saved(away, home, {
     candidates: [], anytimeTdScorer: { source: "model-only", selection: `${away} Player anytime TD`,
+      playerId: `${away}-test-player`, personnelId: `${away}-test-player`, playerTeam: away,
       modelProbability: .9, roleConfidence: .9, decimalOdds: null },
   }));
   const select = () => buildWeeklyMultiSelection(snapshots, { cacheStatus: "fresh", events }, context, NOW);

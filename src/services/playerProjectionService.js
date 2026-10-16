@@ -1,5 +1,6 @@
-import { validDepthLineup, validDepthRoster } from "../../api-lib/depthCharts.js";
+import { validDepthRoster } from "../../api-lib/depthCharts.js";
 import { validatePlayerMetrics } from "../../api-lib/playerMetrics.js";
+import { buildPersonnelView, canonicalTeam } from "../../api-lib/personnelView.js";
 
 const MIN_ROLE_OPPORTUNITIES = 3;
 
@@ -8,6 +9,7 @@ export function buildPlayerProjections({
   home,
   prediction,
   playerMetrics,
+  personnelViews,
   teamMetrics,
   season,
   week,
@@ -35,14 +37,20 @@ export function buildPlayerProjections({
       reasons.push(`${teamCode}: ${invalid || "Verified weekly player roles unavailable"}`);
       continue;
     }
-    result[side] = projectTeam({ teamCode, opponentCode, side, prediction, metrics, teamMetrics, lineup });
+    const personnelView = personnelViews?.[side] ||
+      buildPersonnelView({ team: teamCode, lineup, cutoff, season, week });
+    if (canonicalTeam(personnelView?.team || teamCode) !== canonicalTeam(teamCode)) {
+      reasons.push(`${teamCode}: personnel view belongs to a different team`);
+      continue;
+    }
+    result[side] = projectTeam({ teamCode, opponentCode, side, prediction, metrics, teamMetrics, lineup, personnelView });
     reasons.push(...result[side].reasons.map((reason) => `${teamCode}: ${reason}`));
   }
   result.available = [result.away, result.home].some((team) => team?.players.length > 0);
   return result;
 }
 
-function projectTeam({ teamCode, opponentCode, side, prediction, metrics, teamMetrics, lineup }) {
+function projectTeam({ teamCode, opponentCode, side, prediction, metrics, teamMetrics, lineup, personnelView }) {
   const teamProjection = prediction?.[side] || {};
   const opponentSide = side === "away" ? "home" : "away";
   const opponentProjection = prediction?.[opponentSide] || {};
@@ -53,23 +61,35 @@ function projectTeam({ teamCode, opponentCode, side, prediction, metrics, teamMe
   }
   const roles = new Map();
   const conflicting = new Set();
-  for (const role of lineup.roster) {
-    if (!role.gsisId || !role.playerId || !Number.isInteger(role.rank) || role.rank < 1 ||
-        typeof role.available !== "boolean" || typeof role.statusKnown !== "boolean") continue;
-    if (roles.has(role.gsisId)) conflicting.add(role.gsisId);
-    roles.set(role.gsisId, role);
+  for (const role of personnelView?.players || []) {
+    if (canonicalTeam(role.team) !== canonicalTeam(teamCode) ||
+        !role.canonicalId || !role.group || !Number.isInteger(role.rank) || role.rank < 1 ||
+        typeof role.projectedAvailable !== "boolean" || typeof role.statusKnown !== "boolean" ||
+        !role.eligibleBeforeCutoff || role.identityConflict || role.sourceConflict) continue;
+    if (roles.has(role.canonicalId)) conflicting.add(role.canonicalId);
+    roles.set(role.canonicalId, role);
   }
-  const declaredQbs = Array.isArray(lineup.players) ? lineup.players.filter((player) => player.group === "QB") : [];
-  const starter = lineup.startingQuarterback;
-  const starterId = validDepthLineup(lineup, metrics.predictionWeek, lineup.season) &&
-    declaredQbs.length === 1 && declaredQbs[0].playerId === starter?.playerId &&
-    declaredQbs[0].gsisId === starter?.gsisId ? starter.gsisId : null;
+  const starter = personnelView?.quarterback?.player;
+  const starterId = personnelView?.quarterback?.resolved ? starter?.canonicalId || null : null;
   const players = Object.values(metrics?.players || {}).filter((player) => {
     const role = roles.get(player.gsisId);
-    return role && !conflicting.has(player.gsisId) && role.available &&
+    return role && !conflicting.has(player.gsisId) && role.projectedAvailable &&
+      canonicalTeam(player.team) === teamCode &&
       ["QB", "RB", "WR", "TE"].includes(role.group) &&
       (role.group !== "QB" || player.gsisId === starterId);
-  }).map((player) => ({ ...player, position: roles.get(player.gsisId).group }));
+  }).map((player) => ({
+    ...player,
+    position: roles.get(player.gsisId).group,
+    personnel: {
+      status: roles.get(player.gsisId).status,
+      statusKnown: roles.get(player.gsisId).statusKnown,
+      eligible: roles.get(player.gsisId).propEligible,
+      reason: roles.get(player.gsisId).exclusionReason,
+      replacementFor: roles.get(player.gsisId).replacementFor,
+      confidence: roles.get(player.gsisId).confidence,
+    },
+    opportunityFactor: roles.get(player.gsisId).opportunityFactor,
+  }));
   const excludedPlayers = Object.keys(metrics.players || {}).length - players.length;
   if (excludedPlayers) reasons.push(`${excludedPlayers} historical players excluded without a supported current role/availability`);
   const quarterback = players.find((player) => player.gsisId === starterId && passingProfile(player)) || null;
@@ -164,6 +184,8 @@ function projectTeam({ teamCode, opponentCode, side, prediction, metrics, teamMe
     games,
   });
 
+  capRoundedOpportunities(receiverRows, "targets", passAttempts);
+  capRoundedOpportunities(rusherRows, "rushingAttempts", rushAttempts);
   const combined = mergeCombined(receiverRows, rusherRows);
   const playerIndex = new Map(players.map((player) => [player.playerId, player]));
 
@@ -174,10 +196,13 @@ function projectTeam({ teamCode, opponentCode, side, prediction, metrics, teamMe
         number(projection.receivingTouchdowns) +
         number(projection.rushingTouchdowns) +
         (source.playerId === quarterback?.playerId ? number(projection.quarterbackRushingTouchdowns) : 0);
-      const roleConfidence = calculateRoleConfidence(source, Math.min(games, source.games));
+      const roleConfidence = effectiveRoleConfidence(source, Math.min(games, source.games));
 
       return {
         ...projection,
+        team: teamCode,
+        personnelId: source.gsisId,
+        personnel: source.personnel,
         playerNameKey: normalizePlayerName(projection.playerName),
         anytimeTouchdownProbability: round4(1 - Math.exp(-expectedTouchdowns)),
         roleConfidence,
@@ -190,6 +215,9 @@ function projectTeam({ teamCode, opponentCode, side, prediction, metrics, teamMe
   if (quarterback) {
     const qbProjection = {
       playerId: quarterback.playerId,
+      team: teamCode,
+      personnelId: quarterback.gsisId,
+      personnel: quarterback.personnel,
       playerName: quarterback.playerName,
       playerNameKey: normalizePlayerName(quarterback.playerName),
       team: teamCode,
@@ -206,7 +234,7 @@ function projectTeam({ teamCode, opponentCode, side, prediction, metrics, teamMe
       receivingTouchdowns: 0,
       rushingReceivingYards: round1(findProjectedValue(projectedPlayers, quarterback.playerId, "rushingYards")),
       opportunities: round1(passAttempts + findProjectedValue(projectedPlayers, quarterback.playerId, "rushingAttempts")),
-      roleConfidence: calculateRoleConfidence(quarterback, Math.min(games, quarterback.games)),
+      roleConfidence: effectiveRoleConfidence(quarterback, Math.min(games, quarterback.games)),
       profile: {
         playerId: quarterback.playerId, games: quarterback.games, weeks: quarterback.weeks,
         passing: numericProfile(quarterback.passing), rushing: numericProfile(quarterback.rushing),
@@ -223,6 +251,8 @@ function projectTeam({ teamCode, opponentCode, side, prediction, metrics, teamMe
     else projectedPlayers.unshift(qbProjection);
   }
 
+  const projectedTargets = projectedPlayers.reduce((sum, player) => sum + number(player.targets), 0);
+  const projectedCarries = projectedPlayers.reduce((sum, player) => sum + number(player.rushingAttempts), 0);
   return {
     team: teamCode,
     opponent: opponentCode,
@@ -232,6 +262,8 @@ function projectTeam({ teamCode, opponentCode, side, prediction, metrics, teamMe
     passRate: round4(passRate),
     passAttempts: round1(passAttempts),
     rushAttempts: round1(rushAttempts),
+    unallocatedTargets: round1(Math.max(0, passAttempts - projectedTargets)),
+    unallocatedCarries: round1(Math.max(0, rushAttempts - projectedCarries)),
     ...(hasPassingSample ? { passingYards: round1(passingYards) } : {}),
     startingQuarterback: quarterback?.playerId || null,
     availabilityKnown: players.every((player) => roles.get(player.gsisId).statusKnown),
@@ -250,10 +282,10 @@ function allocateReceivers({ receivingPlayers, passAttempts, passingYards, passi
       : seasonShare;
     return clamp(seasonShare * 0.7 + recentShare * 0.3, 0.01, 0.6);
   });
-  const shareTotal = weightedShares.reduce((sum, value) => sum + value, 0) || 1;
+  const shares = allocateLimitedShares(weightedShares, 0.6);
   const rawYards = receivingPlayers.map((player, index) => {
-    const targetShare = weightedShares[index] / shareTotal;
-    const targets = passAttempts * targetShare;
+    const targetShare = shares[index];
+    const targets = passAttempts * targetShare * clamp(number(player.opportunityFactor, 1), 0, 1);
     const catchRate = clamp(number(player?.receiving?.catchRate, 0.65), 0.35, 0.9);
     const yardsPerTarget = clamp(number(player?.receiving?.yardsPerTarget, 7), 3.5, 14);
     return { player, targetShare, targets, receptions: targets * catchRate, yards: targets * yardsPerTarget };
@@ -262,7 +294,8 @@ function allocateReceivers({ receivingPlayers, passAttempts, passingYards, passi
   const redZoneWeights = receivingPlayers.map((player, index) => {
     const rz = number(player?.receiving?.redZoneTargetShare);
     const ez = number(player?.receiving?.endZoneTargetShare);
-    return Math.max(0.01, rz * 0.65 + ez * 0.35 + weightedShares[index] * 0.25);
+    return Math.max(0.01, (rz * 0.65 + ez * 0.35 + weightedShares[index] * 0.25) *
+      clamp(number(player.opportunityFactor, 1), 0, 1));
   });
   const tdWeightTotal = redZoneWeights.reduce((sum, value) => sum + value, 0) || 1;
 
@@ -289,7 +322,7 @@ function allocateRushers({ rushingPlayers, rushAttempts, rushingTouchdowns, tota
       : seasonShare;
     return clamp(seasonShare * 0.7 + recentShare * 0.3, 0.01, 0.8);
   });
-  const shareTotal = shares.reduce((sum, value) => sum + value, 0) || 1;
+  const allocatedShares = allocateLimitedShares(shares, 0.8);
   const opponentRushAllowed = getOpponentMetric(teamMetrics, opponentCode, "rushingEpaAllowedPerPlay", 0);
   const matchupMultiplier = clamp(1 + opponentRushAllowed * 0.18, 0.83, 1.2);
   const goalLineWeights = rushingPlayers.map((player, index) =>
@@ -298,12 +331,12 @@ function allocateRushers({ rushingPlayers, rushAttempts, rushingTouchdowns, tota
       number(player?.rushing?.goalLineCarryShare) * 0.65 +
       number(player?.rushing?.redZoneCarryShare) * 0.25 +
       shares[index] * 0.1
-    )
+    ) * clamp(number(player.opportunityFactor, 1), 0, 1)
   );
   const tdWeightTotal = goalLineWeights.reduce((sum, value) => sum + value, 0) || 1;
 
   return rushingPlayers.map((player, index) => {
-    const share = shares[index] / shareTotal;
+    const share = allocatedShares[index] * clamp(number(player.opportunityFactor, 1), 0, 1);
     const attempts = rushAttempts * share;
     const ypc = clamp(number(player?.rushing?.yardsPerCarry, 4.1), 2.4, 7.5);
     return {
@@ -317,6 +350,49 @@ function allocateRushers({ rushingPlayers, rushAttempts, rushingTouchdowns, tota
       opportunities: round1(attempts),
     };
   });
+}
+
+function allocateLimitedShares(weights, cap) {
+  const total = weights.reduce((sum, weight) => sum + weight, 0);
+  if (!total) return weights.map(() => 0);
+  const shares = weights.map((weight) => weight / total);
+  let remaining = 1;
+  let eligible = shares.map((_, index) => index);
+  while (eligible.length) {
+    const eligibleTotal = eligible.reduce((sum, index) => sum + shares[index], 0);
+    const capped = eligible.filter((index) => shares[index] / eligibleTotal * remaining > cap);
+    if (!capped.length) {
+      for (const index of eligible) shares[index] = shares[index] / eligibleTotal * remaining;
+      break;
+    }
+    for (const index of capped) {
+      shares[index] = cap;
+      remaining -= cap;
+    }
+    eligible = eligible.filter((index) => !capped.includes(index));
+    if (remaining <= 0) break;
+  }
+  return shares;
+}
+
+function capRoundedOpportunities(rows, field, volume) {
+  const budget = Math.floor((volume + 1e-9) * 10) / 10;
+  const allocated = rows.reduce((sum, row) => sum + number(row[field]), 0);
+  let excess = Math.round((allocated - budget) * 10) / 10;
+  for (let index = rows.length - 1; index >= 0 && excess > 0; index -= 1) {
+    const previous = number(rows[index][field]);
+    const reduction = Math.min(previous, excess);
+    rows[index][field] = round1(previous - reduction);
+    const ratio = previous > 0 ? rows[index][field] / previous : 0;
+    if (field === "targets") {
+      rows[index].receptions = round1(number(rows[index].receptions) * ratio);
+      rows[index].receivingYards = round1(number(rows[index].receivingYards) * ratio);
+    } else {
+      rows[index].rushingYards = round1(number(rows[index].rushingYards) * ratio);
+    }
+    rows[index].opportunities = rows[index][field];
+    excess = Math.round((excess - reduction) * 10) / 10;
+  }
 }
 
 function mergeCombined(receivers, rushers) {
@@ -365,6 +441,11 @@ function calculateRoleConfidence(player, games) {
   const volumeConfidence = clamp(opportunityShare / 0.35, 0, 1);
   const sampleConfidence = clamp(games / 4, 0.35, 1);
   return round4(volumeConfidence * 0.7 + sampleConfidence * 0.3);
+}
+
+function effectiveRoleConfidence(player, games) {
+  return round4(calculateRoleConfidence(player, games) *
+    clamp(number(player?.opportunityFactor, 1), 0, 1));
 }
 
 function getOpponentMetric(teamMetrics, opponentCode, field, fallback) {

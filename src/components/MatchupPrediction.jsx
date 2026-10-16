@@ -17,6 +17,7 @@ import { getPlayerRating, getTeamPlayerRatings } from "../services/playerRatings
 import { getTeamQbr, getTeamRatingsHealth } from "../services/teamRatings.js";
 import { classifyDataHealth, normaliseLayers, saveDataHealthSnapshot } from "../services/dataHealth.js";
 import { personnelAvailableAt } from "../../api-lib/depthCharts.js";
+import { TEAM_NAMES } from "../data.js";
 import MatchupIntelligencePanel from "./MatchupIntelligencePanel.jsx";
 
 async function readRosterResponse(response) {
@@ -86,19 +87,21 @@ function currentQbPerformanceWeight(week) {
   return 0.7;
 }
 
-function buildUnifiedQbAdjustment(roster, teamCode, personnelQb, week = 1, cutoff = null) {
+function buildUnifiedQbAdjustment(roster, teamCode, personnelQb, personnelView, week = 1, cutoff = null) {
   const qbr = personnelAvailableAt(getTeamRatingsHealth(), cutoff) ? getTeamQbr(teamCode) : null;
   const rosterPlayers = Object.values(roster?.groups || {}).flat();
-  const activeQbs = rosterPlayers
-    .filter((player) => String(player.position || "").toUpperCase() === "QB" && player.active !== false)
-    .map((player) => ({ player, rating: getPlayerRating(player, teamCode)?.overall ?? null }))
-    .filter((entry) => Number.isFinite(Number(entry.rating)))
-    .sort((a, b) =>
-      ((a.player.depthChartOrder ?? 99) - (b.player.depthChartOrder ?? 99)) ||
-      (Number(b.rating) - Number(a.rating))
-    );
-
-  const current = activeQbs[0] || null;
+  const decision = personnelView?.quarterback;
+  const selected = decision?.player;
+  const currentPlayer = decision?.resolved && selected?.statusKnown && selected?.propEligible
+    ? rosterPlayers.find((player) =>
+      String(player.id) === String(selected.livePlayerId) ||
+      String(player.gsisId || "") === String(selected.canonicalId)
+    ) || null
+    : null;
+  const currentRosterRating = currentPlayer ? getPlayerRating(currentPlayer, teamCode)?.overall ?? null : null;
+  const current = currentPlayer && Number.isFinite(Number(currentRosterRating))
+    ? { player: currentPlayer, rating: currentRosterRating }
+    : null;
   const baseline = getTeamPlayerRatings(teamCode)
     .filter((player) => String(player.position || "").toUpperCase() === "QB")
     .sort((a, b) => Number(b.overall) - Number(a.overall))[0] || null;
@@ -108,7 +111,11 @@ function buildUnifiedQbAdjustment(roster, teamCode, personnelQb, week = 1, cutof
       active: Boolean(personnelQb?.points),
       points: Number(personnelQb?.points) || 0,
       confidence: Number(personnelQb?.confidence) || 0,
-      reasons: personnelQb?.reasons || [],
+      reasons: [
+        ...(personnelQb?.reasons || []),
+        ...(!selected?.statusKnown ? ["Quarterback health is unknown; named QB adjustment withheld"] : []),
+        ...(decision?.conflict && !decision?.resolved ? ["Quarterback identity conflict is unresolved"] : []),
+      ],
       source: "personnel-fallback",
     };
   }
@@ -450,10 +457,15 @@ export default function MatchupPrediction({ awayCode, homeCode, kickoff, weather
   const homeStanding = standingsByCode[normalizeCode(homeCode)];
   const awayStanding = standingsByCode[normalizeCode(awayCode)];
   const kickerImpact = calculateKickerImpact(kickerData, weather);
+  const personnelViews = officialSnapshot?.personnelViews || {
+    away: personnel?.away?.personnelView,
+    home: personnel?.home?.personnelView,
+  };
   const awayQbAdjustment = buildUnifiedQbAdjustment(
     playerMatchup?.rosters?.away,
     awayCode,
     personnel?.away?.quarterback,
+    personnelViews?.away,
     week,
     personnel?.cutoff
   );
@@ -461,6 +473,7 @@ export default function MatchupPrediction({ awayCode, homeCode, kickoff, weather
     playerMatchup?.rosters?.home,
     homeCode,
     personnel?.home?.quarterback,
+    personnelViews?.home,
     week,
     personnel?.cutoff
   );
@@ -533,6 +546,8 @@ export default function MatchupPrediction({ awayCode, homeCode, kickoff, weather
   const scheduleImpact = prediction.schedule;
   const rivalryImpact = prediction.rivalry;
   const explanation = buildPredictionExplanation(prediction, week, playByPlayData);
+  const personnelNotices = [personnelViews?.away, personnelViews?.home]
+    .map(formatPersonnelNotice).filter(Boolean);
   const coreMarket = getCoreMarket(marketEvent);
   const comparison = buildOddsComparison(coreMarket.away !== null && coreMarket.home !== null
     ? { ...prediction, market: { ...prediction.market, active: true, awayExpected: coreMarket.away, homeExpected: coreMarket.home, total: coreMarket.total } }
@@ -713,6 +728,7 @@ export default function MatchupPrediction({ awayCode, homeCode, kickoff, weather
         <span>Projected total {total}</span>
       </div>
 
+      {personnelNotices.map((notice) => <p key={notice} role="status" className="prediction-note">{notice}</p>)}
       <MatchupIntelligencePanel prediction={prediction} />
       <section className="card prediction-explanation-card">
         {!prediction.matchupIntelligence?.available && <>
@@ -899,6 +915,26 @@ function AdvancedAnalyticsCard({ data, awayCode, homeCode, modelLayers }) {
 
 function formatPercent(value) { return `${(finiteNumber(value) * 100).toFixed(1)}%`; }
 function formatMetric(value, digits = 2) { return finiteNumber(value).toFixed(digits); }
+
+function formatPersonnelNotice(view) {
+  if (!view?.quarterback) return null;
+  const decision = view.quarterback;
+  if (decision.conflict && !decision.resolved) {
+    return `${TEAM_NAMES[view.team] || view.team}'s quarterback situation is unresolved, so Fourth Down is withholding named quarterback projections.`;
+  }
+  const selected = decision.player;
+  if (selected?.replacementFor) {
+    const replaced = view.players?.find((player) => player.canonicalId === selected.replacementFor);
+    return `${TEAM_NAMES[view.team] || view.team}: ${selected.name} is projected to start, replacing ${replaced?.name || "the unavailable starter"}.`;
+  }
+  if (decision.conflict && selected?.liveStarter) {
+    return `${view.team}'s current point-in-time QB observation differs from the checked-in chart; Fourth Down is using the valid live observation.`;
+  }
+  if (selected && !selected.statusKnown) {
+    return `${view.team}'s quarterback health status is unknown; player betting candidates are withheld.`;
+  }
+  return null;
+}
 
 function buildPredictionExplanation(prediction, week, playByPlayData) {
   const { away, home, winner, margin, homeField, market, rivalry, schedule, weather, modelLayers, formBlend } = prediction;

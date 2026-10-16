@@ -12,6 +12,7 @@ import { playerMetricsResponse } from "./playerMetrics.js";
 import { compareTeams } from "../api/nfl/play-by-play.js";
 import { FULL_MODEL_VERSION, FULL_MODEL_KEY } from "../src/services/gamePredictionService.js";
 import { BEST_BETS_CANDIDATE_VERSION } from "../src/services/bestBetsService.js";
+import { activePersonnelRecord, predictionFeatureFixture } from "./personnelTestHelpers.js";
 
 const LOCK = Date.parse("2026-10-15T00:00:00Z");
 const KICKOFF = "2026-10-16T00:15:00Z";
@@ -33,6 +34,10 @@ const context = (week = 6, lock = LOCK) => ({
     visitor_team: { abbreviation: away }, home_team: { abbreviation: home } })),
 });
 function fixture(game, now) {
+  const cutoff = game.sourceDate;
+  const features = predictionFeatureFixture(game.away, game.home, game.season, game.week, cutoff, {
+    away: [activePersonnelRecord("weekly-multi-player", game.away)],
+  });
   const recommendations = [{
     market: "Moneyline", selection: game.away, modelProbability: .7, decimalOdds: 2,
     sportsbook: "Book", updatedAt: now.toISOString(),
@@ -41,12 +46,26 @@ function fixture(game, now) {
     season: game.season, week: game.week, kickoff: game.sourceDate, awayCode: game.away, homeCode: game.home,
     fourthDownPick: game.away, fourthDownAwayScore: 24, fourthDownHomeScore: 20,
     fourthDownAwayWinProbability: .7, fourthDownHomeWinProbability: .3, confidenceScore: .7,
-    modelVersion: FULL_MODEL_VERSION, modelKey: FULL_MODEL_KEY, predictionPayload: { winner: game.away },
-    playerProjections: { available: true },
-    dataQuality: { sources: { odds: { available: true } } },
+    modelVersion: FULL_MODEL_VERSION, modelKey: FULL_MODEL_KEY,
+    predictionFeatureVersion: features.predictionFeatureVersion,
+    opponentNetworkStatus: features.opponentNetworkStatus,
+    personnelVersion: features.personnelVersion,
+    personnelViews: features.personnelViews,
+    predictionPayload: {
+      winner: game.away,
+      modelLayers: { opponentNetwork: features.predictionPayloadFeatures.opponentNetwork },
+      matchupIntelligence: features.predictionPayloadFeatures,
+    },
+    playerProjections: { available: true, away: { players: [] }, home: { players: [] } },
+    dataQuality: {
+      personnelTiming: { cutoff },
+      sources: { odds: { available: true }, opponentNetwork: { available: true } },
+    },
     generatedAt: now.toISOString(), snapshotAt: now.toISOString(),
     bestBets: { candidateVersion: BEST_BETS_CANDIDATE_VERSION, assessed: 4, recommendations, candidates: recommendations,
-      anytimeTdScorer: { source: "model-only", selection: "Validated Full Player anytime TD", modelProbability: .68, roleConfidence: 1 } },
+      anytimeTdScorer: { source: "model-only", selection: "Validated Full Player anytime TD",
+        playerId: "weekly-multi-player", personnelId: "weekly-multi-player", playerTeam: game.away,
+        modelProbability: .68, roleConfidence: 1 } },
   };
 }
 function odds(now) {
@@ -182,9 +201,28 @@ test("real stored-odds readers perform no SharpAPI fetch and reject missing snap
 test("actual shared prediction service builds complete Week 6 records with model-only TD and named players", async () => {
   const game = { season: 2026, week: 6, away: "SEA", home: "DEN", sourceDate: KICKOFF, weather: { dome: true } };
   const away = dataset.metricsByWeek[6].SEA, home = dataset.metricsByWeek[6].DEN;
+  const roster = (team, metrics) => ({
+    team,
+    sourceAsOf: new Date(Date.parse(metrics.expectedLineup.cutoff) - 1000).toISOString(),
+    groups: {
+      players: metrics.expectedLineup.roster.map((player) => ({
+        id: `live-${player.gsisId}`,
+        gsisId: player.gsisId,
+        fullName: player.name,
+        team,
+        position: player.position,
+        depthChartPosition: player.position,
+        depthChartOrder: player.rank,
+        status: "Active",
+        injuryStatus: "Active",
+      })),
+    },
+  });
   const generate = createServerPredictionGenerator({ loadInputs: () => ({
     playByPlay: Promise.resolve({ season: 2026, week: 6, away, home, modelLayers: compareTeams(away, home, 6) }),
     playerMetrics: Promise.resolve(playerMetricsResponse(players, { season: 2026, week: 6, away: "SEA", home: "DEN" })),
+    awayRoster: Promise.resolve(roster("SEA", away)),
+    homeRoster: Promise.resolve(roster("DEN", home)),
   }) });
   const snapshot = await generate(game, odds(new Date(LOCK)), new Date(LOCK));
   assert.ok(completePrediction(snapshot));

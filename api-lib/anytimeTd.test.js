@@ -32,11 +32,37 @@ const prediction = {
   home: { code: "LV", score: 20 },
 };
 
+function personnelFor(candidates) {
+  const byTeam = { KC: [], LV: [] };
+  const players = Array.isArray(candidates) ? candidates
+    : ["away", "home"].flatMap((side) => candidates?.[side]?.players || []);
+  for (const [index, player] of players.entries()) {
+    player.personnelId ||= `test-player-${index}`;
+    player.personnel ||= { eligible: true };
+    byTeam[player.team].push({
+      canonicalId: player.personnelId,
+      team: player.team,
+      statusKnown: true,
+      propEligible: true,
+      projectedAvailable: true,
+      eligibleBeforeCutoff: true,
+      identityConflict: false,
+      sourceConflict: false,
+    });
+  }
+  return {
+    away: { team: "KC", players: byTeam.KC },
+    home: { team: "LV", players: byTeam.LV },
+  };
+}
+
 function run(withTdPrices) {
+  const playerProjections = structuredClone(players);
   return buildBestBets({
     game: { away: "KC", home: "LV" },
     prediction,
-    playerProjections: players,
+    playerProjections,
+    personnelViews: personnelFor(playerProjections),
     oddsEvent: oddsEvent(withTdPrices),
     dataQuality: {},
   });
@@ -72,7 +98,9 @@ test("B: a different qualifying player keeps a normal Anytime TD bet alongside t
 test("the scorer is the top model-probability player even if only another player is priced", () => {
   const only = oddsEvent(true);
   for (const book of only.bookmakers) book.markets = book.markets.filter((m) => m.outcomes[0].playerName === "Beta Receiver");
-  const result = buildBestBets({ game: { away: "KC", home: "LV" }, prediction, playerProjections: players, oddsEvent: only, dataQuality: {} });
+  const playerProjections = structuredClone(players);
+  const result = buildBestBets({ game: { away: "KC", home: "LV" }, prediction,
+    playerProjections, personnelViews: personnelFor(playerProjections), oddsEvent: only, dataQuality: {} });
   assert.match(result.anytimeTdScorer.selection, /Alpha Runner/);
   assert.equal(result.anytimeTdScorer.source, "model-only");
 });
@@ -85,8 +113,10 @@ test("without bookmaker TD odds the model-only scorer is still produced", () => 
 });
 
 function scorer(candidates, odds = null) {
+  const playerProjections = structuredClone(candidates);
   return buildBestBets({ game: { away: "KC", home: "LV" }, prediction,
-    playerProjections: candidates, oddsEvent: odds, dataQuality: {} }).anytimeTdScorer;
+    playerProjections, personnelViews: personnelFor(playerProjections),
+    oddsEvent: odds, dataQuality: {} }).anytimeTdScorer;
 }
 
 test("dedicated scorer probability affects selection with equal role confidence", () => {

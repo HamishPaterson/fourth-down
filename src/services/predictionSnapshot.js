@@ -1,6 +1,7 @@
 import { FULL_MODEL_VERSION, FULL_MODEL_KEY } from "./gamePredictionService.js";
 import { getCoreMarket } from "./oddsApi.js";
 import { PREDICTION_FEATURE_VERSION, MATCHUP_INTELLIGENCE_SCHEMA_VERSION } from "./predictionFeatures.js";
+import { PERSONNEL_VIEW_VERSION } from "../../api-lib/personnelView.js";
 
 export function applyPredictionSnapshot(snapshot) {
   const payload = snapshot?.predictionPayload ?? snapshot?.dataQuality?.predictionPayload;
@@ -44,6 +45,8 @@ export function buildPredictionSnapshot(game, fullResult, oddsEvent, now = new D
     confidenceScore: prediction.confidenceScore, confidenceLabel: prediction.confidence,
     modelVersion: FULL_MODEL_VERSION, modelKey: FULL_MODEL_KEY,
     predictionFeatureVersion: PREDICTION_FEATURE_VERSION,
+    personnelVersion: fullResult.personnelVersion || PERSONNEL_VIEW_VERSION,
+    personnelViews: fullResult.personnelViews || null,
     opponentNetworkStatus: prediction.modelLayers?.opponentNetwork?.available === true &&
       fullResult.dataQuality?.sources?.opponentNetwork?.available === true ? "available" : "unavailable",
     predictionPayload: prediction, playerProjections: fullResult.playerProjections,

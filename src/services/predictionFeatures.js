@@ -1,6 +1,7 @@
 import { BEST_BETS_CANDIDATE_VERSION } from "./bestBetsService.js";
+import { PERSONNEL_VIEW_VERSION } from "../../api-lib/personnelView.js";
 
-export const PREDICTION_FEATURE_VERSION = 1;
+export const PREDICTION_FEATURE_VERSION = 2;
 export const MATCHUP_INTELLIGENCE_SCHEMA_VERSION = 2;
 const PHASE1 = ["rushMatchup", "passMatchup", "successMatchup", "explosiveMatchup", "pressureMatchup"];
 const SITUATIONAL = ["thirdDownMatchup", "redZoneMatchup"];
@@ -22,6 +23,21 @@ export function predictionFeatureStatus(snapshot) {
       networkSource?.available === true && snapshot?.opponentNetworkStatus === "available",
     candidates: snapshot?.bestBets?.candidateVersion === BEST_BETS_CANDIDATE_VERSION &&
       Array.isArray(snapshot.bestBets.candidates),
+    personnel: snapshot?.personnelVersion === PERSONNEL_VIEW_VERSION &&
+      ["away", "home"].every((side) => {
+        const view = snapshot?.personnelViews?.[side];
+        return view?.version === PERSONNEL_VIEW_VERSION &&
+          view.team === snapshot[`${side}Code`] &&
+          view.season === Number(snapshot.season) && view.week === Number(snapshot.week) &&
+          view.cutoff === snapshot.dataQuality?.personnelTiming?.cutoff &&
+          Number.isFinite(Date.parse(view.cutoff)) &&
+          (!view.chart.available || (Number.isFinite(Date.parse(view.chart.observedAt)) &&
+            Date.parse(view.chart.observedAt) <= Date.parse(view.cutoff))) &&
+          (!view.live.available || (Number.isFinite(Date.parse(view.live.observedAt)) &&
+            Date.parse(view.live.observedAt) <= Date.parse(view.cutoff))) &&
+          Array.isArray(view.players) && view.quarterback &&
+          ["front", "LB", "DB"].every((unit) => view.units?.[unit]);
+      }),
   };
   return { ...checks, complete: Object.values(checks).every(Boolean) };
 }

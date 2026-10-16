@@ -29,6 +29,7 @@ export function refreshSavedBestBets(snapshot, odds, now) {
   } : null;
   const bestBets = buildBestBets({
     game, prediction: snapshot.predictionPayload, playerProjections: snapshot.playerProjections,
+    personnelViews: snapshot.personnelViews,
     oddsEvent: event, dataQuality: snapshot.dataQuality, teamMetrics, asOf: snapshot.generatedAt, quoteAsOf: now,
   });
   return { ...snapshot, bestBets,

@@ -5,6 +5,7 @@ import { getTeamQbr, getTeamRatingsHealth } from "./teamRatings.js";
 import { getStadiumWeather } from "./weatherApi.js";
 import { buildBestBets } from "./bestBetsService.js";
 import { personnelAvailableAt, validDepthLineup, validDepthRoster } from "../../api-lib/depthCharts.js";
+import { buildPersonnelView, PERSONNEL_VIEW_VERSION } from "../../api-lib/personnelView.js";
 
 export const FULL_MODEL_VERSION = 11;
 export const FULL_MODEL_KEY = "full-v11-week5-data-gap-audit";
@@ -124,11 +125,29 @@ async function createPrediction({ game, oddsEvent, season, week, away, home, sig
   const awayStanding = standingsByCode[away];
   const depthLineup = values.playByPlay?.away?.expectedLineup;
   const personnelCutoff = values.personnel?.cutoff ||
-    (validDepthLineup(depthLineup, week, season) ? depthLineup.cutoff : null);
+    (validDepthRoster(depthLineup, week, season) ? depthLineup.cutoff : null);
   const personnel = personnelAvailableAt(values.personnel, personnelCutoff) ? values.personnel : null;
   const awayRoster = personnelAvailableAt(values.awayRoster, personnelCutoff) ? values.awayRoster : null;
   const homeRoster = personnelAvailableAt(values.homeRoster, personnelCutoff) ? values.homeRoster : null;
   const qbrAvailable = personnelAvailableAt(getTeamRatingsHealth(), personnelCutoff);
+  const personnelViews = {
+    away: personnel?.away?.personnelView || buildPersonnelView({
+      team: away,
+      lineup: values.playByPlay?.away?.expectedLineup,
+      roster: awayRoster,
+      cutoff: personnelCutoff,
+      season,
+      week,
+    }),
+    home: personnel?.home?.personnelView || buildPersonnelView({
+      team: home,
+      lineup: values.playByPlay?.home?.expectedLineup,
+      roster: homeRoster,
+      cutoff: personnelCutoff,
+      season,
+      week,
+    }),
+  };
   dataQuality.personnel = Boolean(personnel);
   dataQuality.awayRoster = Boolean(awayRoster);
   dataQuality.homeRoster = Boolean(homeRoster);
@@ -192,6 +211,7 @@ async function createPrediction({ game, oddsEvent, season, week, away, home, sig
     home,
     prediction,
     playerMetrics: values.playerMetrics,
+    personnelViews,
     teamMetrics: values.playByPlay,
     season, week, cutoff: personnelCutoff || playerDepth?.cutoff,
   });
@@ -200,6 +220,7 @@ async function createPrediction({ game, oddsEvent, season, week, away, home, sig
     game: { ...gameWithWeather, season, week, away, home },
     prediction,
     playerProjections,
+    personnelViews,
     oddsEvent,
     dataQuality,
     teamMetrics: values.playByPlay,
@@ -209,6 +230,7 @@ async function createPrediction({ game, oddsEvent, season, week, away, home, sig
   return {
     prediction,
     playerProjections,
+    personnelViews,
     bestBets,
     dataQuality: {
       ...dataQuality,
@@ -218,6 +240,7 @@ async function createPrediction({ game, oddsEvent, season, week, away, home, sig
     weather,
     modelVersion: FULL_MODEL_VERSION,
     modelKey: FULL_MODEL_KEY,
+    personnelVersion: PERSONNEL_VIEW_VERSION,
     generatedAt: new Date().toISOString(),
   };
 }

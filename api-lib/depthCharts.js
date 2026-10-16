@@ -1,29 +1,29 @@
+import { canonicalPosition, normalizeAvailability } from "./personnelView.js";
 const ALIASES = { WAS: "WSH", LA: "LAR", JAC: "JAX", OAK: "LV", SD: "LAC", STL: "LAR" };
 const GROUPS = {
   QB: ["QB"], RB: ["RB", "FB"], WR: ["WR"], TE: ["TE"],
   OL: ["LT", "LG", "C", "RG", "RT", "OL", "OT", "OG", "G", "T"],
-  front: ["LDE", "RDE", "LDT", "RDT", "DE", "DT", "NT", "EDGE"],
-  LB: ["WLB", "MLB", "SLB", "LILB", "RILB", "LB", "ILB", "OLB"],
-  DB: ["LCB", "RCB", "SS", "FS", "NB", "CB", "DB", "S"],
+  front: ["DE", "DT", "NT", "EDGE"],
+  LB: ["LB", "OLB"],
+  DB: ["CB", "DB", "SS", "FS", "S"],
 };
-const ABSENCE = { Out: 1, IR: 1, Inactive: 1, PUP: 1, Suspended: 1, Doubtful: .75, Questionable: .25, Probable: .08 };
 export const DEPTH_SCHEMA_VERSION = 2;
 const team = (value) => ALIASES[String(value || "").trim().toUpperCase()] || String(value || "").trim().toUpperCase();
 const timestamp = (value) => typeof value === "string" && /T.*(?:Z|[+-]\d\d:\d\d)$/.test(value)
   && Number.isFinite(Date.parse(value)) ? Date.parse(value) : null;
 
 export function depthAvailability(row) {
-  const rosterStatus = String(row.roster_status || "").trim().toLowerCase();
-  const value = String(row.injury_status || row.status || row.roster_status || "").trim().toLowerCase();
-  const status = rosterStatus === "ir" || rosterStatus.includes("injured reserve") ? "IR"
-    : rosterStatus.includes("inactive") ? "Inactive"
-      : value === "ir" || value.includes("injured reserve") ? "IR"
-    : value.includes("inactive") ? "Inactive" : value.includes("doubt") ? "Doubtful"
-      : value.includes("question") ? "Questionable" : value.includes("probable") ? "Probable"
-        : value === "out" ? "Out" : value.includes("pup") ? "PUP"
-          : value.includes("suspend") ? "Suspended" : value === "active" ? "Active" : "Unknown";
-  const absenceProbability = ABSENCE[status] ?? 0;
-  return { status, absenceProbability, available: absenceProbability < .5, statusKnown: status !== "Unknown" };
+  const availability = normalizeAvailability({
+    injuryStatus: row.injury_status,
+    rosterStatus: row.roster_status,
+    chartStatus: row.status,
+  });
+  return {
+    status: availability.status,
+    absenceProbability: availability.absenceProbability ?? 0,
+    available: availability.projectedAvailable,
+    statusKnown: availability.statusKnown,
+  };
 }
 
 export function weeklyDepthCutoffs(games, season) {
@@ -75,6 +75,7 @@ export function buildDepthMetrics(rows, { season, predictionWeek, cutoff } = {})
     const slots = new Map();
     const roster = new Map();
     const ambiguousRoles = new Set();
+    const supplementalIds = new Set();
     for (const row of snapshot) {
       const formation = row.pos_grp;
       if (formation === "Special Teams") continue;
@@ -85,7 +86,7 @@ export function buildDepthMetrics(rows, { season, predictionWeek, cutoff } = {})
       const id = row.espn_id || row.gsis_id;
       const rank = Number(row.pos_rank);
       const slot = row.pos_slot;
-      const position = String(row.pos_abb || "").toUpperCase();
+      const position = canonicalPosition(row.pos_abb);
       const group = Object.keys(GROUPS).find((key) => GROUPS[key].includes(position));
       if (!id || !slot || !Number.isInteger(rank) || rank < 1 || !group) {
         issues.add("Missing player identity, slot, rank or position");
@@ -99,6 +100,9 @@ export function buildDepthMetrics(rows, { season, predictionWeek, cutoff } = {})
         playerId: String(id), gsisId: row.gsis_id || null, name: row.player_name || null,
         position, group, formation, slot: String(slot), rank, ...depthAvailability(row),
       };
+      if (["NB", "NCB"].includes(String(row.pos_abb || "").toUpperCase())) {
+        supplementalIds.add(player.playerId);
+      }
       const rosterPlayer = roster.get(player.playerId);
       if (rosterPlayer && (player.group !== rosterPlayer.group ||
           player.gsisId !== rosterPlayer.gsisId || player.status !== rosterPlayer.status)) {
@@ -122,7 +126,7 @@ export function buildDepthMetrics(rows, { season, predictionWeek, cutoff } = {})
     }
     // The source lists a nickel-back and sometimes a fullback alongside its base formations.
     // Preserve those optional roles, but do not label a 12-player base unit as starters.
-    const supplemental = declared.filter((player) => player.position === "NB" || player.position === "FB");
+    const supplemental = declared.filter((player) => supplementalIds.has(player.playerId) || player.position === "FB");
     const base = declared.filter((player) => !supplemental.includes(player));
     const unique = new Map();
     for (const player of base) {

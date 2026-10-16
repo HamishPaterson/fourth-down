@@ -1,3 +1,5 @@
+import { canonicalPosition, normalizeAvailability } from "../../api-lib/personnelView.js";
+
 const ESPN_URL =
   "https://site.web.api.espn.com/apis/common/v3/sports/football/nfl/statistics/byathlete";
 
@@ -539,13 +541,7 @@ function findActiveKicker(
         normalizeTeamCode(
           player.team
         ) === team &&
-        ["K", "PK"].includes(
-          String(
-            player.position ||
-              player.depth_chart_position ||
-              ""
-          ).toUpperCase()
-        )
+        canonicalPosition(player.depth_chart_position || player.position) === "K"
     )
     .map((player) => ({
       id: player.id,
@@ -577,24 +573,11 @@ function findActiveKicker(
 }
 
 function isLikelyAvailable(player) {
-  const status = String(
-    player.status || ""
-  ).toLowerCase();
-
-  const injury = String(
-    player.injuryStatus || ""
-  ).toLowerCase();
-
-  if (
-    status.includes("inactive") ||
-    status.includes("injured reserve") ||
-    status === "ir" ||
-    injury === "out"
-  ) {
-    return false;
-  }
-
-  return true;
+  const status = normalizeAvailability({
+    injuryStatus: player.injuryStatus,
+    rosterStatus: player.status,
+  });
+  return status.statusKnown && status.propEligible;
 }
 
 function matchEspnProfile(

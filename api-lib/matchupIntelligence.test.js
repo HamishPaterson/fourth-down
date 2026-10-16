@@ -219,10 +219,39 @@ test("zero contributions cannot support an explanation, including a saturated sc
   input.teamMetrics.home.passingEpaPerPlay = 1;
   const strong = Object.fromEntries(["quarterback", "rosterHealth", "playerRatings", "opponentNetwork"]
     .map((key) => [key, { active: true, awayPoints: -2.5, homePoints: 2.5, confidence: 1 }]));
-  const saturated = predict(input, { modelLayers: { ...strong, scoringBaseline: baseline } });
+  const saturated = predict(input, { modelLayers: { ...strong, scoringBaseline: baseline }   });
   const passing = saturated.matchupIntelligence.signals.find((s) => s.layer === "passMatchup");
   assert.equal(passing.modelMarginContribution, 0);
   assert.equal(passing.explanationSafe, false);
+});
+
+test("current personnel score changes leave raw model evidence unchanged", () => {
+  const input = real(6, "HOU", "JAX");
+  const shared = {
+    scoringBaseline: { active: true, awayExpected: 22.8, homeExpected: 21.6,
+      gamesUsed: { away: 5, home: 5 }, confidence: .65 },
+    opponentNetwork: { active: true, available: true, awayPoints: .18, homePoints: -.18, confidence: .5 },
+  };
+  const evaluate = (personnelLayers) => predictMatchup(input.away, input.home, {
+    season: 2026, week: 6, kickoff: "2026-10-18T20:25:00Z", weather: { dome: true },
+    teamMetrics: input.teamMetrics, playerMetrics: input.playerMetrics,
+    modelLayers: { ...shared, ...personnelLayers },
+  });
+  const healthy = evaluate({
+    quarterback: { active: false, awayPoints: 0, homePoints: 0 },
+    rosterHealth: { active: false, awayPoints: 0, homePoints: 0 },
+  });
+  const personnelChanged = evaluate({
+    quarterback: { active: true, awayPoints: -1.5, homePoints: 0, confidence: .7 },
+    rosterHealth: { active: true, awayPoints: -.4, homePoints: 0, confidence: .78 },
+  });
+
+  assert.notEqual(personnelChanged.continuousMargin, healthy.continuousMargin);
+  assert.notDeepEqual(personnelChanged.home.expectedPlayMix, healthy.home.expectedPlayMix);
+  for (const layer of ["rushMatchup", "passMatchup", "successMatchup", "explosiveMatchup", "pressureMatchup",
+    "thirdDownMatchup", "redZoneMatchup", "opponentNetwork"]) {
+    assert.deepEqual(personnelChanged.modelLayers[layer], healthy.modelLayers[layer], layer);
+  }
 });
 
 test("expected mix preserves observed style, shares and possession/pace context", () => {

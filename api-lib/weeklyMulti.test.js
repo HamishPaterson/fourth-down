@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { createWeeklyMultiCurrentHandler, createWeeklyMultiLockHandler, fetchScheduleGamesForWindow, getDisplayLockCycle, getLockCycle, resolveDisplayWeekContext, resolveLockWeekContext, WEEKLY_MULTI_TIME_ZONE } from "./weeklyMulti.js";
+import { buildWeeklyMultiSelection, createWeeklyMultiCurrentHandler, createWeeklyMultiLockHandler, fetchScheduleGamesForWindow, getDisplayLockCycle, getLockCycle, resolveDisplayWeekContext, resolveLockWeekContext, WEEKLY_MULTI_TIME_ZONE } from "./weeklyMulti.js";
 import { createScheduleHandler } from "../api/nfl/schedule.js";
 
 const THURSDAY = Date.UTC(2026, 9, 8, 0, 0, 0);
@@ -734,6 +734,182 @@ test("dry run remains available after kickoff and does not insert a row", async 
     if (originalSecret === undefined) delete process.env.CRON_SECRET;
     else process.env.CRON_SECRET = originalSecret;
   }
+});
+
+test("personnel exclusions remove unlocked scorer candidates without mutating locked legs", () => {
+  const scorer = {
+    source: "model-only",
+    playerId: "player-1",
+    personnelId: "player-1",
+    playerTeam: "PHI",
+    tdProbability: 0.9,
+    roleConfidence: 0.9,
+    market: "Anytime touchdown",
+    selection: "Player One",
+  };
+  const snapshot = {
+    season: 2026,
+    week: 5,
+    awayCode: "PHI",
+    homeCode: "DAL",
+    kickoff: new Date(THURSDAY + 60 * 60 * 1000).toISOString(),
+    bestBets: { anytimeTdScorer: scorer },
+    personnelViews: {
+      away: {
+        team: "PHI",
+        players: [{
+          canonicalId: "player-1",
+          team: "PHI",
+          status: "Out",
+          statusKnown: true,
+          projectedAvailable: false,
+          propEligible: false,
+          eligibleBeforeCutoff: true,
+        }],
+      },
+      home: { team: "DAL", players: [] },
+    },
+  };
+  const lockedRow = { locked: true, legs: [{ playerId: "locked-player" }] };
+  const originalLockedRow = structuredClone(lockedRow);
+  const selection = buildWeeklyMultiSelection(
+    [snapshot],
+    { cacheStatus: "fresh", events: [] },
+    { season: 2026, week: 5, lockAt: new Date(THURSDAY).toISOString() },
+    new Date(THURSDAY - 60 * 60 * 1000),
+  );
+
+  assert.equal(selection.legs.some((leg) => leg.playerId === "player-1"), false);
+  assert.equal(selection.reasonCounts.personnelExcluded, 1);
+  assert.deepEqual(lockedRow, originalLockedRow);
+});
+
+test("an out-of-game Tampa quarterback cannot enter unlocked Weekly Multi candidates", () => {
+  const playerId = "00-0041251";
+  const snapshot = {
+    season: 2026,
+    week: 5,
+    awayCode: "PHI",
+    homeCode: "DAL",
+    kickoff: new Date(THURSDAY + 60 * 60 * 1000).toISOString(),
+    bestBets: {
+      anytimeTdScorer: {
+        source: "model-only", playerId, personnelId: playerId, playerTeam: "TB",
+        position: "QB", tdProbability: 0.9, roleConfidence: 0.9,
+        selection: "Jalon Daniels anytime TD",
+      },
+    },
+    personnelViews: {
+      away: { team: "PHI", players: [] },
+      home: {
+        team: "TB",
+        players: [{
+          canonicalId: playerId, team: "TB", position: "QB",
+          status: "Active", statusKnown: true, projectedAvailable: true,
+          propEligible: true, eligibleBeforeCutoff: true,
+          identityConflict: false, sourceConflict: false,
+        }],
+      },
+    },
+  };
+  const selection = buildWeeklyMultiSelection(
+    [snapshot],
+    { cacheStatus: "fresh", events: [] },
+    { season: 2026, week: 5, lockAt: new Date(THURSDAY).toISOString() },
+    new Date(THURSDAY - 60 * 60 * 1000),
+  );
+  assert.equal(selection.legs.some((leg) => leg.personnelId === playerId), false);
+  assert.equal(selection.reasonCounts.personnelExcluded, 1);
+});
+
+test("unresolved QB identity conflicts exclude each QB from unlocked scorer candidates", () => {
+  const quarterbackIds = ["00-0034855", "00-0041251"];
+  const snapshot = {
+    season: 2026,
+    week: 5,
+    awayCode: "TB",
+    homeCode: "DAL",
+    kickoff: new Date(THURSDAY + 60 * 60 * 1000).toISOString(),
+    personnelViews: {
+      away: {
+        team: "TB",
+        quarterback: { conflict: true, resolved: false, player: null },
+        players: quarterbackIds.map((canonicalId) => ({
+          canonicalId, team: "TB", position: "QB", status: "Active",
+          statusKnown: true, projectedAvailable: true, propEligible: true,
+          eligibleBeforeCutoff: true, identityConflict: false, sourceConflict: false,
+        })),
+      },
+      home: { team: "DAL", quarterback: { conflict: false, resolved: true }, players: [] },
+    },
+    bestBets: {
+      anytimeTdScorer: {
+        source: "model-only", playerId: quarterbackIds[0], personnelId: quarterbackIds[0],
+        playerTeam: "TB", position: "QB", tdProbability: 0.8, roleConfidence: 0.8,
+        selection: "Baker Mayfield anytime TD",
+      },
+    },
+  };
+  const selection = buildWeeklyMultiSelection(
+    quarterbackIds.map((id) => ({
+      ...snapshot,
+      bestBets: { anytimeTdScorer: {
+        source: "model-only", playerId: id, personnelId: id, playerTeam: "TB", position: "QB",
+        tdProbability: 0.8, roleConfidence: 0.8,
+        selection: `${id === "00-0034855" ? "Baker Mayfield" : "Jalon Daniels"} anytime TD`,
+      } },
+    })),
+    { cacheStatus: "fresh", events: [] },
+    { season: 2026, week: 5, lockAt: new Date(THURSDAY).toISOString() },
+    new Date(THURSDAY - 60 * 60 * 1000),
+  );
+  assert.equal(selection.legs.some((leg) => quarterbackIds.includes(leg.playerId)), false);
+  assert.equal(selection.reasonCounts.personnelExcluded, 2);
+});
+
+test("personnel-filtered scorer can be selected when status is confirmed eligible", () => {
+  const snapshot = {
+    season: 2026,
+    week: 5,
+    awayCode: "PHI",
+    homeCode: "DAL",
+    kickoff: new Date(THURSDAY + 60 * 60 * 1000).toISOString(),
+    bestBets: {
+      anytimeTdScorer: {
+        source: "model-only",
+        playerId: "player-1",
+        personnelId: "player-1",
+        playerTeam: "PHI",
+        tdProbability: 0.9,
+        roleConfidence: 0.9,
+        market: "Anytime touchdown",
+        selection: "Player One",
+      },
+    },
+    personnelViews: {
+      away: {
+        team: "PHI",
+        players: [{
+          canonicalId: "player-1",
+          team: "PHI",
+          status: "Active",
+          statusKnown: true,
+          projectedAvailable: true,
+          propEligible: true,
+          eligibleBeforeCutoff: true,
+        }],
+      },
+      home: { team: "DAL", players: [] },
+    },
+  };
+  const selection = buildWeeklyMultiSelection(
+    [snapshot],
+    { cacheStatus: "fresh", events: [] },
+    { season: 2026, week: 5, lockAt: new Date(THURSDAY).toISOString() },
+    new Date(THURSDAY - 60 * 60 * 1000),
+  );
+
+  assert.equal(selection.legs.some((leg) => leg.playerId === "player-1"), true);
 });
 
 test("dry run returns selection without inserting a row", async () => {

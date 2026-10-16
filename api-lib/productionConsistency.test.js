@@ -11,22 +11,36 @@ import { combinedDecimalOdds, formatAustralianOdds, usableDecimalOdds } from "..
 import { createPredictionLedgerHandler, snapshotToDatabase } from "../api/nfl/game-stats.js";
 import { createScheduleHandler } from "../api/nfl/schedule.js";
 import { createWeeklyMultiCurrentHandler } from "./weeklyMulti.js";
+import { BEST_BETS_CANDIDATE_VERSION } from "../src/services/bestBetsService.js";
+import { predictionFeatureFixture } from "./personnelTestHelpers.js";
 
-const saved = () => ({
+const saved = () => {
+  const cutoff = "2030-10-16T00:15:00Z";
+  const features = predictionFeatureFixture("SEA", "DEN", 2030, 6, cutoff);
+  return ({
   id: "6:SEA:DEN:2030-10-16T00:15:00Z", season: 2030, week: 6,
   awayCode: "SEA", homeCode: "DEN", kickoff: "2030-10-16T00:15:00Z",
   modelVersion: 11, modelKey: "full-v11-week5-data-gap-audit",
+  predictionFeatureVersion: features.predictionFeatureVersion,
+  opponentNetworkStatus: features.opponentNetworkStatus,
+  personnelVersion: features.personnelVersion,
+  personnelViews: features.personnelViews,
   fourthDownAwayScore: 21, fourthDownHomeScore: 19, fourthDownPick: "SEA",
   fourthDownAwayWinProbability: .585, fourthDownHomeWinProbability: .415, fourthDownWinnerProbability: .585,
   confidenceScore: .6, confidenceLabel: "Medium",
-  bestBets: { recommendations: [], assessed: 3 },
+  bestBets: { candidateVersion: BEST_BETS_CANDIDATE_VERSION, candidates: [], recommendations: [], assessed: 3 },
   playerProjections: { available: true },
   predictionPayload: { away: { code: "SEA", score: 22 }, home: { code: "DEN", score: 19 },
-    total: 99, winner: "SEA", winnerWinProbability: .6, confidence: "Medium", modelLayers: {} },
-  dataQuality: { sources: { odds: { available: true } } },
+    total: 99, winner: "SEA", winnerWinProbability: .6, confidence: "Medium",
+    modelLayers: { opponentNetwork: features.predictionPayloadFeatures.opponentNetwork },
+    matchupIntelligence: features.predictionPayloadFeatures },
+  dataQuality: { personnelTiming: { cutoff }, sources: {
+    odds: { available: true }, opponentNetwork: { available: true },
+  } },
   shared: true, authoritative: true,
   generatedAt: "2026-10-15T01:24:49.759Z", snapshotAt: "2026-10-15T01:24:49.759Z", updatedAt: "2026-10-15T01:25:30.904Z",
-});
+  });
+};
 
 for (const [name, value] of [["null", null], ["zero", 0], ["undefined", undefined], ["Infinity", Infinity], ["NaN", NaN]]) {
   test(`invalid ${name} odds never produce a monetary price or combined return`, () => {

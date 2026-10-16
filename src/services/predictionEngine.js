@@ -41,9 +41,19 @@ export function predictMatchup(awayCode, homeCode, options = {}) {
     return { ...baseline, matchupIntelligence: { available: false, signals: [],
       reason: "Exact-season/week team matchup data unavailable" } };
   }
+  // Personnel score effects must not alter the underlying matchup evidence.
+  const evidenceLayers = { ...options.modelLayers };
+  for (const layer of ["quarterback", "rosterHealth"]) {
+    if (evidenceLayers[layer]) {
+      evidenceLayers[layer] = { ...evidenceLayers[layer], active: false, awayPoints: 0, homePoints: 0 };
+    }
+  }
+  const evidenceBaseline = predictCore(away, home, { ...options, modelLayers: evidenceLayers });
+  const evidencePlayMix = buildExpectedPlayMix({ away, home, teamMetrics: data,
+    playerMetrics: options.playerMetrics, prediction: evidenceBaseline, season: options.season, week: Number(options.week) });
   const playMix = buildExpectedPlayMix({ away, home, teamMetrics: data,
     playerMetrics: options.playerMetrics, prediction: baseline, season: options.season, week: Number(options.week) });
-  const intelligence = buildMatchupIntelligence({ away, home, teamMetrics: data, playMix });
+  const intelligence = buildMatchupIntelligence({ away, home, teamMetrics: data, playMix: evidencePlayMix });
   const phase1Layers = { ...options.modelLayers, ...intelligence.layers };
   const phase1 = predictCore(away, home, { ...options, modelLayers: phase1Layers });
   const situational = buildSituationalMatchups({ away, home, teamMetrics: data,

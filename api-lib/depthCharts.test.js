@@ -5,7 +5,10 @@ import { buildDepthMetrics, validDepthLineup, weeklyDepthCutoffs, depthAvailabil
 import { parseGenericCsv } from "../scripts/update-nflverse.mjs";
 import { compareTeams } from "../api/nfl/play-by-play.js";
 import dataset from "../api/nfl/nflverse-team-metrics.js";
+import playerMetrics from "../data/nflverse-player-metrics.js";
+import { playerMetricsResponse } from "./playerMetrics.js";
 import healthHandler, { buildTeamHealth, pointInTimeHealth } from "../api/nfl/qb-roster-health.js";
+import { buildPersonnelView, canonicalPosition } from "./personnelView.js";
 import { predictMatchup } from "../src/services/predictionEngine.js";
 import { getFullGamePrediction, clearFullGamePredictionCache } from "../src/services/gamePredictionService.js";
 import { getQbRosterHealth } from "../src/services/nflApi.js";
@@ -147,6 +150,32 @@ test("unknown availability stays explicitly unknown and missing/ambiguous QB dep
   assert.equal(extract([missing]).KC.available, false);
 });
 
+test("Nico Collins keeps known Houston WR identity while availability remains Unknown", () => {
+  const lineup = dataset.metricsByWeek[6].HOU.expectedLineup;
+  const nicoChartRow = lineup.roster.find((player) => player.name === "Nico Collins");
+  assert.ok(nicoChartRow, "checked-in Houston Week 6 chart contains Nico Collins");
+  const view = buildPersonnelView({
+    team: "HOU", lineup, season: 2026, week: 6, cutoff: lineup.cutoff,
+  });
+  const nico = view.players.find((player) => player.canonicalId === nicoChartRow.gsisId);
+  assert.ok(nico);
+  assert.equal(nico.name, "Nico Collins");
+  assert.equal(nico.team, "HOU");
+  assert.equal(nico.position, "WR");
+  assert.equal(nico.status, "Unknown");
+  assert.equal(nico.statusKnown, false);
+  assert.equal(nico.propEligible, false);
+  assert.equal(nico.eligibleBeforeCutoff, true);
+  assert.equal(nico.identityConflict, false);
+  assert.equal(nico.provenance.statusSource, "unknown");
+});
+
+test("Matchup wording distinguishes unknown health availability from unknown player identity", () => {
+  const component = readFileSync(new URL("../src/components/MatchupPrediction.jsx", import.meta.url), "utf8");
+  assert.match(component, /quarterback health status is unknown; player betting candidates are withheld/i);
+  assert.doesNotMatch(component, /unknown player/i);
+});
+
 test("legacy, nonfinite, inconsistent, duplicated and impossible lineup objects fail validation", () => {
   const lineup = extract(fullRoster()).KC;
   const invalid = [
@@ -222,10 +251,12 @@ test("an explicitly legacy lineup is gated off without modifying other PBP layer
 });
 
 test("live Sleeper QB selection does not fall back to an arbitrary or tied depth player", () => {
-  const player = (id, depth) => ({ id, team: "KC", position: "QB", full_name: id, depth_chart_order: depth, status: "Active" });
-  assert.equal(buildTeamHealth("KC", [player("unknown", null)], []).expectedStarter, null);
-  assert.equal(buildTeamHealth("KC", [player("a", 1), player("b", 1)], []).expectedStarter, null);
-  const known = buildTeamHealth("KC", [player("a", 1), player("b", 2)], []);
+  const player = (id, depth) => ({ id, gsis_id: `gsis-${id}`, team: "KC", position: "QB",
+    full_name: id, depth_chart_order: depth, status: "Active", injury_status: "Active" });
+  const args = [2026, 6, "2026-10-18T17:00:00Z", "2026-10-15T12:00:00Z"];
+  assert.equal(buildTeamHealth("KC", [player("unknown", null)], [], ...args).expectedStarter, null);
+  assert.equal(buildTeamHealth("KC", [player("a", 1), player("b", 1)], [], ...args).expectedStarter, null);
+  const known = buildTeamHealth("KC", [player("a", 1), player("b", 2)], [], ...args);
   assert.equal(known.expectedStarter.name, "a");
   assert.equal(known.projectedStarter.name, "a");
 });
@@ -249,6 +280,142 @@ test("weekly personnel requests never fetch present-day Sleeper injury state", a
     global.fetch = original;
     if (key !== undefined) process.env.BALLDONTLIE_API_KEY = key;
   }
+});
+
+test("frozen HOU tackle and defensive removals use canonical injury weights and supported replacements", () => {
+  const lineup = dataset.metricsByWeek[6].HOU.expectedLineup;
+  const cases = [
+    { label: "offensive tackle", name: "Aireontae Ersery", replacementName: "Nate Thomas",
+      id: "00-0040745", source: "LT", canonical: "LT", weight: 0.42, replacement: "00-0039422" },
+    { label: "EDGE", name: "Will Anderson Jr.", replacementName: "Dominique Robinson",
+      id: "00-0039108", source: "LDE", canonical: "DE", weight: 0.30, replacement: "00-0037082" },
+    { label: "interior DL", name: "Tommy Togiai", replacementName: "Kayden McDonald",
+      id: "00-0036883", source: "LDT", canonical: "DT", weight: 0.20, replacement: "00-0041440" },
+    { label: "LB", name: "Jake Hansen", replacementName: "Jamal Hill",
+      id: "00-0037457", source: "SLB", canonical: "LB", weight: 0.14, replacement: "00-0039395" },
+    { label: "CB", name: "Derek Stingley Jr.", replacementName: "Collin Wright",
+      id: "00-0037237", source: "LCB", canonical: "CB", weight: 0.30, replacement: "00-0041313" },
+    { label: "safety", name: "Reed Blankenship", replacementName: "Kamari Ramsey",
+      id: "00-0037130", source: "SS", canonical: "SS", weight: 0.18, replacement: "00-0041466" },
+  ];
+  const playersFor = (unavailableId) => lineup.roster.map((role) => ({
+    id: role.playerId,
+    gsis_id: role.gsisId,
+    team: "HOU",
+    position: role.position,
+    depth_chart_position: role.position,
+    depth_chart_order: role.rank,
+    full_name: role.name,
+    status: "Active",
+    injury_status: role.gsisId === unavailableId ? "Out" : "Active",
+  }));
+  const sourceMetrics = {
+    season: 2026, week: 6, dataStatus: "available",
+    away: dataset.metricsByWeek[6].HOU,
+    home: dataset.metricsByWeek[6].JAX,
+  };
+  const matchupPlayers = playerMetricsResponse(playerMetrics, { season: 2026, week: 6, away: "HOU", home: "JAX" });
+  const options = {
+    season: 2026, week: 6, kickoff: "2026-10-18T17:00:00Z", weather: { dome: true },
+    teamMetrics: sourceMetrics, playerMetrics: matchupPlayers,
+  };
+  const baseline = predictMatchup("HOU", "JAX", options);
+  const baselineImpactRow = {
+    scenario: "baseline", subject: "none", sourcePosition: null, canonicalPosition: null,
+    status: "Active", appliedWeight: 0, replacement: null, replacementDepth: null,
+    rawPersonnelAdjustment: 0, finalAwayAdjustment: 0, finalHomeAdjustment: 0,
+    houExpectedPoints: baseline.away.expectedPoints, jaxExpectedPoints: baseline.home.expectedPoints,
+    continuousMargin: baseline.continuousMargin,
+    houWinProbability: baseline.awayWinProbability, jaxWinProbability: baseline.homeWinProbability,
+  };
+  const impactRows = [baselineImpactRow];
+  for (const scenario of cases) {
+    const subject = lineup.roster.find((player) => player.gsisId === scenario.id);
+    assert.ok(subject, `${scenario.label} fixture identity`);
+    assert.equal(subject.name, scenario.name, `${scenario.label} named fixture identity`);
+    assert.equal(subject.position, scenario.source, `${scenario.label} source position`);
+    assert.equal(canonicalPosition(subject.position), scenario.canonical, `${scenario.label} canonical position`);
+
+    const health = buildTeamHealth("HOU", playersFor(scenario.id), [], 2026, 6,
+      lineup.cutoff, "2026-10-15T00:00:00Z");
+    const impactRecord = health.personnelView.players.find((player) => player.canonicalId === scenario.id);
+    assert.equal(impactRecord.status, "Out", `${scenario.label} point-in-time status`);
+    assert.equal(impactRecord.rank, 1);
+    assert.equal(impactRecord.replacementId, scenario.replacement);
+    const replacement = health.personnelView.players.find((player) => player.canonicalId === scenario.replacement);
+    assert.equal(replacement.rank, 2);
+    assert.equal(replacement.name, scenario.replacementName, `${scenario.label} replacement identity`);
+    assert.equal(replacement.projectedAvailable, true);
+    assert.equal(replacement.provenance.statusSource, "live-personnel-status");
+    assert.equal(replacement.replacementFor, scenario.id);
+    assert.equal(health.rosterHealth.points, -scenario.weight,
+      `${scenario.label} must use the existing canonical-position weight, not the generic fallback`);
+
+    const adjusted = predictMatchup("HOU", "JAX", {
+      ...options,
+      modelLayers: {
+        rosterHealth: {
+          active: true, available: true, awayPoints: health.rosterHealth.points, homePoints: 0,
+          confidence: health.rosterHealth.confidence, reasons: health.rosterHealth.reasons,
+        },
+      },
+    });
+    assert.equal(adjusted.modelLayers.rosterHealth.awayPoints, -scenario.weight / 2);
+    assert.equal(adjusted.modelLayers.rosterHealth.homePoints, scenario.weight / 2);
+    assert.ok(adjusted.home.expectedPoints > baseline.home.expectedPoints);
+    assert.ok(adjusted.continuousMargin > baseline.continuousMargin);
+    assert.ok(adjusted.awayWinProbability < baseline.awayWinProbability);
+    const evidenceLayers = ["rushMatchup", "passMatchup", "successMatchup", "explosiveMatchup",
+      "pressureMatchup", "thirdDownMatchup", "redZoneMatchup", "opponentNetwork"];
+    for (const layer of evidenceLayers) {
+      assert.deepEqual(adjusted.modelLayers[layer], baseline.modelLayers[layer], `${scenario.label} ${layer}`);
+    }
+    const evidenceBytes = (prediction) => JSON.stringify({
+      phase1: Object.fromEntries(evidenceLayers.slice(0, 5)
+        .map((layer) => [layer, prediction.modelLayers[layer]])),
+      phase2a: Object.fromEntries(evidenceLayers.slice(5, 7)
+        .map((layer) => [layer, prediction.modelLayers[layer]])),
+      opponentNetwork: prediction.modelLayers.opponentNetwork,
+    });
+    assert.equal(evidenceBytes(adjusted), evidenceBytes(baseline),
+      `${scenario.label} Phase 1/2A and Opponent-Network evidence bytes`);
+    const replacementRecord = health.personnelView.players.find((player) => player.canonicalId === scenario.replacement);
+    impactRows.push({
+      scenario: scenario.label, subject: subject.name,
+      sourcePosition: subject.position, canonicalPosition: canonicalPosition(subject.position),
+      status: impactRecord.status, appliedWeight: scenario.weight,
+      replacement: replacement.name, replacementDepth: replacement.rank,
+      replacementProvenance: replacement.provenance.statusSource,
+      rawPersonnelAdjustment: health.rosterHealth.points,
+      finalAwayAdjustment: adjusted.modelLayers.rosterHealth.awayPoints,
+      finalHomeAdjustment: adjusted.modelLayers.rosterHealth.homePoints,
+      houExpectedPoints: adjusted.away.expectedPoints, jaxExpectedPoints: adjusted.home.expectedPoints,
+      continuousMargin: adjusted.continuousMargin,
+      houWinProbability: adjusted.awayWinProbability, jaxWinProbability: adjusted.homeWinProbability,
+      replacementEvidence: replacementRecord.provenance.statusSource,
+    });
+  }
+  assert.equal(cases[0].weight, 0.42, "Aireontae Ersery uses his canonical LT weight, not generic 0.08");
+  console.log("HOU_TACKLE_DEFENSIVE_IMPACT_MATRIX", JSON.stringify(impactRows));
+});
+
+test("frozen Houston QB-out case uses a finite fallback without selecting a later unavailable QB", () => {
+  const lineup = dataset.metricsByWeek[6].HOU.expectedLineup;
+  const players = lineup.roster.map((role) => ({
+    id: role.playerId, gsis_id: role.gsisId, team: "HOU",
+    position: role.position, depth_chart_position: role.position, depth_chart_order: role.rank,
+    full_name: role.name, status: "Active",
+    injury_status: role.group === "QB" ? "Out" : "Active",
+  }));
+  const result = buildTeamHealth("HOU", players, [], 2026, 6, lineup.cutoff, "2026-10-15T00:00:00Z");
+  assert.equal(result.expectedStarter.name, "C.J. Stroud");
+  assert.equal(result.projectedStarter, null);
+  assert.equal(result.personnelView.quarterback.player, null);
+  assert.match(result.quarterback.reasons.join(" "), /no available replacement quarterback/i);
+  assert.match(result.personnelView.quarterback.reason, /replacement identity is unresolved/i);
+  assert.ok(Number.isFinite(result.quarterback.points));
+  assert.ok(Number.isFinite(result.rosterHealth.points));
+  assert.equal(result.rosterHealth.affectedStarters.some((player) => player.position === "QB"), false);
 });
 
 test("point-in-time QB identity reaches personnel without fabricating game availability", () => {
@@ -409,7 +576,8 @@ test("before the weekly cutoff, genuinely current Sleeper personnel retains norm
     if (path.includes("sleeper.app")) {
       sleeperRequested = true;
       body = { qb: { id: "qb", full_name: "Synthetic current QB", team: "KC",
-        position: "QB", depth_chart_order: 1, status: "Active" } };
+        gsis_id: "synthetic-gsis-qb", position: "QB", depth_chart_order: 1, status: "Active",
+        injury_status: "Active" } };
     }
     return { ok: true, json: async () => body, text: async () => JSON.stringify(body) };
   };

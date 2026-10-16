@@ -1,5 +1,6 @@
 import dataset from "./nflverse-team-metrics.js";
 import { validDepthLineup, weeklyDepthCutoffs } from "../../api-lib/depthCharts.js";
+import { buildPersonnelView, canonicalPosition, normalizeAvailability } from "../../api-lib/personnelView.js";
 
 const SLEEPER_URL = "https://api.sleeper.app/v1/players/nfl";
 const ADVANCED_PASSING_URL =
@@ -41,19 +42,9 @@ const POSITION_WEIGHTS = {
   FB: 0.05,
 };
 
-const ABSENCE = {
-  Out: 1,
-  IR: 1,
-  PUP: 1,
-  Suspended: 1,
-  Inactive: 1,
-  Doubtful: 0.75,
-  Questionable: 0.25,
-  Probable: 0.08,
-};
-
 let playerCache = null;
 let playerCacheUntil = 0;
+let playerCacheFetchedAt = null;
 
 export default async function handler(req, res) {
   if (req.method !== "GET") {
@@ -117,8 +108,8 @@ export default async function handler(req, res) {
       season,
       week: req.query.week == null ? null : Number(req.query.week),
       cutoff,
-      away: buildTeamHealth(away, players, leagueQbs),
-      home: buildTeamHealth(home, players, leagueQbs),
+      away: buildTeamHealth(away, players, leagueQbs, season, req.query.week, cutoff),
+      home: buildTeamHealth(home, players, leagueQbs, season, req.query.week, cutoff),
       sourceStatus: {
         sleeper: true,
         advancedPassing: passing.length > 0,
@@ -182,6 +173,7 @@ async function getSleeperPlayers() {
       ...player,
     })
   );
+  playerCacheFetchedAt = new Date().toISOString();
 
   playerCacheUntil =
     Date.now() + 6 * 60 * 60 * 1000;
@@ -244,14 +236,57 @@ async function getAdvancedPassing(apiKey, season) {
 export function buildTeamHealth(
   team,
   allPlayers,
-  leagueQbs
+  leagueQbs,
+  season = Number(dataset.season),
+  week = null,
+  cutoff = null,
+  sourceAsOf = playerCacheFetchedAt
 ) {
+  const liveRoster = {
+    team,
+    sourceAsOf,
+    groups: { players: allPlayers },
+    leagueIdentityIndex: allPlayers.filter((player) => player.gsis_id && player.team)
+      .map((player) => ({ gsisId: player.gsis_id, team: player.team })),
+  };
+  const lineup = Number(dataset.season) === Number(season) && week != null
+    ? dataset.metricsByWeek?.[Number(week)]?.[team]?.expectedLineup
+    : null;
+  const personnelView = buildPersonnelView({
+    team, lineup, roster: liveRoster, season, week, cutoff,
+  });
+  const personnelById = new Map(personnelView.players
+    .filter((player) => player.gsisId)
+    .map((player) => [String(player.gsisId), player]));
   const roster = allPlayers
     .filter(
       (player) =>
         normalizeTeam(player.team) === team
     )
-    .map(normalizePlayer)
+    .map((player) => {
+      const normalised = normalizePlayer(player);
+      const shared = personnelById.get(String(player.gsis_id || ""));
+      if (!shared) return {
+        ...normalised,
+        depth: null,
+        injuryLabel: "Unknown",
+        injuryProbability: 0,
+        availability: null,
+        availableForGame: false,
+        statusKnown: false,
+      };
+      return {
+        ...normalised,
+        position: shared.position,
+        depthPosition: shared.position,
+        depth: shared.rank,
+        injuryLabel: shared.sourceConflict ? "Unknown" : shared.status,
+        injuryProbability: shared.sourceConflict ? 0 : shared.absenceProbability ?? 0,
+        availability: shared.statusKnown && !shared.sourceConflict ? 1 - (shared.absenceProbability ?? 0) : null,
+        availableForGame: shared.statusKnown && !shared.sourceConflict && shared.propEligible,
+        statusKnown: shared.statusKnown,
+      };
+    })
     .sort(
       (a, b) =>
         (a.depth ?? 99) - (b.depth ?? 99)
@@ -267,12 +302,23 @@ export function buildTeamHealth(
     );
 
   const firstTeamQbs = qbs.filter((player) => player.depth === 1);
-  const expectedStarter = firstTeamQbs.length === 1 ? firstTeamQbs[0] : null;
-
-  const availableQbs = qbs.filter((player) => player.availableForGame && player.depth !== null);
-  const bestDepth = Math.min(...availableQbs.map((player) => player.depth));
-  const bestQbs = availableQbs.filter((player) => player.depth === bestDepth);
-  const availableQb = expectedStarter && bestQbs.length === 1 ? bestQbs[0] : null;
+  const chartStarterId = personnelView.quarterback.chartStarter;
+  const selectedQbId = personnelView.quarterback.player?.canonicalId;
+  const chartExpectedStarter = chartStarterId
+    ? qbs.find((player) => player.gsisId === chartStarterId) || null
+    : null;
+  const selectedQb = selectedQbId
+    ? qbs.find((player) => player.gsisId === selectedQbId) || null
+    : null;
+  const expectedStarter = chartExpectedStarter || (personnelView.quarterback.resolved ? selectedQb : null) ||
+    (!chartStarterId
+      ? personnelView.quarterback.liveStarter
+        ? qbs.find((player) => player.gsisId === personnelView.quarterback.liveStarter) || null
+        : firstTeamQbs.length === 1 ? firstTeamQbs[0] : null
+      : null);
+  const availableQb = personnelView.quarterback.resolved && selectedQbId
+    ? qbs.find((player) => player.gsisId === selectedQbId && player.availableForGame) || null
+    : null;
 
   const starterRating = findQbRating(
     expectedStarter,
@@ -298,6 +344,7 @@ export function buildTeamHealth(
 
   if (
     expectedStarter &&
+    expectedStarter.statusKnown &&
     !expectedStarter.availableForGame
   ) {
     const qualityGap =
@@ -326,7 +373,7 @@ export function buildTeamHealth(
       );
     }
   } else if (
-    expectedStarter?.injuryProbability > 0
+    expectedStarter?.statusKnown && expectedStarter.injuryProbability > 0
   ) {
     qbPoints = -clamp(
       expectedStarter.injuryProbability * 0.9,
@@ -338,6 +385,8 @@ export function buildTeamHealth(
       `${expectedStarter.name} carries a ` +
         `${expectedStarter.injuryLabel} designation`
     );
+  } else if (personnelView.quarterback.conflict || (expectedStarter && !expectedStarter.statusKnown)) {
+    qbReasons.push(personnelView.quarterback.reason || "Quarterback availability is unknown; no medical assumption applied");
   }
 
   const affectedStarters = roster.filter(
@@ -405,6 +454,7 @@ export function buildTeamHealth(
 
   return {
     team,
+    personnelView,
 
     expectedStarter: expectedStarter
       ? qbSummary(
@@ -469,6 +519,9 @@ export function buildTeamHealth(
 export function pointInTimeHealth(team, season, week,
   lineup = Number(dataset.season) === season ? dataset.metricsByWeek?.[week]?.[team]?.expectedLineup : null) {
   const valid = validDepthLineup(lineup, week, season);
+  const personnelView = buildPersonnelView({
+    team, lineup: valid ? lineup : null, cutoff: valid ? lineup.cutoff : null, season, week,
+  });
   const qb = valid ? lineup.startingQuarterback : null;
   const summary = qb ? {
     id: qb.playerId, name: qb.name, depth: qb.rank, status: qb.status,
@@ -479,6 +532,7 @@ export function pointInTimeHealth(team, season, week,
     : "Validated point-in-time depth chart unavailable; regenerate the lineup artifact";
   return {
     team, expectedStarter: summary,
+    personnelView,
     projectedStarter: qb?.statusKnown && qb.available ? summary : null,
     starterUnavailable: qb?.statusKnown ? !qb.available : null,
     quarterback: { available: false, points: 0, confidence: 0, reasons: [reason] },
@@ -592,39 +646,17 @@ function findQbRating(player, ratings) {
 }
 
 function normalizePlayer(player) {
-  const position = String(
-    player.position || ""
-  ).toUpperCase();
-
-  const depthPosition = String(
-    player.depth_chart_position || position
-  ).toUpperCase();
-
-  const rosterStatus = normalizeRosterStatus(
-    player.status
-  );
-
-  const injuryLabel = normalizeStatus(
-    player.injury_status
-  );
-
-  const injuryProbability =
-    absenceProbability(
-      injuryLabel,
-      rosterStatus
-    );
-
-  const rosterEligible = [
-    "active",
-    "unknown",
-  ].includes(rosterStatus);
-
-  const availableForGame =
-    rosterEligible &&
-    injuryProbability < 0.5;
+  const position = canonicalPosition(player.depth_chart_position || player.position);
+  const availability = normalizeAvailability({
+    injuryStatus: player.injury_status,
+    rosterStatus: player.status,
+  });
+  const injuryLabel = availability.status;
+  const injuryProbability = availability.absenceProbability ?? 0;
 
   return {
     id: player.id,
+    gsisId: player.gsis_id || null,
 
     name:
       player.full_name ||
@@ -635,21 +667,19 @@ function normalizePlayer(player) {
 
     team: normalizeTeam(player.team),
     position,
-    depthPosition,
+    depthPosition: position,
 
     depth: nullableNumber(
       player.depth_chart_order
     ),
 
-    rosterStatus,
-    rosterEligible,
+    rosterStatus: player.status || "Unknown",
+    rosterEligible: availability.statusKnown,
     injuryLabel,
     injuryProbability,
-
-    availability:
-      1 - injuryProbability,
-
-    availableForGame,
+    availability: availability.statusKnown ? 1 - injuryProbability : null,
+    availableForGame: availability.statusKnown && availability.propEligible,
+    statusKnown: availability.statusKnown,
   };
 }
 
@@ -667,114 +697,6 @@ function qbSummary(player, rating) {
     ),
     ratingSource: rating.source,
   };
-}
-
-function normalizeStatus(status) {
-  const value = String(
-    status || ""
-  ).toLowerCase();
-
-  if (value.includes("question")) {
-    return "Questionable";
-  }
-
-  if (value.includes("doubt")) {
-    return "Doubtful";
-  }
-
-  if (value.includes("out")) {
-    return "Out";
-  }
-
-  if (
-    value === "ir" ||
-    value.includes("injured reserve")
-  ) {
-    return "IR";
-  }
-
-  if (value.includes("pup")) {
-    return "PUP";
-  }
-
-  if (value.includes("suspend")) {
-    return "Suspended";
-  }
-
-  if (value.includes("inactive")) {
-    return "Inactive";
-  }
-
-  if (value.includes("probable")) {
-    return "Probable";
-  }
-
-  return "Active";
-}
-
-function normalizeRosterStatus(value) {
-  const status = String(
-    value || "unknown"
-  )
-    .trim()
-    .toLowerCase();
-
-  if (status === "active") {
-    return "active";
-  }
-
-  if (
-    !status ||
-    status === "unknown"
-  ) {
-    return "unknown";
-  }
-
-  if (
-    status === "ir" ||
-    status.includes("injured reserve")
-  ) {
-    return "ir";
-  }
-
-  if (
-    status === "pup" ||
-    status.includes("physically unable")
-  ) {
-    return "pup";
-  }
-
-  if (status.includes("suspend")) {
-    return "suspended";
-  }
-
-  if (status.includes("inactive")) {
-    return "inactive";
-  }
-
-  return status;
-}
-
-function absenceProbability(
-  injuryLabel,
-  rosterStatus
-) {
-  if (
-    ["ir", "pup", "suspended", "inactive"].includes(
-      rosterStatus
-    )
-  ) {
-    return 1;
-  }
-
-  if (
-    rosterStatus !== "active" &&
-    rosterStatus !== "unknown"
-  ) {
-    return 1;
-  }
-
-  return ABSENCE[injuryLabel] || 0;
 }
 
 function normalizeTeam(code) {

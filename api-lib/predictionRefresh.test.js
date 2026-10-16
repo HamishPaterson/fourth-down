@@ -3,13 +3,14 @@ import test, { beforeEach, afterEach } from "node:test";
 import assert from "node:assert/strict";
 import { createPredictionRefreshHandler, predictionRefreshContext, validatePredictionRefreshBatch } from "./predictionRefresh.js";
 import { validateWeeklyOpponentNetwork, loadWeeklyOpponentNetwork, NFL_TEAMS, createOpponentNetworkHandler } from "../api/nfl/opponent-network.js";
-import { completePrediction, retainPrediction } from "./predictionEligibility.js";
+import { completePrediction, personnelSignature, retainPrediction } from "./predictionEligibility.js";
 import { predictionFeatureStatus, PREDICTION_FEATURE_VERSION, MATCHUP_INTELLIGENCE_SCHEMA_VERSION } from "../src/services/predictionFeatures.js";
 import { applyPredictionSnapshot } from "../src/services/predictionSnapshot.js";
 import gameStats, { snapshotToDatabase, databaseToSnapshot } from "../api/nfl/game-stats.js";
 import { FULL_MODEL_VERSION, FULL_MODEL_KEY } from "../src/services/gamePredictionService.js";
 import { BEST_BETS_CANDIDATE_VERSION } from "../src/services/bestBetsService.js";
 import { createServerPredictionInputLoader } from "./serverPredictions.js";
+import { PERSONNEL_VIEW_VERSION } from "./personnelView.js";
 
 const NOW = new Date("2026-10-15T05:00:00Z"), KICKOFF = "2026-10-18T17:00:00Z";
 const games = Array.from({ length: 14 }, (_, i) => ({
@@ -23,6 +24,14 @@ const network = { season: 2026, week: 6, games: [{ season: 2026, week: 5 }],
 const response = () => ({ statusCode: 200, calls: 0, setHeader() {},
   status(n) { this.statusCode = n; return this; }, json(b) { this.calls++; this.body = b; return this; } });
 function fixture(game, now = NOW) {
+  const personnelView = (team) => ({
+    version: PERSONNEL_VIEW_VERSION, team, season: game.season, week: game.week,
+    cutoff: KICKOFF, chart: { available: true, observedAt: "2026-10-14T00:00:00Z" },
+    live: { available: false, observedAt: null }, players: [],
+    quarterback: { resolved: true, conflict: false }, units: {
+      front: { available: false }, LB: { available: false }, DB: { available: false },
+    },
+  });
   const signals = ["rushMatchup", "passMatchup", "successMatchup", "explosiveMatchup", "pressureMatchup",
     "thirdDownMatchup", "redZoneMatchup"].map((layer) => ({
     layer, available: true, matchups: { away: { confidence: .6 }, home: { confidence: .6 } },
@@ -37,19 +46,30 @@ function fixture(game, now = NOW) {
     fourthDownAwayWinProbability: .65, fourthDownHomeWinProbability: .35, confidenceScore: .7,
     modelVersion: FULL_MODEL_VERSION, modelKey: FULL_MODEL_KEY,
     predictionFeatureVersion: PREDICTION_FEATURE_VERSION, opponentNetworkStatus: "available",
+    personnelVersion: PERSONNEL_VIEW_VERSION,
+    personnelViews: { away: personnelView(game.away), home: personnelView(game.home) },
     predictionPayload: { winner: game.away, away: { score: 24 }, home: { score: 20 }, total: 44, continuousMargin: -4,
       awayWinProbability: .65, homeWinProbability: .35,
       modelLayers: { opponentNetwork: { available: true, homePoints: -.5, awayPoints: .5, confidence: .6 } },
       matchupIntelligence: { schemaVersion: MATCHUP_INTELLIGENCE_SCHEMA_VERSION, signals, situational } },
     playerProjections: { available: true, away: { players: [{ position: "QB" }] }, home: { players: [{ position: "QB" }] } },
-    dataQuality: { sources: { odds: { available: true }, opponentNetwork: { available: true } } },
+    dataQuality: {
+      personnelTiming: { cutoff: KICKOFF },
+      sources: { odds: { available: true }, opponentNetwork: { available: true } },
+    },
     bestBets: { candidateVersion: BEST_BETS_CANDIDATE_VERSION, candidates, recommendations: candidates, assessed: 1 },
     generatedAt: now.toISOString(), snapshotAt: now.toISOString(),
   };
 }
 function database(snapshots = []) {
   const rows = snapshots.map((s, i) => ({ ...snapshotToDatabase(s), id: `p${i}`, updated_at: `v${i}` }));
-  const writes = [], reads = [], locked = '{"id":"bb998fce-9992-423a-8581-e14ce4e2a8b7","status":"locked"}';
+  const writes = [], reads = [], locked = JSON.stringify({
+    id: "bb998fce-9992-423a-8581-e14ce4e2a8b7", status: "locked", odds: 3.4,
+    legs: [
+      { playerId: "locked-player", market: "Moneyline", selection: "HOU", decimalOdds: 1.8 },
+      { playerId: "locked-player-2", market: "Receiving yards", selection: "Over 45.5", decimalOdds: 1.9 },
+    ],
+  });
   let version = 100;
   return { rows, writes, reads, locked, from(table) {
     reads.push(table);
@@ -110,11 +130,14 @@ test("protected refresh authenticates before any input, rejects wrong method and
 });
 test("one validated network is reused across 14 games; dry run writes nothing and keeps locked Multi unchanged", async () => {
   const { res, db, loads, generators, generated } = await run();
+  const lockedBefore = db.locked;
   assert.equal(res.statusCode, 200, res.body.reason);
   assert.equal(res.calls, 1); assert.equal(loads, 1); assert.equal(generators, 1); assert.equal(generated, 14);
   assert.equal(res.body.predictions.length, 14);
   assert.ok(res.body.predictions.every((p) => p.network && p.phase1 && p.phase2a && p.thirdDown && p.redZone && p.complete));
-  assert.deepEqual(db.writes, []); assert.ok(db.locked.includes("bb998fce"));
+  assert.deepEqual(db.writes, []);
+  assert.ok(db.locked.includes("bb998fce"));
+  assert.equal(db.locked, lockedBefore);
 });
 test("all 14 predictions validated before first write; successful refresh only writes prediction_snapshots", async () => {
   let built = 0;
@@ -153,6 +176,9 @@ for (const missing of ["thirdDown", "redZone", "network", "phase1", "candidate",
   });
 }
 test("Phase2A-missing v11 records upgrade, complete current schema is reused irrespective of age", async () => {
+  assert.equal(predictionFeatureStatus(fixture(games[0])).complete, true,
+    JSON.stringify(predictionFeatureStatus(fixture(games[0]))));
+  assert.doesNotThrow(() => validatePredictionRefreshBatch(games.map((game) => fixture(game)), context, NOW));
   const old = games.map((g) => ({ ...fixture(g), authoritative: true, predictionFeatureVersion: undefined }));
   const updated = await run({ db: database(old), dryRun: false });
   assert.equal(updated.res.statusCode, 200, updated.res.body.reason); assert.equal(updated.db.writes.length, 14);
@@ -170,6 +196,61 @@ test("partial browser predictions neither block complete server refresh nor over
   const local = games.map((g) => ({ ...fixture(g), authoritative: false, predictionPayload: null }));
   const result = await run({ db: database(local), dryRun: false });
   assert.equal(result.res.statusCode, 200, result.res.body.reason); assert.equal(result.db.writes.length, 14);
+});
+
+test("personnel view version/freshness is required and a newer status change makes the prediction refresh-eligible", () => {
+  const game = games[0];
+  const existing = fixture(game);
+  existing.authoritative = true;
+  assert.equal(predictionFeatureStatus(existing).personnel, true);
+  assert.equal(completePrediction(existing), true);
+  assert.equal(predictionFeatureStatus({
+    ...existing, personnelVersion: 0,
+  }).personnel, false);
+
+  const incoming = structuredClone(existing);
+  incoming.personnelViews.away.players.push({
+    canonicalId: "00-0000001", team: game.away, position: "WR", rank: 1,
+    status: "Out", statusKnown: true, projectedAvailable: false, propEligible: false,
+    replacementId: null, identityConflict: false, sourceConflict: false,
+  });
+  assert.equal(retainPrediction(existing, incoming, NOW, true), false);
+});
+
+test("material personnel signatures refresh only for identity/status changes, not observation timestamps", () => {
+  const game = games[0];
+  const existing = fixture(game);
+  existing.authoritative = true;
+  existing.personnelViews.away.players.push({
+    canonicalId: "player-1", team: game.away, position: "WR", rank: 1,
+    status: "Active", statusKnown: true, projectedAvailable: true, propEligible: true,
+    replacementId: null, replacementFor: null, identityConflict: false, sourceConflict: false,
+  });
+  existing.personnelViews.away.quarterback = {
+    resolved: true, conflict: false, player: { canonicalId: "player-1" },
+  };
+  existing.personnelViews.away.live = { available: true, observedAt: "2026-10-14T00:00:00Z" };
+  const same = structuredClone(existing);
+  assert.equal(personnelSignature(existing), personnelSignature(same));
+  assert.equal(retainPrediction(existing, same, NOW, true), true);
+
+  const timestampOnly = structuredClone(existing);
+  timestampOnly.personnelViews.away.chart.observedAt = "2026-10-14T01:00:00Z";
+  timestampOnly.personnelViews.away.live.observedAt = "2026-10-15T04:59:00Z";
+  assert.equal(personnelSignature(existing), personnelSignature(timestampOnly));
+  assert.equal(retainPrediction(existing, timestampOnly, NOW, true), true);
+
+  const statusChanged = structuredClone(existing);
+  Object.assign(statusChanged.personnelViews.away.players[0], {
+    status: "Out", projectedAvailable: false, propEligible: false,
+  });
+  assert.notEqual(personnelSignature(existing), personnelSignature(statusChanged));
+  assert.equal(retainPrediction(existing, statusChanged, NOW, true), false);
+
+  const starterChanged = structuredClone(existing);
+  starterChanged.personnelViews.away.quarterback.player.canonicalId = "player-2";
+  assert.notEqual(personnelSignature(existing), personnelSignature(starterChanged));
+  assert.equal(retainPrediction(existing, starterChanged, NOW, true), false);
 });
 test("current feature upgrade never overwrites frozen or graded records", () => {
   const incoming = fixture(games[0]);

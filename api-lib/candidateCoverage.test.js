@@ -10,6 +10,7 @@ import { FULL_MODEL_VERSION, FULL_MODEL_KEY } from "../src/services/gamePredicti
 import { handleOddsRequest } from "../api/nfl/odds.js";
 import { mergeStoredOdds } from "./weeklyMulti.js";
 import { createWeeklyMultiPreparationHandler } from "./weeklyMultiPreparation.js";
+import { activePersonnelRecord, personnelViewFixture, predictionFeatureFixture } from "./personnelTestHelpers.js";
 
 const NOW = new Date("2026-10-15T03:16:31Z");
 const KICKOFF = "2026-10-18T17:00:00Z";
@@ -25,9 +26,10 @@ function fixture([away, home] = PAIRS[0]) {
     awayWinProbability: .8, homeWinProbability: .2, confidenceScore: .8,
   };
   const players = Array.from({ length: 10 }, (_, index) => ({
-    playerName: `Eligible Player${index}`, team: away, position: "WR",
+    playerName: `Eligible Player${index}`, playerId: `${away}-player-${index}`,
+    personnelId: `${away}-player-${index}`, team: away, position: "WR",
     receivingYards: 100 + index, rushingYards: 60, roleConfidence: .9, dataQuality: .9,
-    anytimeTouchdownProbability: .8,
+    anytimeTouchdownProbability: .8, personnel: { eligible: true },
   }));
   const markets = [
     { key: "h2h", outcomes: [{ name: away, price: 100 }, { name: home, price: -110 }] },
@@ -42,11 +44,18 @@ function fixture([away, home] = PAIRS[0]) {
     bookmakers: [{ key: "book", title: "Book", last_update: QUOTE,
       markets: markets.map(m => ({ ...m, last_update: QUOTE })) }] };
   const cutoff = dataset.metricsByWeek[6][away].expectedLineup.cutoff;
-  const dataQuality = { playByPlay: true, teamForm: true, personnel: false,
-    sources: { odds: { available: true } }, personnelTiming: { cutoff } };
-  return { game: { away, home, season: 2026, week: 6 }, prediction, playerProjections: players, oddsEvent, dataQuality,
+  const feature = predictionFeatureFixture(away, home, 2026, 6, cutoff, {
+    away: players.map((player) => activePersonnelRecord(player.personnelId, away)),
+  });
+  const dataQuality = { playByPlay: true, teamForm: true, personnel: true,
+    sources: { odds: { available: true }, opponentNetwork: { available: true } }, personnelTiming: { cutoff } };
+  prediction.matchupIntelligence = feature.predictionPayloadFeatures;
+  prediction.modelLayers = { opponentNetwork: feature.predictionPayloadFeatures.opponentNetwork };
+  return { ...feature, game: { away, home, season: 2026, week: 6 }, prediction, playerProjections: players,
+    personnelViews: feature.personnelViews, oddsEvent, dataQuality,
     teamMetrics: { away: { team: away, ...dataset.metricsByWeek[6][away] },
-      home: { team: home, ...dataset.metricsByWeek[6][home] } }, asOf: NOW.toISOString() };
+      home: { team: home, ...dataset.metricsByWeek[6][home] } },
+    asOf: new Date(Date.parse(cutoff) - 1000).toISOString() };
 }
 
 function snapshot(input, bestBets = buildBestBets(input)) {
@@ -54,6 +63,10 @@ function snapshot(input, bestBets = buildBestBets(input)) {
     fourthDownPick: input.game.away, fourthDownAwayScore: 30, fourthDownHomeScore: 20,
     fourthDownAwayWinProbability: .8, fourthDownHomeWinProbability: .2, confidenceScore: .8,
     modelVersion: FULL_MODEL_VERSION, modelKey: FULL_MODEL_KEY, authoritative: true,
+    predictionFeatureVersion: input.predictionFeatureVersion,
+    opponentNetworkStatus: input.opponentNetworkStatus,
+    personnelVersion: input.personnelVersion,
+    personnelViews: input.personnelViews,
     predictionPayload: input.prediction, playerProjections: { available: true, away: { players: input.playerProjections } },
     dataQuality: input.dataQuality, bestBets, generatedAt: NOW.toISOString(), game: input.game };
 }
@@ -61,19 +74,26 @@ function snapshot(input, bestBets = buildBestBets(input)) {
 test("all 14 Week 6 games evaluate team and player markets using verified dated lineups", () => {
   for (const pair of PAIRS) {
     const input = fixture(pair), result = buildBestBets({ ...input, audit: true });
-    assert.ok(result.candidates.length > 0, pair.join("@"));
+    assert.ok(result.candidates.length > 0, `${pair.join("@")} ${JSON.stringify({
+      diagnostics: result.marketDiagnostics,
+      rejections: result.assessments?.filter((row) => row.rejectionReasons?.length).map((row) => ({
+        player: row.playerName, reasons: row.rejectionReasons,
+      })).slice(0, 3),
+      dataQuality: input.dataQuality,
+    })}`);
     assert.ok(result.candidates.some(b => b.market === "Moneyline"));
     assert.ok(result.candidates.some(b => b.market === "Spread"));
     assert.ok(result.candidates.some(b => b.market === "Game total"));
     assert.ok(result.candidates.some(b => b.market === "Receiving yards"));
     assert.ok(result.assessments.length >= 26);
-    assert.equal(input.dataQuality.personnel, false);
+    assert.equal(input.dataQuality.personnel, true);
   }
 });
 
 test("missing, future, wrong-week or mismatched lineup evidence cannot bypass personnel readiness", () => {
   for (const defect of ["missing", "future", "week", "team", "cutoff"]) {
     const input = fixture();
+    input.dataQuality.personnel = false;
     input.teamMetrics = structuredClone(input.teamMetrics);
     if (defect === "missing") delete input.teamMetrics.home;
     if (defect === "future") input.teamMetrics.away.expectedLineup.snapshotAt = "2026-10-16T00:00:00Z";
@@ -96,9 +116,129 @@ test("missing core data and existing role/quality floors continue to withhold ca
   assert.ok(buildBestBets(input).candidates.every(b => b.category === "Game"));
 });
 
+test("scenario quotes exercise candidate eligibility at Out, Questionable and Unknown statuses", () => {
+  const input = fixture(["HOU", "JAX"]);
+  const target = input.playerProjections[0];
+  const record = input.personnelViews.away.players.find((player) => player.canonicalId === target.personnelId);
+  assert.ok(record);
+  const baselineBets = buildBestBets(input);
+  const candidateKey = (candidate) => `${candidate.personnelId}:${candidate.market}:${candidate.selection}`;
+  const baselineKeys = baselineBets.candidates.map(candidateKey).sort();
+  const targetCandidates = baselineBets.candidates.filter((candidate) =>
+    candidate.personnelId === target.personnelId);
+  assert.ok(targetCandidates.length > 0, "quoted player markets qualify at baseline");
+  const probabilityAndValue = targetCandidates.map(({ modelProbability, expectedValue, edge }) => ({
+    modelProbability, expectedValue, edge,
+  }));
+
+  for (const status of ["Out", "Doubtful", "Unknown"]) {
+    record.status = status;
+    record.statusKnown = status !== "Unknown";
+    record.projectedAvailable = status !== "Out" && status !== "Doubtful";
+    record.propEligible = false;
+    const bets = buildBestBets(input);
+    assert.equal(bets.candidates.some((candidate) => candidate.personnelId === target.personnelId), false, status);
+    assert.deepEqual(bets.candidates.map(candidateKey).sort(),
+      baselineKeys.filter((key) => !targetCandidates.some((candidate) => candidateKey(candidate) === key)).sort(),
+      `${status} removes only that player's baseline candidate(s)`);
+    const saved = snapshot(input, bets);
+    const selection = buildWeeklyMultiSelection([saved], { cacheStatus: "fresh", events: [input.oddsEvent] }, context, NOW);
+    assert.equal(selection.legs.some((leg) => leg.personnelId === target.personnelId), false, status);
+  }
+
+  Object.assign(record, {
+    status: "Questionable", statusKnown: true, projectedAvailable: true, propEligible: true,
+  });
+  const questionableBets = buildBestBets(input);
+  const questionableCandidates = questionableBets.candidates.filter((candidate) =>
+    candidate.personnelId === target.personnelId);
+  assert.deepEqual(questionableCandidates.map(({ modelProbability, expectedValue, edge }) => ({
+    modelProbability, expectedValue, edge,
+  })), probabilityAndValue, "Best Bets applies no second medical probability deduction");
+  assert.deepEqual(questionableBets.candidates.map(candidateKey).sort(), baselineKeys);
+  const onlyTargetBets = { ...questionableBets, candidates: questionableCandidates, recommendations: questionableCandidates };
+  const questionableSelection = buildWeeklyMultiSelection(
+    [snapshot(input, onlyTargetBets)],
+    { cacheStatus: "fresh", events: [input.oddsEvent] }, context, NOW,
+  );
+  for (const bet of questionableCandidates) {
+    const leg = questionableSelection.legs.find((candidate) => candidate.personnelId === target.personnelId &&
+      candidate.market === bet.market && candidate.selection === bet.selection);
+    assert.ok(leg, "Questionable candidate enters the ordinary Weekly Multi consideration path");
+    assert.ok(Math.abs(leg.modelProbability - bet.modelProbability) <= 0.0001);
+    assert.ok(Math.abs(leg.expectedValue - bet.expectedValue) <= 0.0001);
+  }
+  assert.deepEqual(questionableCandidates.map(candidateKey),
+    baselineBets.candidates.filter((candidate) => candidate.personnelId === target.personnelId).map(candidateKey));
+});
+
+test("Nico Collins availability Unknown preserves his HOU identity and emits an availability diagnostic", () => {
+  const input = fixture(["HOU", "JAX"]);
+  const target = input.playerProjections[0];
+  const previousName = target.playerName;
+  const oldId = target.personnelId;
+  const nicoId = dataset.metricsByWeek[6].HOU.expectedLineup.roster
+    .find((player) => player.name === "Nico Collins").gsisId;
+  const nicoRecord = input.personnelViews.away.players
+    .find((player) => player.canonicalId === oldId);
+  target.playerName = "Nico Collins";
+  target.playerId = nicoId;
+  target.personnelId = nicoId;
+  target.team = "HOU";
+  target.position = "WR";
+  nicoRecord.canonicalId = nicoId;
+  nicoRecord.name = "Nico Collins";
+  nicoRecord.team = "HOU";
+  nicoRecord.position = "WR";
+  nicoRecord.status = "Unknown";
+  nicoRecord.statusKnown = false;
+  nicoRecord.projectedAvailable = true;
+  nicoRecord.propEligible = false;
+  for (const market of input.oddsEvent.bookmakers[0].markets) {
+    for (const outcome of market.outcomes) {
+      if (outcome.playerName === previousName) outcome.playerName = "Nico Collins";
+    }
+  }
+
+  const result = buildBestBets({ ...input, audit: true });
+  assert.equal(nicoRecord.name, "Nico Collins");
+  assert.equal(nicoRecord.team, "HOU");
+  assert.equal(nicoRecord.position, "WR");
+  assert.equal(nicoRecord.status, "Unknown");
+  assert.equal(nicoRecord.statusKnown, false);
+  assert.equal(result.candidates.some((candidate) => candidate.personnelId === nicoId), false);
+  assert.ok(result.assessments.some((assessment) =>
+    assessment.playerName === "Nico Collins" &&
+    assessment.rejectionReasons.includes("unknown_availability")));
+});
+
+test("Best Bets rejects a supported projection when its team is outside the game context", () => {
+  const input = fixture(["NYG", "KC"]);
+  const foreignId = "00-0041251";
+  const target = input.playerProjections[0];
+  const oldName = target.playerName;
+  Object.assign(target, {
+    playerName: "Jalon Daniels", playerId: foreignId, personnelId: foreignId,
+    team: "TB", position: "QB", passingYards: 200, roleConfidence: .9, dataQuality: .9,
+  });
+  input.personnelViews.tampa = {
+    team: "TB",
+    players: [activePersonnelRecord(foreignId, "TB")],
+  };
+  for (const market of input.oddsEvent.bookmakers[0].markets) {
+    for (const outcome of market.outcomes) {
+      if (outcome.playerName === oldName) outcome.playerName = "Jalon Daniels";
+    }
+  }
+  const result = buildBestBets({ ...input, audit: true });
+  assert.equal(result.candidates.some((candidate) => candidate.personnelId === foreignId), false);
+  assert.ok(result.assessments.some((assessment) =>
+    assessment.playerName === "Jalon Daniels" &&
+    assessment.rejectionReasons.includes("player_team_mismatch")));
+});
+
 test("NE moneyline never borrows New York Jets price through a substring", () => {
   const input = fixture(["NYJ", "NE"]);
-  input.dataQuality.personnel = true;
   input.prediction.awayWinProbability = .15;
   input.prediction.homeWinProbability = .85;
   input.oddsEvent.bookmakers[0].markets[0].outcomes = [
@@ -245,8 +385,11 @@ test("stored Baltimore props retain canonical kickoff across books and market or
 test("available verified-QB passing markets are evaluated and absent projections are not fabricated", () => {
   const input = fixture(["BUF", "LV"]);
   const qb = { playerName: "Josh Allen", position: "QB", team: "BUF", passingYards: 280,
-    passingTouchdowns: 2.5, completions: 28, roleConfidence: .9, dataQuality: .9 };
+    playerId: "buf-josh-allen", personnelId: "buf-josh-allen",
+    personnel: { eligible: true }, passingTouchdowns: 2.5, completions: 28,
+    roleConfidence: .9, dataQuality: .9 };
   input.playerProjections.push(qb);
+  input.personnelViews.away.players.push(activePersonnelRecord(qb.personnelId, "BUF"));
   for (const [key, line] of [["player_pass_yds",220.5],["player_pass_tds",1.5],["player_completions",20.5]]) {
     input.oddsEvent.bookmakers[0].markets.push({ key, last_update: QUOTE,
       outcomes: [{ playerName: "Josh Allen", name: "Over", point: line, price: -110 }] });

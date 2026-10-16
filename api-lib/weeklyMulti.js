@@ -4,6 +4,7 @@ import { isPlayerLeg, settleLockedLegs } from "./weeklyMultiSettlement.js";
 import { findOddsForGame, resolveTeamCode } from "../src/services/oddsApi.js";
 import { usableDecimalOdds } from "../src/services/oddsDisplay.js";
 import { validateOddsEvents } from "../src/services/quoteValidation.js";
+import { canonicalTeam } from "./personnelView.js";
 
 const BALLDONTLIE_GAMES_URL = "https://api.balldontlie.io/nfl/v1/games";
 // Odds now come from once-a-day stored snapshots, so quote age is bounded by
@@ -268,8 +269,23 @@ function isFreshPrediction(snapshot, context, now) {
     Number.isFinite(kickoff) && kickoff > now.getTime();
 }
 
+function personnelCandidateEligible(snapshot, candidate) {
+  if (!isPlayerLeg(candidate)) return true;
+  const id = candidate.personnelId || candidate.playerId;
+  const team = canonicalTeam(candidate.playerTeam || candidate.teamCode || "");
+  if (!id || !team) return false;
+  const away = canonicalTeam(snapshot?.awayCode);
+  const home = canonicalTeam(snapshot?.homeCode);
+  if (team !== away && team !== home) return false;
+  const view = snapshot?.personnelViews?.[team === away ? "away" : "home"];
+  const record = view?.players?.find((player) => player.canonicalId === String(id));
+  if (record?.position === "QB" && view?.quarterback?.conflict && !view.quarterback.resolved) return false;
+  return Boolean(canonicalTeam(view?.team) === team && record?.statusKnown && record.propEligible === true &&
+    record.projectedAvailable && record.eligibleBeforeCutoff && !record.identityConflict && !record.sourceConflict);
+}
+
 export function buildWeeklyMultiSelection(snapshots, oddsPayload, context, now = new Date()) {
-  const reasonCounts = { stalePrediction: 0, staleOdds: 0, fallbackOdds: 0, invalidCandidates: 0 };
+  const reasonCounts = { stalePrediction: 0, staleOdds: 0, fallbackOdds: 0, invalidCandidates: 0, personnelExcluded: 0 };
   const candidates = [];
   const quoteAudit = validateOddsEvents(Array.isArray(oddsPayload?.events) ? oddsPayload.events : [], { now });
   const oddsEvents = quoteAudit.events;
@@ -279,8 +295,13 @@ export function buildWeeklyMultiSelection(snapshots, oddsPayload, context, now =
     const tdProbability = Number(scorer?.tdProbability ?? scorer?.modelProbability);
     const roleConfidence = Number(scorer?.roleConfidence);
     const scorerProbability = tdProbability * roleConfidence;
+    const scorerPersonnelEligible = scorer?.source === "model-only" &&
+      personnelCandidateEligible(snapshot, scorer);
     // The model-only Anytime TD scorer has no bookmaker price by design.
-    if (scorer?.source === "model-only" && scorer.selection && tdProbability > 0 && tdProbability <= 1 &&
+    if (scorer?.source === "model-only" && !scorerPersonnelEligible) {
+      reasonCounts.personnelExcluded += 1;
+    } else if (scorerPersonnelEligible &&
+      scorer.selection && tdProbability > 0 && tdProbability <= 1 &&
       roleConfidence > 0 && roleConfidence <= 1 && scorerProbability > 0 && scorerProbability <= 1 &&
       snapshot.awayCode && snapshot.homeCode) {
       candidates.push({
@@ -313,10 +334,15 @@ export function buildWeeklyMultiSelection(snapshots, oddsPayload, context, now =
     const bets = [...(bestBetsPayload?.candidates || bestBetsPayload?.recommendations || [])];
     if (scorer?.source === "priced-market") bets.push(scorer);
     for (const bet of bets) {
+      if (!personnelCandidateEligible(snapshot, bet)) {
+        reasonCounts.personnelExcluded += 1;
+        continue;
+      }
       if (bet.quoteValidation?.status === "quarantined") {
         reasonCounts.invalidCandidates += 1;
         continue;
       }
+
       const decimalOdds = getDecimalOddsValue(bet);
       const modelProbability = Number(bet.modelProbability);
       const quoteTime = new Date(bet.updatedAt || 0).getTime();
