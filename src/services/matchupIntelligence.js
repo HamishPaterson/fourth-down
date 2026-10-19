@@ -57,9 +57,11 @@ export function buildExpectedPlayMix({ away, home, teamMetrics, playerMetrics, p
     const own = teamMetrics?.[side], other = teamMetrics?.[otherSide];
     const opportunities = totals ? totals.passAttempts + totals.sacksAllowed + totals.rushingAttempts : 0;
     const sourceMatches = playerMetrics?.[side]?.team === code;
-    if (reason || !sourceMatches || !(opportunities > 0) ||
+    const teamVolumeUnavailable = own?.availability?.teamMetricsAvailable === false;
+    if (reason || teamVolumeUnavailable || !sourceMatches || !(opportunities > 0) ||
         !finite(prediction?.[side]?.expectedPossessions) || !finite(own?.playsPerGame)) {
-      result[side] = { team: code, available: false, reason: reason || "Eligible team play-volume context unavailable" };
+      result[side] = { team: code, available: false,
+        reason: reason || "Eligible team play-volume context unavailable" };
       continue;
     }
     const basePassRate = (totals.passAttempts + totals.sacksAllowed) / opportunities;
@@ -88,7 +90,9 @@ export function buildExpectedPlayMix({ away, home, teamMetrics, playerMetrics, p
 }
 
 export function buildMatchupIntelligence({ away, home, teamMetrics, playMix }) {
-  const confidence = sampleConfidence(teamMetrics?.away, teamMetrics?.home);
+  const phase1Available = [teamMetrics?.away, teamMetrics?.home].every((team) =>
+    !team?.availability || team.availability.phase1Available === true);
+  const confidence = phase1Available ? sampleConfidence(teamMetrics?.away, teamMetrics?.home) : 0;
   const signals = DEFINITIONS.map((definition) => {
     const awaySignal = sideSignal(teamMetrics?.away, teamMetrics?.home, definition, playMix?.away);
     const homeSignal = sideSignal(teamMetrics?.home, teamMetrics?.away, definition, playMix?.home);

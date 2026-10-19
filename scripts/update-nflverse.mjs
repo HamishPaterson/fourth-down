@@ -2,9 +2,11 @@ import { gunzipSync } from "node:zlib";
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
-import { buildDepthMetrics, weeklyDepthCutoffs } from "../api-lib/depthCharts.js";
+import { buildDepthMetrics, validDepthLineup, validDepthRoster, weeklyDepthCutoffs } from "../api-lib/depthCharts.js";
 import { fetchSchedule } from "./balldontlie-schedule.mjs";
 import { buildWeeklySituationalMetrics } from "../api-lib/situationalMetrics.js";
+import { buildWeeklyKickerProfiles } from "../api-lib/kickerMetrics.js";
+import { completedPlayerGames, instant } from "../api-lib/playerMetrics.js";
 
 const season = Number(process.argv[2] || new Date().getUTCFullYear());
 const outputPath = path.resolve("api/nfl/nflverse-team-metrics.js");
@@ -33,36 +35,28 @@ export async function main() {
   const snapRows = snapSource ? parseGenericCsv(snapSource.text) : [];
   const depthRows = depthSource ? parseGenericCsv(depthSource.text) : [];
   const { cutoffs: depthCutoffs, games, sourceAsOf } = await fetchSeasonContext(season);
-  const completedWeeks = [...new Set(plays.map((play) => play.week).filter((week) => week > 0))].sort((a, b) => a - b);
+  const sourceWeeks = [...new Set(plays.filter((play) => play.season === season && play.seasonType === "REG")
+    .map((play) => play.week).filter((week) => week > 0 && week < 18))].sort((a, b) => a - b);
   const metricsByWeek = {};
   const situationalAuditsByWeek = {};
+  const kickerProfilesByWeek = {};
+  const teamMetricsAuditsByWeek = {};
+  const generatedAt = new Date().toISOString();
 
-  for (const predictionWeek of completedWeeks.map((week) => week + 1)) {
-    const eligible = plays.filter((play) => play.week < predictionWeek && isEligible(play));
-    const teams = [...new Set(eligible.flatMap((play) => [play.posteam, play.defteam]).filter(Boolean))];
-    const base = Object.fromEntries(teams.map((code) => [code, buildMetrics(eligible, code)]));
-    const snap = buildSnapMetrics(snapRows, predictionWeek);
-    const depth = buildDepthMetrics(depthRows, { season, predictionWeek, cutoff: depthCutoffs[predictionWeek] });
-    const situational = buildWeeklySituationalMetrics(rows, games, {
+  for (const predictionWeek of sourceWeeks.map((week) => week + 1)) {
+    const result = buildPredictionWeek(rows, games, snapRows, depthRows, {
       season, predictionWeek, cutoff: depthCutoffs[predictionWeek], sourceAsOf,
+      generatedAt,
     });
-    situationalAuditsByWeek[predictionWeek] = situational.audit;
-
-    metricsByWeek[predictionWeek] = Object.fromEntries(teams.map((code) => [
-      code,
-      {
-        ...base[code],
-        opponentAdjusted: buildOpponentAdjustedMetrics(code, base, eligible),
-        snapParticipation: snap[code] || null,
-        expectedLineup: depth[code] || null,
-        situational: situational.teams[code] || null,
-      },
-    ]));
+    metricsByWeek[predictionWeek] = result.metrics;
+    teamMetricsAuditsByWeek[predictionWeek] = result.audit;
+    situationalAuditsByWeek[predictionWeek] = result.situational.audit;
+    kickerProfilesByWeek[predictionWeek] = result.kickers;
   }
 
   const payload = {
     season,
-    generatedAt: new Date().toISOString(),
+    generatedAt,
     source: "nflverse/nflfastR",
     garbageTimeFilter: "Win probability between 5% and 95%",
     weighting: {
@@ -80,6 +74,8 @@ export async function main() {
     },
     metricsByWeek,
     situationalAuditsByWeek,
+    kickerProfilesByWeek,
+    teamMetricsAuditsByWeek,
   };
 
   await mkdir(path.dirname(outputPath), { recursive: true });
@@ -126,8 +122,10 @@ function sourceMeta(source, required) {
     : { available: false, required, url: null, fetchedAt: null };
 }
 
-function parsePbp(rows) {
+export function parsePbp(rows) {
   return rows.map((row) => ({
+    season: num(row.season),
+    playId: row.play_id || "",
     gameId: row.game_id || "",
     seasonType: row.season_type || "",
     week: num(row.week) || 0,
@@ -166,10 +164,256 @@ function parsePbp(rows) {
     firstDown: num(row.first_down) || 0,
     receiverName: cleanName(row.receiver_player_name || row.receiver),
     rusherName: cleanName(row.rusher_player_name || row.rusher),
-  })).map((play, index, rows) => ({
-    ...play,
-    recencyWeight: recencyWeight(play.week, Math.max(...rows.map((item) => item.week || 0))),
   }));
+}
+
+export function buildPredictionWeek(rows, games, snapRows, depthRows, context) {
+  const { season, predictionWeek, cutoff, sourceAsOf } = context;
+  if (!Number.isInteger(season) || !Number.isInteger(predictionWeek) ||
+      instant(cutoff) === null || instant(sourceAsOf) === null) {
+    throw new Error("Team-metrics prediction-week provenance is incomplete");
+  }
+  const historical = rows.filter((row) => num(row.season) === season &&
+    row.season_type === "REG" && num(row.week) >= 1 && num(row.week) < predictionWeek);
+  const completed = completedPlayerGames(games, season, predictionWeek, cutoff)
+    .filter((game) => instant(game.completedAsOf) <= instant(sourceAsOf));
+  const byMatchup = new Map(completed.map((game) => [game.key, game]));
+  const gameIds = new Map();
+  const idsByMatchup = new Map();
+  const unique = new Map();
+  for (const play of parsePbp(historical)) {
+    const [idSeason, idWeek, idAway, idHome] = play.gameId.split("_");
+    if (num(idSeason) !== season || num(idWeek) !== play.week) continue;
+    const away = team(idAway), home = team(idHome);
+    const game = byMatchup.get(`${season}:${play.week}:${[away, home].sort().join(":")}`);
+    if (!game || game.away !== away || game.home !== home || !play.playId || !isEligible(play) ||
+        ![game.away, game.home].includes(play.posteam) ||
+        ![game.away, game.home].includes(play.defteam) || play.posteam === play.defteam) continue;
+    const previousId = idsByMatchup.get(game.key);
+    if (previousId && previousId !== play.gameId) throw new Error(`Conflicting team-metrics game IDs for ${game.key}`);
+    idsByMatchup.set(game.key, play.gameId);
+    gameIds.set(play.gameId, game);
+    const key = `${play.gameId}:${play.playId}`;
+    const previous = unique.get(key);
+    if (previous && JSON.stringify(previous) !== JSON.stringify(play)) {
+      throw new Error(`Conflicting team-metrics play ${key}`);
+    }
+    unique.set(key, play);
+  }
+  const sample = [...unique.values()];
+  const referenceWeek = sample.length ? Math.max(...sample.map((play) => play.week)) : null;
+  const eligible = sample.map((play) => ({ ...play, recencyWeight: recencyWeight(play.week, referenceWeek) }));
+  const performanceTeams = [...new Set(eligible.flatMap((play) => [play.posteam, play.defteam]))];
+  const base = Object.fromEntries(performanceTeams.map((code) => [code, buildMetrics(eligible, code)]));
+  const represented = [...new Set(sample.map((play) => play.gameId))].map((id) => ({ ...gameIds.get(id), gameId: id }));
+  const completedTeamWeeks = new Set(represented.flatMap((game) =>
+    [game.away, game.home].map((code) => `${code}:${game.week}`)));
+  const snap = buildSnapMetrics(snapRows.filter((row) =>
+    completedTeamWeeks.has(`${team(row.team || row.team_abbr || row.club_code)}:${num(row.week)}`)), predictionWeek);
+  const depth = buildDepthMetrics(depthRows, { season, predictionWeek, cutoff });
+  const situational = buildWeeklySituationalMetrics(historical, games, context);
+  const kickers = buildWeeklyKickerProfiles(historical, games, context);
+  const teams = [...new Set([
+    ...Object.keys(situational.teams),
+    ...Object.keys(depth),
+    ...Object.keys(base),
+    ...Object.keys(kickers.profilesByTeam),
+  ])].sort();
+  return {
+    metrics: Object.fromEntries(teams.map((code) => {
+      const teamMetricsAvailable = Boolean(base[code]);
+      const opponentAdjusted = teamMetricsAvailable
+        ? buildOpponentAdjustedMetrics(code, base, eligible)
+        : unavailableOpponentAdjustedMetrics();
+      const expectedLineup = depth[code] || null;
+      const lineupAvailable = validDepthLineup(expectedLineup, predictionWeek, season);
+      const situationalMetrics = situational.teams[code] || null;
+      const situationalAvailable = Boolean(situationalMetrics?.gameProvenance?.length &&
+        (situationalMetrics.thirdDown.offense.opportunities > 0 ||
+          situationalMetrics.redZone.offense.opportunities > 0));
+      const situationalUnavailableReason =
+        "No eligible completed point-in-time situational sample before cutoff";
+      const teamProfiles = kickers.profilesByTeam[code] || [];
+      const expectedKicker = expectedKickerFromLineup(expectedLineup, code);
+      const availability = {
+        contextAvailable: validDepthRoster(expectedLineup, predictionWeek, season),
+        lineupAvailable,
+        teamMetricsAvailable,
+        opponentAdjustedAvailable: Boolean(teamMetricsAvailable && opponentAdjusted.opponents.length),
+        phase1Available: teamMetricsAvailable,
+        situationalAvailable,
+        kickerIdentityAvailable: Boolean(expectedKicker),
+        kickerProfileAvailable: teamProfiles.length > 0,
+      };
+      return [code, {
+        ...(base[code] || unavailableTeamMetrics(code)),
+        team: code,
+        season,
+        predictionWeek,
+        cutoff,
+        schemaVersion: 1,
+        availability,
+        provenance: {
+          schemaVersion: 1,
+          season,
+          predictionWeek,
+          cutoff,
+          context: expectedLineup ? {
+            source: "nflverse depth charts",
+            observedAt: expectedLineup.snapshotAt,
+            available: availability.contextAvailable,
+          } : { source: "nflverse depth charts", observedAt: null, available: false },
+          performance: {
+            source: "nflverse play-by-play",
+            available: teamMetricsAvailable,
+            eligibleGames: represented.filter((game) => game.away === code || game.home === code).length,
+            reason: teamMetricsAvailable ? null : "No completed point-in-time team PBP sample before cutoff",
+          },
+        },
+        opponentAdjusted,
+        snapParticipation: snap[code] || unavailableSnapParticipation(),
+        expectedLineup,
+        expectedKicker,
+        situational: situationalAvailable ? {
+          ...situationalMetrics,
+          available: true,
+          unavailableReason: null,
+        } : unavailableSituationalMetrics(code, season, predictionWeek, cutoff, sourceAsOf,
+          situationalUnavailableReason),
+      }];
+    })),
+    audit: {
+      available: sample.length > 0,
+      reason: sample.length ? null : "No completed point-in-time team PBP sample before cutoff",
+      season, predictionWeek, cutoff, sourceAsOf, referenceWeek,
+      eligiblePlays: sample.length, eligibleGames: represented.length,
+      gameProvenance: represented,
+    },
+    situational, kickers,
+  };
+}
+
+function expectedKickerFromLineup(lineup, code) {
+  const kickers = (lineup?.roster || []).filter((player) => player.position === "K" &&
+    player.rank > 0 && player.team !== "UNKNOWN")
+    .sort((a, b) => a.rank - b.rank || a.playerId.localeCompare(b.playerId));
+  if (!kickers.length || kickers[0].identityConflict ||
+      kickers[1]?.rank === kickers[0].rank) return null;
+  const kicker = kickers[0];
+  return {
+    playerId: String(kicker.gsisId || kicker.playerId),
+    canonicalPlayerId: String(kicker.gsisId || kicker.playerId),
+    depthChartPlayerId: String(kicker.playerId),
+    fullName: kicker.name,
+    team: code,
+    position: "K",
+    status: kicker.status,
+    statusKnown: kicker.statusKnown,
+    depth: kicker.rank,
+    provenance: {
+      source: "nflverse depth charts",
+      observedAt: lineup.snapshotAt,
+      sourcePosition: kicker.sourcePosition || null,
+    },
+  };
+}
+
+function unavailableTeamMetrics(code) {
+  return {
+    team: code,
+    games: null,
+    offensivePlays: null,
+    defensivePlays: null,
+    epaPerPlay: null,
+    defensiveEpaPerPlay: null,
+    successRate: null,
+    defensiveSuccessRate: null,
+    passingEpaPerPlay: null,
+    rushingEpaPerPlay: null,
+    earlyDownEpaPerPlay: null,
+    explosivePlayRate: null,
+    explosivePlayRateAllowed: null,
+    passingEpaAllowedPerPlay: null,
+    rushingEpaAllowedPerPlay: null,
+    pressureAllowedRate: null,
+    sackRateAllowed: null,
+    sacksAllowed: null,
+    pressureGeneratedRate: null,
+    sackRateGenerated: null,
+    sacksGenerated: null,
+    qbHitsGenerated: null,
+    pressureToSackRateAllowed: null,
+    pressureToSackRateGenerated: null,
+    interceptionsThrown: null,
+    interceptionRate: null,
+    interceptionsGenerated: null,
+    defensiveInterceptionRate: null,
+    offensiveFumbles: null,
+    fumblesLost: null,
+    fumbleLostRate: null,
+    defensiveFumblesForced: null,
+    defensiveFumbleRecoveries: null,
+    turnoversPerDrive: null,
+    takeawaysPerDrive: null,
+    qbScrambleRate: null,
+    completionRate: null,
+    airYardsPerAttempt: null,
+    yardsAfterCatchPerCompletion: null,
+    penaltiesPerPlay: null,
+    penaltyYardsPerPlay: null,
+    playsPerGame: null,
+    quarterback: null,
+    sampleReliability: null,
+    thirdDownRate: null,
+    redZoneTouchdownRate: null,
+    drives: null,
+    scoringDriveRate: null,
+    threeAndOutRate: null,
+    longestReception: null,
+    longestRush: null,
+  };
+}
+
+function unavailableOpponentAdjustedMetrics() {
+  return {
+    available: false,
+    opponents: [],
+    epaPerPlay: null,
+    defensiveEpaPerPlay: null,
+    successRate: null,
+    defensiveSuccessRate: null,
+    passingEpaPerPlay: null,
+    rushingEpaPerPlay: null,
+    explosivePlayRate: null,
+  };
+}
+
+function unavailableSnapParticipation() {
+  return {
+    available: false,
+    rows: 0,
+    offensiveRegulars: null,
+    defensiveRegulars: null,
+    offensiveLineRegulars: null,
+    continuityScore: null,
+  };
+}
+
+function unavailableSituationalMetrics(team, season, predictionWeek, cutoff, sourceAsOf, reason) {
+  return {
+    team,
+    schemaVersion: 1,
+    season,
+    predictionWeek,
+    cutoff,
+    sourceAsOf,
+    available: false,
+    unavailableReason: reason,
+    gameProvenance: [],
+    thirdDown: null,
+    redZone: null,
+    league: null,
+  };
 }
 
 export function parseGenericCsv(text) {

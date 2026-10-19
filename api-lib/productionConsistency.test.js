@@ -13,6 +13,7 @@ import { createScheduleHandler } from "../api/nfl/schedule.js";
 import { createWeeklyMultiCurrentHandler } from "./weeklyMulti.js";
 import { BEST_BETS_CANDIDATE_VERSION } from "../src/services/bestBetsService.js";
 import { predictionFeatureFixture } from "./personnelTestHelpers.js";
+import { CURRENT_MODEL_VERSION, CURRENT_MODEL_KEY } from "../src/services/modelIdentity.js";
 
 const saved = () => {
   const cutoff = "2030-10-16T00:15:00Z";
@@ -20,7 +21,7 @@ const saved = () => {
   return ({
   id: "6:SEA:DEN:2030-10-16T00:15:00Z", season: 2030, week: 6,
   awayCode: "SEA", homeCode: "DEN", kickoff: "2030-10-16T00:15:00Z",
-  modelVersion: 11, modelKey: "full-v11-week5-data-gap-audit",
+  modelVersion: CURRENT_MODEL_VERSION, modelKey: CURRENT_MODEL_KEY,
   predictionFeatureVersion: features.predictionFeatureVersion,
   opponentNetworkStatus: features.opponentNetworkStatus,
   personnelVersion: features.personnelVersion,
@@ -66,7 +67,7 @@ test("both views preserve saved identity/version/timestamps and use saved scores
   assert.equal(prediction.winner, "SEA");
   assert.equal(prediction.winnerWinProbability, .585);
   assert.equal(snapshot.id, saved().id);
-  assert.equal(snapshot.modelVersion, 11);
+  assert.equal(snapshot.modelVersion, CURRENT_MODEL_VERSION);
   assert.equal(snapshot.snapshotAt, saved().snapshotAt);
   assert.equal(snapshot.predictionPayload.total, 99);
 });
@@ -116,7 +117,7 @@ test("shared-ledger refresh retains the action query and sends only a GET with v
     assert.equal(url.searchParams.get("season"), "2026");
     assert.equal(url.searchParams.get("week"), "6");
     assert.equal(requested.options.body, undefined);
-    assert.equal(rows[0].modelVersion, 11);
+    assert.equal(rows[0].modelVersion, CURRENT_MODEL_VERSION);
   } finally { global.fetch = original; }
 });
 
@@ -137,7 +138,7 @@ test("real ledger refresh repairs corrupted local scores at the same saved times
     const row = readPredictionLedger().find((r) => r.id === saved().id);
     assert.equal(row.fourthDownAwayScore, 21);
     assert.equal(row.snapshotAt, saved().snapshotAt);
-    assert.equal(row.modelVersion, 11);
+    assert.equal(row.modelVersion, CURRENT_MODEL_VERSION);
     assert.equal(calls.length, 1);
     assert.equal(calls[0].options.body, undefined);
   } finally { global.window = originalWindow; global.fetch = originalFetch; }

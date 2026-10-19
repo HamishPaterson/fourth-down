@@ -32,10 +32,22 @@ function metrics(team) {
       thirdDown: rate(400, 1000), redZone: rate(240, 400) } };
 }
 function fixture() {
+  const team = (code, epa) => ({
+    team: code, games: 5, offensivePlays: 350, defensivePlays: 350, playsPerGame: 65,
+    epaPerPlay: epa, defensiveEpaPerPlay: .05,
+    earlyDownEpaPerPlay: .03, successRate: .45, defensiveSuccessRate: .44,
+    explosivePlayRate: .1, explosivePlayRateAllowed: .09,
+    scoringDriveRate: .22, threeAndOutRate: .3,
+    passingEpaPerPlay: .12, passingEpaAllowedPerPlay: .08,
+    rushingEpaPerPlay: .02, rushingEpaAllowedPerPlay: -.01,
+    pressureGeneratedRate: .15, pressureAllowedRate: .15,
+    opponentAdjusted: { opponents: ["DAL"], epaPerPlay: epa, defensiveEpaPerPlay: .05,
+      passingEpaPerPlay: .12, rushingEpaPerPlay: .02, successRate: .45, explosivePlayRate: .1 },
+  });
   return { away: "BUF", home: "KC", season: 2026, week: 6, kickoff: "2026-10-18T20:25:00Z",
     teamMetrics: { season: 2026, week: 6,
-      away: { ...dataset.metricsByWeek[6].BUF, situational: metrics("BUF") },
-      home: { ...dataset.metricsByWeek[6].KC, situational: metrics("KC") } } };
+      away: { ...team("BUF", .08), situational: metrics("BUF") },
+      home: { ...team("KC", .12), situational: metrics("KC") } } };
 }
 const signal = (input, key) => buildSituationalMatchups(input).signals.find((entry) => entry.key === key);
 const predict = (input, layers = {}) => predictMatchup(input.away, input.home, { ...input, weather: { dome: true },
@@ -341,4 +353,13 @@ test("missing Phase 2A data creates no empty situational cards", () => {
   const result = predict(fixture());
   result.matchupIntelligence.signals = result.matchupIntelligence.signals.filter((s) => s.phase !== "2A");
   assert.doesNotMatch(render(result), /THIRD-DOWN ADVANTAGE|RED-ZONE ADVANTAGE/);
+});
+
+test("situational availability flags suppress populated but ineligible records", () => {
+  const input = fixture();
+  input.teamMetrics.home.availability = { situationalAvailable: false };
+  const result = buildSituationalMatchups(input);
+  assert.equal(result.available, false);
+  assert.ok(result.signals.every((signal) => !signal.available &&
+    /unavailable for this cutoff/i.test(signal.reason)));
 });

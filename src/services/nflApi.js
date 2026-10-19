@@ -90,36 +90,6 @@ export async function getQbRosterHealth(
   return body;
 }
 
-export async function getKickerStats(
-  away,
-  home,
-  season,
-  signal
-) {
-  const params = new URLSearchParams({
-    away,
-    home,
-    season: String(season),
-  });
-
-  const response = await fetch(
-    `/api/nfl/kicker-stats?${params.toString()}`,
-    {
-      signal,
-    }
-  );
-
-  const body = await response.json();
-
-  if (!response.ok) {
-    throw new Error(
-      body.error ||
-        `Kicker request failed (${response.status})`
-    );
-  }
-
-  return body;
-}
 export async function getTeamForm(away, home, season, week, signal) {
   const params = new URLSearchParams({
     away,

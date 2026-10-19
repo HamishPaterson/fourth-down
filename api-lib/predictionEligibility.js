@@ -1,4 +1,4 @@
-import { FULL_MODEL_VERSION, FULL_MODEL_KEY } from "../src/services/gamePredictionService.js";
+import { isCurrentModelIdentity } from "../src/services/modelIdentity.js";
 import { BEST_BETS_CANDIDATE_VERSION } from "../src/services/bestBetsService.js";
 import { predictionFeatureStatus } from "../src/services/predictionFeatures.js";
 
@@ -6,8 +6,7 @@ const number = (value) => value !== null && value !== undefined && value !== "" 
 
 export function completePrediction(snapshot) {
   const bets = snapshot?.bestBets || snapshot?.dataQuality?.bestBetsPayload;
-  return Boolean(snapshot && Number(snapshot.modelVersion) === FULL_MODEL_VERSION &&
-    snapshot.modelKey === FULL_MODEL_KEY && snapshot.predictionPayload &&
+  return Boolean(snapshot && isCurrentModelIdentity(snapshot.modelVersion, snapshot.modelKey) && snapshot.predictionPayload &&
     [snapshot.awayCode, snapshot.homeCode].includes(snapshot.fourthDownPick) &&
     [snapshot.fourthDownAwayScore, snapshot.fourthDownHomeScore,
       snapshot.fourthDownAwayWinProbability, snapshot.fourthDownHomeWinProbability,

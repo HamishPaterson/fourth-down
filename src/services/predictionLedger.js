@@ -3,10 +3,10 @@ import {
   gradeSharedPredictions,
   saveSharedPredictionSnapshots,
 } from "./sharedPredictionLedger.js";
+import { CURRENT_MODEL_VERSION, CURRENT_MODEL_KEY, isCurrentModelIdentity } from "./modelIdentity.js";
 
 const LEDGER_KEY = "fourth-down:prediction-ledger:v1";
-export const CURRENT_MODEL_VERSION = 11;
-export const CURRENT_MODEL_KEY = "full-v11-week5-data-gap-audit";
+export { CURRENT_MODEL_VERSION, CURRENT_MODEL_KEY };
 const WEEK_ONE_BACKFILL = [
   result("2026-W1-SEA-NE", "SEA", "NE", 13, 10, "SEA"),
   result("2026-W1-LAR-SF", "LAR", "SF", 7, 27, "LAR"),
@@ -93,8 +93,7 @@ export function isCurrentCompletePrediction(row) {
     !row?.oddsPick || Number(bestBets?.assessed) > 0;
   return Boolean(
     row &&
-    Number(modelVersion) === CURRENT_MODEL_VERSION &&
-    modelKey === CURRENT_MODEL_KEY &&
+    isCurrentModelIdentity(modelVersion, modelKey) &&
     row.fourthDownPick &&
     hasNumber(row.fourthDownAwayScore) &&
     hasNumber(row.fourthDownHomeScore) &&

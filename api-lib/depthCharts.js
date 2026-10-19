@@ -78,16 +78,17 @@ export function buildDepthMetrics(rows, { season, predictionWeek, cutoff } = {})
     const supplementalIds = new Set();
     for (const row of snapshot) {
       const formation = row.pos_grp;
-      if (formation === "Special Teams") continue;
-      if (!["3WR 1TE", "Base 4-3 D", "Base 3-4 D"].includes(formation)) {
+      const position = canonicalPosition(row.pos_abb);
+      const kickerRole = formation === "Special Teams" && position === "K";
+      if (formation === "Special Teams" && !kickerRole) continue;
+      if (!kickerRole && !["3WR 1TE", "Base 4-3 D", "Base 3-4 D"].includes(formation)) {
         issues.add("Unsupported personnel group");
         continue;
       }
       const id = row.espn_id || row.gsis_id;
       const rank = Number(row.pos_rank);
-      const slot = row.pos_slot;
-      const position = canonicalPosition(row.pos_abb);
-      const group = Object.keys(GROUPS).find((key) => GROUPS[key].includes(position));
+      const slot = row.pos_slot || (kickerRole && Number.isInteger(rank) && rank > 0 ? `K-${rank}` : null);
+      const group = kickerRole ? "K" : Object.keys(GROUPS).find((key) => GROUPS[key].includes(position));
       if (!id || !slot || !Number.isInteger(rank) || rank < 1 || !group) {
         issues.add("Missing player identity, slot, rank or position");
         continue;
@@ -98,7 +99,8 @@ export function buildDepthMetrics(rows, { season, predictionWeek, cutoff } = {})
       const key = `${formation}:${slot}`;
       const player = {
         playerId: String(id), gsisId: row.gsis_id || null, name: row.player_name || null,
-        position, group, formation, slot: String(slot), rank, ...depthAvailability(row),
+        position, sourcePosition: String(row.pos_abb || "").trim().toUpperCase() || null,
+        group, formation, slot: String(slot), rank, ...depthAvailability(row),
       };
       if (["NB", "NCB"].includes(String(row.pos_abb || "").toUpperCase())) {
         supplementalIds.add(player.playerId);
@@ -113,6 +115,7 @@ export function buildDepthMetrics(rows, { season, predictionWeek, cutoff } = {})
           (player.status !== rosterPlayer.status || player.group !== rosterPlayer.group)) {
         issues.add("Conflicting player role or status");
       }
+      if (kickerRole) continue;
       const previous = slots.get(key);
       if (!previous || rank < previous.rank) slots.set(key, player);
       else if (rank === previous.rank && JSON.stringify(player) !== JSON.stringify(previous)) issues.add("Conflicting depth slot");
@@ -126,7 +129,9 @@ export function buildDepthMetrics(rows, { season, predictionWeek, cutoff } = {})
     }
     // The source lists a nickel-back and sometimes a fullback alongside its base formations.
     // Preserve those optional roles, but do not label a 12-player base unit as starters.
-    const supplemental = declared.filter((player) => supplementalIds.has(player.playerId) || player.position === "FB");
+    const supplemental = declared.filter((player) =>
+      (supplementalIds.has(player.playerId) && ["NB", "NCB"].includes(player.sourcePosition)) ||
+      player.position === "FB");
     const base = declared.filter((player) => !supplemental.includes(player));
     const unique = new Map();
     for (const player of base) {

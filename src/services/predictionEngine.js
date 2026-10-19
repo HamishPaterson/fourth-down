@@ -4,6 +4,12 @@ import { getTeamRatings } from "./teamRatings.js";
 import { getHomeFieldAdvantage } from "./homeFieldAdvantage.js";
 import { buildExpectedPlayMix, buildMatchupIntelligence, pressureSignal, explainMatchupSignal } from "./matchupIntelligence.js";
 import { buildSituationalMatchups, explainSituationalSignal } from "./situationalMatchups.js";
+import { TEAM_NAMES } from "../data.js";
+import {
+  createDefaultSpecialTeamsModel,
+  leagueOnlySpecialTeams,
+  KICKER_EXPLANATION_CONFIDENCE,
+} from "./specialTeams.js";
 
 const RATING_BASELINE = 75;
 const BASE_PASS_RATIO = 0.6;
@@ -33,12 +39,20 @@ const TEAM_DIVISION = Object.fromEntries(
 const DIVISIONAL_MARGIN_COMPRESSION_POINTS = 1.2;
 
 export function predictMatchup(awayCode, homeCode, options = {}) {
-  const baseline = predictCore(awayCode, homeCode, options);
-  const data = options.teamMetrics;
   const away = normalizeTeamCode(awayCode), home = normalizeTeamCode(homeCode);
+  const specialTeams = options.specialTeams || createDefaultSpecialTeamsModel(away, home);
+  const predictionOptions = { ...options, specialTeams };
+  const baseline = predictCore(awayCode, homeCode, predictionOptions);
+  const data = options.teamMetrics;
   if (!data || data.season !== options.season || data.week !== Number(options.week) ||
       data.away?.team !== away || data.home?.team !== home) {
-    return { ...baseline, matchupIntelligence: { available: false, signals: [],
+    const leagueOnly = predictCore(away, home, {
+      ...predictionOptions,
+      specialTeams: leagueOnlySpecialTeams(specialTeams),
+    });
+    return { ...baseline,
+      specialTeams: buildSpecialTeamsDiagnostics(baseline, leagueOnly, specialTeams),
+      matchupIntelligence: { available: false, signals: [],
       reason: "Exact-season/week team matchup data unavailable" } };
   }
   // Personnel score effects must not alter the underlying matchup evidence.
@@ -48,42 +62,63 @@ export function predictMatchup(awayCode, homeCode, options = {}) {
       evidenceLayers[layer] = { ...evidenceLayers[layer], active: false, awayPoints: 0, homePoints: 0 };
     }
   }
-  const evidenceBaseline = predictCore(away, home, { ...options, modelLayers: evidenceLayers });
+  const evidenceBaseline = predictCore(away, home, {
+    ...predictionOptions, modelLayers: evidenceLayers,
+    specialTeams: leagueOnlySpecialTeams(specialTeams),
+  });
   const evidencePlayMix = buildExpectedPlayMix({ away, home, teamMetrics: data,
     playerMetrics: options.playerMetrics, prediction: evidenceBaseline, season: options.season, week: Number(options.week) });
   const playMix = buildExpectedPlayMix({ away, home, teamMetrics: data,
     playerMetrics: options.playerMetrics, prediction: baseline, season: options.season, week: Number(options.week) });
   const intelligence = buildMatchupIntelligence({ away, home, teamMetrics: data, playMix: evidencePlayMix });
   const phase1Layers = { ...options.modelLayers, ...intelligence.layers };
-  const phase1 = predictCore(away, home, { ...options, modelLayers: phase1Layers });
+  const leagueOnlyModel = leagueOnlySpecialTeams(specialTeams);
+  const phase1 = predictCore(away, home, {
+    ...predictionOptions, modelLayers: phase1Layers, specialTeams: leagueOnlyModel,
+  });
   const situational = buildSituationalMatchups({ away, home, teamMetrics: data,
     season: options.season, week: Number(options.week), kickoff: options.kickoff });
   const modelLayers = { ...phase1Layers, ...situational.layers };
-  const result = situational.available ? predictCore(away, home, { ...options, modelLayers }) : phase1;
+  const evidenceResult = predictCore(away, home, {
+    ...predictionOptions,
+    modelLayers: situational.available ? modelLayers : phase1Layers,
+    specialTeams: leagueOnlyModel,
+  });
+  const result = predictCore(away, home, {
+    ...predictionOptions,
+    modelLayers: situational.available ? modelLayers : phase1Layers,
+  });
   const signals = [...intelligence.signals,
     pressureSignal({ away, home, teamMetrics: data, layer: phase1.modelLayers.pressureMatchup })]
     .map((signal) => {
-      const without = predictCore(away, home, { ...options, modelLayers: {
+      const without = predictCore(away, home, { ...predictionOptions, modelLayers: {
         ...phase1Layers, [signal.layer]: { active: false, available: false, awayPoints: 0, homePoints: 0 },
-      } });
+        }, specialTeams: leagueOnlyModel });
       return explainMatchupSignal({ ...signal,
         homePoints: phase1.modelLayers[signal.layer].homePoints,
         awayPoints: phase1.modelLayers[signal.layer].awayPoints,
       }, phase1.continuousMargin - without.continuousMargin);
     });
   const situationalSignals = situational.signals.map((signal) => {
-    const without = signal.available ? predictCore(away, home, { ...options, modelLayers: {
+    const without = signal.available ? predictCore(away, home, { ...predictionOptions, specialTeams: leagueOnlyModel, modelLayers: {
       ...modelLayers, [signal.layer]: { active: false, available: false, awayPoints: 0, homePoints: 0 },
-    } }) : result;
+    } }) : evidenceResult;
     return explainSituationalSignal({ ...signal,
-      homePoints: result.modelLayers[signal.layer]?.homePoints || 0,
-      awayPoints: result.modelLayers[signal.layer]?.awayPoints || 0,
-    }, result.continuousMargin - without.continuousMargin);
+      homePoints: evidenceResult.modelLayers[signal.layer]?.homePoints || 0,
+      awayPoints: evidenceResult.modelLayers[signal.layer]?.awayPoints || 0,
+    }, evidenceResult.continuousMargin - without.continuousMargin);
   });
+  const kickerAblation = predictCore(away, home, {
+    ...predictionOptions,
+    modelLayers: result.modelLayers,
+    specialTeams: leagueOnlySpecialTeams(specialTeams),
+  });
+  const specialTeamsDiagnostics = buildSpecialTeamsDiagnostics(result, kickerAblation, specialTeams);
   return {
     ...result,
     away: { ...result.away, expectedPlayMix: playMix.away },
     home: { ...result.home, expectedPlayMix: playMix.home },
+    specialTeams: specialTeamsDiagnostics,
     matchupIntelligence: {
       phase: 1,
       available: signals.some((signal) => signal.available) || situational.available,
@@ -91,13 +126,75 @@ export function predictMatchup(awayCode, homeCode, options = {}) {
       incrementalMargin: round3(result.continuousMargin - baseline.continuousMargin),
       maxPreSimulationMargin: 1,
       situational: { ...situational, signals: situationalSignals,
-        finalMarginAblation: round3(result.continuousMargin - phase1.continuousMargin),
+        finalMarginAblation: round3(evidenceResult.continuousMargin - phase1.continuousMargin),
         phase1Margin: phase1.continuousMargin },
       limitations: ["Explosives combine pass and rush.", "Pressure is a hit/sack proxy, not charted pressure or blitz performance.",
         "Separate passing/rushing success and neutral-situation tendency are unavailable.",
         "NFLverse metric-specific adjustment is distinct from the score-based Opponent-Network.",
         "Earlier team PBP versions are not immutable as-observed history; player mix requires proven pre-cutoff completions."],
     },
+  };
+}
+
+function buildSpecialTeamsDiagnostics(actual, leagueOnly, model) {
+  const awayDelta = round3(actual.away.expectedPoints - leagueOnly.away.expectedPoints);
+  const homeDelta = round3(actual.home.expectedPoints - leagueOnly.home.expectedPoints);
+  const marginAblation = round3(actual.continuousMargin - leagueOnly.continuousMargin);
+  const awayContribution = awayDelta;
+  const homeContribution = homeDelta;
+  const directionClear = Math.abs(marginAblation) >= 0.05;
+  const details = {};
+  const explanations = [];
+  for (const [side, delta, contribution] of [
+    ["away", awayDelta, awayContribution],
+    ["home", homeDelta, homeContribution],
+  ]) {
+    const simulation = actual[side].specialTeamsSimulation || {};
+    const kicker = model[side] || {};
+    const teamName = TEAM_NAMES[actual[side].code] || actual[side].code;
+    const teamPossessive = teamName.endsWith("s") ? `${teamName}'` : `${teamName}'s`;
+    let explanation = null;
+    if (simulation.fallbackActive) {
+      explanation = `${teamPossessive} kicker performance is using the league-average fallback because Fourth Down could not verify enough point-in-time kicker data.`;
+    } else if (directionClear && Math.abs(contribution) > 0 &&
+        simulation.individualizedDataAvailable &&
+        simulation.confidence >= KICKER_EXPLANATION_CONFIDENCE &&
+        kicker.expectedKicker?.fullName) {
+      const reliability = delta >= 0 ? "more reliable" : "less reliable";
+      const effect = delta >= 0 ? "slightly increases" : "slightly reduces";
+      explanation = `${kicker.expectedKicker.fullName} has been ${reliability} in the distance-adjusted kicking sample, which ${effect} ${teamPossessive} scoring expectation.`;
+    }
+    details[side] = {
+      ...simulation,
+      team: actual[side].code,
+      expectedScoreDelta: delta,
+      leagueFallbackExpectedPoints: round3(leagueOnly[side].expectedPoints),
+      explanation,
+    };
+    if (explanation) explanations.push(explanation);
+  }
+  return {
+    schemaVersion: model.schemaVersion || 1,
+    source: model.source || "league-simulation-fallback",
+    artifactAvailable: model.artifactAvailable === true,
+    venue: model.venue || null,
+    venueConfidence: model.venueConfidence || 0,
+    venueSource: model.venueSource || "unresolved",
+    weatherAvailable: model.weatherAvailable === true,
+    weatherFallbackReason: model.weatherFallbackReason || null,
+    away: details.away,
+    home: details.home,
+    predictedIncrementalEffect: {
+      awayExpectedPoints: awayDelta,
+      homeExpectedPoints: homeDelta,
+      continuousMargin: marginAblation,
+      awayWinProbability: round3(actual.awayWinProbability - leagueOnly.awayWinProbability),
+      homeWinProbability: round3(actual.homeWinProbability - leagueOnly.homeWinProbability),
+      leagueFallbackMargin: leagueOnly.continuousMargin,
+      leagueFallbackAwayWinProbability: leagueOnly.awayWinProbability,
+      leagueFallbackHomeWinProbability: leagueOnly.homeWinProbability,
+    },
+    explanation: explanations,
   };
 }
 
@@ -143,12 +240,14 @@ function predictCore(awayCode, homeCode, options = {}) {
 
   const playerLayer = modelLayers.playerRatings;
   const expectedPossessions = possessionsFromPaceLayer(modelLayers.pace);
+  const specialTeams = options.specialTeams || createDefaultSpecialTeamsModel(awayTeam, homeTeam);
   const away = projectTeam(awayTeam, homeTeam, adjustedExpected.away, weatherImpact, {
     expectedPossessions,
     passingMultiplier: playerLayer.awayPassingMultiplier,
     rushingMultiplier: playerLayer.awayRushingMultiplier,
     fieldGoalOpportunityMultiplier: playerLayer.awayFieldGoalOpportunityMultiplier,
     seed: `${awayTeam}-${homeTeam}-${options.week || 1}-away`,
+    kicker: specialTeams.away,
   });
   const home = projectTeam(homeTeam, awayTeam, adjustedExpected.home, weatherImpact, {
     expectedPossessions,
@@ -156,6 +255,7 @@ function predictCore(awayCode, homeCode, options = {}) {
     rushingMultiplier: playerLayer.homeRushingMultiplier,
     fieldGoalOpportunityMultiplier: playerLayer.homeFieldGoalOpportunityMultiplier,
     seed: `${awayTeam}-${homeTeam}-${options.week || 1}-home`,
+    kicker: specialTeams.home,
   });
   const projectedMargin = home.score - away.score;
   const continuousMargin = Number(home.expectedPoints) - Number(away.expectedPoints);
@@ -185,6 +285,7 @@ function predictCore(awayCode, homeCode, options = {}) {
     rivalry,
     schedule,
     modelLayers,
+    specialTeams,
     formBlend,
     market,
   };
@@ -538,10 +639,21 @@ export function createModelLayers(input = {}) {
   const totalMovingLayers = new Set(["scoringBaseline", "pace"]);
   const layers = Object.fromEntries(
     layerNames.map((name) => {
-      const normalised = normaliseModelLayer(input?.[name]);
+      const normalised = name === "specialTeams"
+        ? normaliseModelLayer(null)
+        : normaliseModelLayer(input?.[name]);
       return [name, totalMovingLayers.has(name) ? normalised : centreComparativeLayer(normalised)];
     })
   );
+  layers.specialTeams = {
+    ...layers.specialTeams,
+    active: false,
+    available: false,
+    awayPoints: 0,
+    homePoints: 0,
+    confidence: 0,
+    reasons: ["Kicker performance is represented in the scoring simulation"],
+  };
 
   return {
     ...layers,
@@ -841,6 +953,24 @@ function buildScoringEvents(
     ) *
     num(playerImpact.fieldGoalOpportunityMultiplier, 1);
 
+  const kicker = playerImpact.kicker || createDefaultSpecialTeamsModel("AWAY", "HOME").away;
+  const fieldGoalDistanceShares = normalizedKickShares(kicker.leagueRates?.fieldGoals);
+  const fieldGoalRatesByBucket = Object.fromEntries(
+    Object.entries(kicker.fieldGoals || {}).map(([bucket, value]) => [
+      bucket,
+      clamp(num(value.rate, 0.84) * weather.fieldGoals, 0.05, 0.995),
+    ])
+  );
+  const fieldGoalMakeRate = Object.entries(fieldGoalDistanceShares).reduce(
+    (sum, [bucket, share]) => sum + share * num(fieldGoalRatesByBucket[bucket], 0.84), 0
+  );
+  const leagueFieldGoalRate = Object.entries(kicker.leagueRates?.fieldGoals || {})
+    .reduce((sum, [bucket, value]) =>
+      sum + num(value.attemptShare, 0) * num(value.rate, 0.84), 0) || 0.84;
+  const leagueExtraPointRate = num(kicker.leagueRates?.extraPoints?.rate, 0.94);
+  const extraPointMakeRate = clamp(
+    num(kicker.extraPoints?.posteriorRate, 0.94) * weather.extraPoints, 0.05, 0.995
+  );
 
   const passingShare = clamp(
     passRatio * num(playerImpact.passingMultiplier, 1),
@@ -852,16 +982,6 @@ function buildScoringEvents(
   const totalTouchdownShare = passingShare + rushingShareRaw;
   const passingTouchdownShare = passingShare / totalTouchdownShare;
 
-  const fieldGoalMakeRate = clamp(
-    0.84 * weather.fieldGoals,
-    0.56,
-    0.95
-  );
-  const extraPointMakeRate = clamp(
-    0.945 * weather.extraPoints,
-    0.78,
-    0.97
-  );
   const defensiveTouchdownRate = clamp(
     0.055 + defensiveEdge * 0.0018,
     0.018,
@@ -871,12 +991,12 @@ function buildScoringEvents(
   const expectedFieldGoalPoints =
     expectedPossessions *
     fieldGoalAttemptRate *
-    fieldGoalMakeRate *
+    leagueFieldGoalRate *
     3;
 
   const expectedDefensivePoints =
     defensiveTouchdownRate *
-    (6 + extraPointMakeRate);
+    (6 + leagueExtraPointRate);
 
   const touchdownDriveRate = clamp(
     (
@@ -887,7 +1007,7 @@ function buildScoringEvents(
       Math.max(
         1,
         expectedPossessions *
-          (6 + extraPointMakeRate)
+          (6 + leagueExtraPointRate)
       ),
     0.035,
     0.5
@@ -895,10 +1015,10 @@ function buildScoringEvents(
 
   const rawExpectedPoints =
     expectedPossessions * touchdownDriveRate *
-      (6 + extraPointMakeRate) +
+      (6 + leagueExtraPointRate) +
     expectedPossessions * fieldGoalAttemptRate *
-      fieldGoalMakeRate * 3 +
-    defensiveTouchdownRate * (6 + extraPointMakeRate);
+      leagueFieldGoalRate * 3 +
+    defensiveTouchdownRate * (6 + leagueExtraPointRate);
 
   const calibrationScale = clamp(
     calibratedPoints / Math.max(1, rawExpectedPoints),
@@ -924,7 +1044,8 @@ function buildScoringEvents(
     touchdownDriveRate: calibratedTouchdownRate,
     fieldGoalAttemptRate: calibratedFieldGoalRate,
     passingTouchdownShare,
-    fieldGoalMakeRate,
+    fieldGoalRatesByBucket,
+    fieldGoalDistanceShares,
     extraPointMakeRate,
     defensiveTouchdownRate,
   });
@@ -936,12 +1057,71 @@ function buildScoringEvents(
   const expectedPoints =
     simulations.reduce((total, result) => total + result.score, 0) /
     simulations.length;
+  const expectedFieldGoals = simulations.reduce((total, result) => total + result.fieldGoals, 0) /
+    simulations.length;
+  const expectedFieldGoalAttempts = simulations.reduce((total, result) =>
+    total + result.fieldGoalAttempts, 0) / simulations.length;
+  const expectedExtraPoints = simulations.reduce((total, result) => total + result.extraPoints, 0) /
+    simulations.length;
+  const expectedFieldGoalAttemptsByBucket = Object.fromEntries(
+    Object.keys(fieldGoalDistanceShares).map((bucket) => [bucket, round3(
+      simulations.reduce((sum, result) =>
+        sum + (result.fieldGoalAttemptsByBucket[bucket] || 0), 0) / simulations.length
+    )])
+  );
 
   return {
     ...representative,
     expectedPoints: round3(expectedPoints),
     expectedPossessions: round3(expectedPossessions),
+    specialTeamsSimulation: {
+      expectedFieldGoalAttempts: round3(expectedFieldGoalAttempts),
+      expectedFieldGoalAttemptsByBucket,
+      expectedFieldGoals: round3(expectedFieldGoals),
+      expectedExtraPoints: round3(expectedExtraPoints),
+      fieldGoalAttemptRate: round3(calibratedFieldGoalRate),
+      expectedFieldGoalMakeRate: round3(fieldGoalMakeRate),
+      fieldGoalRatesByBucket: Object.fromEntries(Object.entries(fieldGoalRatesByBucket)
+        .map(([bucket, rate]) => [bucket, round3(rate)])),
+      fieldGoalDistanceShares: Object.fromEntries(Object.entries(fieldGoalDistanceShares)
+        .map(([bucket, share]) => [bucket, round3(share)])),
+      extraPointMakeRate: round3(extraPointMakeRate),
+      fieldGoalWeatherMultiplier: weather.fieldGoals,
+      extraPointWeatherMultiplier: weather.extraPoints,
+      individualizedDataAvailable: kicker.individualizedDataAvailable === true,
+      confidence: num(kicker.sampleConfidence, 0),
+      sampleConfidence: num(kicker.sampleConfidence, 0),
+      expectedKicker: kicker.expectedKicker || null,
+      availabilityStatus: kicker.availabilityStatus || "Unknown",
+      availabilityFactor: kicker.availabilityFactor ?? 1,
+      unavailableKicker: kicker.unavailableKicker || null,
+      identityConfidence: kicker.identityConfidence || 0,
+      identityProvenance: kicker.identityProvenance || null,
+      selectionReason: kicker.selectionReason || null,
+      profileAvailable: kicker.profileAvailable === true,
+      fallbackActive: kicker.fallbackActive !== false,
+      unavailableReason: kicker.unavailableReason || null,
+      performanceSeason: kicker.performanceSeason || null,
+      performanceWeek: kicker.performanceWeek || null,
+      performanceCutoff: kicker.performanceCutoff || null,
+      fieldGoalProfile: kicker.fieldGoals || null,
+      extraPointProfile: kicker.extraPoints || null,
+      gamesRepresented: kicker.gamesRepresented || 0,
+      latestEligibleGame: kicker.latestEligibleGame || null,
+      blockedAttemptTreatment: kicker.blockedAttemptTreatment || null,
+      leagueRates: kicker.leagueRates || null,
+      provenance: kicker.provenance || null,
+    },
   };
+}
+
+function normalizedKickShares(priors) {
+  const shares = Object.fromEntries(Object.entries(priors || {})
+    .map(([bucket, value]) => [bucket, Math.max(0, num(value.attemptShare, 0))]));
+  const total = Object.values(shares).reduce((sum, value) => sum + value, 0);
+  if (total > 0) return Object.fromEntries(Object.entries(shares)
+    .map(([bucket, share]) => [bucket, share / total]));
+  return { under30: 0.18, from30to39: 0.29, from40to49: 0.31, from50plus: 0.22 };
 }
 
 function simulateScoringOutcomes({
@@ -951,7 +1131,8 @@ function simulateScoringOutcomes({
   touchdownDriveRate,
   fieldGoalAttemptRate,
   passingTouchdownShare,
-  fieldGoalMakeRate,
+  fieldGoalRatesByBucket,
+  fieldGoalDistanceShares,
   extraPointMakeRate,
   defensiveTouchdownRate,
 }) {
@@ -965,6 +1146,7 @@ function simulateScoringOutcomes({
     let defensiveTD = random() < defensiveTouchdownRate ? 1 : 0;
     let fieldGoalAttempts = 0;
     let fieldGoals = 0;
+    const attemptBuckets = [];
 
     for (let drive = 0; drive < possessions; drive += 1) {
       const outcome = random();
@@ -977,7 +1159,10 @@ function simulateScoringOutcomes({
 
       if (outcome < touchdownDriveRate + fieldGoalAttemptRate) {
         fieldGoalAttempts += 1;
-        if (random() < fieldGoalMakeRate) fieldGoals += 1;
+        const distanceDraw = (outcome - touchdownDriveRate) / fieldGoalAttemptRate;
+        const bucket = chooseKickBucket(fieldGoalDistanceShares, distanceDraw);
+        attemptBuckets.push(bucket);
+        if (random() < fieldGoalRatesByBucket[bucket]) fieldGoals += 1;
       }
     }
 
@@ -985,6 +1170,12 @@ function simulateScoringOutcomes({
     defensiveTD = Math.min(defensiveTD, 1);
     fieldGoals = Math.min(fieldGoals, 4);
     fieldGoalAttempts = Math.max(fieldGoals, Math.min(fieldGoalAttempts, 5));
+    const fieldGoalAttemptsByBucket = Object.fromEntries(
+      Object.keys(fieldGoalDistanceShares).map((bucket) => [
+        bucket,
+        attemptBuckets.slice(0, fieldGoalAttempts).filter((attempt) => attempt === bucket).length,
+      ])
+    );
 
     const touchdowns = passingTD + rushingTD + defensiveTD;
     let extraPoints = 0;
@@ -1009,12 +1200,22 @@ function simulateScoringOutcomes({
       fieldGoals,
       fieldGoalAttempts,
       extraPoints,
+      fieldGoalAttemptsByBucket,
       twoPoint,
       safeties,
     });
   }
 
   return outcomes;
+}
+
+function chooseKickBucket(shares, value) {
+  let remaining = value;
+  for (const [bucket, share] of Object.entries(shares)) {
+    remaining -= share;
+    if (remaining < 0) return bucket;
+  }
+  return Object.keys(shares).at(-1) || "from40to49";
 }
 
 function selectRepresentativeSimulation(simulations, targetPoints) {

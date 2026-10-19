@@ -2,7 +2,8 @@ import { useEffect, useState } from "react";
 import { predictMatchup } from "../services/predictionEngine.js";
 import { findOddsForGame, getCoreMarket, getNflOdds } from "../services/oddsApi.js";
 import { applyPredictionSnapshot } from "../services/predictionSnapshot.js";
-import { getStandings, getQbRosterHealth, getKickerStats, getTeamForm, getOpponentNetwork, getPlayByPlayMetrics } from "../services/nflApi.js";
+import { getStandings, getQbRosterHealth, getTeamForm, getOpponentNetwork, getPlayByPlayMetrics } from "../services/nflApi.js";
+import { buildSpecialTeamsModel } from "../services/specialTeams.js";
 import {
   savePredictionSnapshot,
   refreshPredictionLedger,
@@ -225,7 +226,7 @@ function normalizeCode(code) {
   return aliases[normalized] || normalized;
 }
 
-export default function MatchupPrediction({ awayCode, homeCode, kickoff, weather, oddsEvent, savedPrediction, week, scheduleContext, actualAwayScore = null, actualHomeScore = null }) {
+export default function MatchupPrediction({ awayCode, homeCode, kickoff, venue, weather, oddsEvent, savedPrediction, week, scheduleContext, actualAwayScore = null, actualHomeScore = null }) {
   const season = Number(savedPrediction?.season) || 2026;
   const matchingSnapshot = (rows) => findPredictionSnapshot(rows, Number(week) || 0, awayCode, homeCode, season);
   const suppliedSnapshot = matchingSnapshot([savedPrediction].filter(Boolean));
@@ -240,7 +241,6 @@ export default function MatchupPrediction({ awayCode, homeCode, kickoff, weather
   const [standingsByCode, setStandingsByCode] = useState({});
   const [loadedPersonnel, setPersonnel] = useState(null);
   const personnel = loadedPersonnel?.week === Number(week) ? loadedPersonnel : null;
-  const [kickerData, setKickerData] = useState(null);
   const [teamForm, setTeamForm] = useState(null);
   const [opponentNetwork, setOpponentNetwork] = useState(null);
   const [playByPlayData, setPlayByPlayData] = useState(null);
@@ -293,16 +293,6 @@ export default function MatchupPrediction({ awayCode, homeCode, kickoff, weather
       .catch(() => setPersonnel(null));
     return () => controller.abort();
   }, [awayCode, homeCode, kickoff, week]);
-
-  useEffect(() => {
-    if (!awayCode || !homeCode) return;
-    const controller = new AbortController();
-    const currentSeason = kickoff ? new Date(kickoff).getUTCFullYear() : new Date().getUTCFullYear();
-    getKickerStats(normalizeCode(awayCode), normalizeCode(homeCode), currentSeason - 1, controller.signal)
-      .then(setKickerData)
-      .catch(() => setKickerData(null));
-    return () => controller.abort();
-  }, [awayCode, homeCode, kickoff]);
 
   useEffect(() => {
     if (!awayCode || !homeCode || !week) return;
@@ -456,11 +446,24 @@ export default function MatchupPrediction({ awayCode, homeCode, kickoff, weather
 
   const homeStanding = standingsByCode[normalizeCode(homeCode)];
   const awayStanding = standingsByCode[normalizeCode(awayCode)];
-  const kickerImpact = calculateKickerImpact(kickerData, weather);
   const personnelViews = officialSnapshot?.personnelViews || {
     away: personnel?.away?.personnelView,
     home: personnel?.home?.personnelView,
   };
+  const predictionSeason = kickoff ? new Date(kickoff).getUTCFullYear() : 2026;
+  const specialTeams = buildSpecialTeamsModel({
+    away: normalizeCode(awayCode),
+    home: normalizeCode(homeCode),
+    personnelViews,
+    kickerProfiles: playByPlayData?.kickerProfiles,
+    season: predictionSeason,
+    week: Number(week) || 1,
+    cutoff: personnel?.cutoff ||
+      playByPlayData?.away?.expectedLineup?.cutoff ||
+      playByPlayData?.kickerProfiles?.cutoff,
+    weather,
+    venue,
+  });
   const awayQbAdjustment = buildUnifiedQbAdjustment(
     playerMatchup?.rosters?.away,
     awayCode,
@@ -523,14 +526,8 @@ export default function MatchupPrediction({ awayCode, homeCode, kickoff, weather
           ...(personnel?.home?.rosterHealth?.reasons || []),
         ],
       },
-      specialTeams: {
-        active: Boolean(kickerImpact.awayPoints || kickerImpact.homePoints),
-        awayPoints: kickerImpact.awayPoints,
-        homePoints: kickerImpact.homePoints,
-        confidence: kickerData ? 0.7 : 0,
-        reasons: kickerData ? ["Kicker accuracy, range and weather-adjusted field-goal opportunity"] : [],
-      },
     },
+    specialTeams,
     rivalry: scheduleContext
       ? {
           meetingNumber: scheduleContext.meetingNumber,
@@ -628,7 +625,7 @@ export default function MatchupPrediction({ awayCode, homeCode, kickoff, weather
         detail: playerMatchup ? "Loaded and centred as a matchup edge" : "Unavailable",
       },
       opponentNetwork: { available: Boolean(opponentNetwork), label: "Opponent network", detail: opponentNetwork ? "Loaded" : "Unavailable" },
-      kicker: { available: Boolean(kickerData), label: "Kicker data", detail: kickerData ? "Loaded" : "Unavailable" },
+      kicker: { available: Boolean(playByPlayData?.kickerProfiles), label: "NFLverse kicker performance", detail: playByPlayData?.kickerProfiles ? "Loaded" : "League simulation fallback" },
       market: { available: Boolean(marketEvent), label: "Betting market", detail: marketEvent ? "Loaded or cached" : "Unavailable" },
       weather: { available: Boolean(weather), label: "Weather", detail: weather ? "Loaded" : "Unavailable" },
     };
@@ -657,7 +654,7 @@ export default function MatchupPrediction({ awayCode, homeCode, kickoff, weather
       auditVersion: 3,
       auditNote: "fourth-down data health snapshot",
     });
-  }, [away.code, home.code, week, kickoff, prediction.modelLayers, teamForm, personnel, playByPlayData, playerMatchup, opponentNetwork, kickerData, marketEvent, weather]);
+  }, [away.code, home.code, week, kickoff, prediction.modelLayers, teamForm, personnel, playByPlayData, playerMatchup, opponentNetwork, marketEvent, weather]);
 
   const comparisonCard = (
     <section className="card prediction-comparison-card">
@@ -961,7 +958,6 @@ function buildPredictionExplanation(prediction, week, playByPlayData) {
     finiteNumber(modelLayers?.driveEfficiency?.homePoints) + finiteNumber(modelLayers?.situationalEfficiency?.homePoints) + finiteNumber(modelLayers?.redZone?.homePoints));
   addEdge("Explosive plays", "The recent play-by-play profile shows a better chance of creating chunk gains.", modelLayers?.explosivePlays?.awayPoints, modelLayers?.explosivePlays?.homePoints);
   addEdge("Opponent comparison", "Results against shared and connected opponents favour this side.", modelLayers?.opponentNetwork?.awayPoints, modelLayers?.opponentNetwork?.homePoints);
-  addEdge("Special teams", "Kicker range, accuracy and conditions create a small advantage.", modelLayers?.specialTeams?.awayPoints, modelLayers?.specialTeams?.homePoints);
 
   if (homeField && Math.abs(finiteNumber(homeField.total)) >= 0.1) {
     edges.push({ label: "Home-field advantage", detail: "Playing at home provides a meaningful edge in this matchup.", code: home.code, strength: Math.abs(finiteNumber(homeField.total)), icon: "✓" });
@@ -972,6 +968,9 @@ function buildPredictionExplanation(prediction, week, playByPlayData) {
   if (schedule?.active) modelDetails.push(`Schedule context: ${schedule.summary}.`);
   if (rivalry?.active) modelDetails.push(`${rivalry.description} reduces the projected margin by ${finiteNumber(rivalry.marginCompressionPoints).toFixed(1)} points.`);
   if (weather?.active) modelDetails.push(`Weather is rated ${String(weather.severity || "active").toLowerCase()} and affects passing, rushing and kicking.`);
+  if (prediction.specialTeams?.explanation?.length) {
+    modelDetails.push(prediction.specialTeams.explanation[0]);
+  }
 
   const sortedEdges = edges.sort((first, second) => second.strength - first.strength);
   const winnerEdges = winnerCode ? sortedEdges.filter((edge) => edge.code === winnerCode) : sortedEdges;
@@ -1223,90 +1222,7 @@ function formatSignedLocal(value) {
   return `${number >= 0 ? "+" : ""}${number.toFixed(1)}`;
 }
 
-const KICK_DISTANCE_MIX = {
-  under30: 0.18,
-  from30to39: 0.29,
-  from40to49: 0.31,
-  from50plus: 0.22,
-};
-
-function calculateKickerImpact(data, weather) {
-  if (!data?.leaguePriors) return { awayPoints: 0, homePoints: 0 };
-
-  return {
-    awayPoints: calculateTeamKickerPoints(data.away, data.leaguePriors, weather),
-    homePoints: calculateTeamKickerPoints(data.home, data.leaguePriors, weather),
-  };
-}
-
-function calculateTeamKickerPoints(kicker, priors, weather) {
-  if (!kicker) return 0;
-
-  let kickerExpectedAccuracy = 0;
-  let leagueExpectedAccuracy = 0;
-
-  for (const [bucket, share] of Object.entries(KICK_DISTANCE_MIX)) {
-    const prior = priors[bucket];
-    if (!prior) continue;
-
-    const actual = kicker[bucket] || { made: 0, attempts: 0 };
-    const made = finiteNumber(actual.made);
-    const attempts = finiteNumber(actual.attempts);
-    const leagueAccuracy = finiteNumber(prior.accuracy);
-    const priorAttempts = finiteNumber(prior.priorAttempts);
-    const regressedAccuracy =
-      (made + leagueAccuracy * priorAttempts) /
-      Math.max(1, attempts + priorAttempts);
-
-    kickerExpectedAccuracy +=
-      share * applyKickingWeather(regressedAccuracy, bucket, weather);
-    leagueExpectedAccuracy +=
-      share * applyKickingWeather(leagueAccuracy, bucket, weather);
-  }
-
-  const pointDifference =
-    (kickerExpectedAccuracy - leagueExpectedAccuracy) * 2.1 * 3;
-
-  return roundThree(clamp(pointDifference, -1.25, 1.25));
-}
-
-function applyKickingWeather(baseAccuracy, bucket, weather) {
-  if (!weather || weather.dome) return baseAccuracy;
-
-  const windKmh = finiteNumber(weather.windSpeed);
-  const gustKmh = Math.max(windKmh, finiteNumber(weather.windGust));
-  const rainMm = Math.max(0, finiteNumber(weather.rain ?? weather.precipitation));
-  const snowCm = Math.max(0, finiteNumber(weather.snowfall));
-  const distanceExposure = {
-    under30: 0.15,
-    from30to39: 0.4,
-    from40to49: 0.72,
-    from50plus: 1,
-  }[bucket] ?? 0.5;
-
-  const windLoad = clamp((windKmh - 16) / 32, 0, 1);
-  const gustLoad = clamp((gustKmh - 28) / 35, 0, 1);
-  const rainLoad = clamp(rainMm / 8, 0, 1);
-  const snowLoad = clamp(snowCm / 4, 0, 1);
-  const penalty =
-    distanceExposure * (0.11 * windLoad + 0.055 * gustLoad) +
-    0.025 * rainLoad +
-    0.05 * snowLoad +
-    distanceExposure *
-      (0.035 * windLoad * rainLoad + 0.05 * windLoad * snowLoad);
-
-  return clamp(baseAccuracy * (1 - penalty), 0.05, 0.995);
-}
-
 function finiteNumber(value) {
   const number = Number(value);
   return Number.isFinite(number) ? number : 0;
-}
-
-function clamp(value, minimum, maximum) {
-  return Math.min(maximum, Math.max(minimum, value));
-}
-
-function roundThree(value) {
-  return Math.round(value * 1000) / 1000;
 }

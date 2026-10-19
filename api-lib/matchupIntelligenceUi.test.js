@@ -24,15 +24,37 @@ function prediction(week = 6, awayCode = "BUF", homeCode = "KC") {
     playerMetrics: playerMetricsResponse(players, { season: 2026, week, away: awayCode, home: homeCode }),
     modelLayers: compareTeams(away, home, week) });
 }
+function supportedPrediction(week = 7, awayCode = "BUF", homeCode = "KC") {
+  const cutoff = dataset.metricsByWeek[week][awayCode].cutoff;
+  const sourceAsOf = new Date(Date.parse(cutoff) - 3600000).toISOString();
+  const game = { gameId: `fixture-${awayCode}-${homeCode}`, week: 1, away: awayCode, home: homeCode,
+    kickoff: new Date(Date.parse(cutoff) - 3 * 86400000).toISOString(),
+    completedAsOf: new Date(Date.parse(cutoff) - 2 * 86400000).toISOString() };
+  const side = (team) => ({
+    team, predictionWeek: week, cutoff, games: 1, expectedCompletedGames: 1,
+    gameProvenance: [game],
+    teamTotals: { passAttempts: 30, sacksAllowed: 2, rushingAttempts: 25, targets: 30,
+      completions: 20, passingYards: 240 },
+    players: {},
+  });
+  const playerMetrics = {
+    available: true, schemaVersion: 2, season: 2026, requestedWeek: week, metricsWeek: week,
+    cutoff, sourceAsOf, generatedAt: cutoff, away: side(awayCode), home: side(homeCode),
+  };
+  const away = dataset.metricsByWeek[week][awayCode], home = dataset.metricsByWeek[week][homeCode];
+  return predictMatchup(awayCode, homeCode, { season: 2026, week,
+    weather: { dome: true }, teamMetrics: { season: 2026, week, away, home }, playerMetrics,
+    modelLayers: compareTeams(away, home, week) });
+}
 const render = (value) => renderToStaticMarkup(createElement(Panel, { prediction: value }));
 const explain = (signal) => {
-  const input = prediction();
+  const input = supportedPrediction();
   input.matchupIntelligence.signals = [signal];
   return render(input);
 };
 
 test("Matchup renders named supported signals, game style and a named lean without redesign", () => {
-  const input = prediction(), markup = render(input);
+  const input = supportedPrediction(), markup = render(input);
   assert.match(markup, /KEY MATCHUP ADVANTAGES/);
   assert.match(markup, /Buffalo Bills/);
   assert.match(markup, /Kansas City Chiefs/);
@@ -46,6 +68,12 @@ test("Matchup renders named supported signals, game style and a named lean witho
   }
 });
 
+test("context-only weeks omit unsupported matchup explanations", () => {
+  const input = prediction(6);
+  assert.equal(input.matchupIntelligence.available, false);
+  assert.equal(render(input), "");
+});
+
 test("old saved predictions are not retrofitted with fresh matchup explanations", () => {
   assert.equal(render({ away: { code: "BUF" }, home: { code: "KC" }, winner: "KC" }), "");
 });
@@ -56,7 +84,7 @@ test("missing historical mix does not invent game style or percentages", () => {
 });
 
 test("explanation-unsafe factors are never presented as an advantage", () => {
-  const input = prediction();
+  const input = supportedPrediction();
   input.matchupIntelligence.signals = input.matchupIntelligence.signals.map((signal) => ({
     ...signal, explanationSafe: false, explanation: "UNSUPPORTED ADVANTAGE MUST NOT APPEAR",
   }));
@@ -67,7 +95,7 @@ test("explanation-unsafe factors are never presented as an advantage", () => {
 });
 
 test("display threshold hides sub-0.05 effects without mutating model output or lean reasons", () => {
-  const input = prediction();
+  const input = supportedPrediction();
   input.winner = "KC";
   const template = input.matchupIntelligence.signals.find((s) => s.explanationSafe);
   input.matchupIntelligence.signals = [
@@ -97,18 +125,20 @@ test("display threshold hides sub-0.05 effects without mutating model output or 
 });
 
 test("Seattle-Denver uses football language without altering predictions or diagnostics", () => {
-  const input = prediction(6, "SEA", "DEN"), before = structuredClone(input);
+  const input = supportedPrediction(7, "SEA", "DEN"), before = structuredClone(input);
   const markup = render(input);
   assert.deepEqual(input, before);
   assert.match(markup, /Seattle Seahawks/);
   assert.match(markup, /Denver Broncos/);
   assert.match(markup, /pass protection|pressure/);
-  assert.doesNotMatch(markup, /EPA|proxy|ablation|layer|metric-specific|%|\d+\.\d+|the opponent|the opposing team|the opposing defense|the offense|the defense|the quarterback|blitz|play-action|screen|route-depth|fourth-down|red-zone|special-teams/i);
+  assert.match(markup, /THIRD-DOWN ADVANTAGE/);
+  assert.match(markup, /RED-ZONE ADVANTAGE/);
+  assert.doesNotMatch(markup, /EPA|proxy|ablation|layer|metric-specific|%|\d+\.\d+|the opponent|the opposing team|the opposing defense|the offense|the defense|the quarterback|blitz|play-action|screen|route-depth|special-teams/i);
   assert.ok(input.matchupIntelligence.signals.some((signal) => signal.explanation?.includes("Removing only")));
 });
 
 test("raw and adjusted football descriptions respect the exact contributing metric", () => {
-  const signal = structuredClone(prediction().matchupIntelligence.signals.find((s) => s.layer === "rushMatchup"));
+  const signal = structuredClone(supportedPrediction().matchupIntelligence.signals.find((s) => s.layer === "rushMatchup"));
   signal.advantagedTeam = signal.homeTeam;
   signal.disadvantagedTeam = signal.awayTeam;
   const own = signal.matchups.home, other = signal.matchups.away;

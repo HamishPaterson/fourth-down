@@ -29,7 +29,7 @@ export function auditSituationalFields(rows) {
 
 export function buildWeeklySituationalMetrics(rows, schedule, { season, predictionWeek, cutoff, sourceAsOf }) {
   for (const field of REQUIRED) {
-    if (!rows.length || !(field in rows[0])) throw new Error(`Situational PBP source missing ${field}`);
+    if (rows.length && !(field in rows[0])) throw new Error(`Situational PBP source missing ${field}`);
   }
   if (instant(sourceAsOf) === null) throw new Error("Situational source observation time missing");
   const games = completedPlayerGames(schedule, season, predictionWeek, cutoff)

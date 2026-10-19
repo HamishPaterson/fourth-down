@@ -44,10 +44,52 @@ const STADIUMS = {
   WSH: { name: "Northwest Stadium", lat: 38.9076, lon: -76.8645, dome: false },
 };
 
+const NEUTRAL_VENUES = {
+  "Wembley Stadium": { name: "Wembley Stadium", lat: 51.5560, lon: -0.2796, dome: false },
+  "Tottenham Hotspur Stadium": { name: "Tottenham Hotspur Stadium", lat: 51.6043, lon: -0.0665, dome: false },
+  "Allianz Arena": { name: "Allianz Arena", lat: 48.2188, lon: 11.6247, dome: false },
+  "Deutsche Bank Park": { name: "Deutsche Bank Park", lat: 50.0686, lon: 8.6455, dome: false },
+  "Estadio Azteca": { name: "Estadio Azteca", lat: 19.3029, lon: -99.1505, dome: false },
+};
+
+const VENUE_ALIASES = {
+  "Arrowhead Stadium": "GEHA Field at Arrowhead Stadium",
+  "EverBank Field": "EverBank Stadium",
+  "TIAA Bank Field": "EverBank Stadium",
+  "Wembley": "Wembley Stadium",
+  "Tottenham": "Tottenham Hotspur Stadium",
+  "Frankfurt Stadium": "Deutsche Bank Park",
+};
+
 export function getStadium(code) {
   const normalized = String(code || "").trim().toUpperCase();
   const aliases = { WAS: "WSH", LA: "LAR" };
   return STADIUMS[aliases[normalized] || normalized] || null;
+}
+
+export function resolveStadium(homeCode, venue) {
+  const venueName = typeof venue === "string"
+    ? venue.trim()
+    : String(venue?.fullName || venue?.name || "").trim();
+  if (venueName && !/^(venue unavailable|tbd|unknown)$/i.test(venueName)) {
+    const alias = Object.entries(VENUE_ALIASES)
+      .find(([name]) => normalizeVenueName(name) === normalizeVenueName(venueName))?.[1];
+    const canonicalName = alias || venueName;
+    const normalized = normalizeVenueName(canonicalName);
+    const stadium = [...Object.values(STADIUMS), ...Object.values(NEUTRAL_VENUES)]
+      .find((entry) => normalizeVenueName(entry.name) === normalized);
+    return stadium
+      ? { stadium, source: "scheduled-venue", confidence: 1, requestedVenue: venueName }
+      : { stadium: null, source: "scheduled-venue-unresolved", confidence: 0, requestedVenue: venueName };
+  }
+  const stadium = getStadium(homeCode);
+  return stadium
+    ? { stadium, source: "home-team-default", confidence: 0.6, requestedVenue: null }
+    : { stadium: null, source: "home-team-unresolved", confidence: 0, requestedVenue: null };
+}
+
+function normalizeVenueName(value) {
+  return String(value || "").toLowerCase().replace(/[^a-z0-9]/g, "");
 }
 
 export default STADIUMS;

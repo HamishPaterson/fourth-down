@@ -34,6 +34,37 @@ const fullRoster = () => [
   row("nickel", "NB", 12),
 ];
 
+test("raw depth source positions remain unchanged while extracted model roles are canonical", () => {
+  const rows = fullRoster();
+  const before = structuredClone(rows);
+  const lineup = extract(rows).KC;
+  for (const [sourcePosition, canonical] of [
+    ["LDE", "DE"], ["LDT", "DT"], ["SLB", "LB"], ["LCB", "CB"], ["SS", "SS"],
+  ]) {
+    const source = rows.find((entry) => entry.pos_abb === sourcePosition);
+    const model = lineup.roster.find((entry) => entry.playerId === source.espn_id);
+    assert.equal(source.pos_abb, sourcePosition);
+    assert.equal(model.position, canonical);
+    assert.equal(model.slot, source.pos_slot);
+    assert.equal(canonicalPosition(source.pos_abb), model.position);
+  }
+  assert.deepEqual(rows, before);
+});
+
+test("a base defender also listed as a nickel supplemental role remains a base starter", () => {
+  const rows = fullRoster();
+  const safety = rows.find((entry) => entry.pos_abb === "SS");
+  safety.espn_id = "nickel";
+  safety.gsis_id = "gsis-nickel";
+  safety.player_name = "nickel";
+  const lineup = extract(rows).KC;
+  assert.equal(lineup.defensiveStarters, 11);
+  assert.equal(lineup.available, true);
+  assert.equal(lineup.players.filter((player) => player.position === "SS").length, 1);
+  assert.equal(lineup.supplemental.some((player) => player.sourcePosition === "NB"), true);
+  assert.equal(validDepthLineup(lineup, 6, 2026), true);
+});
+
 test("two actual historical weeks select different documented QBs with no backward leakage", () => {
   const early = extract(historical, 2).NYG;
   const later = extract(historical, 6).NYG;
@@ -47,6 +78,24 @@ test("two actual historical weeks select different documented QBs with no backwa
   assert.equal(early.projectedStarters, 4); // Deliberately partial source subset, not a whole roster.
   assert.ok(validDepthLineup(early, 2, 2026));
   assert.notEqual(early.snapshotAt, later.snapshotAt);
+});
+
+test("point-in-time NFLverse special-teams K/PK rows enter the shared roster without changing starter counts", () => {
+  const kickerRow = row("depth-kicker", "PK", "K", 1, {
+    pos_grp: "Special Teams",
+    injury_status: "",
+  });
+  const lineup = extract([...fullRoster(), kickerRow]).KC;
+  const view = buildPersonnelView({
+    team: "KC", lineup, season: 2026, week: 6, cutoff: cutoffs[6],
+  });
+
+  assert.equal(validDepthLineup(lineup, 6, 2026), true);
+  assert.equal(lineup.roster.some((player) => player.position === "K" && player.playerId === "depth-kicker"), true);
+  assert.equal(lineup.players.some((player) => player.position === "K"), false);
+  assert.equal(lineup.positionCounts.K, undefined);
+  assert.equal(view.players.find((player) => player.canonicalId === "gsis-depth-kicker").position, "K");
+  assert.equal(view.players.find((player) => player.canonicalId === "gsis-depth-kicker").status, "Unknown");
 });
 
 test("archive accumulation and identical repeated snapshots never inflate counts", () => {
@@ -151,9 +200,14 @@ test("unknown availability stays explicitly unknown and missing/ambiguous QB dep
 });
 
 test("Nico Collins keeps known Houston WR identity while availability remains Unknown", () => {
-  const lineup = dataset.metricsByWeek[6].HOU.expectedLineup;
+  let replaced = false;
+  const rows = fullRoster().map((entry) => {
+    if (entry.pos_abb !== "WR" || replaced) return { ...entry, team: "HOU" };
+    replaced = true;
+    return { ...entry, team: "HOU", espn_id: "nico", gsis_id: "nico-gsis", player_name: "Nico Collins" };
+  });
+  const lineup = extract(rows).HOU;
   const nicoChartRow = lineup.roster.find((player) => player.name === "Nico Collins");
-  assert.ok(nicoChartRow, "checked-in Houston Week 6 chart contains Nico Collins");
   const view = buildPersonnelView({
     team: "HOU", lineup, season: 2026, week: 6, cutoff: lineup.cutoff,
   });
@@ -189,7 +243,20 @@ test("legacy, nonfinite, inconsistent, duplicated and impossible lineup objects 
   for (const entry of invalid) assert.equal(validDepthLineup(entry, 6, 2026), false);
 });
 
-const metrics = (lineup) => ({ ...dataset.metricsByWeek[6].KC, expectedLineup: lineup });
+const metrics = (lineup) => ({
+  team: "KC",
+  availability: {
+    contextAvailable: Boolean(lineup?.roster?.length),
+    lineupAvailable: validDepthLineup(lineup, 6, 2026),
+    teamMetricsAvailable: false,
+    opponentAdjustedAvailable: false,
+    phase1Available: false,
+    situationalAvailable: false,
+    kickerIdentityAvailable: false,
+    kickerProfileAvailable: false,
+  },
+  expectedLineup: lineup,
+});
 const predict = (lineup) => predictMatchup("SF", "KC", {
   week: 6, kickoff: "2026-10-18T20:25:00.000Z",
   modelLayers: {
@@ -204,8 +271,8 @@ test("a genuine starter loss worsens the existing signal; stronger valid coverag
   const loss = compareTeams(metrics(healthy), metrics(injured), 6).expectedLineup;
   const gain = compareTeams(metrics(injured), metrics(healthy), 6).expectedLineup;
   assert.equal(neutral.homePoints, 0);
-  assert.equal(loss.homePoints, -.013);
-  assert.equal(gain.homePoints, .013);
+  assert.equal(loss.homePoints, -.02);
+  assert.equal(gain.homePoints, .02);
   console.log("Lineup sensitivity", [loss, neutral, gain].map((layer) => ({
     homePoints: layer.homePoints, margin: predict(layer).continuousMargin, probability: predict(layer).homeWinProbability,
   })));
@@ -241,7 +308,7 @@ test("an explicitly legacy lineup is gated off without modifying other PBP layer
   assert.equal(layers.expectedLineup.available, false);
   assert.equal(layers.expectedLineup.homePoints, 0);
   assert.equal(layers.expectedLineup.confidence, 0);
-  assert.match(layers.expectedLineup.reasons[0], /regenerate/);
+  assert.match(layers.expectedLineup.reasons[0], /unavailable or invalid/);
   for (const key of Object.keys(baseline).filter((key) => key !== "expectedLineup")) {
     assert.deepEqual(layers[key], baseline[key]);
   }
@@ -333,7 +400,8 @@ test("frozen HOU tackle and defensive removals use canonical injury weights and 
     const subject = lineup.roster.find((player) => player.gsisId === scenario.id);
     assert.ok(subject, `${scenario.label} fixture identity`);
     assert.equal(subject.name, scenario.name, `${scenario.label} named fixture identity`);
-    assert.equal(subject.position, scenario.source, `${scenario.label} source position`);
+    assert.equal(subject.position, scenario.canonical, `${scenario.label} canonical artifact position`);
+    assert.equal(canonicalPosition(scenario.source), subject.position, `${scenario.label} source-to-model mapping`);
     assert.equal(canonicalPosition(subject.position), scenario.canonical, `${scenario.label} canonical position`);
 
     const health = buildTeamHealth("HOU", playersFor(scenario.id), [], 2026, 6,

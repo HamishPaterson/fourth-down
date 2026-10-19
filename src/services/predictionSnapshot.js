@@ -1,4 +1,4 @@
-import { FULL_MODEL_VERSION, FULL_MODEL_KEY } from "./gamePredictionService.js";
+import { CURRENT_MODEL_VERSION as FULL_MODEL_VERSION, CURRENT_MODEL_KEY as FULL_MODEL_KEY } from "./modelIdentity.js";
 import { getCoreMarket } from "./oddsApi.js";
 import { PREDICTION_FEATURE_VERSION, MATCHUP_INTELLIGENCE_SCHEMA_VERSION } from "./predictionFeatures.js";
 import { PERSONNEL_VIEW_VERSION } from "../../api-lib/personnelView.js";

@@ -5,8 +5,11 @@ import { buildBestBets } from "../src/services/bestBetsService.js";
 import { buildWeeklyMultiSelection } from "./weeklyMulti.js";
 import { handleOddsRequest } from "../api/nfl/odds.js";
 import { activePersonnelRecord, personnelViewFixture } from "./personnelTestHelpers.js";
+import { CURRENT_MODEL_VERSION, CURRENT_MODEL_KEY } from "../src/services/modelIdentity.js";
+import { fixedTestNow, useFixedTestClock } from "./testClock.js";
 
-const NOW = new Date("2026-10-15T03:16:31Z");
+useFixedTestClock();
+const NOW = fixedTestNow();
 const QUOTE = "2026-10-14T20:00:00Z";
 const KICKOFF = "2026-10-18T17:00:00Z";
 const context = { season: 2026, week: 6, lockAt: "2026-10-15T00:00:00Z" };
@@ -36,6 +39,33 @@ const event = (books) => ({ id: "event", away_team: "SEA", home_team: "DEN",
 const validate = e => validateOddsEvents([e], { now: NOW });
 const checked = result => result.events[0].bookmakers.flatMap(b => b.markets.flatMap(m => m.outcomes));
 const reasons = row => row.quoteValidation.reasons;
+
+test("30-hour quote freshness is inclusive; one millisecond outside is stale", () => {
+  for (const [offset, stale] of [[-1, false], [0, false], [1, true]]) {
+    const quote = new Date(NOW.getTime() - 30 * 3600000 - offset).toISOString();
+    const result = validate(event([book("book", pair("Boundary", 49.5, -110, -110, { timestamp: quote }))]));
+    assert.equal(result.quarantined.length, stale ? 2 : 0, `boundary offset ${offset}ms`);
+    if (stale) assert.ok(result.quarantined.every((row) => reasons(row).includes("stale_offer")));
+  }
+});
+
+test("quote validation preserves missing-timestamp policy and rejects invalid timestamps", () => {
+  const missing = event([book("book", pair("Timestamp"))]);
+  for (const b of missing.bookmakers) {
+    delete b.last_update;
+    for (const m of b.markets) {
+      delete m.last_update;
+      for (const o of m.outcomes) {
+        delete o.updatedAt;
+        delete o.quoteSource.timestamp;
+      }
+    }
+  }
+  // Quote validation permits absent timestamps; Multi's priced-leg gate rejects them.
+  assert.equal(validate(missing).quarantined.length, 0);
+  const invalid = event([book("book", pair("Timestamp", 49.5, -110, -110, { timestamp: "invalid" }))]);
+  assert.ok(validate(invalid).quarantined.every((row) => reasons(row).includes("stale_offer")));
+});
 
 function brokenLadder() {
   return event([
@@ -90,8 +120,8 @@ function saved(away, home, bestBets) {
   };
   return {
     season: 2026, week: 6, awayCode: away, homeCode: home, kickoff: KICKOFF,
-    modelVersion: 11,
-    modelKey: "full-v11-week5-data-gap-audit",
+    modelVersion: CURRENT_MODEL_VERSION,
+    modelKey: CURRENT_MODEL_KEY,
     fourthDownPick: away,
     fourthDownAwayScore: 24,
     fourthDownHomeScore: 20,

@@ -60,7 +60,10 @@ function interaction(own, other, key, offense, defense, league) {
 
 export function buildSituationalMatchups({ away, home, teamMetrics, season, week, kickoff }) {
   const awayMetrics = teamMetrics?.away?.situational, homeMetrics = teamMetrics?.home?.situational;
-  const reason = provenanceReason(awayMetrics, away, { season, week, kickoff }) ||
+  const componentUnavailable = [teamMetrics?.away, teamMetrics?.home]
+    .some((team) => team?.availability?.situationalAvailable === false);
+  const reason = componentUnavailable ? "Situational PBP performance unavailable for this cutoff" :
+    provenanceReason(awayMetrics, away, { season, week, kickoff }) ||
     provenanceReason(homeMetrics, home, { season, week, kickoff }) ||
     (["away", "home"].some((side) => teamMetrics?.[side]?.expectedLineup?.cutoff &&
       instant(teamMetrics[side].expectedLineup.cutoff) !== instant(teamMetrics[side].situational.cutoff))

@@ -1,20 +1,34 @@
 // services/weatherApi.js
 // Fetches outdoor conditions across the full game window from Open-Meteo.
-import { getStadium } from "./stadiums.js";
+import { resolveStadium } from "./stadiums.js";
 
 const FORECAST_URL = "https://api.open-meteo.com/v1/forecast";
 const GAME_HOURS = 5; // kickoff hour through kickoff + 4 hours
 
-export async function getStadiumWeather(homeCode, kickoff, signal) {
-  const stadium = getStadium(homeCode);
-  if (!stadium) return null;
+export async function getStadiumWeather(homeCode, kickoff, signal, venue) {
+  const resolution = resolveStadium(homeCode, venue);
+  const stadium = resolution.stadium;
+  if (!stadium) {
+    return unavailableWeather(resolution, "Scheduled venue could not be resolved");
+  }
 
   if (stadium.dome) {
-    return { dome: true, stadium: stadium.name, gameHours: 0 };
+    return {
+      dome: true,
+      stadium: stadium.name,
+      venue: stadium.name,
+      venueConfidence: resolution.confidence,
+      venueSource: resolution.source,
+      weatherAvailable: true,
+      weatherSource: "indoor-venue",
+      gameHours: 0,
+    };
   }
 
   const date = kickoff instanceof Date ? kickoff : new Date(kickoff);
-  if (Number.isNaN(date.getTime())) return null;
+  if (Number.isNaN(date.getTime())) {
+    return unavailableWeather(resolution, "Kickoff time is invalid", stadium);
+  }
 
   const params = new URLSearchParams({
     latitude: String(stadium.lat),
@@ -41,15 +55,21 @@ export async function getStadiumWeather(homeCode, kickoff, signal) {
 
   try {
     const response = await fetch(`${FORECAST_URL}?${params.toString()}`, { signal });
-    if (!response.ok) return null;
+    if (!response.ok) {
+      return unavailableWeather(resolution, `Weather provider returned HTTP ${response.status}`, stadium);
+    }
 
     const data = await response.json();
     const hourly = data?.hourly;
     const times = hourly?.time || [];
-    if (!times.length) return null;
+    if (!times.length) return unavailableWeather(resolution, "Weather provider returned no hourly observations", stadium);
 
     const kickoffSeconds = Math.floor(date.getTime() / 1000);
     const startIndex = nearestIndex(times, kickoffSeconds);
+    const observationTime = Number(times[startIndex]);
+    if (!Number.isFinite(observationTime) || Math.abs(observationTime - kickoffSeconds) > 90 * 60) {
+      return unavailableWeather(resolution, "No weather observation is sufficiently close to kickoff", stadium);
+    }
     const indexes = Array.from({ length: GAME_HOURS }, (_, offset) => startIndex + offset)
       .filter((index) => index < times.length);
     if (!indexes.length) return null;
@@ -61,6 +81,12 @@ export async function getStadiumWeather(homeCode, kickoff, signal) {
     return {
       dome: false,
       stadium: stadium.name,
+      venue: stadium.name,
+      venueConfidence: resolution.confidence,
+      venueSource: resolution.source,
+      weatherAvailable: true,
+      weatherSource: "open-meteo",
+      kickoffObservation: new Date(observationTime * 1000).toISOString(),
       gameHours: indexes.length,
       temperature: average(values("temperature_2m")),
       humidity: average(values("relative_humidity_2m")),
@@ -77,11 +103,25 @@ export async function getStadiumWeather(homeCode, kickoff, signal) {
       weatherCode: maximum(values("weather_code")),
     };
   } catch (error) {
-    if (error?.name !== "AbortError") {
-      console.warn("Weather lookup failed:", error?.message || error);
-    }
-    return null;
+    if (error?.name === "AbortError") throw error;
+    console.warn("Weather lookup failed:", error?.message || error);
+    return unavailableWeather(resolution, "Weather provider request failed", stadium);
   }
+}
+
+function unavailableWeather(resolution, reason, stadium = null) {
+  return {
+    dome: stadium?.dome ?? false,
+    stadium: stadium?.name || resolution.requestedVenue || null,
+    venue: stadium?.name || resolution.requestedVenue || null,
+    venueConfidence: resolution.confidence,
+    venueSource: resolution.source,
+    weatherAvailable: false,
+    weatherSource: null,
+    fallbackActive: true,
+    fallbackReason: reason,
+    gameHours: 0,
+  };
 }
 
 export function describeWeather(weather) {

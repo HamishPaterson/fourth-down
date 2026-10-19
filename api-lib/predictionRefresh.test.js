@@ -9,7 +9,7 @@ import { applyPredictionSnapshot } from "../src/services/predictionSnapshot.js";
 import gameStats, { snapshotToDatabase, databaseToSnapshot } from "../api/nfl/game-stats.js";
 import { FULL_MODEL_VERSION, FULL_MODEL_KEY } from "../src/services/gamePredictionService.js";
 import { BEST_BETS_CANDIDATE_VERSION } from "../src/services/bestBetsService.js";
-import { createServerPredictionInputLoader } from "./serverPredictions.js";
+import { createServerPredictionInputLoader, refreshSavedBestBets } from "./serverPredictions.js";
 import { PERSONNEL_VIEW_VERSION } from "./personnelView.js";
 
 const NOW = new Date("2026-10-15T05:00:00Z"), KICKOFF = "2026-10-18T17:00:00Z";
@@ -198,6 +198,29 @@ test("partial browser predictions neither block complete server refresh nor over
   assert.equal(result.res.statusCode, 200, result.res.body.reason); assert.equal(result.db.writes.length, 14);
 });
 
+test("legacy model scores require full authoritative generation, not candidate-only relabeling", async () => {
+  const old = games.map((game) => ({
+    ...fixture(game), modelVersion: 11, modelKey: "full-v11-week5-data-gap-audit", authoritative: true,
+  }));
+  assert.equal(completePrediction(old[0]), false);
+  const missingCandidates = structuredClone(old[0]);
+  delete missingCandidates.bestBets.candidateVersion;
+  delete missingCandidates.bestBets.candidates;
+  assert.throws(() => refreshSavedBestBets(missingCandidates, { events: [] }, NOW), /complete pre-kickoff/);
+  const intact = structuredClone(old[0]);
+  assert.deepEqual(refreshSavedBestBets(old[0], { events: [] }, NOW), intact);
+  const result = await run({ db: database(old), dryRun: false });
+  assert.equal(result.res.statusCode, 200, result.res.body.reason);
+  assert.equal(result.generated, games.length);
+  assert.equal(result.db.writes.length, games.length);
+  for (const row of result.db.rows) {
+    const saved = databaseToSnapshot(row);
+    assert.equal(Number(saved.modelVersion), FULL_MODEL_VERSION);
+    assert.equal(saved.modelKey, FULL_MODEL_KEY);
+  }
+  const current = { ...fixture(games[0]), authoritative: true };
+  assert.equal(retainPrediction(current, { ...old[0], fourthDownAwayScore: 99 }, NOW), true);
+});
 test("personnel view version/freshness is required and a newer status change makes the prediction refresh-eligible", () => {
   const game = games[0];
   const existing = fixture(game);

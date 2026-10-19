@@ -184,7 +184,8 @@ export default function Matchup({ game, onBack }) {
     getStadiumWeather(
       homeCode,
       kickoff.toISOString(),
-      controller.signal
+      controller.signal,
+      liveGame?.venue || game.venue
     )
       .then(setWeather)
       .catch(() => setWeather(null));
@@ -193,6 +194,8 @@ export default function Matchup({ game, onBack }) {
   }, [
     homeCode,
     validKickoff ? kickoff.toISOString() : null,
+    game.venue,
+    liveGame?.venue,
   ]);
 
   async function refreshWeather() {
@@ -200,7 +203,9 @@ export default function Matchup({ game, onBack }) {
 
     const result = await getStadiumWeather(
       homeCode,
-      kickoff.toISOString()
+      kickoff.toISOString(),
+      undefined,
+      liveGame?.venue || game.venue
     );
     setWeather(result);
   }
@@ -345,6 +350,7 @@ export default function Matchup({ game, onBack }) {
           awayCode={awayCode}
           homeCode={homeCode}
           kickoff={validKickoff ? kickoff.toISOString() : null}
+          venue={liveGame?.venue || game.venue}
           weather={weather}
           oddsEvent={oddsEvent}
           week={Number(game.week || liveGame?.week || 1)}

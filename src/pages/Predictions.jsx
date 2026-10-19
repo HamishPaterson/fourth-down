@@ -85,7 +85,8 @@ export default function Predictions({ onOpen }) {
               const weather = await getStadiumWeather(
                 game.home,
                 game.sourceDate,
-                controller.signal
+                controller.signal,
+                game.venue
               );
 
               return {

@@ -36,10 +36,22 @@ function predict(input = fixture(), extra = {}) {
     teamMetrics: input.teamMetrics, modelLayers: { scoringBaseline: baseline }, ...extra });
 }
 function real(week = 6, away = "BUF", home = "KC") {
+  const awayMetrics = dataset.metricsByWeek[week][away], homeMetrics = dataset.metricsByWeek[week][home];
   const teamMetrics = { season: 2026, week, dataStatus: "available",
-    away: dataset.metricsByWeek[week][away], home: dataset.metricsByWeek[week][home] };
+    away: awayMetrics, home: homeMetrics };
+  teamMetrics.dataStatus = awayMetrics.availability?.teamMetricsAvailable === false ||
+    homeMetrics.availability?.teamMetricsAvailable === false ? "context-only" : "available";
   return { away, home, teamMetrics,
     playerMetrics: playerMetricsResponse(players, { season: 2026, week, away, home }) };
+}
+function supportedMixInput(week = 6, away = "BUF", home = "KC") {
+  const input = real(week, away, home);
+  input.teamMetrics = {
+    season: 2026, week, dataStatus: "available",
+    away: { ...metric(away), expectedLineup: dataset.metricsByWeek[week][away].expectedLineup },
+    home: { ...metric(home), expectedLineup: dataset.metricsByWeek[week][home].expectedLineup },
+  };
+  return input;
 }
 function finiteNumbers(value) {
   if (typeof value === "number") assert.ok(Number.isFinite(value));
@@ -127,6 +139,24 @@ test("unsupported defense, zero sample and nonfinite metrics never produce safe 
   finiteNumbers(result.matchupIntelligence);
 });
 
+test("component availability blocks populated-but-unavailable performance values", () => {
+  const input = fixture();
+  input.teamMetrics.away.availability = { phase1Available: false, teamMetricsAvailable: false };
+  input.teamMetrics.home.availability = { phase1Available: false, teamMetricsAvailable: false };
+  const prediction = predict(input);
+  assert.equal(prediction.matchupIntelligence.available, false);
+  assert.ok(prediction.matchupIntelligence.signals.every((signal) =>
+    !signal.available && !signal.explanationSafe));
+
+  const mixInput = supportedMixInput();
+  for (const side of ["away", "home"]) {
+    mixInput.teamMetrics[side].availability = { teamMetricsAvailable: false };
+  }
+  const withStalePlayVolume = predict(mixInput);
+  assert.ok(["away", "home"].every((side) =>
+    !withStalePlayVolume[side].expectedPlayMix.available));
+});
+
 test("missing opponent adjustment is reported, not invented", () => {
   const input = fixture();
   delete input.teamMetrics.home.opponentAdjusted;
@@ -162,7 +192,7 @@ test("correlated metric views do not inflate independent model confidence", () =
 });
 
 test("pressure reuses exactly one existing layer, never a new duplicate adjustment", () => {
-  const input = real();
+  const input = supportedMixInput();
   const oldLayers = compareTeams(input.teamMetrics.away, input.teamMetrics.home, 6);
   const result = predict(input, { playerMetrics: input.playerMetrics, modelLayers: oldLayers });
   close(result.modelLayers.pressureMatchup.homePoints, oldLayers.pressureMatchup.homePoints);
@@ -171,7 +201,7 @@ test("pressure reuses exactly one existing layer, never a new duplicate adjustme
 });
 
 test("pressure generated and allowance retain corrected directions", () => {
-  const input = real(), teams = structuredClone(input.teamMetrics);
+  const input = supportedMixInput(), teams = structuredClone(input.teamMetrics);
   const before = compareTeams(teams.away, teams.home, 6).pressureMatchup.homePoints;
   teams.home.pressureGeneratedRate += .1;
   assert.ok(compareTeams(teams.away, teams.home, 6).pressureMatchup.homePoints > before);
@@ -225,7 +255,7 @@ test("zero contributions cannot support an explanation, including a saturated sc
   assert.equal(passing.explanationSafe, false);
 });
 
-test("current personnel score changes leave raw model evidence unchanged", () => {
+test("context-only personnel changes do not make unsupported PBP evidence available", () => {
   const input = real(6, "HOU", "JAX");
   const shared = {
     scoringBaseline: { active: true, awayExpected: 22.8, homeExpected: 21.6,
@@ -247,7 +277,8 @@ test("current personnel score changes leave raw model evidence unchanged", () =>
   });
 
   assert.notEqual(personnelChanged.continuousMargin, healthy.continuousMargin);
-  assert.notDeepEqual(personnelChanged.home.expectedPlayMix, healthy.home.expectedPlayMix);
+  assert.deepEqual(personnelChanged.home.expectedPlayMix, healthy.home.expectedPlayMix);
+  assert.equal(personnelChanged.home.expectedPlayMix.available, false);
   for (const layer of ["rushMatchup", "passMatchup", "successMatchup", "explosiveMatchup", "pressureMatchup",
     "thirdDownMatchup", "redZoneMatchup", "opponentNetwork"]) {
     assert.deepEqual(personnelChanged.modelLayers[layer], healthy.modelLayers[layer], layer);
@@ -255,7 +286,7 @@ test("current personnel score changes leave raw model evidence unchanged", () =>
 });
 
 test("expected mix preserves observed style, shares and possession/pace context", () => {
-  const input = real();
+  const input = supportedMixInput();
   const prediction = predict(input);
   const mix = buildExpectedPlayMix({ ...input, prediction, season: 2026, week: 6 });
   for (const side of ["away", "home"]) {
@@ -273,7 +304,7 @@ test("expected mix preserves observed style, shares and possession/pace context"
 });
 
 test("observed run-heavy identity is retained even against a much weaker pass allowance", () => {
-  const input = real(), prediction = predict(input);
+  const input = supportedMixInput(), prediction = predict(input);
   input.playerMetrics = structuredClone(input.playerMetrics);
   input.teamMetrics = structuredClone(input.teamMetrics);
   input.playerMetrics.away.teamTotals.passAttempts = 35;
@@ -289,7 +320,7 @@ test("observed run-heavy identity is retained even against a much weaker pass al
 });
 
 test("weak pass defense moves tendency by no more than 1.5 points; script and pace remain separate", () => {
-  const input = real();
+  const input = supportedMixInput();
   input.teamMetrics = structuredClone(input.teamMetrics);
   const prediction = predict(input);
   const run = () => buildExpectedPlayMix({ ...input, prediction, season: 2026, week: 6 }).away;
@@ -342,10 +373,11 @@ test("full orchestration passes real artifact matchups through predictions, role
     clearFullGamePredictionCache();
     const result = await getFullGamePrediction({ away: "CHI", home: "KC", week: 6,
       sourceDate: "2026-10-18T20:25:00Z", weather: { dome: true } }, null, { season: 2026, forceRefresh: true });
-    assert.ok(result.prediction.matchupIntelligence.available);
-    assert.ok(result.prediction.away.expectedPlayMix.available);
-    assert.ok(result.prediction.matchupIntelligence.signals.some((s) => s.explanationSafe));
-    close(result.playerProjections.away.passRate, result.prediction.away.expectedPlayMix.passRate);
+    assert.equal(result.prediction.matchupIntelligence.available, false);
+    assert.ok(result.prediction.matchupIntelligence.signals.every((s) =>
+      !s.available && !s.explanationSafe));
+    assert.equal(result.prediction.away.expectedPlayMix.available, false);
+    assert.equal(result.prediction.modelLayers.expectedLineup.available, true);
     const qb = result.playerProjections.away.players.find((p) => p.position === "QB");
     assert.equal(qb.playerId, input.teamMetrics.away.expectedLineup.startingQuarterback.gsisId);
     assert.ok(result.bestBets.anytimeTdScorer);
@@ -354,7 +386,7 @@ test("full orchestration passes real artifact matchups through predictions, role
   } finally { global.fetch = original; clearFullGamePredictionCache(); }
 });
 
-test("all 32 real teams have finite named matchups without changing existing coarse roster or network layers", () => {
+test("all 32 context-only teams retain explicit unavailable signals and separate roster/network layers", () => {
   const codes = Object.keys(dataset.metricsByWeek[6]).sort();
   const phase1Layers = ["rushMatchup", "passMatchup", "successMatchup", "explosiveMatchup", "pressureMatchup"];
   for (let i = 0; i < codes.length; i += 2) {
@@ -369,10 +401,19 @@ test("all 32 real teams have finite named matchups without changing existing coa
     assert.equal(result.modelLayers.opponentNetwork.homePoints, .3);
     assert.equal(result.modelLayers.playerRatings.homePoints, .2);
     const signals = result.matchupIntelligence.signals;
-    assert.equal(signals.length, 7);
-    assert.deepEqual(signals.map((s) => s.layer), [...phase1Layers, "thirdDownMatchup", "redZoneMatchup"]);
-    assert.equal(new Set(signals.map((s) => s.category)).size, 7);
-    assert.ok(signals.slice(5).every((s) => s.available && s.phase === "2A" && s.matchups));
+    assert.equal(signals.length, 5);
+    assert.deepEqual(signals.map((s) => s.layer), phase1Layers);
+    assert.equal(new Set(signals.map((s) => s.category)).size, 5);
+    assert.equal(result.matchupIntelligence.available, false);
+    assert.ok(signals.every((signal) => !signal.available && !signal.explanationSafe));
+    assert.equal(result.matchupIntelligence.situational.available, false);
+    for (const entry of result.matchupIntelligence.situational.signals) {
+      assert.equal(entry.available, false);
+      assert.ok(entry.reason);
+      assert.equal(entry.matchups, null);
+      assert.equal(entry.homePoints, 0);
+      assert.equal(signals.some((s) => s.layer === entry.layer), false);
+    }
     const withoutSituational = structuredClone(input);
     delete withoutSituational.teamMetrics.away.situational;
     delete withoutSituational.teamMetrics.home.situational;
@@ -395,7 +436,40 @@ test("all 32 real teams have finite named matchups without changing existing coa
   }
 });
 
-test("earlier real weeks keep exactly the five ordered Phase 1 signals when situational provenance is unavailable", () => {
+test("complete point-in-time situational fixtures produce exactly seven signals; unsupported metrics never pad them", () => {
+  const input = supportedMixInput();
+  input.teamMetrics = structuredClone(input.teamMetrics);
+  const cutoff = input.teamMetrics.away.expectedLineup.cutoff;
+  const sourceAsOf = "2026-10-15T00:00:00Z";
+  const sample = (conversions, opportunities) => ({ conversions, opportunities, rate: conversions / opportunities });
+  for (const side of ["away", "home"]) {
+    const code = input[side];
+    input.teamMetrics[side].situational = {
+      schemaVersion: 1, team: code, season: 2026, predictionWeek: 6, cutoff, sourceAsOf,
+      gameProvenance: [{ gameId: "2026_01_BUF_KC", week: 1, away: "BUF", home: "KC",
+        kickoff: "2026-09-13T17:00:00Z", completedAsOf: "2026-09-13T21:00:00Z" }],
+      thirdDown: { offense: sample(40, 100), defense: sample(40, 100) },
+      redZone: { offense: sample(24, 40), defense: sample(24, 40) },
+      league: { cutoff, sourceAsOf, maxWeek: 1, latestCompletion: "2026-09-13T21:00:00Z",
+        thirdDown: sample(400, 1000), redZone: sample(240, 400) },
+    };
+  }
+  const supported = predict(input);
+  assert.deepEqual(supported.matchupIntelligence.signals.map((s) => s.layer),
+    ["rushMatchup", "passMatchup", "successMatchup", "explosiveMatchup", "pressureMatchup",
+      "thirdDownMatchup", "redZoneMatchup"]);
+  assert.ok(supported.matchupIntelligence.signals.slice(5).every((s) => s.available && s.matchups));
+  for (const key of ["thirdDown", "redZone"]) {
+    const unsupported = structuredClone(input);
+    delete unsupported.teamMetrics.home.situational[key];
+    const result = predict(unsupported);
+    assert.deepEqual(result.matchupIntelligence.signals.map((s) => s.layer),
+      ["rushMatchup", "passMatchup", "successMatchup", "explosiveMatchup", "pressureMatchup"]);
+    assert.ok(result.matchupIntelligence.situational.signals.every((s) => !s.available && s.reason));
+  }
+});
+
+test("earlier context-only weeks keep Phase 1 and situational signals explicitly unavailable", () => {
   const phase1Layers = ["rushMatchup", "passMatchup", "successMatchup", "explosiveMatchup", "pressureMatchup"];
   for (const week of [2, 3, 4, 5]) {
     const input = real(week);
@@ -403,6 +477,8 @@ test("earlier real weeks keep exactly the five ordered Phase 1 signals when situ
     const signals = result.matchupIntelligence.signals;
     assert.equal(signals.length, 5);
     assert.deepEqual(signals.map((s) => s.layer), phase1Layers);
+    assert.equal(result.matchupIntelligence.available, false);
+    assert.ok(signals.every((signal) => !signal.available && !signal.explanationSafe));
     assert.equal(new Set(signals.map((s) => s.category)).size, 5);
     const situational = result.matchupIntelligence.situational;
     assert.equal(situational.available, false);

@@ -11,8 +11,10 @@ import { handleOddsRequest } from "../api/nfl/odds.js";
 import { mergeStoredOdds } from "./weeklyMulti.js";
 import { createWeeklyMultiPreparationHandler } from "./weeklyMultiPreparation.js";
 import { activePersonnelRecord, personnelViewFixture, predictionFeatureFixture } from "./personnelTestHelpers.js";
+import { fixedTestNow, useFixedTestClock } from "./testClock.js";
 
-const NOW = new Date("2026-10-15T03:16:31Z");
+useFixedTestClock();
+const NOW = fixedTestNow();
 const KICKOFF = "2026-10-18T17:00:00Z";
 const QUOTE = "2026-10-14T20:00:00Z";
 const PAIRS = [["SEA","DEN"],["HOU","JAX"],["CHI","ATL"],["BAL","CLE"],["PIT","TB"],["TEN","IND"],
@@ -55,7 +57,7 @@ function fixture([away, home] = PAIRS[0]) {
     personnelViews: feature.personnelViews, oddsEvent, dataQuality,
     teamMetrics: { away: { team: away, ...dataset.metricsByWeek[6][away] },
       home: { team: home, ...dataset.metricsByWeek[6][home] } },
-    asOf: new Date(Date.parse(cutoff) - 1000).toISOString() };
+    asOf: new Date(Date.parse(cutoff) - 1000).toISOString(), quoteAsOf: NOW };
 }
 
 function snapshot(input, bestBets = buildBestBets(input)) {
@@ -96,11 +98,24 @@ test("missing, future, wrong-week or mismatched lineup evidence cannot bypass pe
     input.dataQuality.personnel = false;
     input.teamMetrics = structuredClone(input.teamMetrics);
     if (defect === "missing") delete input.teamMetrics.home;
-    if (defect === "future") input.teamMetrics.away.expectedLineup.snapshotAt = "2026-10-16T00:00:00Z";
+    if (defect === "future") input.teamMetrics.away.expectedLineup.snapshotAt =
+      new Date(Date.parse(input.dataQuality.personnelTiming.cutoff) + 15 * 60000).toISOString();
     if (defect === "week") input.teamMetrics.away.expectedLineup.predictionWeek = 7;
     if (defect === "team") input.teamMetrics.away.team = "KC";
     if (defect === "cutoff") input.dataQuality.personnelTiming.cutoff = "2026-10-17T00:00:00Z";
     assert.equal(buildBestBets(input).candidates.length, 0, defect);
+  }
+});
+
+test("lineup observations are inclusive at cutoff and reject one millisecond or fifteen minutes after it", () => {
+  for (const [offset, eligible] of [[-1, true], [0, true], [1, false], [15 * 60000, false]]) {
+    const input = fixture();
+    input.dataQuality.personnel = false;
+    input.teamMetrics = structuredClone(input.teamMetrics);
+    const cutoff = Date.parse(input.dataQuality.personnelTiming.cutoff);
+    input.asOf = new Date(cutoff).toISOString();
+    input.teamMetrics.away.expectedLineup.snapshotAt = new Date(cutoff + offset).toISOString();
+    assert.equal(buildBestBets(input).candidates.length > 0, eligible, `${offset}ms`);
   }
 });
 

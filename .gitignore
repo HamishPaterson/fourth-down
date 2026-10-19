@@ -3,3 +3,4 @@ dist
 .vs/
 .vercel
 .env*
+.vscode/

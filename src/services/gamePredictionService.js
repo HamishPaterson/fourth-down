@@ -3,12 +3,14 @@ import { buildPlayerProjections } from "./playerProjectionService.js";
 import * as nflApi from "./nflApi.js";
 import { getTeamQbr, getTeamRatingsHealth } from "./teamRatings.js";
 import { getStadiumWeather } from "./weatherApi.js";
+import { resolveStadium } from "./stadiums.js";
 import { buildBestBets } from "./bestBetsService.js";
 import { personnelAvailableAt, validDepthLineup, validDepthRoster } from "../../api-lib/depthCharts.js";
 import { buildPersonnelView, PERSONNEL_VIEW_VERSION } from "../../api-lib/personnelView.js";
+import { buildSpecialTeamsModel } from "./specialTeams.js";
+import { CURRENT_MODEL_VERSION as FULL_MODEL_VERSION, CURRENT_MODEL_KEY as FULL_MODEL_KEY } from "./modelIdentity.js";
 
-export const FULL_MODEL_VERSION = 11;
-export const FULL_MODEL_KEY = "full-v11-week5-data-gap-audit";
+export { FULL_MODEL_VERSION, FULL_MODEL_KEY };
 const cache = new Map();
 const pending = new Map();
 const CACHE_MS = 5 * 60 * 1000;
@@ -19,7 +21,11 @@ export async function getFullGamePrediction(game, oddsEvent, options = {}) {
   const away = normalizeCode(game.away);
   const home = normalizeCode(game.home);
   const oddsFingerprint = createOddsFingerprint(oddsEvent);
-  const key = `${options.loadInputs ? "server:" : ""}${season}:${week}:${away}:${home}:${FULL_MODEL_KEY}:${oddsFingerprint}`;
+  const kickoffKey = game.sourceDate || game.date || game.time || "no-kickoff";
+  const venueKey = typeof game.venue === "string"
+    ? game.venue.trim().toLowerCase()
+    : String(game.venue?.fullName || game.venue?.name || "").trim().toLowerCase();
+  const key = `${options.loadInputs ? "server:" : ""}${season}:${week}:${away}:${home}:${kickoffKey}:${venueKey}:${FULL_MODEL_KEY}:${oddsFingerprint}`;
   const cached = cache.get(key);
 
   if (!options.forceRefresh && cached && Date.now() - cached.savedAt < CACHE_MS) {
@@ -79,7 +85,6 @@ async function createPrediction({ game, oddsEvent, season, week, away, home, sig
   const tasks = loadInputs ? loadInputs({ away, home, season, week, signal }) : {
     standings: optionalCall("getStandings", [signal]),
     personnel: optionalCall("getQbRosterHealth", [away, home, season, signal, week]),
-    kicker: optionalCall("getKickerStats", [away, home, season - 1, signal]),
     teamForm: week > 1
       ? optionalCall("getTeamForm", [away, home, season, week, signal])
       : Promise.resolve(null),
@@ -106,7 +111,8 @@ async function createPrediction({ game, oddsEvent, season, week, away, home, sig
 
   settled.forEach((result, index) => {
     const name = names[index];
-    dataQuality[name] = result.status === "fulfilled" && result.value !== null;
+    dataQuality[name] = result.status === "fulfilled" && result.value !== null &&
+      !(name === "playByPlay" && result.value.dataStatus === "context-only");
     values[name] = result.status === "fulfilled" ? result.value : null;
     if (name === "opponentNetwork" && result.status === "rejected") {
       const reason = result.reason instanceof Error ? result.reason.message : "Opponent network unavailable";
@@ -148,6 +154,19 @@ async function createPrediction({ game, oddsEvent, season, week, away, home, sig
       week,
     }),
   };
+  const specialTeams = buildSpecialTeamsModel({
+    away,
+    home,
+    personnelViews,
+    kickerProfiles: values.playByPlay?.kickerProfiles,
+    season,
+    week,
+    cutoff: personnelCutoff,
+    weather,
+    venue: gameWithWeather.venue,
+  });
+  dataQuality.kicker = [specialTeams.away, specialTeams.home]
+    .some((kicker) => kicker.profileAvailable);
   dataQuality.personnel = Boolean(personnel);
   dataQuality.awayRoster = Boolean(awayRoster);
   dataQuality.homeRoster = Boolean(homeRoster);
@@ -177,7 +196,6 @@ async function createPrediction({ game, oddsEvent, season, week, away, home, sig
       personnel?.away?.rosterHealth,
       personnel?.home?.rosterHealth
     ),
-    specialTeams: buildKickerLayer(values.kicker),
   };
 
   const prediction = predictMatchup(away, home, {
@@ -196,6 +214,7 @@ async function createPrediction({ game, oddsEvent, season, week, away, home, sig
       : undefined,
     scheduleContext: gameWithWeather.scheduleContext,
     modelLayers,
+    specialTeams,
     rivalry: gameWithWeather.scheduleContext
       ? {
           meetingNumber: gameWithWeather.scheduleContext.meetingNumber,
@@ -235,7 +254,7 @@ async function createPrediction({ game, oddsEvent, season, week, away, home, sig
     dataQuality: {
       ...dataQuality,
       weather,
-      sources: buildSourceDiagnostics({ ...values, personnel }, weather, oddsEvent),
+      sources: buildSourceDiagnostics({ ...values, personnel, specialTeams }, weather, oddsEvent),
     },
     weather,
     modelVersion: FULL_MODEL_VERSION,
@@ -251,7 +270,17 @@ function buildSourceDiagnostics(values, weather, oddsEvent) {
     teamForm: sourceDiagnostic(values.teamForm, "team form"),
     opponentNetwork: sourceDiagnostic(values.opponentNetwork, "opponent network"),
     personnel: sourceDiagnostic(values.personnel, "QB and roster health"),
-    kicker: sourceDiagnostic(values.kicker, "kicker data"),
+    kicker: {
+      label: "NFLverse kicker performance",
+      available: values.specialTeams?.artifactAvailable === true,
+      updatedAt: values.specialTeams?.artifactAvailable
+        ? values.playByPlay?.kickerProfiles?.generatedAt || null
+        : null,
+      source: values.specialTeams?.source || null,
+      warning: values.specialTeams?.artifactAvailable
+        ? null
+        : "Point-in-time kicker artifact unavailable; league simulation fallback active",
+    },
     playerMetrics: sourceDiagnostic(values.playerMetrics, "nflverse player metrics"),
     weather: { label: "weather", available: Boolean(weather), updatedAt: weather?.generatedAt || null },
     odds: { label: "odds", available: Boolean(oddsEvent), updatedAt: oddsEvent?.last_update || oddsEvent?.updatedAt || null },
@@ -260,18 +289,44 @@ function buildSourceDiagnostics(values, weather, oddsEvent) {
 function sourceDiagnostic(value, label) {
   return {
     label,
-    available: Boolean(value) && value?.dataStatus !== "neutral" && value?.available !== false,
+    available: Boolean(value) && value?.dataStatus !== "neutral" &&
+      value?.dataStatus !== "context-only" && value?.available !== false,
     updatedAt: value?.generatedAt || value?.refreshedAt || null,
     source: value?.source || null,
-    warning: value?.warning || value?.reason || null,
+    warning: value?.warning || value?.reason ||
+      (value?.dataStatus === "context-only"
+        ? "Eligible PBP performance is unavailable; independent lineup and personnel context remains available"
+        : null),
   };
 }
 async function resolveGameWeather(game, homeCode, signal) {
-  if (game?.weather) return game.weather;
+  const resolution = resolveStadium(homeCode, game?.venue);
+  const explicitScheduledVenue = resolution.source.startsWith("scheduled-");
+  if (game?.weather && !explicitScheduledVenue && resolution.stadium) {
+    return {
+      ...game.weather,
+      venue: game.weather.venue || game.weather.stadium || resolution.stadium.name,
+      venueConfidence: game.weather.venueConfidence ?? resolution.confidence,
+      venueSource: game.weather.venueSource || resolution.source,
+      weatherAvailable: game.weather.weatherAvailable ?? true,
+      weatherSource: game.weather.weatherSource || "provided-home-default",
+    };
+  }
+  const providedVenue = game?.weather?.venue || game?.weather?.stadium;
+  if (game?.weather && resolution.stadium &&
+      providedVenue === resolution.stadium.name) {
+    return {
+      ...game.weather,
+      venue: resolution.stadium.name,
+      venueConfidence: resolution.confidence,
+      venueSource: resolution.source,
+      weatherAvailable: game.weather.weatherAvailable ?? true,
+    };
+  }
   const kickoff = game?.sourceDate || game?.date || game?.time || null;
   if (!homeCode || !kickoff) return null;
   try {
-    return await getStadiumWeather(homeCode, kickoff, signal);
+    return await getStadiumWeather(homeCode, kickoff, signal, game?.venue);
   } catch (error) {
     if (error?.name === "AbortError") throw error;
     console.warn(`Weather unavailable for ${homeCode}`, error);
@@ -494,47 +549,6 @@ function buildUnits(roster) {
     runDefense: front * 0.6 + lb * 0.4,
     coverage: players.length ? rated.length / players.length : 0,
   };
-}
-
-function buildKickerLayer(data) {
-  if (!data?.leaguePriors) return neutralLayer();
-  const awayPoints = kickerPoints(data.away, data.leaguePriors);
-  const homePoints = kickerPoints(data.home, data.leaguePriors);
-  return {
-    active: Boolean(awayPoints || homePoints),
-    awayPoints,
-    homePoints,
-    confidence: 0.7,
-    reasons: ["Kicker accuracy and distance profile"],
-  };
-}
-
-const DISTANCE_MIX = {
-  under30: 0.18,
-  from30to39: 0.29,
-  from40to49: 0.31,
-  from50plus: 0.22,
-};
-
-function kickerPoints(kicker, priors) {
-  if (!kicker) return 0;
-  let kickerAccuracy = 0;
-  let leagueAccuracy = 0;
-
-  for (const [bucket, share] of Object.entries(DISTANCE_MIX)) {
-    const prior = priors[bucket];
-    if (!prior) continue;
-    const actual = kicker[bucket] || { made: 0, attempts: 0 };
-    const priorAccuracy = finite(prior.accuracy);
-    const priorAttempts = finite(prior.priorAttempts);
-    const regressed =
-      (finite(actual.made) + priorAccuracy * priorAttempts) /
-      Math.max(1, finite(actual.attempts) + priorAttempts);
-    kickerAccuracy += share * regressed;
-    leagueAccuracy += share * priorAccuracy;
-  }
-
-  return round3(clamp((kickerAccuracy - leagueAccuracy) * 6.3, -1.25, 1.25));
 }
 
 function neutralLayer() {

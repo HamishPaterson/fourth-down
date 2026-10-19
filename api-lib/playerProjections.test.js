@@ -9,6 +9,7 @@ import { playerMetricsResponse, validatePlayerMetrics, completedPlayerGames } fr
 import { buildPlayerProjections } from "../src/services/playerProjectionService.js";
 import { buildBestBets } from "../src/services/bestBetsService.js";
 import { buildWeeklyMultiSelection } from "./weeklyMulti.js";
+import { CURRENT_MODEL_VERSION, CURRENT_MODEL_KEY } from "../src/services/modelIdentity.js";
 import handler from "../api/nfl/game-stats.js";
 import regenerated from "../data/nflverse-player-metrics.js";
 import { getFullGamePrediction, clearFullGamePredictionCache } from "../src/services/gamePredictionService.js";
@@ -380,6 +381,7 @@ test("Philadelphia Hurts Out excludes his projection and Best Bets; McKee uses h
   const weekly = buildWeeklyMultiSelection(
     [{
       season: 2026, week: 6, awayCode: "PHI", homeCode: "KC", kickoff,
+      modelVersion: CURRENT_MODEL_VERSION, modelKey: CURRENT_MODEL_KEY,
       bestBets: bets, personnelViews: input.personnelViews,
     }],
     { cacheStatus: "fresh", events: [oddsEvent] },
@@ -448,6 +450,7 @@ test("Tampa Bay Baker Mayfield/Jalon Daniels conflict uses only Tampa chart, liv
   assert.ok(bets.candidates.every((candidate) =>
     !qbs.some((qbPlayer) => candidate.personnelId === qbPlayer.canonicalId)));
   const scorerSnapshots = qbs.map((qbPlayer) => ({
+    modelVersion: CURRENT_MODEL_VERSION, modelKey: CURRENT_MODEL_KEY,
     season: 2026, week: 6, awayCode: "TB", homeCode: "KC", kickoff,
     personnelViews: unresolvedInput.personnelViews,
     bestBets: { anytimeTdScorer: {
@@ -516,6 +519,7 @@ test("Tampa Bay Baker Mayfield/Jalon Daniels conflict uses only Tampa chart, liv
   const resolvedWeekly = buildWeeklyMultiSelection(
     [{
       season: 2026, week: 6, awayCode: "TB", homeCode: "KC", kickoff,
+      modelVersion: CURRENT_MODEL_VERSION, modelKey: CURRENT_MODEL_KEY,
       bestBets: resolvedBets, personnelViews: resolvedInput.personnelViews,
     }],
     { cacheStatus: "fresh", events: [oddsEvent] },
@@ -607,6 +611,7 @@ test("Houston Stroud-out case excludes every unsupported QB through projections 
   const weekly = buildWeeklyMultiSelection(
     [{
       season: 2026, week: 6, awayCode: "HOU", homeCode: "JAX", kickoff,
+      modelVersion: CURRENT_MODEL_VERSION, modelKey: CURRENT_MODEL_KEY,
       bestBets: bets, personnelViews: input.personnelViews,
     }],
     { cacheStatus: "fresh", events: [oddsEvent] },

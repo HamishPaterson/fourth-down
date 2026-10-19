@@ -299,6 +299,19 @@ The read handler owns cache headers and sets them before sending its response.
 
 ## Point-in-time depth charts and personnel
 
+Team PBP regeneration now gates each prediction week's sample on matching
+regular-season games with completion observations at or before its kickoff cutoff
+and source observation. Recency is anchored to the latest game week in that
+eligible sample, never the latest week in the download. Existing multipliers
+remain 1.00, 0.95, 0.85, 0.75 and 0.65 for older weeks. An empty sample has no
+recency reference and no fabricated numeric performance. The artifact still retains
+independently eligible canonical team, lineup, personnel and kicker-identity context;
+PBP, opponent-adjusted, snap and situational availability are reported separately in
+each team's component availability/provenance. `teamMetricsAuditsByWeek` records the
+eligible sample and its reason when unavailable. Later completion observations cannot
+reconstruct earlier as-observed history. Snap participation is restricted to the same
+eligible team/game weeks.
+
 The nflverse depth archive uses `dt` snapshot timestamps, not prediction weeks.
 The extractor in `api-lib/depthCharts.js` selects the latest whole team snapshot
 at or before each week's first scheduled regular-season kickoff, established from

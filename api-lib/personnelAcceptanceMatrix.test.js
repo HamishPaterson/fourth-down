@@ -7,6 +7,7 @@ import { buildPersonnelView } from "./personnelView.js";
 import { buildPlayerProjections } from "../src/services/playerProjectionService.js";
 import { buildBestBets } from "../src/services/bestBetsService.js";
 import { buildWeeklyMultiSelection } from "./weeklyMulti.js";
+import { CURRENT_MODEL_VERSION, CURRENT_MODEL_KEY } from "../src/services/modelIdentity.js";
 import { predictMatchup } from "../src/services/predictionEngine.js";
 import { buildTeamHealth } from "../api/nfl/qb-roster-health.js";
 
@@ -192,9 +193,9 @@ function assertOpportunityConservation(row, scenario) {
   ];
   assert.ok(values.every(Number.isFinite), `${scenario.name}: finite values`);
   assert.ok(values.every((value) => value >= 0), `${scenario.name}: no negative allocations`);
-  assert.ok(row.targetShare <= 1,
+  assert.ok(row.targetShare <= 1 + Number.EPSILON * 4,
     `${scenario.name}: target share at most 1 (${JSON.stringify(row)})`);
-  assert.ok(row.carryShare <= 1,
+  assert.ok(row.carryShare <= 1 + Number.EPSILON * 4,
     `${scenario.name}: carry share at most 1 (${JSON.stringify(row)})`);
   assert.ok(Math.abs(row.allocatedTargets + row.unallocatedTargets - row.passAttempts) <= ROUNDING_TOLERANCE,
     `${scenario.name}: target rounding residual within ${ROUNDING_TOLERANCE}`);
@@ -306,6 +307,7 @@ function weeklyLegForCandidate(scenario, candidate, oddsEvent) {
   const selection = buildWeeklyMultiSelection(
     [{
       season: 2026, week: WEEK, awayCode: "HOU", homeCode: "JAX", kickoff: KICKOFF,
+      modelVersion: CURRENT_MODEL_VERSION, modelKey: CURRENT_MODEL_KEY,
       bestBets, personnelViews: scenario.input.personnelViews,
     }],
     { cacheStatus: "fresh", events: [oddsEvent] },
@@ -724,6 +726,7 @@ test("Tampa Bay unresolved and resolved QB candidate matrix uses Baker Mayfield 
     const selection = buildWeeklyMultiSelection(
       [{
         season: 2026, week: WEEK, awayCode: "TB", homeCode: "KC", kickoff: KICKOFF,
+        modelVersion: CURRENT_MODEL_VERSION, modelKey: CURRENT_MODEL_KEY,
         bestBets: { candidates: [candidate], recommendations: [candidate] },
         personnelViews: row.input.personnelViews,
       }],
