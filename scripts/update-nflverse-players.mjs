@@ -1,12 +1,21 @@
 import { gunzipSync } from "node:zlib";
 import {
-  mkdir,
+  readFile,
+  rename,
+  unlink,
   writeFile,
 } from "node:fs/promises";
+import { randomUUID } from "node:crypto";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { weeklyDepthCutoffs } from "../api-lib/depthCharts.js";
-import { PLAYER_METRICS_SCHEMA, completedPlayerGames, playerTeam } from "../api-lib/playerMetrics.js";
+import {
+  instant,
+  PLAYER_METRICS_SCHEMA,
+  completedPlayerGames,
+  playerTeam,
+  validatePlayerMetrics,
+} from "../api-lib/playerMetrics.js";
 import { fetchSchedule as fetchPlayerSchedule } from "./balldontlie-schedule.mjs";
 
 const season = Number(
@@ -17,11 +26,17 @@ const season = Number(
 const outputPath = path.resolve(
   "data/nflverse-player-metrics.js"
 );
-
-const sourceUrl =
-  "https://github.com/nflverse/" +
-  "nflverse-data/releases/download/" +
-  `pbp/play_by_play_${season}.csv.gz`;
+const teamArtifactPath = path.resolve(
+  "api/nfl/nflverse-team-metrics.js"
+);
+const artifactPrefix = "const NFLVERSE_PLAYER_METRICS = ";
+const artifactSuffix = ";\n\nexport default NFLVERSE_PLAYER_METRICS;\n";
+const canonicalTeams = [
+  "ARI", "ATL", "BAL", "BUF", "CAR", "CHI", "CIN", "CLE",
+  "DAL", "DEN", "DET", "GB", "HOU", "IND", "JAX", "KC",
+  "LAC", "LAR", "LV", "MIA", "MIN", "NE", "NO", "NYG",
+  "NYJ", "PHI", "PIT", "SEA", "SF", "TB", "TEN", "WSH",
+];
 
 const aliases = {
   WAS: "WSH",
@@ -33,144 +48,199 @@ const aliases = {
 };
 
 export async function main() {
-if (!process.env.BALLDONTLIE_API_KEY) throw new Error("BALLDONTLIE_API_KEY required for player game completion/cutoff provenance");
-console.log(
-  `Downloading nflverse ${season} play-by-play for player metrics...`
-);
-
-const response = await fetch(
-  sourceUrl
-);
-
-if (!response.ok) {
-  throw new Error(
-    `nflverse returned HTTP ${response.status}`
-  );
-}
-
-const compressedBytes =
-  Buffer.from(
-    await response.arrayBuffer()
-  );
-
-const text = gunzipSync(
-  compressedBytes
-).toString("utf8");
-
-const rows = parseCsv(text);
-for (const field of ["season", "game_id", "play_id", "week", "posteam", "defteam", "play_type"]) {
-  if (!rows.length || !(field in rows[0])) throw new Error(`Player source missing ${field}`);
-}
-
-const plays = rows
-  .map(parsePlay)
-  .filter(isEligible);
-const schedule = await fetchPlayerSchedule(season);
-const sourceAsOf = new Date().toISOString();
-const cutoffs = weeklyDepthCutoffs(schedule, season);
-
-const completedWeeks = [
-  ...new Set(
-    plays
-      .map((play) => play.week)
-      .filter(Boolean)
-  ),
-].sort(
-  (first, second) =>
-    first - second
-);
-
-const playerMetricsByWeek = {};
-
-for (
-  const predictionWeek
-  of completedWeeks.map(
-    (week) => week + 1
-  )
-) {
-  playerMetricsByWeek[predictionWeek] = buildWeeklyPlayerMetrics(plays, schedule, {
-    season, predictionWeek, cutoff: cutoffs[predictionWeek],
-  });
-}
-
-const payload = {
-  schemaVersion: PLAYER_METRICS_SCHEMA,
-  sourceAsOf,
-  cutoffs,
-  season,
-
-  generatedAt:
-    new Date().toISOString(),
-
-  source:
-    "nflverse/nflfastR play-by-play",
-
-  sourceUrl,
-
-  garbageTimeFilter:
-    "Win probability between 5% and 95%",
-  latestCompletedWeek: completedWeeks.length ? Math.max(...completedWeeks) : null,
-  requiredFields: ["season", "game_id", "play_id", "week", "posteam", "defteam", "play_type"],
-  playerMetricsByWeek,
-};
-
-await mkdir(
-  path.dirname(outputPath),
-  {
-    recursive: true,
+  if (!process.env.BALLDONTLIE_API_KEY) {
+    throw new Error("BALLDONTLIE_API_KEY required for player game completion/cutoff provenance");
   }
-);
-
-await writeFile(
-  outputPath,
-
-  `const NFLVERSE_PLAYER_METRICS = ${JSON.stringify(
-    payload,
-    null,
-    2
-  )};\n\nexport default NFLVERSE_PLAYER_METRICS;\n`
-);
-
-const generatedWeeks =
-  Object.keys(
-    playerMetricsByWeek
-  ).map(Number);
-
-const latestWeek =
-  generatedWeeks.length
-    ? Math.max(...generatedWeeks)
-    : null;
-
-const latestTeams =
-  latestWeek !== null
-    ? playerMetricsByWeek[
-        latestWeek
-      ] || {}
-    : {};
-
-const playerCount =
-  Object.values(
-    latestTeams
-  ).reduce(
-    (total, teamEntry) =>
-      total +
-      Object.keys(
-        teamEntry.players || {}
-      ).length,
-    0
-  );
-
-console.log(
-  `Wrote ${outputPath}`
-);
-
-console.log(
-  `Eligible plays: ${plays.length} | ` +
-    `latest player profiles: ${playerCount}`
-);
+  console.log(`Downloading nflverse ${season} play-by-play for player metrics...`);
+  const result = await regeneratePlayerMetrics({ season, outputPath });
+  console.log(`Wrote ${outputPath}`);
+  console.log(`Eligible plays: ${result.eligiblePlayCount} | latest player profiles: ${result.playerCount}`);
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href) await main();
+
+export async function regeneratePlayerMetrics({
+  season,
+  outputPath: destination = outputPath,
+  fetchImpl = globalThis.fetch,
+  scheduleFetcher = fetchPlayerSchedule,
+  now = () => new Date(),
+  io = { readFile, writeFile, rename, unlink },
+  generateWeek = buildWeeklyPlayerMetrics,
+}) {
+  const resolvedOutput = path.resolve(destination);
+  if (resolvedOutput === teamArtifactPath) {
+    throw new Error("Player updater cannot write the team artifact");
+  }
+
+  const existing = parsePlayerArtifact(await io.readFile(resolvedOutput, "utf8"));
+  validatePlayerArtifact(existing, { season });
+
+  const requestedSourceUrl = `https://github.com/nflverse/nflverse-data/releases/download/pbp/play_by_play_${season}.csv.gz`;
+  const response = await fetchImpl(requestedSourceUrl);
+  if (!response.ok) throw new Error(`nflverse returned HTTP ${response.status}`);
+  const compressedBytes = Buffer.from(await response.arrayBuffer());
+  const text = gunzipSync(compressedBytes).toString("utf8");
+  const rows = parseCsv(text);
+  for (const field of ["season", "game_id", "play_id", "week", "posteam", "defteam", "play_type"]) {
+    if (!rows.length || !(field in rows[0])) throw new Error(`Player source missing ${field}`);
+  }
+
+  const plays = rows.map(parsePlay).filter(isEligible);
+  const schedule = await scheduleFetcher(season);
+  const sourceAsOf = now().toISOString();
+  const scheduleCutoffs = weeklyDepthCutoffs(schedule, season);
+  const latestCompletedWeek = Math.max(0, ...plays.map((play) => play.week));
+  const predictionWeek = latestCompletedWeek + 1;
+  const cutoff = scheduleCutoffs[predictionWeek];
+  if (!Number.isInteger(predictionWeek) || predictionWeek < 2 || predictionWeek > 18 || !cutoff) {
+    throw new Error(`Unable to determine a valid target prediction week from nflverse data (${predictionWeek})`);
+  }
+
+  const targetMetrics = generateWeek(plays, schedule, { season, predictionWeek, cutoff });
+  validateTargetWeek(targetMetrics, { season, predictionWeek, cutoff, sourceAsOf });
+
+  const cutoffs = { ...existing.cutoffs, [predictionWeek]: cutoff };
+  const playerMetricsByWeek = Object.fromEntries(
+    Object.entries({ ...existing.playerMetricsByWeek, [predictionWeek]: targetMetrics })
+      .sort(([first], [second]) => Number(first) - Number(second)),
+  );
+  const payload = {
+    ...existing,
+    sourceAsOf,
+    cutoffs,
+    season,
+    generatedAt: sourceAsOf,
+    source: "nflverse/nflfastR play-by-play",
+    sourceUrl: requestedSourceUrl,
+    garbageTimeFilter: "Win probability between 5% and 95%",
+    latestCompletedWeek,
+    requiredFields: ["season", "game_id", "play_id", "week", "posteam", "defteam", "play_type"],
+    playerMetricsByWeek,
+  };
+  validatePlayerArtifact(payload, { season });
+
+  const serialized = serializePlayerArtifact(payload);
+  const validatedSerialization = parsePlayerArtifact(serialized);
+  validatePlayerArtifact(validatedSerialization, { season });
+  await writePlayerArtifactAtomically(resolvedOutput, serialized, { season, io, targetWeek: predictionWeek });
+
+  const playerCount = Object.values(targetMetrics).reduce(
+    (total, teamEntry) => total + Object.keys(teamEntry.players || {}).length,
+    0,
+  );
+  return { payload, predictionWeek, cutoff, eligiblePlayCount: plays.length, playerCount };
+}
+
+export async function writePlayerArtifactAtomically(destination, serialized, { season, io, targetWeek }) {
+  const directory = path.dirname(destination);
+  const temporaryPath = path.join(directory, `.${path.basename(destination)}.${process.pid}.${randomUUID()}.tmp`);
+  try {
+    await io.writeFile(temporaryPath, serialized, { flag: "wx" });
+    const temporaryArtifact = parsePlayerArtifact(await io.readFile(temporaryPath, "utf8"));
+    validatePlayerArtifact(temporaryArtifact, { season, targetWeek });
+    await io.rename(temporaryPath, destination);
+  } catch (error) {
+    try {
+      await io.unlink(temporaryPath);
+    } catch (cleanupError) {
+      if (cleanupError.code !== "ENOENT") {
+        throw new AggregateError([error, cleanupError], "Player artifact update failed and temporary-file cleanup also failed");
+      }
+    }
+    throw error;
+  }
+}
+
+export function parsePlayerArtifact(source) {
+  if (!source.startsWith(artifactPrefix) || !source.endsWith(artifactSuffix)) {
+    throw new Error("Player artifact has an invalid JavaScript wrapper");
+  }
+  return JSON.parse(source.slice(artifactPrefix.length, -artifactSuffix.length));
+}
+
+export function serializePlayerArtifact(artifact) {
+  return `${artifactPrefix}${JSON.stringify(artifact, null, 2)}${artifactSuffix}`;
+}
+
+export function validatePlayerArtifact(artifact, { season, targetWeek } = {}) {
+  if (artifact?.schemaVersion !== PLAYER_METRICS_SCHEMA) throw new Error("Player artifact schema mismatch");
+  if (artifact.season !== season) throw new Error("Player artifact season mismatch");
+  if (instant(artifact.sourceAsOf) === null || instant(artifact.generatedAt) === null ||
+      Date.parse(artifact.generatedAt) < Date.parse(artifact.sourceAsOf)) {
+    throw new Error("Player artifact generation provenance invalid");
+  }
+  if (!artifact.cutoffs || typeof artifact.cutoffs !== "object" ||
+      !artifact.playerMetricsByWeek || typeof artifact.playerMetricsByWeek !== "object") {
+    throw new Error("Player artifact weekly data missing");
+  }
+
+  for (const [weekText, teams] of Object.entries(artifact.playerMetricsByWeek)) {
+    const week = Number(weekText);
+    const cutoff = artifact.cutoffs[weekText];
+    if (!/^(?:[1-9]|1[0-8])$/.test(weekText) || instant(cutoff) === null ||
+        !teams || typeof teams !== "object" || Array.isArray(teams)) {
+      throw new Error(`Invalid player artifact week ${weekText}`);
+    }
+    for (const [team, metrics] of Object.entries(teams)) {
+      if (!canonicalTeams.includes(team) || playerTeam(team) !== team ||
+          metrics?.team !== team || metrics.predictionWeek !== week ||
+          instant(metrics.cutoff) !== instant(cutoff)) {
+        throw new Error(`Invalid player artifact team identity for week ${week} ${team}`);
+      }
+      const validationError = validatePlayerMetrics({
+        available: true,
+        schemaVersion: artifact.schemaVersion,
+        season: artifact.season,
+        requestedWeek: week,
+        metricsWeek: week,
+        cutoff,
+        sourceAsOf: artifact.sourceAsOf,
+        generatedAt: artifact.generatedAt,
+        away: metrics,
+        home: null,
+      }, { season, week, cutoff });
+      if (validationError) throw new Error(`Invalid player artifact week ${week} ${team}: ${validationError}`);
+      const playerIds = new Set();
+      for (const player of Object.values(metrics.players || {})) {
+        if (typeof player.playerId !== "string" || !player.playerId.trim() ||
+            playerIds.has(player.playerId) || player.team !== team) {
+          throw new Error(`Invalid or duplicate player identity in week ${week} ${team}`);
+        }
+        playerIds.add(player.playerId);
+      }
+    }
+  }
+  if (targetWeek !== undefined) {
+    const targetTeams = artifact.playerMetricsByWeek[targetWeek];
+    const targetCodes = Object.keys(targetTeams || {}).sort();
+    const expectedCodes = [...canonicalTeams].sort();
+    if (targetCodes.length !== expectedCodes.length ||
+        targetCodes.some((team, index) => team !== expectedCodes[index])) {
+      throw new Error(`Player artifact target week ${targetWeek} must contain all 32 canonical teams`);
+    }
+  }
+  return true;
+}
+
+function validateTargetWeek(teams, { season, predictionWeek, cutoff, sourceAsOf }) {
+  if (!teams || typeof teams !== "object" || Array.isArray(teams)) {
+    throw new Error(`Generated player week ${predictionWeek} is invalid`);
+  }
+  const teamCodes = Object.keys(teams).sort();
+  if (teamCodes.length !== canonicalTeams.length ||
+      teamCodes.some((team, index) => team !== [...canonicalTeams].sort()[index])) {
+    throw new Error(`Generated player week ${predictionWeek} must contain all 32 canonical teams`);
+  }
+  validatePlayerArtifact({
+    schemaVersion: PLAYER_METRICS_SCHEMA,
+    season,
+    sourceAsOf,
+    generatedAt: sourceAsOf,
+    cutoffs: { [predictionWeek]: cutoff },
+    playerMetricsByWeek: { [predictionWeek]: teams },
+  }, { season, targetWeek: predictionWeek });
+}
 
 export function buildWeeklyPlayerMetrics(plays, schedule, { season, predictionWeek, cutoff }) {
   const completed = completedPlayerGames(schedule, season, predictionWeek, cutoff);
