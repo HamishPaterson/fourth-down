@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { buildWeeklyMultiSelection, createWeeklyMultiCurrentHandler, createWeeklyMultiLockHandler, fetchScheduleGamesForWindow, getDisplayLockCycle, getLockCycle, resolveDisplayWeekContext, resolveLockWeekContext, WEEKLY_MULTI_TIME_ZONE } from "./weeklyMulti.js";
 import { createScheduleHandler } from "../api/nfl/schedule.js";
+import { CURRENT_MODEL_VERSION, CURRENT_MODEL_KEY } from "../src/services/modelIdentity.js";
 
 const THURSDAY = Date.UTC(2026, 9, 8, 0, 0, 0);
 const DAY = 24 * 60 * 60 * 1000;
@@ -736,7 +737,7 @@ test("dry run remains available after kickoff and does not insert a row", async 
   }
 });
 
-test("personnel exclusions remove unlocked scorer candidates without mutating locked legs", () => {
+test("personnel exclusions remove unlocked model-only scorer candidates without mutating locked legs", () => {
   const scorer = {
     source: "model-only",
     playerId: "player-1",
@@ -748,6 +749,7 @@ test("personnel exclusions remove unlocked scorer candidates without mutating lo
     selection: "Player One",
   };
   const snapshot = {
+    modelVersion: CURRENT_MODEL_VERSION, modelKey: CURRENT_MODEL_KEY,
     season: 2026,
     week: 5,
     awayCode: "PHI",
@@ -787,6 +789,7 @@ test("personnel exclusions remove unlocked scorer candidates without mutating lo
 test("an out-of-game Tampa quarterback cannot enter unlocked Weekly Multi candidates", () => {
   const playerId = "00-0041251";
   const snapshot = {
+    modelVersion: CURRENT_MODEL_VERSION, modelKey: CURRENT_MODEL_KEY,
     season: 2026,
     week: 5,
     awayCode: "PHI",
@@ -825,6 +828,7 @@ test("an out-of-game Tampa quarterback cannot enter unlocked Weekly Multi candid
 test("unresolved QB identity conflicts exclude each QB from unlocked scorer candidates", () => {
   const quarterbackIds = ["00-0034855", "00-0041251"];
   const snapshot = {
+    modelVersion: CURRENT_MODEL_VERSION, modelKey: CURRENT_MODEL_KEY,
     season: 2026,
     week: 5,
     awayCode: "TB",
@@ -867,8 +871,9 @@ test("unresolved QB identity conflicts exclude each QB from unlocked scorer cand
   assert.equal(selection.reasonCounts.personnelExcluded, 2);
 });
 
-test("personnel-filtered scorer can be selected when status is confirmed eligible", () => {
+test("a personnel-eligible model-only scorer still requires priced market odds", () => {
   const snapshot = {
+    modelVersion: CURRENT_MODEL_VERSION, modelKey: CURRENT_MODEL_KEY,
     season: 2026,
     week: 5,
     awayCode: "PHI",
@@ -909,7 +914,7 @@ test("personnel-filtered scorer can be selected when status is confirmed eligibl
     new Date(THURSDAY - 60 * 60 * 1000),
   );
 
-  assert.equal(selection.legs.some((leg) => leg.playerId === "player-1"), true);
+  assert.equal(selection.legs.some((leg) => leg.playerId === "player-1"), false);
 });
 
 test("dry run returns selection without inserting a row", async () => {

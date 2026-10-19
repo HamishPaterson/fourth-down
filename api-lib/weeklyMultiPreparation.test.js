@@ -5,7 +5,7 @@ import { createWeeklyMultiPreparationHandler } from "./weeklyMultiPreparation.js
 import { createServerPredictionGenerator, readPredictionOdds, saveAuthoritativePrediction } from "./serverPredictions.js";
 import { completePrediction, retainPrediction } from "./predictionEligibility.js";
 import { snapshotToDatabase, databaseToSnapshot } from "../api/nfl/game-stats.js";
-import { createWeeklyMultiCurrentHandler } from "./weeklyMulti.js";
+import { createWeeklyMultiCurrentHandler, getLockCycle, isGeneratedLate, lockIsPastDeadline, WEEKLY_MULTI_TIME_ZONE } from "./weeklyMulti.js";
 import dataset from "../api/nfl/nflverse-team-metrics.js";
 import players from "../data/nflverse-player-metrics.js";
 import { playerMetricsResponse } from "./playerMetrics.js";
@@ -13,8 +13,13 @@ import { compareTeams } from "../api/nfl/play-by-play.js";
 import { FULL_MODEL_VERSION, FULL_MODEL_KEY } from "../src/services/gamePredictionService.js";
 import { BEST_BETS_CANDIDATE_VERSION } from "../src/services/bestBetsService.js";
 import { activePersonnelRecord, predictionFeatureFixture } from "./personnelTestHelpers.js";
+import { fixedTestNow, useFixedTestClock } from "./testClock.js";
+import { predictionFeatureStatus, PREDICTION_FEATURE_VERSION, MATCHUP_INTELLIGENCE_SCHEMA_VERSION } from "../src/services/predictionFeatures.js";
+import { PERSONNEL_VIEW_VERSION } from "./personnelView.js";
+import { KICKER_METRICS_SCHEMA } from "./kickerMetrics.js";
 
-const LOCK = Date.parse("2026-10-15T00:00:00Z");
+useFixedTestClock();
+const LOCK = fixedTestNow().setUTCHours(0, 0, 0, 0);
 const KICKOFF = "2026-10-16T00:15:00Z";
 const PAIRS = [["SEA", "DEN"], ["BUF", "LV"], ["BAL", "CLE"], ["CHI", "ATL"], ["HOU", "JAX"]];
 let originalSecret;
@@ -131,6 +136,8 @@ test("server refresh uses the current model and persists all Best Bets before ex
   assert.equal(res.body.status, "locked");
   assert.equal(res.body.record.lock_at, "2026-10-15T00:00:00.000Z");
   assert.equal(res.body.record.legs.length, 5);
+  assert.equal(res.body.record.partial, false);
+  assert.ok(res.body.record.legs.every((leg) => Number.isFinite(leg.edge) && leg.edge > 0));
   assert.equal(db.tables.prediction_snapshots.length, 5);
   for (const row of db.tables.prediction_snapshots) {
     const snapshot = databaseToSnapshot(row);
@@ -141,6 +148,42 @@ test("server refresh uses the current model and persists all Best Bets before ex
   }
   assert.deepEqual(db.writes, [...Array(5).fill("prediction_snapshots"), "weekly_best_multis"]);
   assert.equal(reports.at(-1).lock, "completed");
+  assert.equal(res.body.record.generated_late, false);
+  assert.equal(res.body.record.odds_late, false);
+  assert.equal(new Set(res.body.record.legs.map((leg) => leg.matchupKey)).size, 5);
+  assert.ok(res.body.record.legs.filter((leg) => leg.market === "Anytime touchdown").length <= 1);
+});
+
+test("Thursday 10:00 Brisbane lock is exclusive before and inclusive at the boundary", async () => {
+  assert.equal(WEEKLY_MULTI_TIME_ZONE, "Australia/Brisbane");
+  const local = new Intl.DateTimeFormat("en-AU", {
+    timeZone: WEEKLY_MULTI_TIME_ZONE, weekday: "long", hour: "2-digit", minute: "2-digit", hourCycle: "h23",
+  }).format(new Date(LOCK));
+  assert.match(local, /Thursday/);
+  assert.match(local, /10:00/);
+  for (const offset of [-60000, 0, 60000]) {
+    const now = new Date(LOCK + offset);
+    const cycle = getLockCycle(now);
+    assert.equal(cycle.targetLockAt, LOCK);
+    assert.equal(cycle.eligible, offset >= 0);
+    const { res, db } = await run({ now, ctx: { ...context(), eligible: cycle.eligible } });
+    if (offset < 0) {
+      assert.equal(res.body.reason, "Outside the weekly preparation day");
+      assert.deepEqual(db.writes, []);
+    } else {
+      assert.equal(res.body.status, "locked");
+      assert.equal(res.body.record.legs.length, 5);
+      assert.equal(res.body.record.generated_late, false);
+      assert.equal(res.body.record.odds_late, false);
+    }
+  }
+});
+
+test("late generation and retry-deadline comparisons preserve their strict boundaries", () => {
+  assert.equal(isGeneratedLate(context(), new Date(LOCK + 15 * 60000)), false);
+  assert.equal(isGeneratedLate(context(), new Date(LOCK + 15 * 60000 + 1)), true);
+  assert.equal(lockIsPastDeadline(context(), new Date(LOCK + 30 * 60000)), true);
+  assert.equal(lockIsPastDeadline(context(), new Date(LOCK + 30 * 60000 - 1)), false);
 });
 
 test("stale model-v6 and incomplete first-writer records cannot block complete authoritative predictions", async () => {
@@ -230,6 +273,16 @@ test("actual shared prediction service builds complete Week 6 records with model
   assert.equal(snapshot.bestBets.anytimeTdScorer.source, "model-only");
   assert.ok(snapshot.bestBets.anytimeTdScorer.selection);
   assert.ok(snapshot.bestBets.assessed > 0);
+  assert.equal(snapshot.modelKey, FULL_MODEL_KEY);
+  assert.equal(snapshot.predictionFeatureVersion, PREDICTION_FEATURE_VERSION);
+  assert.equal(snapshot.predictionPayload.matchupIntelligence.schemaVersion, MATCHUP_INTELLIGENCE_SCHEMA_VERSION);
+  assert.equal(snapshot.personnelVersion, PERSONNEL_VIEW_VERSION);
+  assert.equal(predictionFeatureStatus(snapshot).personnel, true);
+  assert.equal(snapshot.predictionPayload.specialTeams.schemaVersion, KICKER_METRICS_SCHEMA);
+  const stored = databaseToSnapshot(snapshotToDatabase(snapshot));
+  assert.equal(Number(stored.modelVersion), FULL_MODEL_VERSION);
+  assert.equal(stored.modelKey, FULL_MODEL_KEY);
+  assert.deepEqual(stored.predictionPayload.specialTeams, snapshot.predictionPayload.specialTeams);
 });
 
 test("generation failure validates the entire batch before writing and prevents lock", async () => {
@@ -262,6 +315,8 @@ test("late Hobby invocation executes ordered stages, not independent racing jobs
   });
   assert.equal(res.body.status, "generated late");
   assert.equal(res.body.record.lock_at, new Date(LOCK).toISOString());
+  assert.equal(res.body.record.generated_late, true);
+  assert.equal(res.body.record.odds_late, true);
   assert.equal(db.writes.at(-1), "weekly_best_multis");
 });
 
@@ -302,17 +357,17 @@ test("no qualifying candidates yields an honest empty partial at the deadline, n
   assert.match(res.body.record.reason, /Fewer than five eligible legs/);
 });
 
-test("a model-only TD remains eligible alongside priced Best Bets after shared persistence", async () => {
-  const { res } = await run({ generatePrediction: async (game) => {
+test("a model-only TD without market odds is excluded after shared persistence", async () => {
+  const { res } = await run({ now: new Date(LOCK + 30 * 60000), generatePrediction: async (game) => {
     const snapshot = fixture(game, new Date(LOCK));
-    if (game.away === "SEA") {
-      snapshot.bestBets.recommendations = [];
-      snapshot.bestBets.candidates = [];
-    }
+    snapshot.bestBets.recommendations = [];
+    snapshot.bestBets.candidates = [];
     return snapshot;
   } });
-  assert.equal(res.body.record.legs.length, 5);
-  assert.ok(res.body.record.legs.some((leg) => leg.modelOnly && leg.selection === "Validated Full Player anytime TD"));
+  assert.equal(res.body.status, "generated late");
+  assert.equal(res.body.record.legs.length, 0);
+  assert.equal(res.body.record.partial, true);
+  assert.equal(res.body.record.legs.some((leg) => leg.market === "Anytime touchdown"), false);
 });
 
 test("next week does not reuse last week's lock and post-kickoff recovery is prohibited", async () => {

@@ -11,6 +11,7 @@ import {
   resolveLockWeekContext,
 } from "./weeklyMulti.js";
 import { activePersonnelRecord, personnelViewFixture } from "./personnelTestHelpers.js";
+import { CURRENT_MODEL_VERSION, CURRENT_MODEL_KEY } from "../src/services/modelIdentity.js";
 
 const THURSDAY = Date.UTC(2026, 9, 8, 0, 0, 0);
 const HOUR = 60 * 60 * 1000;
@@ -37,6 +38,7 @@ const ml = book([{ key: "h2h", outcomes: [{ name: "ARI", price: 100 }] }]);
 const spread = book([{ key: "spreads", outcomes: [{ name: "BUF", point: -3.5, price: -110 }] }]);
 const total = book([{ key: "totals", outcomes: [{ name: "Over", point: 44.5, price: -110 }] }]);
 const passYds = book([{ key: "player_pass_yds", outcomes: [{ name: "Over", playerName: "Named Quarterback", point: 250.5, price: -110 }] }]);
+const anytimeTd = book([{ key: "player_anytime_td", outcomes: [{ name: "Yes", playerName: "K. Walker", price: 100 }] }]);
 
 const GAMES = [
   { away: "ARI", home: "LAR", id: "e1", bets: [bet("Moneyline", "ARI")], core: ml },
@@ -45,9 +47,10 @@ const GAMES = [
   { away: "KC", home: "DEN", id: "e4", bets: [bet("player_pass_yds", "Named Quarterback Over 250.5 passing yards", {
     line: 250.5, category: "Player", playerId: "named-qb", personnelId: "named-qb", playerTeam: "KC",
   })], props: passYds },
-  { away: "SEA", home: "SF", id: "e5", bets: [], scorer: {
-    source: "model-only", selection: "K. Walker anytime TD", playerId: "td-player", personnelId: "td-player",
-    playerTeam: "SEA", modelProbability: 0.7, roleConfidence: 1, decimalOdds: null,
+  { away: "SEA", home: "SF", id: "e5", bets: [], core: anytimeTd, scorer: {
+    source: "priced-market", market: "Anytime touchdown", selection: "K. Walker Yes",
+    playerId: "td-player", personnelId: "td-player", playerTeam: "SEA", modelProbability: 0.7,
+    decimalOdds: 2, sportsbook: "BK", updatedAt: QUOTE_AT,
   } },
 ];
 
@@ -64,8 +67,8 @@ function snapshotFor(game, overrides = {}) {
   const generatedAt = new Date(THURSDAY - HOUR).toISOString();
   return {
     season: 2026, week: 5, kickoff: new Date(THURSDAY + 3 * HOUR).toISOString(), awayCode: game.away, homeCode: game.home,
-    modelVersion: 11,
-    modelKey: "full-v11-week5-data-gap-audit",
+    modelVersion: CURRENT_MODEL_VERSION,
+    modelKey: CURRENT_MODEL_KEY,
     fourthDownPick: game.away,
     fourthDownAwayScore: 24,
     fourthDownHomeScore: 20,
@@ -88,10 +91,10 @@ function predictionRow(game) {
   return {
     season: 2026, week: 5, kickoff: new Date(THURSDAY + 3 * HOUR).toISOString(), away_code: game.away, home_code: game.home,
     fourth_down_pick: game.away, predicted_away_score: 24, predicted_home_score: 20, away_win_probability: 0.6, home_win_probability: 0.4,
-    model_version: 11, created_at: new Date(THURSDAY - HOUR).toISOString(),
+    model_version: CURRENT_MODEL_VERSION, created_at: new Date(THURSDAY - HOUR).toISOString(),
     data_quality: {
       snapshot: {
-        modelKey: "full-v11-week5-data-gap-audit", predictionPayload: {}, generatedAt: new Date(THURSDAY - HOUR).toISOString(),
+        modelKey: CURRENT_MODEL_KEY, predictionPayload: {}, generatedAt: new Date(THURSDAY - HOUR).toISOString(),
         ...snapshotFor(game),
         bestBets: { recommendations: game.bets, anytimeTdScorer: game.scorer },
         dataQuality: { sources: { odds: { available: true } } },
@@ -170,6 +173,98 @@ const select = (games = GAMES, payloads = mergeStoredOdds(storedPayloads(games).
   buildWeeklyMultiSelection(games.map((game) => snapshotFor(game)), payloads, CONTEXT, now);
 const legFor = (selection, away) => selection.legs.find((leg) => leg.awayCode === away);
 
+function selectTd(overrides = {}) {
+  const game = {
+    ...GAMES[4],
+    scorer: { ...GAMES[4].scorer, ...overrides },
+    core: Object.hasOwn(overrides, "core") ? overrides.core : anytimeTd,
+  };
+  return select([game]);
+}
+
+test("only the shared current model identity admits new snapshots and selection", () => {
+  for (const [version, key, eligible] of [
+    [CURRENT_MODEL_VERSION, CURRENT_MODEL_KEY, true],
+    [String(CURRENT_MODEL_VERSION), CURRENT_MODEL_KEY, true],
+    [CURRENT_MODEL_VERSION, "wrong-key", false],
+    [11, "full-v11-week5-data-gap-audit", false],
+    [11, CURRENT_MODEL_KEY, false],
+    [undefined, CURRENT_MODEL_KEY, false],
+    [CURRENT_MODEL_VERSION, undefined, false],
+    ["12garbage", CURRENT_MODEL_KEY, false],
+    ["v12", CURRENT_MODEL_KEY, false],
+    [[CURRENT_MODEL_VERSION], CURRENT_MODEL_KEY, false],
+    [true, CURRENT_MODEL_KEY, false],
+    [CURRENT_MODEL_VERSION + 1, CURRENT_MODEL_KEY, false],
+  ]) {
+    const snapshot = snapshotFor(GAMES[0], { modelVersion: version, modelKey: key });
+    const row = predictionRow(GAMES[0]);
+    row.model_version = version;
+    Object.assign(row.data_quality.snapshot, { modelVersion: version, modelKey: key });
+    assert.equal(predictionSnapshotsForWeek([row], CONTEXT, NOW).length, eligible ? 1 : 0,
+      `snapshot version ${version}, key ${key}`);
+    const selection = buildWeeklyMultiSelection([snapshot],
+      mergeStoredOdds(storedPayloads().core, storedPayloads().props), CONTEXT, NOW);
+    assert.equal(selection.legs.length, eligible ? 1 : 0, `selection version ${version}, key ${key}`);
+    assert.equal(selection.reasonCounts.stalePrediction, eligible ? 0 : 1);
+  }
+});
+
+test("snapshot kickoff must be strictly future; 24-hour prediction age is inclusive", () => {
+  for (const [kickoffOffset, age, eligible] of [
+    [1, 24 * HOUR, true],
+    [1, 24 * HOUR - 1, true],
+    [1, 24 * HOUR + 1, false],
+    [0, HOUR, false],
+    [-1, HOUR, false],
+  ]) {
+    const row = predictionRow(GAMES[0]);
+    row.kickoff = new Date(NOW.getTime() + kickoffOffset).toISOString();
+    row.data_quality.snapshot.generatedAt = new Date(NOW.getTime() - age).toISOString();
+    assert.equal(predictionSnapshotsForWeek([row], CONTEXT, NOW).length, eligible ? 1 : 0);
+  }
+});
+
+test("priced legs cannot use missing or invalid timestamps", () => {
+  for (const updatedAt of [undefined, null, "", "invalid"]) {
+    const snapshot = snapshotFor(GAMES[0]);
+    snapshot.bestBets.recommendations = [{ ...GAMES[0].bets[0], updatedAt }];
+    const result = buildWeeklyMultiSelection([snapshot],
+      mergeStoredOdds(storedPayloads().core, storedPayloads().props), CONTEXT, NOW);
+    assert.equal(result.legs.length, 0);
+    assert.equal(result.reasonCounts.staleOdds, 1);
+  }
+});
+
+test("existing locked Multis stay readable and immutable for legacy and current model identities", async () => {
+  for (const [modelVersion, modelKey] of [
+    [11, "full-v11-week5-data-gap-audit"],
+    [CURRENT_MODEL_VERSION, CURRENT_MODEL_KEY],
+  ]) {
+    const saved = {
+      id: "bb998fce-9992-423a-8581-e14ce4e2a8b7",
+      season: CONTEXT.season, week: CONTEXT.week, lock_at: CONTEXT.lockAt,
+      modelVersion, modelKey, status: "locked", partial: false,
+      legs: [{ awayCode: "ARI", homeCode: "LAR", market: "Moneyline", selection: "ARI", decimalOdds: 2 }],
+    };
+    const before = structuredClone(saved);
+    const database = lockClient({ existing: saved });
+    const lock = await runLock({
+      database, fetchOdds: async () => assert.fail("A stored lock must not fetch odds"),
+    });
+    assert.equal(lock.res.body.status, "already locked");
+    const res = response();
+    await createWeeklyMultiCurrentHandler({
+      createClient: () => database.client, getNow: () => NOW,
+      fetchGames: async () => assert.fail("A stored lock must not fetch schedule"),
+      resolveDisplayContext: async () => assert.fail("A stored lock must not be regenerated"),
+    })({ method: "GET" }, res);
+    assert.deepEqual(res.body.record, before);
+    assert.deepEqual(saved, before);
+    assert.equal(inserts(database).length, 0);
+  }
+});
+
 test("stored core odds are read from the snapshot endpoints, merged with stored player props", () => {
   const urls = getStoredOddsUrls({ headers: { host: "example.test" } });
   assert.deepEqual(urls, { core: "https://example.test/api/nfl/odds", props: "https://example.test/api/nfl/odds?props=1&source=snapshot" });
@@ -179,7 +274,7 @@ test("stored core odds are read from the snapshot endpoints, merged with stored 
   assert.deepEqual(merged.events.find((event) => event.id === "e4").bookmakers[0].markets.map((market) => market.key), ["player_pass_yds"]);
 });
 
-test("moneyline, spread, total, player prop and model-only Anytime TD are all selected", () => {
+test("moneyline, spread, total, player prop and positively priced Anytime TD are selected", () => {
   const selection = select();
   assert.equal(selection.complete, true);
   assert.equal(selection.legs.length, 5);
@@ -188,32 +283,57 @@ test("moneyline, spread, total, player prop and model-only Anytime TD are all se
   assert.equal(legFor(selection, "DAL").market, "Total");
   assert.equal(legFor(selection, "KC").market, "player_pass_yds");
   const td = legFor(selection, "SEA");
-  assert.equal(td.modelOnly, true);
-  assert.equal(td.decimalOdds, null);
+  assert.equal(td.modelOnly, undefined);
+  assert.equal(td.decimalOdds, 2);
   assert.equal(td.modelProbability, 0.7);
-  assert.equal(td.selection, "K. Walker anytime TD");
+  assert.equal(td.impliedProbability, 0.5);
+  assert.ok(Math.abs(td.edge - 0.2) < 1e-12);
+  assert.equal(td.selection, "K. Walker Yes");
 });
 
-test("five model-only TDs yield only the highest role-adjusted scorer and an honest partial at the floor", () => {
+test("model-only TD predictions without market odds are excluded", () => {
   const games = GAMES.map((game, index) => ({ ...game, bets: [], scorer: {
-    source: "model-only", selection: `${game.away} Player anytime TD`,
+    source: "model-only", selection: `${game.away} Player anytime TD`, market: "Anytime touchdown",
     playerId: `${game.away}-td`, personnelId: `${game.away}-td`, playerTeam: game.away,
-    modelProbability: .95 - index * .04, roleConfidence: index === 0 ? .6 : 1,
+    modelProbability: .95 - index * .04, roleConfidence: index === 0 ? .6 : 1, decimalOdds: null,
   } }));
   const selected = select(games);
-  assert.equal(selected.legs.length, 1);
-  assert.equal(selected.legs[0].awayCode, "BUF");
-  assert.ok(Math.abs(selected.legs[0].modelProbability - .91) < 1e-12);
+  assert.equal(selected.legs.length, 0);
   assert.equal(selected.partial, true);
   assert.equal(selected.threshold, .55);
-  assert.equal(selected.legs[0].edge, null);
-  assert.equal(selected.legs[0].expectedValue, null);
-  assert.equal(selected.legs[0].decimalOdds, null);
 });
 
-test("invalid or weak role confidence cannot admit a TD to create diversity", () => {
+test("a model-only TD with a null edge cannot enter selection", () => {
+  const game = { ...GAMES[4], scorer: { ...GAMES[4].scorer, source: "model-only", decimalOdds: null, edge: null } };
+  const result = select([game]);
+  assert.equal(result.legs.length, 0);
+});
+
+test("zero, negative, NaN and non-finite calculated edges are rejected", () => {
+  for (const modelProbability of [undefined, null, 0.5, 0.49, NaN, Infinity, -Infinity]) {
+    assert.equal(selectTd({ modelProbability }).legs.length, 0, `model probability ${modelProbability}`);
+  }
+});
+
+test("missing or invalid Anytime TD odds are rejected", () => {
+  for (const decimalOdds of [undefined, null, NaN, Infinity, 1, 0, -2]) {
+    assert.equal(selectTd({ decimalOdds }).legs.length, 0, `decimal odds ${decimalOdds}`);
+  }
+  assert.equal(selectTd({ core: null }).legs.length, 0);
+});
+
+test("a finite positive Anytime TD edge remains eligible above the probability threshold", () => {
+  const selected = selectTd({ modelProbability: 0.7, decimalOdds: 2 });
+  assert.equal(selected.legs.length, 1);
+  assert.equal(selected.legs[0].modelProbability, 0.7);
+  assert.equal(selected.legs[0].impliedProbability, 0.5);
+  assert.ok(Math.abs(selected.legs[0].edge - 0.2) < 1e-12);
+  assert.ok(Number.isFinite(selected.legs[0].edge) && selected.legs[0].edge > 0);
+});
+
+test("model-only TD predictions cannot enter selection through role confidence", () => {
   for (const roleConfidence of [undefined, null, 0, 1.1, NaN, .3]) {
-    const game = { ...GAMES[4], scorer: { ...GAMES[4].scorer, roleConfidence } };
+    const game = { ...GAMES[4], scorer: { ...GAMES[4].scorer, source: "model-only", roleConfidence } };
     assert.equal(select([game]).legs.length, 0);
   }
 });
@@ -251,7 +371,7 @@ test("readable player markets match exact stored market, player, direction and l
 
 test("multiple Anytime TD offers, priced or unpriced, cannot consume more than one game", () => {
   const games = GAMES.map((g) => ({ ...g, bets: [], scorer: {
-    ...GAMES[4].scorer, selection: `${g.away} Player anytime TD`,
+    ...GAMES[4].scorer, source: "model-only", selection: `${g.away} Player anytime TD`,
     playerId: `${g.away}-td`, personnelId: `${g.away}-td`, playerTeam: g.away,
   } }));
   games[0].bets = [bet("Anytime touchdown", "Named Player Yes", {
@@ -263,7 +383,37 @@ test("multiple Anytime TD offers, priced or unpriced, cannot consume more than o
   assert.equal(result.legs[0].modelOnly, undefined);
 });
 
-test("ranking is unchanged for priced input and model-only legs rank after priced legs", () => {
+test("the same Anytime TD player offered in two matchups cannot produce duplicate legs", () => {
+  const first = GAMES[4];
+  const second = {
+    ...first, home: "LAR", id: "e6",
+    scorer: { ...first.scorer, selection: "K. Walker Yes" },
+  };
+  const result = select([first, second]);
+  const tdLegs = result.legs.filter((leg) => leg.marketFamily === "anytime-td");
+  assert.equal(tdLegs.filter((leg) => leg.playerId === "td-player").length, 1);
+  assert.equal(new Set(tdLegs.map((leg) => leg.playerId)).size, tdLegs.length);
+});
+
+test("explicitly contradictory moneyline candidates cannot both be selected", () => {
+  const game = {
+    ...GAMES[0],
+    bets: [
+      bet("Moneyline", "ARI", { modelProbability: 0.8 }),
+      bet("Moneyline", "LAR", { modelProbability: 0.8 }),
+    ],
+    core: book([{ key: "h2h", outcomes: [{ name: "ARI", price: 100 }, { name: "LAR", price: 100 }] }]),
+  };
+  const result = select([game]);
+  const moneylineSelections = result.legs
+    .filter((leg) => leg.market === "Moneyline")
+    .map((leg) => leg.selection);
+  assert.equal(moneylineSelections.length, 1);
+  assert.equal(moneylineSelections.includes("ARI") && moneylineSelections.includes("LAR"), false);
+  assert.equal(new Set(result.legs.map((leg) => leg.matchupKey)).size, result.legs.length);
+});
+
+test("ranking is unchanged for priced candidates", () => {
   const games = [
     { ...GAMES[0], bets: [bet("Moneyline", "ARI", { decimalOdds: 2.2, modelProbability: 0.7 })],
       core: book([{ key: "h2h", outcomes: [{ name: "ARI", price: 120 }] }]) },
@@ -274,15 +424,8 @@ test("ranking is unchanged for priced input and model-only legs rank after price
   ];
   const selection = select(games);
   assert.deepEqual(selection.legs.map((leg) => leg.awayCode), ["DAL", "BUF", "ARI"]);
-  const mixed = select([GAMES[0], GAMES[4]]);
-  assert.deepEqual(mixed.legs.map((leg) => leg.awayCode), ["ARI", "SEA"]);
-});
-
-test("a priced leg for a matchup wins over the model-only scorer for the same matchup", () => {
-  const game = { ...GAMES[0], scorer: GAMES[4].scorer };
-  const selection = select([game]);
-  assert.equal(selection.legs.length, 1);
-  assert.equal(selection.legs[0].market, "Moneyline");
+  const mixed = select([GAMES[0], { ...GAMES[4], scorer: { ...GAMES[4].scorer, source: "model-only" } }]);
+  assert.deepEqual(mixed.legs.map((leg) => leg.awayCode), ["ARI"]);
 });
 
 test("missing snapshot data never fabricates a leg", () => {
@@ -313,15 +456,17 @@ test("refresh and lock read only stored snapshots and make zero SharpAPI calls",
   assert.equal(inserts(database).length, 1);
 });
 
-test("the lock persists moneyline, spread, total, player prop and model-only TD legs with their locked values", async () => {
+test("the lock persists moneyline, spread, total, player prop and priced Anytime TD legs", async () => {
   const { res, database } = await runLock({ fetchOdds: storedOddsFetch() });
   const record = inserts(database)[0][1];
   assert.equal(record.status, "locked");
   assert.equal(record.legs.length, 5);
   assert.deepEqual(record.legs.map((leg) => leg.market).sort(), ["Anytime touchdown", "Moneyline", "Spread", "Total", "player_pass_yds"]);
-  const td = record.legs.find((leg) => leg.modelOnly);
-  assert.equal(td.decimalOdds, null);
+  const td = record.legs.find((leg) => leg.market === "Anytime touchdown");
+  assert.equal(td.modelOnly, undefined);
+  assert.equal(td.decimalOdds, 2);
   assert.equal(td.modelProbability, 0.7);
+  assert.ok(Number.isFinite(td.edge) && td.edge > 0);
   assert.equal(record.lock_at, CONTEXT.lockAt);
   assert.equal(res.body.record.legs.length, 5);
 });
@@ -461,7 +606,11 @@ test("an unresolved locked multi survives week rollover and snapshot refreshes",
 test("a new week's lock does not overwrite an unresolved previous-week record", async () => {
   const week = 7 * 24 * HOUR;
   const quoteAt = new Date(THURSDAY + week - 2 * HOUR).toISOString();
-  const newWeekGames = GAMES.map((game) => ({ ...game, bets: game.bets.map((entry) => ({ ...entry, updatedAt: quoteAt })) }));
+  const newWeekGames = GAMES.map((game) => ({
+    ...game,
+    bets: game.bets.map((entry) => ({ ...entry, updatedAt: quoteAt })),
+    scorer: game.scorer ? { ...game.scorer, updatedAt: quoteAt } : game.scorer,
+  }));
   const shifted = newWeekGames.map(predictionRow).map((row) => ({
     ...row, week: 6, kickoff: new Date(THURSDAY + week + 3 * HOUR).toISOString(),
     data_quality: { snapshot: { ...row.data_quality.snapshot, generatedAt: new Date(THURSDAY + week - HOUR).toISOString() } },

@@ -5,6 +5,7 @@ import { findOddsForGame, resolveTeamCode } from "../src/services/oddsApi.js";
 import { usableDecimalOdds } from "../src/services/oddsDisplay.js";
 import { validateOddsEvents } from "../src/services/quoteValidation.js";
 import { canonicalTeam } from "./personnelView.js";
+import { isCurrentModelIdentity } from "../src/services/modelIdentity.js";
 
 const BALLDONTLIE_GAMES_URL = "https://api.balldontlie.io/nfl/v1/games";
 // Odds now come from once-a-day stored snapshots, so quote age is bounded by
@@ -253,9 +254,9 @@ export function predictionSnapshotsForWeek(rows, context, now = new Date()) {
 function isFreshPrediction(snapshot, context, now) {
   if (!snapshot || Number(snapshot.season) !== context.season || Number(snapshot.week) !== context.week) return false;
   if (snapshot.source === "full-model-error") return false;
-  const modelVersion = Number(snapshot.modelVersion ?? snapshot.dataQuality?.modelVersion);
+  const modelVersion = snapshot.modelVersion ?? snapshot.dataQuality?.modelVersion;
   const modelKey = snapshot.modelKey ?? snapshot.dataQuality?.modelKey;
-  if (modelVersion !== 11 || modelKey !== "full-v11-week5-data-gap-audit") return false;
+  if (!isCurrentModelIdentity(modelVersion, modelKey)) return false;
   const payload = snapshot.predictionPayload ?? snapshot.dataQuality?.predictionPayload;
   const bestBets = snapshot.bestBets ?? snapshot.dataQuality?.bestBetsPayload;
   const dataQuality = snapshot.dataQuality;
@@ -290,41 +291,15 @@ export function buildWeeklyMultiSelection(snapshots, oddsPayload, context, now =
   const quoteAudit = validateOddsEvents(Array.isArray(oddsPayload?.events) ? oddsPayload.events : [], { now });
   const oddsEvents = quoteAudit.events;
   for (const snapshot of snapshots || []) {
+    if (!isCurrentModelIdentity(snapshot?.modelVersion ?? snapshot?.dataQuality?.modelVersion,
+      snapshot?.modelKey ?? snapshot?.dataQuality?.modelKey)) {
+      reasonCounts.stalePrediction += 1;
+      continue;
+    }
     const bestBetsPayload = snapshot.bestBets || snapshot.dataQuality?.bestBetsPayload;
     const scorer = bestBetsPayload?.anytimeTdScorer;
-    const tdProbability = Number(scorer?.tdProbability ?? scorer?.modelProbability);
-    const roleConfidence = Number(scorer?.roleConfidence);
-    const scorerProbability = tdProbability * roleConfidence;
-    const scorerPersonnelEligible = scorer?.source === "model-only" &&
-      personnelCandidateEligible(snapshot, scorer);
-    // The model-only Anytime TD scorer has no bookmaker price by design.
-    if (scorer?.source === "model-only" && !scorerPersonnelEligible) {
+    if (scorer?.source === "model-only" && !personnelCandidateEligible(snapshot, scorer)) {
       reasonCounts.personnelExcluded += 1;
-    } else if (scorerPersonnelEligible &&
-      scorer.selection && tdProbability > 0 && tdProbability <= 1 &&
-      roleConfidence > 0 && roleConfidence <= 1 && scorerProbability > 0 && scorerProbability <= 1 &&
-      snapshot.awayCode && snapshot.homeCode) {
-      candidates.push({
-        ...scorer,
-        category: "Anytime touchdowns",
-        market: "Anytime touchdown",
-        modelOnly: true,
-        decimalOdds: null,
-        price: null,
-        sportsbook: null,
-        modelProbability: scorerProbability,
-        tdProbability,
-        marketFamily: "anytime-td",
-        impliedProbability: null,
-        edge: null,
-        expectedValue: null,
-        awayCode: snapshot.awayCode,
-        homeCode: snapshot.homeCode,
-        matchup: `${snapshot.awayCode} at ${snapshot.homeCode}`,
-        matchupKey: `${context.season}:${context.week}:${snapshot.awayCode}:${snapshot.homeCode}`,
-        kickoff: snapshot.kickoff,
-        oddsUpdatedAt: null,
-      });
     }
     const event = findOddsForGame(oddsEvents, snapshot);
     if (!event || isFallbackEvent(event)) {
@@ -357,7 +332,7 @@ export function buildWeeklyMultiSelection(snapshots, oddsPayload, context, now =
       }
       const impliedProbability = 1 / decimalOdds;
       const edge = modelProbability - impliedProbability;
-      if (edge <= 0) continue;
+      if (!Number.isFinite(edge) || edge <= 0) continue;
       candidates.push({
         ...bet,
         marketFamily: weeklyMultiMarketFamily(bet),
