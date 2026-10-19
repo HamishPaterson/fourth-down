@@ -55,6 +55,41 @@ test("weather request uses actual Wembley venue coordinates and kickoff-hour obs
   });
 });
 
+test("Stade de France uses its outdoor coordinates for scheduled PIT at NO weather", async () => {
+  await withFetch({
+    ok: true,
+    async json() { return hourlyFixture(); },
+  }, async (calls) => {
+    const weather = await getStadiumWeather("NO", kickoff, undefined, "Stade de France");
+    const url = new URL(calls[0]);
+    assert.equal(url.searchParams.get("latitude"), "48.9244726");
+    assert.equal(url.searchParams.get("longitude"), "2.3601325");
+    assert.equal(weather.dome, false);
+    assert.equal(weather.stadium, "Stade de France");
+    assert.equal(weather.venueSource, "scheduled-venue");
+    assert.equal(weather.weatherSource, "open-meteo");
+    assert.equal(weather.weatherAvailable, true);
+    assert.equal(calls.length, 1);
+  });
+});
+
+test("Reliant Stadium uses NRG identity and dome bypass exactly like NRG Stadium", async () => {
+  await withFetch({
+    ok: true,
+    async json() { return hourlyFixture(); },
+  }, async (calls) => {
+    const alias = await getStadiumWeather("HOU", kickoff, undefined, "Reliant Stadium");
+    const canonical = await getStadiumWeather("HOU", kickoff, undefined, "NRG Stadium");
+    assert.equal(alias.stadium, canonical.stadium);
+    assert.equal(alias.venue, canonical.venue);
+    assert.equal(alias.dome, canonical.dome);
+    assert.equal(alias.weatherAvailable, canonical.weatherAvailable);
+    assert.equal(alias.weatherSource, canonical.weatherSource);
+    assert.equal(alias.weatherSource, "indoor-venue");
+    assert.equal(calls.length, 0);
+  });
+});
+
 test("weather request uses EverBank when scheduled and reports home-default when venue is absent", async () => {
   await withFetch({
     ok: true,

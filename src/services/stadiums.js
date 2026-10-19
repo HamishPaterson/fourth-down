@@ -45,6 +45,7 @@ const STADIUMS = {
 };
 
 const NEUTRAL_VENUES = {
+  "Stade de France": { name: "Stade de France", lat: 48.9244726, lon: 2.3601325, dome: false },
   "Wembley Stadium": { name: "Wembley Stadium", lat: 51.5560, lon: -0.2796, dome: false },
   "Tottenham Hotspur Stadium": { name: "Tottenham Hotspur Stadium", lat: 51.6043, lon: -0.0665, dome: false },
   "Allianz Arena": { name: "Allianz Arena", lat: 48.2188, lon: 11.6247, dome: false },
@@ -56,6 +57,7 @@ const VENUE_ALIASES = {
   "Arrowhead Stadium": "GEHA Field at Arrowhead Stadium",
   "EverBank Field": "EverBank Stadium",
   "TIAA Bank Field": "EverBank Stadium",
+  "Reliant Stadium": "NRG Stadium",
   "Wembley": "Wembley Stadium",
   "Tottenham": "Tottenham Hotspur Stadium",
   "Frankfurt Stadium": "Deutsche Bank Park",
