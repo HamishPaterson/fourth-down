@@ -36,7 +36,7 @@ registers an alias.
 This phase is **not a production cutover**. Existing SharpAPI snapshots and
 routes remain the active rollback path; normal browser reads remain cache-only.
 The new controlled refresh service is not called from UI, prediction, Best Bets,
-Weekly Multi, or cron handlers. Persistent storage is not connected. Adapter
+Weekly Multi, or cron handlers. Production storage is not connected. Adapter
 tests use mocked fetch responses and must never contact a live provider.
 
 Normalized snapshots require explicit completeness evidence before replacing a
@@ -59,6 +59,90 @@ The provider-selection settings are not wired into current production reads.
 Credit limits default to zero in code, so paid refreshes fail closed until
 explicitly configured. `PARLAY_API_KEY` is read only by the server-side adapter
 and must never use a `VITE_` prefix or be exposed to browser code.
+
+### Phase 2: persistent boundary (not activated)
+
+`supabase/odds_provider_cache.sql` is an **unapplied**, additive migration.
+Do not execute it against Production in this phase. The existing Sharp table's
+conflict key is `(sport, season, week, market)`, which excludes provider, bookmaker,
+player, side and line. Reusing that upsert would overwrite other providers and
+cannot atomically publish a multi-market refresh. The separate provider tables
+leave Sharp's schema, routes, reads and writes unchanged.
+
+The new Supabase repository uses the existing server-only service-role client
+pattern. Normal cache readers contain no provider dependency. They read only the
+current promoted COMPLETE generation, preserving prior complete data on failure,
+with stale/attempt diagnostics and optional event/market/player filtering.
+Quote identity includes provider, scope, event, bookmaker, canonical/raw market,
+player, selection, side and line, never a timestamp or price. Each generation
+retains history; new prices do not mutate earlier generations or copied Multi
+quote locks. Refresh IDs are included in future quote-lock copies.
+
+The explicit refresh pipeline validates authoritative event/week/team context,
+all requested event/market coverage, prices and player eligibility, writes a
+candidate, reads and validates it again, then atomically promotes a fenced current
+pointer. Candidates and partial page sets are never visible as current. Older
+provider timestamps cannot replace matching current quotes. No cross-provider
+price blending occurs. Missing full coverage deliberately blocks promotion;
+an operator must investigate rather than pad missing events or markets.
+
+Database-clock 120-second leases use owner tokens, renewal before every paid page,
+owner-only release and expired-lease recovery. Credit reservations use a
+provider/month PostgreSQL advisory transaction lock, so different resources and
+server instances share the same budget. Each props page reserves 3 credits; the
+US h2h/spreads/totals request reserves 3. No request is intentionally dispatched
+when its documented maximum would exceed the monthly limit or, for automatic
+calls, the automatic budget. This cannot guarantee that unexpected provider
+overcharges never exceed those limits after dispatch. Actual charges are recorded
+honestly, never clamped: `expected_credits` retains the reservation,
+`observed_credits` retains the actual charge, and `overrun_credits` records any
+positive difference. `COST_OVERRUN` atomically suspends all later paid automatic
+and manual calls for that provider/month, including previously reserved calls
+that have not dispatched. There is no automatic paid retry.
+Outstanding dispatched requests also block later paid reservations and dispatches
+until reconciled, serializing paid calls across scopes for that provider/month.
+If their owner/lease is lost, the next paid attempt atomically records
+`CHARGE_UNKNOWN` and sticky suspension before refusing the call.
+
+An unknown post-dispatch charge, even for a successful response, retains the full
+reservation as `CHARGE_UNKNOWN` and also suspends paid calls. Later exact evidence
+can reconcile the charge but never silently clears suspension. Only a known
+pre-dispatch failure releases its reservation (`PRE_DISPATCH_FAILURE`). A worker
+crash never automatically releases possibly consumed credits. Suspension is
+sticky; this phase exposes no administrative reset RPC or route. Any future reset
+must be separately authorized and auditable. Cached COMPLETE generations remain
+readable. Reconciliation is idempotent. Unbound repositories
+cannot be used for paid adapter calls. Explicitly free events calls are logged
+without paid reservations, retain the adapter timeout, and are not retried.
+
+`createProviderRefreshOperation` is a server-only operation factory, **not a new
+public API route or cron**. It requires POST and the existing timing-safe
+`Bearer CRON_SECRET` operational authorization. Supply a trusted server context
+loader (authoritative event mappings and exact-week player artifact); request
+bodies cannot supply identities, credentials or budgets. No default context
+loader or application/cron wiring is activated in this phase.
+
+Refresh reasons are machine codes only: `SCHEDULED_REFRESH`,
+`MANUAL_ADMIN_REFRESH`, `INITIAL_PROVIDER_VALIDATION`, or `RECOVERY_REFRESH`.
+The operation, domain, repository and SQL reject all other values, including
+free-form request text. Persisted failures use a bounded allowlist of failure
+codes and structured HTTP/usage state, not exceptions, headers, provider bodies
+or remote messages.
+
+- `plan`: no provider calls or writes; reports minimum/maximum estimated credits.
+- `dry-run`: requires a server-supplied fixture; validates without repository
+  creation, provider calls, quote writes, promotion or ledger writes. Live paid
+  dry runs are intentionally disabled because usage must not escape accounting.
+- `persist`: explicitly authorized only; distributed lease, per-page reservation,
+  candidate validation and atomic promotion. Do not invoke live in Phase 2.
+
+The migration grants RPC execution and table reads only to `service_role`; clients
+cannot mutate tables directly. No credentials or request headers are persisted.
+Tests use mocked fetch and a local embedded PostgreSQL fixture (`@electric-sql/pglite`)
+to execute the migration and transactional RPCs without contacting Supabase.
+This local engine queues requests; multi-instance fencing/reservation tests verify
+database state transitions, not a production multi-connection load test.
+
 The score-based live Opponent-Network remains a separate, unchanged model layer.
 
 There are no separate rushing/passing success rates, pass/rush explosive rates,

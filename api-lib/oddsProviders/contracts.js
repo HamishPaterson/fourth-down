@@ -1,6 +1,23 @@
 import process from "node:process";
 
 export const PROVIDER_PRIMARY = "parlay";
+export const REFRESH_REASON_CODES = Object.freeze([
+  "SCHEDULED_REFRESH", "MANUAL_ADMIN_REFRESH", "INITIAL_PROVIDER_VALIDATION", "RECOVERY_REFRESH",
+]);
+export const REFRESH_FAILURE_CODES = Object.freeze([
+  "PROVIDER_REQUEST_FAILED", "REFRESH_VALIDATION_FAILED", "PERSISTENCE_FAILED",
+  "CREDIT_BUDGET_BLOCKED", "LEASE_LOST", "REFRESH_FAILED",
+]);
+
+export function requireRefreshReason(reason) {
+  if (!REFRESH_REASON_CODES.includes(reason)) throw new Error("INVALID_REFRESH_REASON");
+  return reason;
+}
+
+export function requireRefreshFailure(code) {
+  if (!REFRESH_FAILURE_CODES.includes(code)) throw new Error("INVALID_REFRESH_FAILURE");
+  return code;
+}
 export const PROVIDER_NAMES = Object.freeze(["parlay", "sharp", "theoddsapi", "propline"]);
 
 export const COMPLETENESS = Object.freeze({
@@ -121,7 +138,8 @@ export function createLockedQuoteSnapshot(quote, assessment = {}) {
     impliedProbability: quote.impliedProbability,
     providerTimestamp: quote.providerTimestamp ?? null,
     fetchedAt: quote.fetchedAt,
-    cacheFetchedAt: quote.fetchedAt,
+    cacheFetchedAt: quote.cacheFetchedAt ?? quote.fetchedAt,
+    refreshId: quote.refreshId ?? null,
     modelProbability: assessment.modelProbability ?? null,
     edge: assessment.edge ?? null,
   };

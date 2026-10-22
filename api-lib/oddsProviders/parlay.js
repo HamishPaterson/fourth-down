@@ -83,6 +83,9 @@ function requireCreditRepository(repository) {
       typeof repository.appendCreditEntry !== "function") {
     throw new Error("Parlay paid requests require a credit ledger repository");
   }
+  if (repository.paidRequestsRequireReservation && typeof repository.reserveCredits !== "function") {
+    throw new Error("Persistent paid requests require a refresh-bound reservation repository");
+  }
 }
 
 async function listEvents({ season, week, fetchImpl, timeoutMs, repository, now }) {
@@ -132,6 +135,7 @@ async function fetchCoreOdds({
   const expectedCredits = estimateProviderCredits({ provider: "parlay", endpoint: "odds", markets, regions });
   const budget = await authorizePaidCall({
     repository, creditConfiguration, expectedCredits, automatic, now,
+    endpoint: "odds", season, week, reason,
   });
   if (!budget.allowed) {
     await recordLedger(repository, {
@@ -147,12 +151,13 @@ async function fetchCoreOdds({
   try {
     const response = await requestJSON({
       url: url.toString(), endpoint: "odds", fetchImpl, timeoutMs,
+      beforeRequest: repository.beforePaidRequest ? () => repository.beforePaidRequest(budget.reservationId) : undefined,
     });
     await recordLedger(repository, {
       endpoint: "odds", season, week, reason, automatic, expectedCredits,
       actualCredits: response.observedCredits,
       budgetCredits: Math.max(response.observedCredits ?? expectedCredits, expectedCredits),
-      success: true, now,
+      success: true, now, budget, httpStatus: response.httpStatus,
     });
     return {
       provider: "parlay",
@@ -170,6 +175,8 @@ async function fetchCoreOdds({
   } catch (error) {
     await recordLedger(repository, {
       endpoint: "odds", season, week, reason, automatic, expectedCredits, success: false, now,
+      budget, requestAttempted: error.requestAttempted !== false,
+      actualCredits: error.observedCredits ?? null, httpStatus: error.httpStatus ?? null,
     });
     throw error;
   }
@@ -209,6 +216,7 @@ async function fetchPlayerProps({
     const expectedCredits = estimateProviderCredits({ provider: "parlay", endpoint: "props" });
     const budget = await authorizePaidCall({
       repository, creditConfiguration, expectedCredits, automatic, now,
+      endpoint: "props", season, week, reason,
     });
     if (!budget.allowed) {
       await recordLedger(repository, {
@@ -228,16 +236,21 @@ async function fetchPlayerProps({
     url.searchParams.set("offset", String(offset));
     let response;
     try {
-      response = await requestJSON({ url: url.toString(), endpoint: "props", fetchImpl, timeoutMs });
+      response = await requestJSON({
+        url: url.toString(), endpoint: "props", fetchImpl, timeoutMs,
+        beforeRequest: repository.beforePaidRequest ? () => repository.beforePaidRequest(budget.reservationId) : undefined,
+      });
       await recordLedger(repository, {
         endpoint: "props", season, week, reason, automatic, expectedCredits,
         actualCredits: response.observedCredits,
         budgetCredits: Math.max(response.observedCredits ?? expectedCredits, expectedCredits),
-        success: true, now,
+        success: true, now, budget, httpStatus: response.httpStatus,
       });
     } catch (error) {
       await recordLedger(repository, {
         endpoint: "props", season, week, reason, automatic, expectedCredits, success: false, now,
+        budget, requestAttempted: error.requestAttempted !== false,
+        actualCredits: error.observedCredits ?? null, httpStatus: error.httpStatus ?? null,
       });
       pageMetadata.push({
         pageNumber,
@@ -413,6 +426,9 @@ function normalizePlayerProps(result, { events = [], players = [], fetchedAt, no
       { side: isAnytime ? "yes" : "over", priceField: "over_price", price: row.over_price },
       { side: isAnytime ? "no" : "under", priceField: "under_price", price: row.under_price },
     ];
+    if (sides.some(({ price }) => price !== null && price !== undefined && !normalizeAmericanPrice(price))) {
+      rejectRow("invalid_supplied_price");
+    }
     for (const side of sides) {
       const quote = normalizeQuote({
         row,
@@ -551,7 +567,7 @@ export function normalizeAmericanPrice(value) {
 
 function normalizeEvent(row, { season, week, fetchedAt }) {
   if (!row || typeof row !== "object") throw new Error("Parlay event row is invalid");
-  const providerEventId = row.canonical_event_id ?? row.id ?? row.event_id;
+  const providerEventId = row.canonical_event_id ?? row.id ?? row.event_id ?? row.providerEventId;
   const kickoff = row.commence_time ?? row.kickoff ?? row.start_time;
   const homeTeam = row.home_team ?? row.homeTeam ?? row.home;
   const awayTeam = row.away_team ?? row.awayTeam ?? row.away;
@@ -709,6 +725,7 @@ function parseObservedCredits(headers) {
 }
 
 function finiteNonNegative(value) {
+  if (value === null || value === undefined || value === "") return null;
   const number = Number(value);
   return Number.isFinite(number) && number >= 0 ? number : null;
 }
@@ -758,7 +775,14 @@ function blockedResult(endpoint, season, week, expectedCredits, budget, now) {
   };
 }
 
-async function authorizePaidCall({ repository, creditConfiguration, expectedCredits, automatic, now }) {
+async function authorizePaidCall({
+  repository, creditConfiguration, expectedCredits, automatic, now, endpoint, season, week, reason,
+}) {
+  if (typeof repository.reserveCredits === "function") {
+    return repository.reserveCredits({
+      configuration: creditConfiguration, expectedCredits, automatic, endpoint, season, week, reason,
+    });
+  }
   const current = now();
   const ledger = repository
     ? await repository.readCreditLedger({ provider: "parlay", since: current.toISOString().slice(0, 7) })
@@ -783,8 +807,23 @@ async function recordLedger(repository, {
   budgetCredits = null,
   success,
   now,
+  budget,
+  requestAttempted = true,
+  httpStatus = null,
 }) {
   if (!repository) throw new Error("Parlay paid requests require a credit ledger repository");
+  if (typeof repository.reconcileReservation === "function") {
+    if (!budget?.allowed) return;
+    return repository.reconcileReservation({
+      reservationId: budget.reservationId,
+      observedCredits: actualCredits,
+      requestAttempted,
+      success,
+      httpStatus,
+      resultStatus: success ? "success" : !requestAttempted ? "released_pre_request" :
+        actualCredits !== null ? "failed_charge_known" : "failed_charge_unknown",
+    });
+  }
   const timestamp = now().toISOString();
   const ledger = await repository.readCreditLedger({
     provider: "parlay",
@@ -811,7 +850,7 @@ async function recordFreeRequest(repository, { endpoint, season, week, success, 
     endpoint,
     season,
     week,
-    reason: "free metadata/event request",
+    reason: "SCHEDULED_REFRESH",
     automatic: true,
     expectedCredits: 0,
     actualCredits: 0,
@@ -821,16 +860,20 @@ async function recordFreeRequest(repository, { endpoint, season, week, success, 
   }));
 }
 
-async function requestJSON({ url, endpoint, fetchImpl, timeoutMs }) {
+async function requestJSON({ url, endpoint, fetchImpl, timeoutMs, beforeRequest }) {
   if (typeof window !== "undefined") {
-    throw new Error("Parlay provider adapters are server-only");
+    throw Object.assign(new Error("Parlay provider adapters are server-only"), { requestAttempted: false });
   }
   const apiKey = process.env.PARLAY_API_KEY;
-  if (!apiKey) throw new Error("PARLAY_API_KEY is not configured");
+  if (!apiKey) throw Object.assign(new Error("PARLAY_API_KEY is not configured"), { requestAttempted: false });
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   let response;
+  let attempted = false;
   try {
+    await beforeRequest?.();
+    if (controller.signal.aborted) throw new Error("Request timed out before dispatch");
+    attempted = true;
     response = await fetchImpl(url, {
       method: "GET",
       headers: { Accept: "application/json", "X-API-Key": apiKey },
@@ -852,6 +895,7 @@ async function requestJSON({ url, endpoint, fetchImpl, timeoutMs }) {
       headers: response.headers,
       requestId: getHeader(response.headers, "x-request-id"),
       observedCredits: parseObservedCredits(response.headers),
+      httpStatus: response.status,
     };
   } catch (error) {
     const message = safeError(error, apiKey);
@@ -860,12 +904,14 @@ async function requestJSON({ url, endpoint, fetchImpl, timeoutMs }) {
       : `Parlay ${endpoint} request failed: ${message}`;
     if (error instanceof Error) {
       // Fetch errors can contain request headers; only preserve a sanitized cause.
-      // eslint-disable-next-line preserve-caught-error
-      throw new Error(safeMessage, { cause: new Error(message) });
+      throw Object.assign(new Error(safeMessage, { cause: new Error(message) }), {
+        requestAttempted: attempted,
+        observedCredits: response ? parseObservedCredits(response.headers) : null,
+        httpStatus: response?.status ?? null,
+      });
     }
     // A primitive rejection may contain credentials, so do not attach it as a cause.
-    // eslint-disable-next-line preserve-caught-error
-    throw new Error(safeMessage);
+    throw Object.assign(new Error(safeMessage), { requestAttempted: attempted });
   } finally {
     clearTimeout(timer);
   }

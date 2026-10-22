@@ -20,6 +20,7 @@
     "vite": "latest"
   },
   "devDependencies": {
+    "@electric-sql/pglite": "^0.5.11",
     "@eslint/js": "latest",
     "eslint": "latest",
     "eslint-plugin-react-hooks": "latest",
