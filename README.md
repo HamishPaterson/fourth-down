@@ -23,6 +23,42 @@ the named team's allowance. Success/explosive adjustments are residuals, not
 absolute rates: their 25% residual is added to the raw attack rate before allowance.
 Both teams are evaluated identically and the difference is centered.
 Adjusted defense, when separately unavailable for a category, is not invented.
+
+## Odds provider migration — Phase 1
+
+Phase 1 adds a server-only, provider-neutral odds domain and an explicit
+ParlayAPI adapter under `api-lib/oddsProviders/`. The adapter supports events,
+core odds and player props, preserves provider/raw-market provenance, and maps
+only the Parlay market keys established by the provider audit. Unknown market
+variants remain distinct unless a future adapter configuration explicitly
+registers an alias.
+
+This phase is **not a production cutover**. Existing SharpAPI snapshots and
+routes remain the active rollback path; normal browser reads remain cache-only.
+The new controlled refresh service is not called from UI, prediction, Best Bets,
+Weekly Multi, or cron handlers. Persistent storage is not connected. Adapter
+tests use mocked fetch responses and must never contact a live provider.
+
+Normalized snapshots require explicit completeness evidence before replacing a
+known-good complete snapshot. The in-memory repository is the storage-boundary
+reference implementation. Parlay props pages are sequential, counted
+individually, never retried automatically, and guarded by a maximum-page limit,
+offset-loop protection, and the configured credit budget. Missing/unusable
+completeness headers remain `UNKNOWN`.
+
+Server-side configuration is reserved for a later approved cutover:
+
+```text
+ODDS_PROVIDER_PRIMARY=parlay
+ODDS_PROVIDER_FALLBACKS=theoddsapi,propline
+PARLAY_MONTHLY_CREDIT_LIMIT=1000
+PARLAY_AUTOMATIC_CREDIT_BUDGET=800
+```
+
+The provider-selection settings are not wired into current production reads.
+Credit limits default to zero in code, so paid refreshes fail closed until
+explicitly configured. `PARLAY_API_KEY` is read only by the server-side adapter
+and must never use a `VITE_` prefix or be exposed to browser code.
 The score-based live Opponent-Network remains a separate, unchanged model layer.
 
 There are no separate rushing/passing success rates, pass/rush explosive rates,
