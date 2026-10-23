@@ -153,7 +153,6 @@ test("H: genuinely missing TD projections render an accurate model-only empty st
 
 for (const [name, change] of [
   ["missing identity", (v) => { v.playerProjections[0].personnelId = "missing"; }],
-  ["duplicate identity", (v) => { v.personnelViews.away.players.push(v.personnelViews.away.players[0]); }],
   ["identity conflict", (v) => { v.personnelViews.away.players[0].identityConflict = true; }],
   ["source conflict", (v) => { v.personnelViews.away.players[0].sourceConflict = true; }],
   ["wrong matchup", (v) => { v.game.away = "NE"; }],
@@ -170,6 +169,9 @@ for (const [name, change] of [
 });
 
 const rows = JSON.parse(readFileSync(new URL("./fixtures/week7-rendered-bets.json", import.meta.url)));
+const nyjPersonnel = rows.find((row) => row.awayCode === "MIA").personnelViews.home.players;
+nyjPersonnel.find((player) => player.canonicalId === "00-0039794").name = "Braelon Allen";
+nyjPersonnel.find((player) => player.canonicalId === "00-0038120").name = "Breece Hall";
 const odds = JSON.parse(readFileSync(new URL("./fixtures/week7-rendered-quotes.json", import.meta.url)));
 function displayed(awayCode, quotes = odds) {
   const saved = rows.find((row) => row.awayCode === awayCode);
@@ -216,4 +218,69 @@ for (const saved of rows) test(`saved ${saved.awayCode}@${saved.homeCode} indepe
   assert.match(markup, /Model pick/);
   assert.doesNotMatch(markup, /No eligible TD betting recommendation|priced player candidate|0\.0%/);
   assert.equal(row.bestBets.anytimeTdScorer.source, "unavailable");
+});
+
+function allenCollision() {
+  const snapshot = structuredClone(rows.find((row) => row.awayCode === "MIA"));
+  const allen = snapshot.playerProjections.home.players.find((player) => player.playerName === "B.Allen");
+  const hall = snapshot.playerProjections.home.players.find((player) => player.playerName === "B.Hall");
+  assert.equal(allen.personnelId, "00-0039794");
+  assert.equal(allen.anytimeTouchdownProbability, .4785);
+  assert.equal(hall.anytimeTouchdownProbability, .4384);
+  const view = snapshot.personnelViews.home;
+  Object.assign(view.players.find((record) => record.canonicalId === allen.personnelId), { name: "Braelon Allen" });
+  Object.assign(view.players.find((record) => record.canonicalId === hall.personnelId), { name: "Breece Hall" });
+  return { snapshot, allen, hall, value: { game: snapshot, playerProjections: snapshot.playerProjections,
+    personnelViews: snapshot.personnelViews, quoteAsOf: NOW } };
+}
+
+test("exact MIA-NYJ B. Allen / Braelon Allen / Breece Hall collision resolves only through canonical ID and matchup team", () => {
+  const { snapshot, allen, value } = allenCollision(), before = structuredClone(snapshot);
+  const pick = selectTdModelPick(value);
+  assert.equal(pick.identityState, "MATCHED");
+  assert.equal(pick.playerName, "Braelon Allen");
+  assert.equal(pick.personnelId, allen.personnelId);
+  assert.equal(pick.playerTeam, "NYJ");
+  assert.equal(pick.modelProbability, .4785);
+  assert.equal(pick.roleConfidence, 1);
+  assert.equal(pick.availabilityKnown, false);
+  assert.equal(pick.bettingEligible, false);
+  const row = ui.enrichSavedPredictionWithCurrentMarket({ ...snapshot, bestBets: {
+    ...snapshot.bestBets, anytimeTdModelPick: pick,
+  } }, { away: "MIA", home: "NYJ" }, [], NOW);
+  assert.equal(row.bestBets.anytimeTdModelPick.playerName, "Braelon Allen");
+  const markup = render(pick);
+  assert.match(markup, /Braelon Allen/);
+  assert.match(markup, /47\.9%/);
+  assert.match(markup, /Role 100%/);
+  assert.doesNotMatch(markup, /Breece Hall/);
+  assert.deepEqual(snapshot, before);
+});
+
+for (const [name, change] of [
+  ["canonical full name is absent", ({ value, allen }) => {
+    delete value.personnelViews.home.players.find((record) => record.canonicalId === allen.personnelId).name;
+  }],
+  ["conflicting full name on Allen's canonical record", ({ value, allen }) => {
+    value.personnelViews.home.players.find((record) => record.canonicalId === allen.personnelId).name = "Breece Hall";
+  }],
+  ["duplicate canonical identity with conflicting names", ({ value, allen }) => {
+    const record = value.personnelViews.home.players.find((row) => row.canonicalId === allen.personnelId);
+    value.personnelViews.home.players.push({ ...record, name: "Breece Hall" });
+  }],
+]) test(`B. Allen returns AMBIGUOUS rather than guessing when ${name}`, () => {
+  const fixture = allenCollision();
+  change(fixture);
+  const pick = selectTdModelPick(fixture.value);
+  assert.equal(pick.identityState, "AMBIGUOUS");
+  assert.equal(pick.primaryReason, "IDENTITY_AMBIGUOUS");
+  assert.equal(pick.modelPickEligible, false);
+  assert.equal(pick.modelProbability, null);
+  assert.doesNotMatch(pick.selection, /Breece Hall/);
+});
+
+test("B. Allen cannot resolve through a canonical record from outside the saved matchup", () => {
+  const { value } = allenCollision();
+  value.game = { awayCode: "MIA", homeCode: "NE" };
+  assert.equal(selectTdModelPick(value).modelPickEligible, false);
 });

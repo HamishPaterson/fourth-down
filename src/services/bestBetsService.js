@@ -225,21 +225,39 @@ function isAnytimeTdBet(bet) {
     /anytime\s*(td|touchdown)/i.test(String(bet?.selection || ""));
 }
 
+function modelPickName(player, record) {
+  const projectedName = canonicalPlayerName(getPlayerName(player));
+  const recordName = canonicalPlayerName(getPlayerName(record));
+  const compatible = (first, second) => {
+    const a = nameTokens(first), b = nameTokens(second);
+    return a.join(":") === b.join(":") ||
+      a.length >= 2 && b.length >= 2 && a.at(-1) === b.at(-1) &&
+      a[0].length === 1 && a[0] === b[0][0];
+  };
+  if (isFullPlayerName(recordName)) {
+    return compatible(projectedName, recordName) ? recordName : null;
+  }
+  const resolved = resolvePlayerDisplayName(player);
+  return isFullPlayerName(resolved) && compatible(projectedName, resolved) ? resolved : null;
+}
+
 export function selectTdModelPick({ game, playerProjections, personnelViews, oddsEvent, quoteAsOf = new Date() }) {
   const projected = playerProjections?.available === false ? [] : collectProjectedPlayers(playerProjections);
   const teams = [game?.away || game?.awayCode, game?.home || game?.homeCode].map(canonicalTeam).filter(Boolean);
   const rejections = [];
+  let ambiguousProbability = -Infinity;
   const players = projected.flatMap((player) => {
     const view = Object.values(personnelViews || {}).find((row) => canonicalTeam(row?.team) === canonicalTeam(player.team));
     const id = player.personnelId || player.gsisId;
     const records = id ? view?.players?.filter((row) => row.canonicalId === id) || [] : [];
     const record = records.length === 1 ? records[0] : null;
-    const playerName = resolvePlayerDisplayName(player);
+    const playerName = record ? modelPickName(player, record) : null;
     const probability = findMetric(player, "anytimeTouchdownProbability");
     const roleConfidence = player.roleConfidence ?? player.confidence ?? player.role?.confidence;
     const availability = classifyPlayerAvailability(record);
     const status = player.personnel?.status;
-    const reason = !record || !isFullPlayerName(playerName) || record.identityConflict || record.sourceConflict ||
+    const reason = records.length > 1 || record && !playerName ? "IDENTITY_AMBIGUOUS"
+      : !record || record.identityConflict || record.sourceConflict ||
       player.personnel?.confidence === "unmatched" ? "IDENTITY_UNRESOLVED"
       : !teams.includes(canonicalTeam(player.team)) || canonicalTeam(record.team) !== canonicalTeam(player.team) ? "TEAM_MISMATCH"
         : ["Doubtful", "Out", "Inactive", "IR", "PUP", "Suspended", "NFI"].includes(status) ||
@@ -249,15 +267,21 @@ export function selectTdModelPick({ game, playerProjections, personnelViews, odd
             : ["UNKNOWN_IDENTITY", "UNKNOWN_NOT_IN_LINEUP", "UNSUPPORTED_ROLE"].includes(availability) ? "IDENTITY_UNRESOLVED"
               : !Number.isFinite(probability) || probability <= 0 || probability > 1 ? "PLAYER_PROJECTION_UNAVAILABLE"
                 : !Number.isFinite(roleConfidence) || roleConfidence < .55 || roleConfidence > 1 ? "ROLE_CONFIDENCE_INSUFFICIENT" : null;
-    if (reason) { rejections.push(reason); return []; }
+    if (reason) {
+      rejections.push(reason);
+      if (reason === "IDENTITY_AMBIGUOUS" && Number.isFinite(probability)) ambiguousProbability = Math.max(ambiguousProbability, probability);
+      return [];
+    }
     return [{ player, playerName, probability, roleConfidence, availability,
       dataQuality: normaliseConfidence(player.dataQuality ?? player.quality ?? player.dataQualityScore) }];
   }).sort((a, b) => b.probability - a.probability || b.roleConfidence - a.roleConfidence ||
     a.playerName.localeCompare(b.playerName));
   const top = players[0];
-  if (!top) {
-    const primaryReason = projected.length ? primaryPlayerReason(rejections) : "PLAYER_PROJECTION_UNAVAILABLE";
+  if (!top || ambiguousProbability >= top.probability) {
+    const primaryReason = ambiguousProbability > -Infinity ? "IDENTITY_AMBIGUOUS"
+      : projected.length ? primaryPlayerReason(rejections) : "PLAYER_PROJECTION_UNAVAILABLE";
     return { source: "unavailable", modelPickEligible: false, bettingEligible: false,
+      identityState: primaryReason === "IDENTITY_AMBIGUOUS" ? "AMBIGUOUS" : "UNRESOLVED",
       title: "Anytime TD scorer", selection: "No eligible scorer projection", modelProbability: null,
       decimalOdds: null, price: null, confidenceLevel: "Cautious", primaryReason,
       explanation: playerReasonMessage(primaryReason), risk: "No eligible model scorer remains after filtering." };
@@ -274,7 +298,7 @@ export function selectTdModelPick({ game, playerProjections, personnelViews, odd
   const confidenceScore = clamp(top.probability * .45 + top.roleConfidence * .3 + top.dataQuality * .25, 0, 1);
   const unknown = top.availability.startsWith("UNKNOWN");
   return {
-    source: "model-only", modelPickEligible: true, bettingEligible: false, title: "Anytime TD scorer",
+    source: "model-only", modelPickEligible: true, bettingEligible: false, identityState: "MATCHED", title: "Anytime TD scorer",
     playerId: top.player.playerId, personnelId: top.player.personnelId || top.player.gsisId,
     playerTeam: top.player.team, playerName: top.playerName, selection: top.playerName,
     modelProbability: top.probability, roleConfidence: top.roleConfidence, dataQuality: top.dataQuality,

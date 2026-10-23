@@ -8,6 +8,9 @@ import { refreshPredictionLedger } from "../src/services/predictionLedger.js";
 import { savedBestBetsDisplay } from "../src/services/savedBestBetsDisplay.js";
 import { refreshSavedBestBets } from "./serverPredictions.js";
 const rows = JSON.parse(readFileSync(new URL("./fixtures/week7-rendered-bets.json", import.meta.url)));
+const nyjPersonnel = rows.find((row) => row.awayCode === "MIA").personnelViews.home.players;
+nyjPersonnel.find((player) => player.canonicalId === "00-0039794").name = "Braelon Allen";
+nyjPersonnel.find((player) => player.canonicalId === "00-0038120").name = "Breece Hall";
 const odds = JSON.parse(readFileSync(new URL("./fixtures/week7-rendered-quotes.json", import.meta.url)));
 const NOW = new Date("2026-10-23T03:30:00Z");
 const quoteEvents = (snapshot) => [{
