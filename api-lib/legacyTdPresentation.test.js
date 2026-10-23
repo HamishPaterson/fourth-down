@@ -123,14 +123,22 @@ before(async () => {
 });
 after(async () => { await server?.close(); });
 
-test("Predictions saved-row boundary and TD markup correct the legacy text and never display fake zero", () => {
-  const snapshot = fixture(), original = structuredClone(snapshot);
+test("Predictions restores the independent model pick from legacy saved projections without fake active status or zero", () => {
+  const snapshot = fixture();
+  snapshot.personnelViews = { away: { team: "NE", players: [{
+    canonicalId: "player-1", team: "NE", status: "Unknown", statusKnown: false,
+    propEligible: false, projectedAvailable: true, eligibleBeforeCutoff: true,
+  }] } };
+  const original = structuredClone(snapshot);
   const mapped = ui.mapLedgerPrediction(snapshot);
   const markup = renderToStaticMarkup(createElement(ui.AnytimeTdScorer, {
-    scorer: mapped.bestBets.anytimeTdScorer, awayCode: "NE", homeCode: "CHI",
+    scorer: mapped.bestBets.anytimeTdModelPick, awayCode: "NE", homeCode: "CHI",
   }));
-  assert.match(markup, /Player availability is unknown/);
-  assert.match(markup, /Model probability<\/small><strong>Unavailable/);
+  assert.match(markup, /Example Player/);
+  assert.match(markup, /Model pick/);
+  assert.match(markup, /Availability is unconfirmed/);
+  assert.match(markup, /Model probability<\/small><strong>65\.0%/);
+  assert.match(markup, /Role 90%/);
   assert.match(markup, /Price<\/small><strong>Unavailable/);
   assert.doesNotMatch(markup, /0\.0%|projections were not available|No player-level touchdown projection/);
   assert.deepEqual(snapshot, original);

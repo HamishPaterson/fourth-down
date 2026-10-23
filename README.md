@@ -375,11 +375,19 @@ does not become eligible: only verified AVAILABLE, EXPECTED_ACTIVE or QUESTIONAB
 players with existing role/identity/point-in-time eligibility can qualify.
 Player roles retain the existing 55% confidence floor; availability evidence older
 than seven days, or observed after the applicable cutoff, remains ineligible.
-The dedicated Anytime TD card is a betting recommendation only for a validated
-current priced candidate passing identity, event/team, personnel, role, probability,
-positive-edge and existing edge/EV gates. Statistical TD leaders without an
-eligible bet are retained only in `statisticalProjection` diagnostics; the card
-shows Unavailable probability/price and a specific rejection reason. Supplied
+The dedicated Anytime TD card is an independent Model Pick (`anytimeTdModelPick`),
+not the priced betting output (`anytimeTdScorer`). It ranks saved TD probability
+first, with role confidence (55% minimum) as eligibility and a tie-breaker, using
+the existing model/role/data-quality confidence calculation. A resolved matchup
+identity and supported pre-cutoff projected role are required. Confirmed inactive,
+conflicted, stale or unsupported players are excluded. Unknown health is disclosed
+and may retain a supported model projection; it is never relabelled active and
+does not grant priced betting eligibility. No bookmaker price, edge or EV is
+needed to select the model player. An independently validated current price may
+be displayed for that same player, but never changes the selection.
+
+The separate priced TD output retains identity, event/team, personnel, role,
+probability, freshness, positive-edge and existing edge/EV gates. Supplied
 malformed prices (including zero and non-finite values) are INVALID_PRICE, never
 missing prices or a model-only betting fallback. Primary reason order is projection,
 identity, availability, role/quality, invalid price, stale price, missing price,
@@ -568,11 +576,12 @@ existing availability rules; unknown health remains explicitly unknown.
 There is no new statistical regression prior: existing rate caps and sample/role
 confidence remain; no-sample named projections are omitted. Interceptions and
 scrambles are retained as profile evidence, not new scoring interactions.
-The Anytime TD equation remains `1 - exp(-expectedTDs)`. Dedicated scorer ranking
-uses TD probability times role confidence; data quality does not multiply into
-the scorer score. Displayed probability remains the raw model TD probability.
-Unsupported roles/identities do not produce a scorer.
-Best Bets and Weekly Best Multi continue consuming the same downstream outputs.
+The Anytime TD equation remains `1 - exp(-expectedTDs)`. The Model Pick ranks raw
+TD probability first, independently of pricing; displayed probability remains the
+saved model probability. Role confidence remains an eligibility requirement.
+Unsupported roles/identities do not produce a scorer. Priced Best Bets and Weekly
+Best Multi retain their existing betting outputs and eligibility rules; the model
+display fallback never enters those candidate pools.
 
 After explicit approval, regenerate depth context using
 `npm run update:nflverse -- 2026`, then player metrics using

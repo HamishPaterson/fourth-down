@@ -81,7 +81,9 @@ for (const originalSnapshot of rows) {
     for (const bet of display.candidates) assert.ok(markup.includes(bet.selection));
     if (display.candidates.length) assert.doesNotMatch(markup, /None qualified|No Best Bets/);
     else assert.match(markup, /None qualified/);
-    assert.doesNotMatch(markup, /No player touchdown projection was available|Model pick|(?<![\d.])0\.0%/);
+    assert.match(markup, /Model pick/);
+    assert.ok(mapped.bestBets.anytimeTdModelPick.modelPickEligible);
+    assert.doesNotMatch(markup, /No player touchdown projection was available|No eligible TD betting recommendation|(?<![\d.])0\.0%/);
     assert.deepEqual(snapshot, original);
   });
 }

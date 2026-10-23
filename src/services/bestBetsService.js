@@ -136,6 +136,7 @@ export function buildBestBets({ game, prediction, playerProjections, personnelVi
     },
     highlights,
     anytimeTdScorer,
+    anytimeTdModelPick: selectTdModelPick({ game, playerProjections, personnelViews, oddsEvent, quoteAsOf }),
     qualified: recommendations.length,
     rejected: Math.max(0, assessed - recommendations.length),
     generatedAt: new Date().toISOString(),
@@ -222,6 +223,72 @@ function isAnytimeTdBet(bet) {
   return bet?.market === "Anytime touchdown" ||
     bet?.category === "Anytime touchdowns" ||
     /anytime\s*(td|touchdown)/i.test(String(bet?.selection || ""));
+}
+
+export function selectTdModelPick({ game, playerProjections, personnelViews, oddsEvent, quoteAsOf = new Date() }) {
+  const projected = playerProjections?.available === false ? [] : collectProjectedPlayers(playerProjections);
+  const teams = [game?.away || game?.awayCode, game?.home || game?.homeCode].map(canonicalTeam).filter(Boolean);
+  const rejections = [];
+  const players = projected.flatMap((player) => {
+    const view = Object.values(personnelViews || {}).find((row) => canonicalTeam(row?.team) === canonicalTeam(player.team));
+    const id = player.personnelId || player.gsisId;
+    const records = id ? view?.players?.filter((row) => row.canonicalId === id) || [] : [];
+    const record = records.length === 1 ? records[0] : null;
+    const playerName = resolvePlayerDisplayName(player);
+    const probability = findMetric(player, "anytimeTouchdownProbability");
+    const roleConfidence = player.roleConfidence ?? player.confidence ?? player.role?.confidence;
+    const availability = classifyPlayerAvailability(record);
+    const status = player.personnel?.status;
+    const reason = !record || !isFullPlayerName(playerName) || record.identityConflict || record.sourceConflict ||
+      player.personnel?.confidence === "unmatched" ? "IDENTITY_UNRESOLVED"
+      : !teams.includes(canonicalTeam(player.team)) || canonicalTeam(record.team) !== canonicalTeam(player.team) ? "TEAM_MISMATCH"
+        : ["Doubtful", "Out", "Inactive", "IR", "PUP", "Suspended", "NFI"].includes(status) ||
+          ["DOUBTFUL", "OUT", "IR", "PUP", "SUSPENDED"].includes(availability) ||
+          record.projectedAvailable !== true || player.available === false || player.eligible === false ? "PLAYER_UNAVAILABLE"
+          : record.eligibleBeforeCutoff !== true || availability === "UNKNOWN_STALE" ? "AVAILABILITY_STALE"
+            : ["UNKNOWN_IDENTITY", "UNKNOWN_NOT_IN_LINEUP", "UNSUPPORTED_ROLE"].includes(availability) ? "IDENTITY_UNRESOLVED"
+              : !Number.isFinite(probability) || probability <= 0 || probability > 1 ? "PLAYER_PROJECTION_UNAVAILABLE"
+                : !Number.isFinite(roleConfidence) || roleConfidence < .55 || roleConfidence > 1 ? "ROLE_CONFIDENCE_INSUFFICIENT" : null;
+    if (reason) { rejections.push(reason); return []; }
+    return [{ player, playerName, probability, roleConfidence, availability,
+      dataQuality: normaliseConfidence(player.dataQuality ?? player.quality ?? player.dataQualityScore) }];
+  }).sort((a, b) => b.probability - a.probability || b.roleConfidence - a.roleConfidence ||
+    a.playerName.localeCompare(b.playerName));
+  const top = players[0];
+  if (!top) {
+    const primaryReason = projected.length ? primaryPlayerReason(rejections) : "PLAYER_PROJECTION_UNAVAILABLE";
+    return { source: "unavailable", modelPickEligible: false, bettingEligible: false,
+      title: "Anytime TD scorer", selection: "No eligible scorer projection", modelProbability: null,
+      decimalOdds: null, price: null, confidenceLevel: "Cautious", primaryReason,
+      explanation: playerReasonMessage(primaryReason), risk: "No eligible model scorer remains after filtering." };
+  }
+  // Select from saved model probabilities before inspecting any bookmaker price.
+  const eventTeams = [resolveTeamCode(oddsEvent?.away_team), resolveTeamCode(oddsEvent?.home_team)];
+  const eventMatches = eventTeams.every((team) => !team || teams.includes(canonicalTeam(team)));
+  const validation = validateOddsEvents(eventMatches && oddsEvent ? [oddsEvent] : [], { now: new Date(quoteAsOf) });
+  const quote = flattenMarkets(validation.events[0])
+    .filter((market) => market.marketKey === "player_anytime_td" &&
+      market.quoteValidation?.status === "validated" && !market.quoteSource?.rolloverFallback &&
+      namesMatch(top.playerName, market.playerName))
+    .sort((a, b) => americanToDecimal(b.price) - americanToDecimal(a.price))[0];
+  const confidenceScore = clamp(top.probability * .45 + top.roleConfidence * .3 + top.dataQuality * .25, 0, 1);
+  const unknown = top.availability.startsWith("UNKNOWN");
+  return {
+    source: "model-only", modelPickEligible: true, bettingEligible: false, title: "Anytime TD scorer",
+    playerId: top.player.playerId, personnelId: top.player.personnelId || top.player.gsisId,
+    playerTeam: top.player.team, playerName: top.playerName, selection: top.playerName,
+    modelProbability: top.probability, roleConfidence: top.roleConfidence, dataQuality: top.dataQuality,
+    confidenceScore: round4(confidenceScore), confidenceLevel: confidenceLabel(confidenceScore),
+    personnelState: top.availability, availabilityKnown: !unknown,
+    price: quote?.price ?? null, decimalOdds: quote ? americanToDecimal(quote.price) : null,
+    sportsbook: quote?.sportsbook || null, updatedAt: quote?.updatedAt || null,
+    quoteValidation: quote?.quoteValidation || null,
+    explanation: `${top.playerName} has the highest model touchdown probability among eligible projected scorers (${percent(top.probability)}).` +
+      (unknown ? " Availability is unconfirmed; the supported projected role is used for this model pick only." : ""),
+    qualificationReason: `TD probability ranks first; role confidence is ${percent(top.roleConfidence)}. Bookmaker price does not select this player.`,
+    risk: unknown ? "Unknown availability is not confirmed active status and does not grant priced betting eligibility."
+      : "A model pick is not a priced betting recommendation; touchdowns are high-variance events.",
+  };
 }
 
 function selectAnytimeTdScorer({ playerProjections, personnelViews, playerBetCandidates, diagnostics, coreDataReady }) {

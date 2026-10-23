@@ -1,6 +1,6 @@
 import { findOddsForGame, resolveTeamCode } from "./oddsApi.js";
 import { canonicalQuoteMarket, validateOddsEvents } from "./quoteValidation.js";
-import { BEST_BETS_CANDIDATE_VERSION, isQualifiedBestBet } from "./bestBetsService.js";
+import { BEST_BETS_CANDIDATE_VERSION, isQualifiedBestBet, selectTdModelPick } from "./bestBetsService.js";
 import { tdBettingDisplay } from "./playerBetDiagnostics.js";
 
 const key = (value) => String(value || "").toLowerCase().replace(/[^a-z0-9]/g, "");
@@ -60,6 +60,8 @@ export function savedBestBetsDisplay(snapshot, events, now = new Date()) {
   const recommendations = candidates.map((bet, index) => ({ ...bet, rank: index + 1 }));
   return { ...saved, candidates, recommendations,
     qualified: candidates.length, highlights: null, anytimeTdScorer: scorer, displayDiagnostics: candidateDiagnostics,
+    anytimeTdModelPick: selectTdModelPick({ game: snapshot, playerProjections: snapshot.playerProjections,
+      personnelViews: snapshot.personnelViews, oddsEvent: event, quoteAsOf: now }),
     message: candidates.length ? null : "No saved candidate has a matching current eligible quote.",
   };
 }

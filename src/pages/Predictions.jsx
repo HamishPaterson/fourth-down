@@ -21,7 +21,7 @@ import { getPlayerRating, resolveFullPlayerName } from "../services/playerRating
 import { getStadiumWeather } from "../services/weatherApi.js";
 import { playerDiagnosticSummary, scorerProbabilityLabel, tdBettingDisplay } from "../services/playerBetDiagnostics.js";
 import { savedBestBetsDisplay } from "../services/savedBestBetsDisplay.js";
-import { isQualifiedBestBet } from "../services/bestBetsService.js";
+import { isQualifiedBestBet, selectTdModelPick } from "../services/bestBetsService.js";
 
 const SEASON = 2026;
 const SCHEDULE_CACHE_PREFIX = "fourth-down:schedule";
@@ -688,7 +688,7 @@ function BestBetsPanel({ bestBets, kickoff, awayCode, homeCode }) {
         awayCode={awayCode}
         homeCode={homeCode}
       />
-      <AnytimeTdScorer scorer={bestBets?.anytimeTdScorer} awayCode={awayCode} homeCode={homeCode} />
+      <AnytimeTdScorer scorer={bestBets?.anytimeTdModelPick} awayCode={awayCode} homeCode={homeCode} />
       {playerDiagnosticSummary(bestBets) && (
         <p className="best-bets-market-note">
           {playerDiagnosticSummary(bestBets)}
@@ -794,7 +794,7 @@ function displayBetFamily(bet) {
 }
 
 function AnytimeTdScorer({ scorer, awayCode, homeCode }) {
-  scorer = tdBettingDisplay(scorer);
+  const modelPick = scorer?.source === "model-only" && scorer.modelPickEligible === true;
   const selection = scorer?.selection || "No eligible scorer projection";
   const hasPrice = usableDecimalOdds(scorer?.decimalOdds, scorer?.price) !== null;
 
@@ -812,21 +812,15 @@ function AnytimeTdScorer({ scorer, awayCode, homeCode }) {
           <strong>{selection}</strong>
         </div>
         <span className="best-bet-price">
-          {hasPrice
-            ? formatAustralianOdds(scorer.decimalOdds, scorer.price)
-            : scorer?.source === "unavailable" ? "Unavailable" : "Model pick"}
+          {modelPick ? "Model pick" : "Unavailable"}
         </span>
       </div>
       <div className="best-bet-metrics" style={{ gridTemplateColumns: "repeat(3, 1fr)" }}>
         <span><small>Model probability</small><strong>{scorerProbabilityLabel(scorer)}</strong></span>
-        <span><small>Confidence</small><strong>{scorer?.confidenceLevel || "Cautious"}</strong></span>
+        <span><small>Confidence</small><strong>{scorer?.confidenceLevel || "Cautious"}{modelPick ? ` · Role ${(scorer.roleConfidence * 100).toFixed(0)}%` : ""}</strong></span>
         <span><small>Price</small><strong>{hasPrice ? formatAustralianOdds(scorer.decimalOdds, scorer.price) : "Unavailable"}</strong></span>
       </div>
-      <p>{scorer?.explanation || "No player touchdown projection was available."}</p>
-      {scorer?.source === "priced-market" && (
-        <p>Edge: {(scorer.edge * 100).toFixed(1)}% · {scorer.sportsbook}
-          {scorer.updatedAt ? ` · Quote: ${scorer.updatedAt}` : ""}</p>
-      )}
+      <p>{scorer?.explanation || "Player touchdown projections are unavailable."}</p>
       {scorer?.qualificationReason && (
         <p style={{ marginTop: "8px", padding: "9px", borderRadius: "8px", background: "rgba(255,255,255,0.06)" }}>
           <strong>Why this scorer:</strong> {scorer.qualificationReason}
@@ -1497,7 +1491,10 @@ function mapLedgerPrediction(row) {
     (typeof row.dataQuality?.bestBets === "object" ? row.dataQuality.bestBets : null);
   return {
     ...row,
-    bestBets: bestBets ? { ...bestBets, anytimeTdScorer: tdBettingDisplay(
+    bestBets: bestBets ? { ...bestBets, anytimeTdModelPick: selectTdModelPick({
+      game: row, playerProjections: row.playerProjections, personnelViews: row.personnelViews,
+      oddsEvent: row.game?.oddsEvent,
+    }), anytimeTdScorer: tdBettingDisplay(
       bestBets.anytimeTdScorer, new Date(), { ...row, bestBets }
     ) } : null,
     awayCode: normalizeTeamCode(row.awayCode),
