@@ -1773,6 +1773,11 @@ body {
 .predictions-centre-line { position: absolute; z-index: -1; top: 60px; bottom: 155px; left: 50%; width: 1px; background: linear-gradient(180deg, transparent, rgba(255,255,255,.22) 20%, rgba(255,255,255,.22) 80%, transparent); }
 .predictions-game-meta { position: relative; z-index: 2; color: rgba(255,255,255,.75); border-color: rgba(255,255,255,.18); }
 .predictions-game-meta strong { color: #fff; font-size: 11px; }
+.predictions-historical-note { position: relative; z-index: 2; color: rgba(255,255,255,.72); font-size: 12px; }
+.predictions-final-result { position: relative; z-index: 2; display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 16px; border: 1px solid rgba(255,255,255,.3); border-radius: 12px; background: rgba(0,0,0,.45); }
+.predictions-final-result > strong { font-size: 22px; }
+.predictions-final-result > small { font-weight: 800; letter-spacing: .08em; }
+.predictions-final-result > span { font-size: 13px; }
 .predictions-scoreboard { position: relative; z-index: 2; display: grid; grid-template-columns: minmax(0,1fr) auto minmax(0,1fr); align-items: center; gap: 14px; min-height: 270px; padding: 24px 0 18px; }
 .predictions-team { min-width: 0; display: flex; flex-direction: column; align-items: center; text-align: center; }
 .predictions-logo-stage { min-height: 112px; display: grid; place-items: center; }

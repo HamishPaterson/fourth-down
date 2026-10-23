@@ -1648,13 +1648,17 @@ async function readSnapshots(supabase, request, response) {
 
   let snapshots = (data || []).map(databaseToSnapshot);
   if (request.query?.bets === "display") {
+    const { resultGameKey, isValidCompletedResult } = await import("../../src/services/gameResults.js");
+    const historicalGames = new Set(String(request.query?.historicalGames || "").split(","));
     const now = new Date();
     const { getCurrentWeekWindow } = await import("./odds.js");
     if (season === 2026 && week === getCurrentWeekWindow(now.getTime()).week) {
+      const needsDisplayAssessment = (snapshot) => completePrediction(snapshot) &&
+        !isValidCompletedResult(snapshot) && !historicalGames.has(resultGameKey(snapshot));
       const { readPredictionOdds, refreshSavedBestBets } = await import("../../api-lib/serverPredictions.js");
-      const odds = await readPredictionOdds(supabase, now);
+      const odds = snapshots.some(needsDisplayAssessment) ? await readPredictionOdds(supabase, now) : null;
       snapshots = snapshots.map((snapshot) => {
-        if (!completePrediction(snapshot)) return snapshot;
+        if (!needsDisplayAssessment(snapshot)) return snapshot;
         return refreshSavedBestBets(snapshot, odds, now, { displayOnly: true });
       });
     }

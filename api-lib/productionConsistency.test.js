@@ -14,6 +14,8 @@ import { createWeeklyMultiCurrentHandler } from "./weeklyMulti.js";
 import { BEST_BETS_CANDIDATE_VERSION } from "../src/services/bestBetsService.js";
 import { predictionFeatureFixture } from "./personnelTestHelpers.js";
 import { CURRENT_MODEL_VERSION, CURRENT_MODEL_KEY } from "../src/services/modelIdentity.js";
+import { resultGameKey } from "../src/services/gameResults.js";
+import { getCurrentWeekWindow } from "../api/nfl/odds.js";
 
 const saved = () => {
   const cutoff = "2030-10-16T00:15:00Z";
@@ -203,6 +205,24 @@ test("ledger successful and not-found reads return HTTP 200 exactly once", async
     assert.equal(res.statusCode, 200);
     assert.equal(res.body.snapshots.length, initial.length);
   }
+});
+
+test("completed display exclusions preserve saved Best Bets and skip all current-quote reads when only finals remain", async () => {
+  const week = getCurrentWeekWindow().week;
+  const snapshot = { ...saved(), season: 2026, week, kickoff: "2026-10-23T00:15Z" };
+  const initial = [snapshotToDatabase(snapshot)];
+  const before = structuredClone(initial);
+  const db = database({ initial }), tables = [], originalFrom = db.from;
+  db.from = (table) => { tables.push(table); assert.equal(table, "prediction_snapshots"); return originalFrom.call(db, table); };
+  const res = await ledgerRequest(db, { query: { season: "2026", week: String(week), bets: "display",
+    historicalGames: resultGameKey(snapshot) } });
+  assert.equal(res.statusCode, 200);
+  assert.equal(res.body.snapshots.length, 1);
+  assert.deepEqual(res.body.snapshots[0].bestBets, snapshot.bestBets);
+  assert.equal(res.body.snapshots[0].displayBestBetsAsOf, undefined);
+  assert.deepEqual(tables, ["prediction_snapshots"]);
+  assert.deepEqual(db.writes, []);
+  assert.deepEqual(initial, before);
 });
 test("ledger validation, persistence and unexpected errors send explicit JSON once", async () => {
   const invalid = await ledgerRequest(database(), { query: { week: "invalid" } });

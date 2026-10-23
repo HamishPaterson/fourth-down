@@ -22,6 +22,7 @@ import { getStadiumWeather } from "../services/weatherApi.js";
 import { playerDiagnosticSummary, scorerProbabilityLabel, tdBettingDisplay } from "../services/playerBetDiagnostics.js";
 import { savedBestBetsDisplay } from "../services/savedBestBetsDisplay.js";
 import { isQualifiedBestBet, selectTdModelPick } from "../services/bestBetsService.js";
+import { isFinalGame, resultGameKey, withGameResult, completedPickLabel } from "../services/gameResults.js";
 
 const SEASON = 2026;
 const SCHEDULE_CACHE_PREFIX = "fourth-down:schedule";
@@ -51,9 +52,8 @@ export default function Predictions({ onOpen }) {
 
       try {
         const cachedSchedule = readScheduleCache(SEASON, week);
-        const [scheduleResult, oddsResult] = await Promise.allSettled([
+        const [scheduleResult] = await Promise.allSettled([
           fetchSchedule(SEASON, week, controller.signal),
-          getNflOddsWithProps(controller.signal),
         ]);
 
         const liveSchedule =
@@ -74,6 +74,10 @@ export default function Predictions({ onOpen }) {
               game.home &&
               Number(game.week) === Number(week)
           );
+        const [oddsResult] = await Promise.allSettled([
+          scheduleGames.some((game) => !isFinalGame(game.resultGame || game))
+            ? getNflOddsWithProps(controller.signal) : Promise.resolve([]),
+        ]);
 
         // Weather must be loaded for the Predictions page itself. Do not rely
         // on opening Matchup or on an older shared snapshot containing weather.
@@ -81,6 +85,7 @@ export default function Predictions({ onOpen }) {
           scheduleGames,
           4,
           async (game) => {
+            if (isFinalGame(game.resultGame || game)) return game;
             if (game.weather) return game;
             if (!game.home || !game.sourceDate) return game;
 
@@ -156,6 +161,8 @@ export default function Predictions({ onOpen }) {
             season: SEASON,
             week,
             displayBets: true,
+            historicalGames: games.filter((game) => isFinalGame(game.resultGame || game))
+              .map(resultGameKey).filter(Boolean),
             signal: controller.signal,
           });
 
@@ -183,6 +190,10 @@ export default function Predictions({ onOpen }) {
           3,
           async (game) => {
             const saved = findLedgerRow(ledger, game);
+            if (isFinalGame(game.resultGame || game) || hasFinalResult(saved)) {
+              return saved ? enrichSavedPredictionWithCurrentMarket(saved, game, oddsEvents)
+                : withGameResult(buildMarketFallback(game, [], new Error("No saved pre-game prediction is available")), game);
+            }
             const kickoffTime = new Date(
               saved?.kickoff || game.sourceDate || 0
             ).getTime();
@@ -280,21 +291,7 @@ export default function Predictions({ onOpen }) {
   const predictions = useMemo(() => rows, [rows]);
   const weeklyParlay = useWeeklyParlay(predictions);
 
-  const filtered = predictions.filter((row) => {
-    if (filter === "agree") {
-      return row.oddsPick && row.oddsPick === row.fourthDownPick;
-    }
-
-    if (filter === "disagree") {
-      return row.oddsPick && row.oddsPick !== row.fourthDownPick;
-    }
-
-    if (filter === "close") {
-      return projectedMargin(row) <= 3;
-    }
-
-    return true;
-  });
+  const filtered = filterPredictions(predictions, filter);
 
   const agreement = predictions.filter(
     (row) => row.oddsPick && row.oddsPick === row.fourthDownPick
@@ -344,6 +341,7 @@ export default function Predictions({ onOpen }) {
               onChange={(event) => setFilter(event.target.value)}
             >
               <option value="all">All predictions</option>
+              <option value="completed">Completed Games</option>
               <option value="agree">Market agreement</option>
               <option value="disagree">Market disagreement</option>
               <option value="close">Close games</option>
@@ -358,7 +356,7 @@ export default function Predictions({ onOpen }) {
         <PredictionSummary
           icon={<Swords size={20} />}
           label="Upcoming predictions"
-          value={predictions.length}
+          value={predictions.filter((row) => !hasFinalResult(row)).length}
         />
         <PredictionSummary
           icon={<CheckCircle2 size={20} />}
@@ -379,8 +377,8 @@ export default function Predictions({ onOpen }) {
 
       {filtered.length === 0 ? (
         <div className="card empty predictions-empty">
-          <h2>No predictions available</h2>
-          <p>{status}</p>
+          <h2>{filter === "completed" ? "No completed games" : "No predictions available"}</h2>
+          <p>{filter === "completed" ? `No games have a final result for Week ${week}.` : status}</p>
         </div>
       ) : (
         <div className="predictions-game-grid">
@@ -410,6 +408,16 @@ export default function Predictions({ onOpen }) {
       </p>
     </section>
   );
+}
+
+function filterPredictions(predictions, filter) {
+  return predictions.filter((row) => {
+    if (filter === "completed") return hasFinalResult(row);
+    if (filter === "agree") return row.oddsPick && row.oddsPick === row.fourthDownPick;
+    if (filter === "disagree") return row.oddsPick && row.oddsPick !== row.fourthDownPick;
+    if (filter === "close") return projectedMargin(row) <= 3;
+    return true;
+  });
 }
 
 async function buildFullPredictionRow(game, oddsEvents, signal) {
@@ -471,22 +479,18 @@ export function PredictionCard({ prediction, onOpen }) {
     prediction.oddsPick &&
     prediction.oddsPick === prediction.fourthDownPick;
   const isFinal = hasFinalResult(prediction);
-  const awayScore = isFinal
-    ? prediction.actualAwayScore
-    : prediction.fourthDownAwayScore;
-  const homeScore = isFinal
-    ? prediction.actualHomeScore
-    : prediction.fourthDownHomeScore;
+  const awayScore = prediction.fourthDownAwayScore;
+  const homeScore = prediction.fourthDownHomeScore;
   const projectedTie =
-    !isFinal &&
     Number(prediction.fourthDownAwayScore) ===
       Number(prediction.fourthDownHomeScore);
   const currentWeek = getCurrentWeek();
   const bestBetsAvailable =
-    !isFinal && Number(prediction.week) === Number(currentWeek);
+    isFinal ? Boolean(prediction.bestBets) : Number(prediction.week) === Number(currentWeek);
 
   return (
-    <article className="card predictions-game-card" style={style}>
+    <article className={`card predictions-game-card${isFinal ? " predictions-game-completed" : ""}`} style={style}
+      data-game-key={resultGameKey(prediction)} data-status={isFinal ? "FINAL" : "INCOMPLETE"}>
       <span className="predictions-away-watermark" aria-hidden="true" />
       <span className="predictions-home-watermark" aria-hidden="true" />
       <span className="predictions-centre-line" aria-hidden="true" />
@@ -519,7 +523,7 @@ export function PredictionCard({ prediction, onOpen }) {
             role="tab"
             aria-selected={activeTab === "best-bets"}
           >
-            Best Bets
+            {isFinal ? "Pre-game Best Bets" : "Best Bets"}
             {prediction.bestBets?.qualified > 0 && (
               <span>{prediction.bestBets.qualified}</span>
             )}
@@ -531,6 +535,11 @@ export function PredictionCard({ prediction, onOpen }) {
           Best Bets are available for the current week only.
         </p>
       )}
+      {isFinal && (
+        <p className="predictions-historical-note">
+          Completed game · Original pre-game prediction and betting information. Not actionable.
+        </p>
+      )}
       {activeTab === "prediction" || !bestBetsAvailable ? (
         <>
       <div className="predictions-scoreboard">
@@ -539,23 +548,21 @@ export function PredictionCard({ prediction, onOpen }) {
           score={awayScore}
           picked={
             normalizeTeamCode(
-              isFinal ? prediction.actualWinner : prediction.fourthDownPick
+              prediction.fourthDownPick
             ) === normalizeTeamCode(prediction.awayCode)
           }
           side="away"
         />
 
         <div className="predictions-score-divider">
-          <small>{isFinal ? "FINAL" : "PROJECTED"}</small>
+          <small>PROJECTED</small>
           <strong>
             {displayScore(awayScore)} - {displayScore(homeScore)}
           </strong>
-          {!isFinal && awayScore !== null && homeScore !== null && Number.isFinite(Number(awayScore)) && Number.isFinite(Number(homeScore)) &&
+          {awayScore !== null && homeScore !== null && Number.isFinite(Number(awayScore)) && Number.isFinite(Number(homeScore)) &&
             <small>Projected total {Number(awayScore) + Number(homeScore)}</small>}
           <span>
-            {isFinal
-              ? `${prediction.actualWinner} WON`
-              : prediction.source === "full-model-error"
+            {prediction.source === "full-model-error"
                 ? "MODEL FALLBACK"
                 : projectedTie
                   ? "PROJECTED TIE"
@@ -570,12 +577,21 @@ export function PredictionCard({ prediction, onOpen }) {
           score={homeScore}
           picked={
             normalizeTeamCode(
-              isFinal ? prediction.actualWinner : prediction.fourthDownPick
+              prediction.fourthDownPick
             ) === normalizeTeamCode(prediction.homeCode)
           }
           side="home"
         />
       </div>
+
+      {isFinal && (
+        <div className="predictions-final-result" aria-label="Final result">
+          <small>FINAL</small>
+          <strong>{prediction.awayCode} {displayScore(prediction.actualAwayScore)} - {prediction.homeCode} {displayScore(prediction.actualHomeScore)}</strong>
+          <span>{prediction.actualWinner === "TIE" ? "Tied game" : `${TEAM_NAMES[prediction.actualWinner] || prediction.actualWinner} won`}</span>
+          <small>{completedPickLabel(prediction)}</small>
+        </div>
+      )}
 
       <div
         className="predictions-game-details"
@@ -1364,7 +1380,11 @@ function PredictionSummary({ icon, label, value }) {
 }
 
 function enrichSavedPredictionWithCurrentMarket(saved, game, oddsEvents, now = new Date()) {
-  const display = mapLedgerPrediction(saved);
+  const resolved = withGameResult(saved, game);
+  const display = mapLedgerPrediction(resolved);
+  if (hasFinalResult(resolved)) return {
+    ...display, game: { ...game, ...saved.game },
+  };
   if (saved.displayBestBetsAsOf) display.bestBets = savedBestBetsDisplay(saved, oddsEvents, now);
   const oddsEvent = findOddsForGame(oddsEvents, game);
   const market = getCoreMarket(oddsEvent);
@@ -1397,12 +1417,8 @@ function enrichSavedPredictionWithCurrentMarket(saved, game, oddsEvents, now = n
 }
 
 function findLedgerRow(ledger, game) {
-  return ledger.find(
-    (row) =>
-      Number(row.week) === Number(game.week) &&
-      normalizeTeamCode(row.awayCode) === game.away &&
-      normalizeTeamCode(row.homeCode) === game.home
-  );
+  const key = resultGameKey(game);
+  return key ? ledger.find((row) => resultGameKey(row) === key) : undefined;
 }
 
 function hasClearPlayerPropLabels(saved) {
@@ -1491,7 +1507,7 @@ function mapLedgerPrediction(row) {
     (typeof row.dataQuality?.bestBets === "object" ? row.dataQuality.bestBets : null);
   return {
     ...row,
-    bestBets: bestBets ? { ...bestBets, anytimeTdModelPick: selectTdModelPick({
+    bestBets: hasFinalResult(row) ? bestBets : bestBets ? { ...bestBets, anytimeTdModelPick: selectTdModelPick({
       game: row, playerProjections: row.playerProjections, personnelViews: row.personnelViews,
       oddsEvent: row.game?.oddsEvent,
     }), anytimeTdScorer: tdBettingDisplay(
@@ -1683,6 +1699,7 @@ function mapScheduleGame(apiGame) {
   return {
     id: String(apiGame?.id || `${away}-${home}-${sourceDate}`),
     week: Number(apiGame?.week || 0),
+    season: Number(apiGame?.season || SEASON),
     away,
     home,
     awayName:
@@ -1698,6 +1715,7 @@ function mapScheduleGame(apiGame) {
           apiGame?.venue?.name ||
           "Venue unavailable",
     status: apiGame?.status || apiGame?.status_state || "Scheduled",
+    resultGame: apiGame,
     scheduleContext: apiGame?.scheduleContext || null,
     weather: apiGame?.weather || null,
   };
@@ -1791,7 +1809,10 @@ function formatKickoff(value) {
 }
 
 function sortPredictions(first, second) {
+  const completedOrder = Number(hasFinalResult(first)) - Number(hasFinalResult(second));
+  if (completedOrder) return completedOrder;
   const firstDate = new Date(first.kickoff || 0).getTime();
   const secondDate = new Date(second.kickoff || 0).getTime();
-  return firstDate - secondDate;
+  return (Number.isFinite(firstDate) ? firstDate : 0) - (Number.isFinite(secondDate) ? secondDate : 0) ||
+    String(first.id || resultGameKey(first)).localeCompare(String(second.id || resultGameKey(second)));
 }

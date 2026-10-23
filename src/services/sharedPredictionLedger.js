@@ -6,6 +6,7 @@ export async function fetchSharedPredictionLedger(options = {}) {
   if (options.season) params.set("season", String(options.season));
   if (options.week) params.set("week", String(options.week));
   if (options.displayBets) params.set("bets", "display");
+  if (options.historicalGames?.length) params.set("historicalGames", options.historicalGames.join(","));
 
   const response = await fetch(
     params.size ? `${ENDPOINT}&${params.toString()}` : ENDPOINT,

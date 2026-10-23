@@ -203,6 +203,15 @@ compatibility path never recovers a betting candidate, recalculates model output
 fetches providers or rewrites a saved prediction. Empty betting probabilities
 display `Unavailable`, not a fabricated zero.
 
+Completed games remain on Predictions below incomplete games in kickoff order.
+The View dropdown's Completed Games option filters the same loaded rows. Final
+status and scores reuse the Results schedule source; matching includes season,
+week, ordered team codes and kickoff, never display names or elapsed time.
+Completed cards retain the saved projection alongside a separate final score and
+pick outcome (ties remain neutral). Their saved Best Bets are historical only:
+current-market display reassessment is skipped and no forecast is regenerated.
+The Results page's grading and persistence behaviour is unchanged.
+
 The Predictions page consumes the returned shared ledger directly, even when
 browser storage is full or unavailable. Saved Best Bets remain display-only:
 each saved candidate must retain a validated current quote at the same bookmaker,

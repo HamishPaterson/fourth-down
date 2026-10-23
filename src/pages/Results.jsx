@@ -3,6 +3,7 @@ import { CheckCircle2, MinusCircle, XCircle } from "lucide-react";
 import TeamLogo from "../components/TeamLogo.jsx";
 import { TEAM_NAMES } from "../data.js";
 import { getTeamTheme } from "../services/teamThemes.js";
+import { isFinalGame, getGameTeamCode, getGameScore, isValidCompletedResult } from "../services/gameResults.js";
 import {
   hasMigratedSharedLedger,
   migrateLocalPredictionLedger,
@@ -388,44 +389,6 @@ function resultMatchesGame(row, game) {
     normalizeTeamCode(row.homeCode) === getGameTeamCode(game, "home");
 }
 
-function isFinalGame(game) {
-  if (game.completed === true) return true;
-
-  const status = String(
-    game.status ||
-    game.status_state ||
-    game.state ||
-    ""
-  ).toLowerCase();
-
-  return (
-    status.includes("final") ||
-    status.includes("complete") ||
-    status.includes("closed") ||
-    status === "post"
-  );
-}
-
-
-function getGameTeamCode(game, side) {
-  const team = side === "away"
-    ? game.visitor_team || game.away_team || game.away || {}
-    : game.home_team || game.home || {};
-  return normalizeTeamCode(
-    team.abbreviation || team.abbr || team.code ||
-    game[`${side}_team_abbreviation`] || game[`${side}_team_code`]
-  );
-}
-
-function getGameScore(game, side) {
-  const value = side === "away"
-    ? game.visitor_team_score ?? game.away_team_score ?? game.away_score
-    : game.home_team_score ?? game.home_score;
-  if (value == null || value === "") return null;
-  const score = Number(value);
-  return Number.isFinite(score) ? score : null;
-}
-
 function getResultSeason(row) {
   const explicit = Number(row.season);
   if (Number.isInteger(explicit)) return explicit;
@@ -643,13 +606,6 @@ function calculateWeeklyBreakdown(rows) {
         : { graded: 0, teamScoreError: 0 },
     };
   });
-}
-
-function isValidCompletedResult(row) {
-  if (!row?.actualWinner) return false;
-  const away = Number(row.actualAwayScore);
-  const home = Number(row.actualHomeScore);
-  return Number.isFinite(away) && Number.isFinite(home) && !(away === 0 && home === 0);
 }
 
 function hasActualScores(row) {
