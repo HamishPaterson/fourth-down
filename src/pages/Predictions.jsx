@@ -1370,6 +1370,7 @@ function PredictionSummary({ icon, label, value }) {
 }
 
 function enrichSavedPredictionWithCurrentMarket(saved, game, oddsEvents) {
+  const display = mapLedgerPrediction(saved);
   const oddsEvent = findOddsForGame(oddsEvents, game);
   const market = getCoreMarket(oddsEvent);
   const hasMarket = market.away !== null && market.home !== null;
@@ -1386,11 +1387,7 @@ function enrichSavedPredictionWithCurrentMarket(saved, game, oddsEvents) {
     saved?.weather ||
     null;
   return {
-    ...mapLedgerPrediction(saved),
-    bestBets:
-      saved.bestBets ||
-      saved?.dataQuality?.bestBetsPayload ||
-      (typeof saved?.dataQuality?.bestBets === "object" ? saved.dataQuality.bestBets : null),
+    ...display,
     oddsPick,
     marketAwayScore: hasMarket ? market.away : saved.marketAwayScore,
     marketHomeScore: hasMarket ? market.home : saved.marketHomeScore,
@@ -1495,8 +1492,13 @@ function hasSavedPrediction(row) {
 }
 
 function mapLedgerPrediction(row) {
+  const bestBets = row.bestBets || row.dataQuality?.bestBetsPayload ||
+    (typeof row.dataQuality?.bestBets === "object" ? row.dataQuality.bestBets : null);
   return {
     ...row,
+    bestBets: bestBets ? { ...bestBets, anytimeTdScorer: tdBettingDisplay(
+      bestBets.anytimeTdScorer, new Date(), { ...row, bestBets }
+    ) } : null,
     awayCode: normalizeTeamCode(row.awayCode),
     homeCode: normalizeTeamCode(row.homeCode),
   };

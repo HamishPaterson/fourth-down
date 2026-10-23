@@ -66,8 +66,92 @@ export function scorerProbabilityLabel(scorer) {
     ? "Unavailable" : `${(scorer.modelProbability * 100).toFixed(1)}%`;
 }
 
-export function tdBettingDisplay(scorer, now = new Date()) {
-  if (!scorer || scorer.source === "unavailable") return scorer;
+function unavailableTd(reason) {
+  return { source: "unavailable", title: "Anytime TD scorer", selection: "No eligible TD betting recommendation",
+    modelProbability: null, decimalOdds: null, primaryReason: reason, explanation: playerReasonMessage(reason),
+    risk: "No eligible priced player candidate remains after filtering." };
+}
+
+function savedTdPlayers(value) {
+  if (!value || typeof value !== "object") return [];
+  if (Array.isArray(value)) return value.flatMap(savedTdPlayers);
+  const probability = value.anytimeTouchdownProbability ?? value.anytime_touchdown_probability;
+  if (Number.isFinite(probability) && probability >= 0 && probability <= 1 &&
+      (value.playerName || value.name || value.fullName)) return [value];
+  return Object.values(value).flatMap(savedTdPlayers);
+}
+
+const suppliedPrice = (price) => price !== null && price !== undefined && price !== "";
+const playerNameKey = (name) => String(name || "").toLowerCase().replace(/[^a-z0-9]/g, "");
+
+function savedTdPlayerReason(player, snapshot) {
+  const id = player.personnelId || player.gsisId;
+  const view = Object.values(snapshot.personnelViews || {}).find((row) => row?.team === player.team);
+  const record = id && view?.players?.find((row) => row.canonicalId === id);
+  const personnel = record || player.personnel;
+  if (record?.identityConflict || record?.sourceConflict ||
+      player.personnel?.confidence === "unmatched") return "PLAYER_IDENTITY_MISMATCH";
+  if (!id || !player.team || !personnel) return "NO_ELIGIBLE_CANDIDATE";
+  if (personnel.statusKnown === false && personnel.status === "Unknown") return "PLAYER_AVAILABILITY_UNKNOWN";
+  if (personnel.eligibleBeforeCutoff === false) return "AVAILABILITY_STALE";
+  if (["Doubtful", "Out", "Inactive", "IR", "PUP", "Suspended", "NFI"].includes(personnel.status))
+    return personnel.status === "Doubtful" ? "PLAYER_DOUBTFUL" : "PLAYER_UNAVAILABLE";
+  const eligible = record ? record.statusKnown === true && record.propEligible === true &&
+    record.eligibleBeforeCutoff === true && record.projectedAvailable !== false
+    : personnel.statusKnown === true && personnel.eligible === true;
+  if (!eligible) return "NO_ELIGIBLE_CANDIDATE";
+  if (Number.isFinite(player.roleConfidence) && player.roleConfidence < .55) return "ROLE_CONFIDENCE_INSUFFICIENT";
+  if (!Number.isFinite(player.roleConfidence)) return "NO_ELIGIBLE_CANDIDATE";
+
+  const odds = snapshot.game?.oddsEvent;
+  const name = playerNameKey(player.playerName || player.name || player.fullName);
+  const quotes = (odds?.bookmakers || []).flatMap((book) => (book.markets || [])
+    .filter((market) => market.key === "player_anytime_td")
+    .flatMap((market) => (market.outcomes || []).filter((quote) =>
+      playerNameKey(quote.playerName || quote.description || quote.name) === name)
+      .map((quote) => ({ ...quote, updatedAt: quote.quoteSource?.timestamp || quote.last_update ||
+        market.last_update || book.last_update }))));
+  const quarantined = (snapshot.bestBets?.quarantinedOffers || []).filter((quote) =>
+    quote.market === "player_anytime_td" && playerNameKey(quote.playerName) === name);
+  const offers = [...quotes, ...quarantined];
+  if (!offers.length) return Array.isArray(odds?.bookmakers) ? "PRICE_UNAVAILABLE" : "NO_ELIGIBLE_CANDIDATE";
+  const reasons = offers.map((quote) => {
+    if (!suppliedPrice(quote.price)) return "PRICE_UNAVAILABLE";
+    if (!Number.isFinite(Number(quote.price)) || Math.abs(Number(quote.price)) < 100 ||
+        quote.decimalOdds !== undefined && (!Number.isFinite(quote.decimalOdds) || quote.decimalOdds <= 1) ||
+        quote.quoteValidation?.reasons?.includes("malformed_price")) return "INVALID_PRICE";
+    const at = Date.parse(snapshot.generatedAt || snapshot.snapshotAt);
+    const quoted = Date.parse(quote.updatedAt);
+    if (quote.stale === true || quote.quoteValidation?.reasons?.includes("stale_offer") ||
+        Number.isFinite(at) && Number.isFinite(quoted) && (quoted > at || at - quoted > 30 * 3600000)) return "PRICE_STALE";
+    if (!Number.isFinite(quoted) || !Number.isFinite(at)) return "NO_ELIGIBLE_CANDIDATE";
+    if (Number.isFinite(quote.edge) && quote.edge <= 0) return "NON_POSITIVE_EDGE";
+    const probability = player.anytimeTouchdownProbability ?? player.anytime_touchdown_probability;
+    if (probability < .55) return "PROBABILITY_BELOW_THRESHOLD";
+    return "NO_ELIGIBLE_CANDIDATE";
+  });
+  return reasons.every((reason) => reason === reasons[0]) ? reasons[0] : "NO_ELIGIBLE_CANDIDATE";
+}
+
+export function normalizeSavedTdEmptyState(scorer, snapshot) {
+  if (scorer?.source !== "unavailable") return scorer;
+  const structuredReason = canonicalReason(scorer.primaryReason);
+  if (PLAYER_REASON_PRIORITY.includes(structuredReason)) return scorer;
+  const diagnostics = snapshot?.bestBets?.marketDiagnostics?.playerDiagnostics?.filter((row) =>
+    row.market === "player_anytime_td" && PLAYER_REASON_PRIORITY.includes(canonicalReason(row.rejectionCode)));
+  if (diagnostics?.length) {
+    const reasons = diagnostics.map((row) => canonicalReason(row.rejectionCode));
+    return unavailableTd(reasons.every((reason) => reason === reasons[0]) ? reasons[0] : "NO_ELIGIBLE_CANDIDATE");
+  }
+  if (!snapshot || !Object.hasOwn(snapshot, "playerProjections")) return unavailableTd("NO_ELIGIBLE_CANDIDATE");
+  const players = savedTdPlayers(snapshot.playerProjections);
+  if (!players.length) return unavailableTd("PLAYER_PROJECTION_UNAVAILABLE");
+  const reasons = players.map((player) => savedTdPlayerReason(player, snapshot));
+  return unavailableTd(reasons.every((reason) => reason === reasons[0]) ? reasons[0] : "NO_ELIGIBLE_CANDIDATE");
+}
+
+export function tdBettingDisplay(scorer, now = new Date(), savedPrediction) {
+  if (!scorer || scorer.source === "unavailable") return normalizeSavedTdEmptyState(scorer, savedPrediction);
   const supplied = scorer.price !== null && scorer.price !== undefined && scorer.price !== "";
   const price = Number(scorer.price);
   const timestamp = Date.parse(scorer.updatedAt);
