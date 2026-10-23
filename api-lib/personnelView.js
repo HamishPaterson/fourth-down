@@ -23,6 +23,30 @@ const unavailable = new Set(["Doubtful", "Out", "Inactive", "IR", "PUP", "Suspen
 const nameKey = (value) => String(value || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "")
   .toLowerCase().replace(/\b(jr|sr|ii|iii|iv)\b\.?/g, "").replace(/[^a-z0-9]/g, "");
 
+export function classifyPlayerAvailability(player, { sourceAvailable = true, observedAt } = {}) {
+  if (!player || player.identityConflict || player.sourceConflict) return "UNKNOWN_IDENTITY";
+  if (!sourceAvailable) return "UNKNOWN_SOURCE_UNAVAILABLE";
+  if (player.inLineup === false) return "UNKNOWN_NOT_IN_LINEUP";
+  if (player.position && !["QB", "RB", "FB", "WR", "TE"].includes(player.position)) return "UNSUPPORTED_ROLE";
+  const observation = player.observationTimestamp || player.chartObservationTimestamp;
+  const timestamp = typeof observation === "number" ? observation : Date.parse(observation);
+  const at = Date.parse(observedAt || player.cutoff);
+  if (player.eligibleBeforeCutoff === false ||
+      Number.isFinite(timestamp) && Number.isFinite(at) &&
+        (timestamp > at || at - timestamp > 7 * 86400000)) return "UNKNOWN_STALE";
+  const states = { Active: "AVAILABLE", Probable: "EXPECTED_ACTIVE", Questionable: "QUESTIONABLE",
+    Doubtful: "DOUBTFUL", Out: "OUT", Inactive: "OUT", IR: "IR", PUP: "PUP",
+    Suspended: "SUSPENDED", NFI: "OUT" };
+  return states[player.status] || (player.provenance?.statusSource === "unknown" &&
+    !player.provenance?.live && !player.provenance?.chart ? "UNKNOWN_SOURCE_UNAVAILABLE" : "UNKNOWN_GAME_STATUS");
+}
+
+export function availableForPlayerBet(player, options) {
+  return ["AVAILABLE", "EXPECTED_ACTIVE", "QUESTIONABLE"].includes(classifyPlayerAvailability(player, options)) &&
+    player?.statusKnown === true && player.propEligible === true &&
+    player.projectedAvailable !== false && player.eligibleBeforeCutoff === true;
+}
+
 export function canonicalTeam(value) {
   const code = String(value || "").trim().toUpperCase();
   return aliases[code] || code;
@@ -255,6 +279,11 @@ export function buildPersonnelView({ team, lineup, roster, cutoff, season, week,
       };
     }).filter(Boolean);
   chartRecords.push(...liveRecords);
+  for (const player of chartRecords) {
+    player.availabilityState = classifyPlayerAvailability(player, {
+      sourceAvailable: chartEligible || liveEligible, observedAt,
+    });
+  }
 
   const qbs = chartRecords.filter((player) => player.group === "QB");
   const chartStarterId = lineup?.startingQuarterback?.gsisId || lineup?.startingQuarterback?.playerId;

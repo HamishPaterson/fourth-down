@@ -941,7 +941,8 @@ test("Anytime TD remains 1-exp(-expected TDs) and Best Bets consumes only eligib
     personnelViews: input.personnelViews,
     oddsEvent: null, dataQuality: {} });
   assert.ok(bets.anytimeTdScorer);
-  assert.equal(bets.anytimeTdScorer.source, "model-only");
+  assert.equal(bets.anytimeTdScorer.source, "unavailable");
+  assert.ok(bets.anytimeTdScorer.statisticalProjection);
 });
 for (const change of ["legacy", "season", "week", "cutoff", "futureLog", "duplicateLog", "nonfinite", "missingVolume"]) {
   test(`rejects ${change} input instead of silently fabricating certainty`, () => {

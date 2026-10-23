@@ -1736,8 +1736,15 @@ async function saveSnapshots(supabase, request, response) {
     }
 
     delete merged.authoritative;
+    delete merged.lockProvenance;
     // A browser cannot remove a server-owned marker, including when adding results.
-    if (existingSnapshot?.authoritative) merged.authoritative = true;
+    if (existingSnapshot?.authoritative) {
+      const results = Object.fromEntries([
+        "actualWinner", "actualAwayScore", "actualHomeScore", "fourthDownCorrect", "marketCorrect",
+        "gradedAt", "frozenAt", "savedBeforeKickoff",
+      ].filter((key) => merged[key] !== undefined).map((key) => [key, merged[key]]));
+      merged = { ...existingSnapshot, ...results };
+    }
     const { data, error } = await writePredictionVersion(supabase, merged, existing);
 
     if (error) {

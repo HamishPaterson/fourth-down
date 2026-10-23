@@ -19,6 +19,7 @@ import { getFullGamePrediction } from "../services/gamePredictionService.js";
 import { buildPredictionSnapshot } from "../services/predictionSnapshot.js";
 import { getPlayerRating, resolveFullPlayerName } from "../services/playerRatings.js";
 import { getStadiumWeather } from "../services/weatherApi.js";
+import { playerDiagnosticSummary, scorerProbabilityLabel, tdBettingDisplay } from "../services/playerBetDiagnostics.js";
 
 const SEASON = 2026;
 const SCHEDULE_CACHE_PREFIX = "fourth-down:schedule";
@@ -686,14 +687,9 @@ function BestBetsPanel({ bestBets, kickoff, awayCode, homeCode }) {
         homeCode={homeCode}
       />
       <AnytimeTdScorer scorer={bestBets?.anytimeTdScorer} awayCode={awayCode} homeCode={homeCode} />
-      {bestBets?.marketDiagnostics?.playerMarkets === 0 && (
+      {playerDiagnosticSummary(bestBets) && (
         <p className="best-bets-market-note">
-          No player-prop prices were returned for this game, so only moneyline, spread and total markets could be assessed.
-        </p>
-      )}
-      {bestBets?.marketDiagnostics?.playerMarkets > 0 && bestBets?.marketDiagnostics?.matchedPlayerMarkets === 0 && (
-        <p className="best-bets-market-note">
-          Player-prop prices were returned, but player names still did not match the projection feed. The provider and projection names are now included in the saved diagnostics.
+          {playerDiagnosticSummary(bestBets)}
         </p>
       )}
       {!recommendations.length ? (
@@ -798,8 +794,8 @@ function displayBetFamily(bet) {
 }
 
 function AnytimeTdScorer({ scorer, awayCode, homeCode }) {
+  scorer = tdBettingDisplay(scorer);
   const selection = scorer?.selection || "No eligible scorer projection";
-  const modelProbability = Number(scorer?.modelProbability || 0);
   const hasPrice = usableDecimalOdds(scorer?.decimalOdds, scorer?.price) !== null;
 
   return (
@@ -818,15 +814,19 @@ function AnytimeTdScorer({ scorer, awayCode, homeCode }) {
         <span className="best-bet-price">
           {hasPrice
             ? formatAustralianOdds(scorer.decimalOdds, scorer.price)
-            : "Model pick"}
+            : scorer?.source === "unavailable" ? "Unavailable" : "Model pick"}
         </span>
       </div>
       <div className="best-bet-metrics" style={{ gridTemplateColumns: "repeat(3, 1fr)" }}>
-        <span><small>Model probability</small><strong>{formatPercent(modelProbability)}</strong></span>
+        <span><small>Model probability</small><strong>{scorerProbabilityLabel(scorer)}</strong></span>
         <span><small>Confidence</small><strong>{scorer?.confidenceLevel || "Cautious"}</strong></span>
         <span><small>Price</small><strong>{hasPrice ? formatAustralianOdds(scorer.decimalOdds, scorer.price) : "Unavailable"}</strong></span>
       </div>
       <p>{scorer?.explanation || "No player touchdown projection was available."}</p>
+      {scorer?.source === "priced-market" && (
+        <p>Edge: {(scorer.edge * 100).toFixed(1)}% · {scorer.sportsbook}
+          {scorer.updatedAt ? ` · Quote: ${scorer.updatedAt}` : ""}</p>
+      )}
       {scorer?.qualificationReason && (
         <p style={{ marginTop: "8px", padding: "9px", borderRadius: "8px", background: "rgba(255,255,255,0.06)" }}>
           <strong>Why this scorer:</strong> {scorer.qualificationReason}

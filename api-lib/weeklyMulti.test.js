@@ -72,7 +72,9 @@ function createCurrentEntry(overrides = {}) {
 }
 
 function createLockEntry(overrides = {}) {
-  return createScheduleHandler({ lockHandler: createWeeklyMultiLockHandler(overrides) });
+  return createScheduleHandler({ lockHandler: createWeeklyMultiLockHandler({
+    recordExecution: async () => {}, persistManifest: async () => "fixture-manifest", ...overrides,
+  }) });
 }
 
 test("schedule entry preserves existing schedule behavior without weeklyMultiMode", async () => {
@@ -369,7 +371,7 @@ test("week mapping handles Week 1 opener, Thanksgiving, bye week and offseason w
   }
 });
 
-test("offseason and schedule API failure return not ready without writing", async () => {
+test("unavailable audit storage fails closed without calling the legacy schedule resolver", async () => {
   const originalSecret = process.env.CRON_SECRET;
   process.env.CRON_SECRET = "expected-secret";
   try {
@@ -386,10 +388,9 @@ test("offseason and schedule API failure return not ready without writing", asyn
       });
       const res = response();
       await handler({ method: "GET", headers: { authorization: "Bearer expected-secret" }, query: { weeklyMultiMode: "lock" } }, res);
-      assert.equal(res.statusCode, 200, item.name);
-      assert.equal(res.body.status, "not ready", item.name);
-      assert.equal(clientCalls, 0, item.name);
-      if (item.name === "schedule API failure") assert.match(res.body.reason, /Schedule data is unavailable/);
+      assert.equal(res.statusCode, 503, item.name);
+      assert.equal(res.body.error, "INPUT_OR_AUDIT_UNAVAILABLE", item.name);
+      assert.equal(clientCalls, 1, item.name);
     }
   } finally {
     if (originalSecret === undefined) delete process.env.CRON_SECRET;
@@ -420,7 +421,7 @@ test("lock resolver returns not yet locked before Thursday without fetching sche
   assert.equal(fetchCount, 0);
 });
 
-test("lock route rejects absent and incorrect CRON_SECRET before accessing dependencies", async () => {
+test("lock route denies missing/incorrect secret without resolving inputs and attempts safe audit storage", async () => {
   const originalSecret = process.env.CRON_SECRET;
   let dependencyCalls = 0;
   const handler = createLockEntry({
@@ -438,7 +439,7 @@ test("lock route rejects absent and incorrect CRON_SECRET before accessing depen
     const wrong = response();
     await handler({ method: "GET", headers: { authorization: "Bearer wrong-secret" }, query: { weeklyMultiMode: "lock" } }, wrong);
     assert.equal(wrong.statusCode, 401);
-    assert.equal(dependencyCalls, 0);
+    assert.equal(dependencyCalls, 2);
   } finally {
     if (originalSecret === undefined) delete process.env.CRON_SECRET;
     else process.env.CRON_SECRET = originalSecret;
@@ -483,7 +484,7 @@ test("windowed schedule resolver derives the key and earliest kickoff with one r
   assert.equal(context.firstKickoffAt, new Date(THURSDAY + 60 * 60 * 1000).toISOString());
 });
 
-test("plain-text 429 returns not ready without odds refresh or writes", async () => {
+test("historical lock does not call a legacy rate-limited schedule dependency", async () => {
   const originalSecret = process.env.CRON_SECRET;
   process.env.CRON_SECRET = "expected-secret";
   const database = createLockClient();
@@ -499,7 +500,7 @@ test("plain-text 429 returns not ready without odds refresh or writes", async ()
     await handler({ method: "GET", headers: { authorization: "Bearer expected-secret" }, query: { weeklyMultiMode: "lock" } }, res);
     assert.equal(res.statusCode, 200);
     assert.equal(res.body.status, "not ready");
-    assert.equal(res.body.reason, "schedule provider rate limited");
+    assert.equal(res.body.reason, "HISTORICAL_LOCK_PROHIBITED");
     assert.equal(oddsCalls, 0);
     assert.equal(database.calls.some(([method]) => method === "insert"), false);
   } finally {
@@ -637,7 +638,7 @@ test("read route reports a missed week when no saved multi exists after first ki
   assert.equal(res.body.message, "No Weekly Best Multi was locked for this week.");
 });
 
-test("late generation is allowed at the deadline before the first kickoff and flagged", async () => {
+test("legacy late-generation entry cannot reconstruct a historical lock at its deadline", async () => {
   const originalSecret = process.env.CRON_SECRET;
   process.env.CRON_SECRET = "expected-secret";
   const context = {
@@ -661,16 +662,16 @@ test("late generation is allowed at the deadline before the first kickoff and fl
   try {
     await handler({ method: "GET", headers: { authorization: "Bearer expected-secret", host: "example.test" }, query: { weeklyMultiMode: "lock" } }, res);
     assert.equal(res.statusCode, 200);
-    assert.equal(res.body.status, "generated late");
-    assert.equal(res.body.record.generated_late, true);
-    assert.equal(database.insertedRecord.generated_late, true);
+    assert.equal(res.body.status, "not ready");
+    assert.equal(res.body.reason, "HISTORICAL_LOCK_PROHIBITED");
+    assert.equal(database.insertedRecord, null);
   } finally {
     if (originalSecret === undefined) delete process.env.CRON_SECRET;
     else process.env.CRON_SECRET = originalSecret;
   }
 });
 
-test("late lock after first kickoff is missed and performs no writes", async () => {
+test("historical late lock after kickoff cannot write or refresh", async () => {
   const originalSecret = process.env.CRON_SECRET;
   process.env.CRON_SECRET = "expected-secret";
   const context = {
@@ -695,8 +696,8 @@ test("late lock after first kickoff is missed and performs no writes", async () 
   try {
     await handler({ method: "GET", headers: { authorization: "Bearer expected-secret", host: "example.test" }, query: { weeklyMultiMode: "lock" } }, res);
     assert.equal(res.statusCode, 200);
-    assert.equal(res.body.status, "missed");
-    assert.equal(res.body.message, "No Weekly Best Multi was locked for this week.");
+    assert.equal(res.body.status, "not ready");
+    assert.equal(res.body.reason, "HISTORICAL_LOCK_PROHIBITED");
     assert.equal(database.calls.some(([method]) => method === "insert"), false);
     assert.equal(oddsCalls, 0);
   } finally {
@@ -705,7 +706,7 @@ test("late lock after first kickoff is missed and performs no writes", async () 
   }
 });
 
-test("dry run remains available after kickoff and does not insert a row", async () => {
+test("historical dry run after kickoff cannot masquerade as a new lock", async () => {
   const originalSecret = process.env.CRON_SECRET;
   process.env.CRON_SECRET = "expected-secret";
   const context = {
@@ -729,7 +730,7 @@ test("dry run remains available after kickoff and does not insert a row", async 
   try {
     await handler({ method: "GET", headers: { authorization: "Bearer expected-secret", host: "example.test" }, query: { weeklyMultiMode: "lock", dryRun: "true" } }, res);
     assert.equal(res.statusCode, 200);
-    assert.equal(res.body.dryRun, true);
+    assert.equal(res.body.reason, "HISTORICAL_LOCK_PROHIBITED");
     assert.equal(database.calls.some(([method]) => method === "insert"), false);
   } finally {
     if (originalSecret === undefined) delete process.env.CRON_SECRET;
@@ -917,7 +918,7 @@ test("a personnel-eligible model-only scorer still requires priced market odds",
   assert.equal(selection.legs.some((leg) => leg.playerId === "player-1"), false);
 });
 
-test("dry run returns selection without inserting a row", async () => {
+test("historical dry run returns the preservation reason without inserting a row", async () => {
   const originalSecret = process.env.CRON_SECRET;
   process.env.CRON_SECRET = "expected-secret";
   const calls = [];
@@ -956,8 +957,7 @@ test("dry run returns selection without inserting a row", async () => {
   try {
     await handler({ method: "GET", headers: { authorization: "Bearer expected-secret", host: "example.test" }, query: { weeklyMultiMode: "lock", dryRun: "true" } }, res);
     assert.equal(res.statusCode, 200);
-    assert.equal(res.body.dryRun, true);
-    assert.equal(Array.isArray(res.body.legs), true);
+    assert.equal(res.body.reason, "HISTORICAL_LOCK_PROHIBITED");
     assert.equal(calls.some(([method]) => method === "insert"), false);
   } finally {
     if (originalSecret === undefined) delete process.env.CRON_SECRET;

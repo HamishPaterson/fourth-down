@@ -419,7 +419,7 @@ test("available verified-QB passing markets are evaluated and absent projections
   assert.ok(buildBestBets(input).candidates.every(b => b.category !== "Game"));
 });
 
-test("preparation audits all 14 saved games without regenerating scores or writing during dry run", async () => {
+test("historical candidate-repair dry run cannot recreate past lock-time inputs", async () => {
   const inputs = PAIRS.map(pair => fixture(pair));
   const stored = inputs.map(input => {
     const s = snapshot(input); delete s.bestBets.candidateVersion; delete s.bestBets.candidates;
@@ -440,6 +440,7 @@ test("preparation audits all 14 saved games without regenerating scores or writi
   try {
     await createWeeklyMultiPreparationHandler({
       getNow: () => NOW, createClient: () => client, report() {},
+      recordExecution: async () => {}, persistManifest: async () => "fixture-manifest",
       resolveContext: async () => ({ ...context, available: true, eligible: true,
         games: PAIRS.map(([away, home]) => ({ season: 2026, week: 6, date: KICKOFF,
           visitor_team: { abbreviation: away }, home_team: { abbreviation: home } })) }),
@@ -453,8 +454,6 @@ test("preparation audits all 14 saved games without regenerating scores or writi
   } finally {
     if (originalSecret === undefined) delete process.env.CRON_SECRET; else process.env.CRON_SECRET = originalSecret;
   }
-  assert.equal(new Set(refreshed).size, 14);
-  assert.equal(body.reusedPredictions, 14);
-  assert.equal(body.generatedPredictions, 0);
-  assert.equal(body.legCount, 5);
+  assert.equal(refreshed.length, 0);
+  assert.equal(body.reason, "HISTORICAL_LOCK_PROHIBITED");
 });

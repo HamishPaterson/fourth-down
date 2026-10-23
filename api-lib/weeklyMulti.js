@@ -3,8 +3,9 @@ import { SNAPSHOT_MAX_AGE_MS } from "./oddsSnapshots.js";
 import { isPlayerLeg, settleLockedLegs } from "./weeklyMultiSettlement.js";
 import { findOddsForGame, resolveTeamCode } from "../src/services/oddsApi.js";
 import { usableDecimalOdds } from "../src/services/oddsDisplay.js";
-import { validateOddsEvents } from "../src/services/quoteValidation.js";
-import { canonicalTeam } from "./personnelView.js";
+import { validateOddsEvents, canonicalQuoteMarket } from "../src/services/quoteValidation.js";
+import { createWeeklyMultiPreparationHandler } from "./weeklyMultiPreparation.js";
+import { canonicalTeam, availableForPlayerBet, classifyPlayerAvailability } from "./personnelView.js";
 import { isCurrentModelIdentity } from "../src/services/modelIdentity.js";
 
 const BALLDONTLIE_GAMES_URL = "https://api.balldontlie.io/nfl/v1/games";
@@ -270,7 +271,7 @@ function isFreshPrediction(snapshot, context, now) {
     Number.isFinite(kickoff) && kickoff > now.getTime();
 }
 
-function personnelCandidateEligible(snapshot, candidate) {
+function personnelCandidateEligible(snapshot, candidate, now) {
   if (!isPlayerLeg(candidate)) return true;
   const id = candidate.personnelId || candidate.playerId;
   const team = canonicalTeam(candidate.playerTeam || candidate.teamCode || "");
@@ -282,59 +283,113 @@ function personnelCandidateEligible(snapshot, candidate) {
   const record = view?.players?.find((player) => player.canonicalId === String(id));
   if (record?.position === "QB" && view?.quarterback?.conflict && !view.quarterback.resolved) return false;
   return Boolean(canonicalTeam(view?.team) === team && record?.statusKnown && record.propEligible === true &&
-    record.projectedAvailable && record.eligibleBeforeCutoff && !record.identityConflict && !record.sourceConflict);
+    record.projectedAvailable && record.eligibleBeforeCutoff && !record.identityConflict && !record.sourceConflict &&
+    availableForPlayerBet(record, { observedAt: now.toISOString() }));
+}
+
+function candidatePersonnelAssessment(snapshot, candidate, now) {
+  if (!isPlayerLeg(candidate)) return { identityState: "NOT_APPLICABLE", availabilityState: "NOT_APPLICABLE" };
+  const id = candidate.personnelId || candidate.playerId;
+  const team = canonicalTeam(candidate.playerTeam || candidate.teamCode || "");
+  const view = team === canonicalTeam(snapshot.awayCode) ? snapshot.personnelViews?.away :
+    team === canonicalTeam(snapshot.homeCode) ? snapshot.personnelViews?.home : null;
+  const player = id && view?.players?.find((row) => row.canonicalId === String(id));
+  return {
+    identityState: player && !player.identityConflict && !player.sourceConflict ? "MATCHED" : "UNRESOLVED",
+    availabilityState: !id ? "UNKNOWN_IDENTITY" : classifyPlayerAvailability(player || { inLineup: false },
+      { sourceAvailable: Boolean(view), observedAt: now.toISOString() }),
+  };
 }
 
 export function buildWeeklyMultiSelection(snapshots, oddsPayload, context, now = new Date()) {
   const reasonCounts = { stalePrediction: 0, staleOdds: 0, fallbackOdds: 0, invalidCandidates: 0, personnelExcluded: 0 };
+  const candidateDiagnostics = [];
+  const reject = (snapshot, bet, reasons) => candidateDiagnostics.push({
+    predictionId: snapshot.id || null, candidateId: candidateIdentity({ ...bet,
+      matchupKey: `${context.season}:${context.week}:${snapshot.awayCode}:${snapshot.homeCode}` }),
+    market: canonicalQuoteMarket(bet.market), quoteId: bet.quoteId || null,
+    ...candidatePersonnelAssessment(snapshot, bet, now), reasons, eligible: false,
+  });
   const candidates = [];
   const quoteAudit = validateOddsEvents(Array.isArray(oddsPayload?.events) ? oddsPayload.events : [], { now });
   const oddsEvents = quoteAudit.events;
   for (const snapshot of snapshots || []) {
-    if (!isCurrentModelIdentity(snapshot?.modelVersion ?? snapshot?.dataQuality?.modelVersion,
-      snapshot?.modelKey ?? snapshot?.dataQuality?.modelKey)) {
+    const predictionReasons = isCurrentModelIdentity(snapshot?.modelVersion, snapshot?.modelKey) ? [] : ["WRONG_MODEL"];
+    if (predictionReasons.length) {
       reasonCounts.stalePrediction += 1;
+      for (const bet of snapshot.bestBets?.candidates || snapshot.bestBets?.recommendations || []) {
+        reject(snapshot, bet, predictionReasons);
+      }
       continue;
     }
     const bestBetsPayload = snapshot.bestBets || snapshot.dataQuality?.bestBetsPayload;
     const scorer = bestBetsPayload?.anytimeTdScorer;
-    if (scorer?.source === "model-only" && !personnelCandidateEligible(snapshot, scorer)) {
+    if (scorer?.source === "model-only" && !personnelCandidateEligible(snapshot, scorer, now)) {
       reasonCounts.personnelExcluded += 1;
     }
     const event = findOddsForGame(oddsEvents, snapshot);
     if (!event || isFallbackEvent(event)) {
       reasonCounts.fallbackOdds += 1;
+      for (const bet of bestBetsPayload?.candidates || bestBetsPayload?.recommendations || []) {
+        reject(snapshot, bet, ["EVENT_MISSING_OR_FALLBACK"]);
+      }
       continue;
     }
     const bets = [...(bestBetsPayload?.candidates || bestBetsPayload?.recommendations || [])];
     if (scorer?.source === "priced-market") bets.push(scorer);
     for (const bet of bets) {
-      if (!personnelCandidateEligible(snapshot, bet)) {
+      if (context.requireSnapshotEvidence && isPlayerLeg(bet) &&
+          (!Number.isFinite(bet.roleConfidence) || bet.roleConfidence < .55 || bet.roleConfidence > 1)) {
         reasonCounts.personnelExcluded += 1;
+        reject(snapshot, bet, ["ROLE_CONFIDENCE_INSUFFICIENT"]);
+        continue;
+      }
+      if (!personnelCandidateEligible(snapshot, bet, now)) {
+        reasonCounts.personnelExcluded += 1;
+        reject(snapshot, bet, ["PERSONNEL_INELIGIBLE"]);
         continue;
       }
       if (bet.quoteValidation?.status === "quarantined") {
         reasonCounts.invalidCandidates += 1;
+        reject(snapshot, bet, ["QUOTE_QUARANTINED"]);
         continue;
       }
 
       const decimalOdds = getDecimalOddsValue(bet);
       const modelProbability = Number(bet.modelProbability);
       const quoteTime = new Date(bet.updatedAt || 0).getTime();
-      if (!Number.isFinite(quoteTime) || quoteTime <= 0 || now.getTime() - quoteTime > ODDS_MAX_AGE_MS || quoteTime > now.getTime() + 60000) {
+      if (!Number.isFinite(quoteTime) || quoteTime <= 0 || now.getTime() - quoteTime > ODDS_MAX_AGE_MS ||
+          quoteTime > Math.min(now.getTime(), Date.parse(context.lockAt))) {
         reasonCounts.staleOdds += 1;
+        reject(snapshot, bet, [quoteTime > Date.parse(context.lockAt) ? "POST_LOCK_QUOTE" :
+          quoteTime > now.getTime() ? "FUTURE_QUOTE" : "QUOTE_STALE_OR_MISSING_TIME"]);
         continue;
       }
+      const matchedQuote = currentBookQuote(event, bet, now, context);
       if (!Number.isFinite(decimalOdds) || decimalOdds <= 1 || !Number.isFinite(modelProbability) || modelProbability < 0 || modelProbability > 1 ||
-        !bet.selection || !bet.market || !isRealBookmaker(bet.sportsbook, event, now) || !hasCurrentBookMarket(event, bet)) {
+        !bet.selection || !bet.market || !matchedQuote) {
         reasonCounts.invalidCandidates += 1;
+        reject(snapshot, bet, ["EXACT_CURRENT_QUOTE_NOT_FOUND"]);
         continue;
       }
       const impliedProbability = 1 / decimalOdds;
       const edge = modelProbability - impliedProbability;
-      if (!Number.isFinite(edge) || edge <= 0) continue;
+      if (!Number.isFinite(edge) || edge <= 0) {
+        reject(snapshot, bet, ["NON_POSITIVE_EDGE"]);
+        continue;
+      }
+      candidateDiagnostics.push({
+        predictionId: snapshot.id, candidateId: candidateIdentity({ ...bet,
+          matchupKey: `${context.season}:${context.week}:${snapshot.awayCode}:${snapshot.homeCode}` }),
+        market: canonicalQuoteMarket(bet.market), quoteId: bet.quoteId || null,
+        ...candidatePersonnelAssessment(snapshot, bet, now),
+        eligible: modelProbability >= FLOOR_PROBABILITY,
+        reasons: modelProbability >= FLOOR_PROBABILITY ? [] : ["PROBABILITY_BELOW_FLOOR"],
+      });
       candidates.push({
         ...bet,
+        predictionId: snapshot.id,
+        provider: matchedQuote.quoteSource?.provider || "SharpAPI",
         marketFamily: weeklyMultiMarketFamily(bet),
         decimalOdds,
         modelProbability,
@@ -392,6 +447,8 @@ export function buildWeeklyMultiSelection(snapshots, oddsPayload, context, now =
     oddsRefreshedAt: oddsPayload?.refreshedAt || null,
     oddsLate,
     reasonCounts,
+    candidateDiagnostics,
+    eligibleCandidates: ranked.filter((candidate) => candidate.modelProbability >= FLOOR_PROBABILITY),
     quarantinedOffers: quoteAudit.quarantined,
     candidateCounts: Object.fromEntries([...new Set(ranked.map((candidate) => candidate.marketFamily))].sort()
       .map((family) => [family, ranked.filter((candidate) => candidate.marketFamily === family && candidate.modelProbability >= FLOOR_PROBABILITY).length])),
@@ -463,7 +520,10 @@ export function mergeStoredOdds(core, props) {
     }
   }
   const refreshed = [core?.refreshedAt, props?.refreshedAt].filter(Boolean).sort();
-  return { events, cacheStatus, refreshedAt: refreshed[0] || null };
+  return { events, cacheStatus, refreshedAt: refreshed[0] || null,
+    markets: [...(core?.markets || []), ...(props?.markets || [])],
+    partialMarkets: [...new Set([...(core?.partialMarkets || []), ...(props?.partialMarkets || [])])],
+  };
 }
 
 export function secureBearerMatches(header, secret) {
@@ -475,7 +535,7 @@ export function secureBearerMatches(header, secret) {
   return difference === 0;
 }
 
-function candidateIdentity(candidate) {
+export function candidateIdentity(candidate) {
   return [candidate.matchupKey, String(candidate.market).trim().toLowerCase(), String(candidate.selection).trim().toLowerCase(), String(candidate.line ?? candidate.point ?? candidate.handicap ?? "").trim()].join(":");
 }
 
@@ -501,29 +561,29 @@ function isFallbackEvent(event) {
   return /(fallback|placeholder|stale|unavailable|published consensus)/.test(markers);
 }
 
-function isRealBookmaker(sportsbook, event, now) {
-  const name = normalizeText(sportsbook);
-  if (!name || /(fallback|placeholder|publishedconsensus|^market$)/.test(name)) return false;
-  return (event.bookmakers || []).some((book) => {
-    const updatedAt = new Date(book?.last_update || 0).getTime();
-    return [book?.title, book?.name, book?.key].some((value) => normalizeText(value) === name) &&
-      Number.isFinite(updatedAt) && now.getTime() - updatedAt <= ODDS_MAX_AGE_MS && updatedAt <= now.getTime() + 60000;
-  });
-}
-
-function hasCurrentBookMarket(event, bet) {
+function currentBookQuote(event, bet, now, context) {
+  if (!bet.sportsbook || /(fallback|placeholder|publishedconsensus|^market$)/.test(normalizeText(bet.sportsbook))) return null;
   const marketName = String(bet.market || "").toLowerCase();
   const bookmaker = (event.bookmakers || []).find((book) => [book?.title, book?.name, book?.key]
     .some((value) => normalizeText(value) === normalizeText(bet.sportsbook)));
-  if (!bookmaker) return false;
+  if (!bookmaker) return null;
   const markets = Array.isArray(bookmaker.markets) ? bookmaker.markets : [];
   const matches = markets.filter((market) => marketLabelMatches(market.key, marketName));
-  if (!matches.length) return false;
+  if (!matches.length) return null;
   const selection = normalizeText(bet.selection);
   const suppliedLine = bet.line ?? bet.point ?? bet.handicap;
   const line = suppliedLine === null || suppliedLine === undefined ? null : Number(suppliedLine);
-  return matches.some((market) => (market.outcomes || []).some((outcome) => {
-    if (outcome.quoteValidation?.status !== "validated") return false;
+  for (const market of matches) for (const outcome of market.outcomes || []) {
+    const matchesOutcome = () => {
+    if (outcome.quoteValidation?.status !== "validated" || outcome.quoteSource?.rolloverFallback === true) return false;
+    const timestamp = outcome.quoteSource?.timestamp || outcome.updatedAt || market.last_update || bookmaker.last_update;
+    const time = Date.parse(timestamp);
+    if (!Number.isFinite(time) || time > Date.parse(context.lockAt) || time > now.getTime() + 60000 ||
+        now.getTime() - time > ODDS_MAX_AGE_MS || time !== Date.parse(bet.updatedAt)) return false;
+    const fetchedAt = Date.parse(outcome.quoteSource?.fetchedAt);
+    if (context.requireSnapshotEvidence && (!outcome.quoteSource?.id ||
+        !Number.isFinite(fetchedAt) || fetchedAt > now.getTime() || !bet.quoteId)) return false;
+    if (Number.isFinite(fetchedAt) && fetchedAt > Date.parse(context.lockAt)) return false;
     if (bet.quoteId && outcome.quoteSource?.id !== bet.quoteId) return false;
     if (bet.price !== null && bet.price !== undefined && bet.price !== "" &&
         (!Number.isFinite(Number(bet.price)) || Number(bet.price) !== Number(outcome.price))) return false;
@@ -537,7 +597,10 @@ function hasCurrentBookMarket(event, bet) {
     const decimal = usableDecimalOdds(null, outcome.price);
     const matchingPrice = decimal !== null && Math.abs(decimal - getDecimalOddsValue(bet)) <= .0051;
     return selectionMatch && matchingPrice && (line === null || Number(point) === line);
-  }));
+    };
+    if (matchesOutcome()) return outcome;
+  }
+  return null;
 }
 
 function marketLabelMatches(key, label) {
@@ -716,161 +779,5 @@ function setWeeklyMultiReadCache(res, seconds) {
 }
 
 export function createWeeklyMultiLockHandler(overrides = {}) {
-  const resolveContext = overrides.resolveContext || resolveLockWeekContext;
-  const createClient = overrides.createClient || createWeeklyMultiClient;
-  const fetchOdds = overrides.fetchOdds || ((...args) => fetch(...args));
-  const getNow = overrides.getNow || (() => new Date());
-
-  return async function handler(req, res) {
-    res.setHeader("Cache-Control", "no-store, max-age=0");
-    if (req.method !== "GET" && req.method !== "POST") {
-      res.setHeader("Allow", "GET, POST");
-      return res.status(405).json({ error: "Method not allowed" });
-    }
-
-    const secret = process.env.CRON_SECRET;
-    if (!secret || !secureBearerMatches(req.headers.authorization, secret)) {
-      return res.status(401).json({ error: "Unauthorized" });
-    }
-
-    const dryRun = String(req.query?.dryRun ?? req.query?.dry_run ?? req.body?.dryRun ?? req.body?.dry_run ?? "")
-      .toLowerCase() === "true" || String(req.query?.dryRun ?? req.query?.dry_run ?? req.body?.dryRun ?? req.body?.dry_run ?? "") === "1";
-
-    try {
-      const now = getNow();
-      const context = await resolveContext(now, { allowBeforeLock: dryRun });
-      if (!context.available) {
-        return res.status(200).json({
-          status: context.notYetLocked ? "not yet locked" : "not ready",
-          reason: context.reason,
-          lockAt: context.lockAt,
-          deadlineAt: context.deadlineAt,
-        });
-      }
-      if (!context.eligible && !dryRun) {
-        return res.status(200).json({
-          status: "not yet locked",
-          season: context.season,
-          week: context.week,
-          lockAt: context.lockAt,
-          deadlineAt: context.deadlineAt,
-        });
-      }
-
-      const supabase = createClient();
-      const { data: existing, error: readError } = await supabase
-        .from("weekly_best_multis")
-        .select("*")
-        .eq("season", context.season)
-        .eq("week", context.week)
-        .maybeSingle();
-      if (readError) throw readError;
-      if (existing && !dryRun) return res.status(200).json({ status: "already locked", record: existing });
-
-      const atDeadline = lockIsPastDeadline(context, now);
-      if (!dryRun && atDeadline) {
-        const firstKickoff = new Date(context.firstKickoffAt || "").getTime();
-        if (!Number.isFinite(firstKickoff)) {
-          return res.status(200).json({
-            status: "not ready",
-            season: context.season,
-            week: context.week,
-            reason: "The first regular-season kickoff is unavailable",
-          });
-        }
-        if (now.getTime() >= firstKickoff) {
-          return res.status(200).json({
-            status: "missed",
-            season: context.season,
-            week: context.week,
-            firstKickoffAt: context.firstKickoffAt,
-            message: "No Weekly Best Multi was locked for this week.",
-          });
-        }
-      }
-
-      const urls = getStoredOddsUrls(req);
-      const readStored = async (url) => {
-        const response = await fetchOdds(url, { cache: "no-store", headers: { Accept: "application/json" } });
-        if (!response.ok) throw new Error(`Stored odds request failed (${response.status})`);
-        return response.json();
-      };
-      const [{ data: predictionRows, error: predictionError }, coreOdds, propOdds] = await Promise.all([
-        supabase.from("prediction_snapshots").select("*").eq("season", context.season).eq("week", context.week),
-        readStored(urls.core),
-        readStored(urls.props),
-      ]);
-      if (predictionError) throw predictionError;
-      const oddsPayload = mergeStoredOdds(coreOdds, propOdds);
-      const snapshots = predictionSnapshotsForWeek(predictionRows, context, now);
-      const freshOdds = isFreshOddsPayload(oddsPayload);
-      const selection = buildWeeklyMultiSelection(snapshots, freshOdds ? oddsPayload : null, context, now);
-      const dataReady = snapshots.length > 0 && freshOdds;
-      const notReadyReason = !dataReady
-        ? snapshots.length === 0 ? "No fresh, current-model complete saved predictions are available" : "Fresh stored odds snapshots are unavailable"
-        : selection.complete ? null : "Fewer than five eligible legs qualify at the 55% probability floor";
-
-      if (dryRun) {
-        return res.status(200).json({
-          status: !dataReady || !selection.complete ? "not ready" : "locked",
-          dryRun: true,
-          season: context.season,
-          week: context.week,
-          lockAt: context.lockAt,
-          deadlineAt: context.deadlineAt,
-          legCount: selection.legs.length,
-          legs: selection.legs,
-          threshold: selection.threshold,
-          complete: selection.complete,
-          reason: notReadyReason,
-          oddsCacheStatus: oddsPayload.cacheStatus || "unavailable",
-          predictionCount: snapshots.length,
-        });
-      }
-
-      if (!atDeadline && (!dataReady || !selection.complete)) {
-        return res.status(200).json({
-          status: "not ready",
-          season: context.season,
-          week: context.week,
-          lockAt: context.lockAt,
-          deadlineAt: context.deadlineAt,
-          legCount: selection.legs.length,
-          threshold: selection.threshold,
-          reason: notReadyReason,
-          oddsCacheStatus: oddsPayload.cacheStatus || "unavailable",
-        });
-      }
-
-      const reason = selection.complete
-        ? null
-        : [notReadyReason, !dataReady ? "Saved at retry deadline with incomplete inputs" : null].filter(Boolean).join("; ");
-      const record = makeWeeklyMultiRecord(selection, context, now, reason);
-      const { data: inserted, error: insertError } = await supabase
-        .from("weekly_best_multis")
-        .insert(record)
-        .select("*")
-        .single();
-
-      if (insertError) {
-        if (insertError.code === "23505") {
-          const { data: winner, error: winnerError } = await supabase
-            .from("weekly_best_multis")
-            .select("*")
-            .eq("season", context.season)
-            .eq("week", context.week)
-            .single();
-          if (winnerError) throw winnerError;
-          return res.status(200).json({ status: "already locked", record: winner });
-        }
-        throw insertError;
-      }
-
-      const status = record.generated_late ? "generated late" : record.partial ? "partial" : "locked";
-      return res.status(200).json({ status, record: inserted });
-    } catch (error) {
-      console.error("Weekly Best Multi lock failed", error);
-      return res.status(500).json({ error: "Weekly Best Multi lock failed" });
-    }
-  };
+  return createWeeklyMultiPreparationHandler(overrides);
 }

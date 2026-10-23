@@ -3,8 +3,8 @@ import assert from "node:assert/strict";
 import { buildBestBets } from "../src/services/bestBetsService.js";
 
 const players = [
-  { playerName: "Alpha Runner", team: "KC", rushingYards: 70, anytimeTouchdownProbability: 0.55, roleConfidence: 0.9, dataQuality: 0.9 },
-  { playerName: "Beta Receiver", team: "LV", receivingYards: 60, anytimeTouchdownProbability: 0.4, roleConfidence: 0.9, dataQuality: 0.9 },
+  { playerName: "Alpha Runner", team: "KC", rushingYards: 70, anytimeTouchdownProbability: 0.65, roleConfidence: 0.9, dataQuality: 0.9 },
+  { playerName: "Beta Receiver", team: "LV", receivingYards: 60, anytimeTouchdownProbability: 0.6, roleConfidence: 0.9, dataQuality: 0.9 },
 ];
 
 function oddsEvent(withTdPrices) {
@@ -19,8 +19,8 @@ function oddsEvent(withTdPrices) {
   }
   return {
     bookmakers: [
-      { key: "a", title: "A", markets },
-      { key: "b", title: "B", markets },
+      { key: "a", title: "A", last_update: new Date().toISOString(), markets },
+      { key: "b", title: "B", last_update: new Date().toISOString(), markets },
     ],
   };
 }
@@ -42,6 +42,7 @@ function personnelFor(candidates) {
     byTeam[player.team].push({
       canonicalId: player.personnelId,
       team: player.team,
+      status: "Active",
       statusKnown: true,
       propEligible: true,
       projectedAvailable: true,
@@ -95,21 +96,23 @@ test("B: a different qualifying player keeps a normal Anytime TD bet alongside t
   assert.deepEqual(tdPlayers(result), ["Beta Receiver"]);
 });
 
-test("the scorer is the top model-probability player even if only another player is priced", () => {
+test("an unpriced statistical leader cannot displace an eligible priced scorer", () => {
   const only = oddsEvent(true);
   for (const book of only.bookmakers) book.markets = book.markets.filter((m) => m.outcomes[0].playerName === "Beta Receiver");
   const playerProjections = structuredClone(players);
   const result = buildBestBets({ game: { away: "KC", home: "LV" }, prediction,
     playerProjections, personnelViews: personnelFor(playerProjections), oddsEvent: only, dataQuality: {} });
-  assert.match(result.anytimeTdScorer.selection, /Alpha Runner/);
-  assert.equal(result.anytimeTdScorer.source, "model-only");
+  assert.match(result.anytimeTdScorer.selection, /Beta Receiver/);
+  assert.equal(result.anytimeTdScorer.source, "priced-market");
 });
 
-test("without bookmaker TD odds the model-only scorer is still produced", () => {
+test("without bookmaker TD odds only non-betting statistical diagnostics remain", () => {
   const result = run(false);
   assert.equal(tdPlayers(result).length, 0);
-  assert.equal(result.anytimeTdScorer.source, "model-only");
-  assert.equal(result.anytimeTdScorer.modelProbability, 0.55);
+  assert.equal(result.anytimeTdScorer.source, "unavailable");
+  assert.equal(result.anytimeTdScorer.modelProbability, null);
+  assert.equal(result.anytimeTdScorer.primaryReason, "PRICE_UNAVAILABLE");
+  assert.equal(result.anytimeTdScorer.statisticalProjection.modelProbability, 0.65);
 });
 
 function scorer(candidates, odds = null) {
@@ -120,10 +123,10 @@ function scorer(candidates, odds = null) {
 }
 
 test("dedicated scorer probability affects selection with equal role confidence", () => {
-  assert.match(scorer(players).selection, /Alpha Runner/);
+  assert.match(scorer(players).statisticalProjection.playerName, /Alpha Runner/);
   assert.match(scorer(players.map((player, index) => ({
     ...player, anytimeTouchdownProbability: index ? .8 : .4,
-  }))).selection, /Beta Receiver/);
+  }))).statisticalProjection.playerName, /Beta Receiver/);
 });
 
 test("dedicated scorer uses probability times role confidence and displays raw probability", () => {
@@ -133,12 +136,18 @@ test("dedicated scorer uses probability times role confidence and displays raw p
   ];
   for (const odds of [null, oddsEvent(true)]) {
     const result = scorer(candidates, odds);
-    assert.match(result.selection, /Beta Receiver/);
-    assert.equal(result.modelProbability, .65);
-    assert.match(result.explanation, /65%/);
+    if (odds) {
+      assert.match(result.selection, /Beta Receiver/);
+      assert.equal(result.modelProbability, .65);
+      assert.match(result.explanation, /65%/);
+    } else {
+      assert.equal(result.source, "unavailable");
+      assert.equal(result.statisticalProjection.playerName, "Beta Receiver");
+      assert.equal(result.statisticalProjection.modelProbability, .65);
+    }
   }
   candidates[0].roleConfidence = .95;
-  assert.match(scorer(candidates).selection, /Alpha Runner/);
+  assert.match(scorer(candidates).statisticalProjection.playerName, /Alpha Runner/);
 });
 
 test("data quality cannot change ranking between eligible players", () => {
@@ -146,10 +155,10 @@ test("data quality cannot change ranking between eligible players", () => {
     { ...players[0], anytimeTouchdownProbability: .8, roleConfidence: .6, dataQuality: .99 },
     { ...players[1], anytimeTouchdownProbability: .65, roleConfidence: .9, dataQuality: .5 },
   ];
-  assert.match(scorer(candidates).selection, /Beta Receiver/);
+  assert.match(scorer(candidates).statisticalProjection.playerName, /Beta Receiver/);
   candidates[0].dataQuality = .5;
   candidates[1].dataQuality = .99;
-  assert.match(scorer(candidates).selection, /Beta Receiver/);
+  assert.match(scorer(candidates).statisticalProjection.playerName, /Beta Receiver/);
 });
 
 test("unsupported identities, roles, probabilities and explicit ineligibility cannot win", () => {
@@ -163,13 +172,13 @@ test("unsupported identities, roles, probabilities and explicit ineligibility ca
     { ...players[0], anytimeTouchdownProbability: 2 },
   ];
   for (const player of unsupported) {
-    assert.match(scorer([player, players[1]]).selection, /Beta Receiver/);
+    assert.match(scorer([player, players[1]]).statisticalProjection.playerName, /Beta Receiver/);
     assert.equal(scorer([player], oddsEvent(true)).source, "unavailable");
   }
   assert.equal(scorer({ available: false, away: { players } }, oddsEvent(true)).source, "unavailable");
   assert.equal(scorer([]).source, "unavailable");
 });
 
-test("priced scorer displays raw probability even outside normal bet probability caps", () => {
-  assert.equal(scorer([{ ...players[0], anytimeTouchdownProbability: .98 }], oddsEvent(true)).modelProbability, .98);
+test("priced scorer uses the same probability as the qualified priced candidate", () => {
+  assert.equal(scorer([{ ...players[0], anytimeTouchdownProbability: .98 }], oddsEvent(true)).modelProbability, .95);
 });

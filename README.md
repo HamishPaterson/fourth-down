@@ -224,12 +224,13 @@ pre-feature records can upgrade before kickoff, but browser partial records
 cannot replace authoritative records and frozen/graded records cannot upgrade.
 All predictions remain model-v11; scoring formulas are unchanged.
 
-This path reads/writes only prediction snapshots, apart from reading stored odds
-and other model inputs. It never prepares/selects/locks a Weekly Multi or calls
+By default this path writes only prediction snapshots, apart from reading stored odds
+and other model inputs. It never selects/locks a Weekly Multi or calls
 SharpAPI. Persistence uses existing optimistic per-record writes, not a database
 transaction: a storage failure after validation may leave some records refreshed;
 it reports an error and a subsequent run reuses complete records. The locked
-Weekly Multi is independent and untouched.
+Weekly Multi is independent and untouched. The explicit future-lock option below
+also saves an immutable expected-game plan. Week 7 prediction refreshes are prohibited.
 
 Phase 2A requires `situational` schema-1 team data. The regenerated checked-in
 artifact supports all 32 teams for Week 6; Weeks 2-5 remain unavailable because
@@ -314,50 +315,93 @@ checks stored snapshot freshness, rather than assuming the jobs ran in order.
 
 `/api/weekly-multi/lock` runs Thursday within 00:00-00:59 UTC, with a second
 01:00-01:59 UTC invocation for retry/finalization. Other days are no-ops.
-Both lock invocations execute the same protected orchestration:
-1. Resolve season/week from scheduled games; return any immutable existing Multi.
-2. Require all games to be pre-kickoff and both stored odds sets to be fresh.
-3. Generate predictions using `getFullGamePrediction` and its existing model,
-   player projections and Best Bets. Server input adapters call existing handlers;
-   no browser, alternate prediction formulas or SharpAPI calls are involved.
-4. Validate the entire generated batch before writing. Save current complete
-   authoritative snapshots, then re-read and verify eligibility for every game.
-5. Only after successful persistence, invoke the existing selection/lock logic.
+Both invocations now execute the same **saved-state-only** audited pipeline:
+1. Record the invocation and authorization outcome; return any existing immutable lock.
+2. Read the pre-lock immutable expected-game plan and saved predictions.
+3. Read normalized persisted core/prop quotes, without calling any odds provider,
+   fetching a schedule, generating predictions or repairing candidates.
+4. Append a sanitized immutable input manifest before selection; evaluate readiness.
+5. Append the result manifest, then insert a lock only with five eligible unique
+   matchups. Insufficient candidates leave no fabricated partial/empty lock.
 
-Preparation and lock do not race: **each lock request waits for its own preparation
-and persistence verification**. An early, late, missing or failed preparation job
-cannot make an unprepared lock proceed. Optimistic compare-and-swap writes and
-unique insert recovery preserve the first fresh complete server candidates across
-concurrent invocations. Stale model-v6 and incomplete score-only snapshots cannot
-block upgrades. Browser saves cannot replace server-owned records; final and
-post-kickoff predictions are protected. A shared snapshot builder is used by
-both the browser's full Predictions pipeline and the server refresh.
+Before the scheduled lock, a separately authorized administrator must prepare the
+complete current-model prediction batch. Use the existing protected prediction-only
+refresh with JSON `{"dryRun":true,"prepareWeeklyLock":true}` first. Only an
+explicitly approved POST with `{"dryRun":false,"prepareWeeklyLock":true}` writes:
+it verifies pre-lock authoritative provenance, saves predictions, re-reads the
+complete batch, and saves the immutable expected-game plan. This is **not** a cron
+or page action. It may acquire the existing model's inputs; never invoke it as
+part of a read-only readiness check. Keep exact-week team/player artifacts and
+persisted Sharp quotes current through separately approved upstream operations.
+No source-data regeneration is performed here. Conflicting plans fail rather
+than being overwritten. An interrupted batch has no ready plan until verification
+succeeds. Explicit pre-lock refreshes may replace stale/unproven server snapshots;
+ordinary refresh reuse rules remain unchanged.
 
-The authoritative lock timestamp remains 10:00 AEST. Hobby cannot guarantee actual
-execution at that instant, nor generation before it; late execution is reported,
-never backdated. The existing 10:30 AEST deadline still governs partial selections;
-the second cron finalizes when invoked after it and before kickoff. Failed
-generation or persistence **never** finalizes an unsafe empty Multi. With complete
-predictions but insufficient eligible bets, the existing honest partial/zero-leg
-record is allowed at the deadline, with its reason. `dryRun=1` validates generation
-and selection without saving predictions or locking.
+`evaluateWeeklyMultiReadiness` in `api-lib/weeklyMultiReadiness.js` is pure and
+read-only. Supply the saved plan, saved prediction rows (via `savedPredictionRows`),
+persisted normalized odds, and an explicit clock. It returns READY, NOT_READY,
+DEGRADED_NON_BLOCKING or UNKNOWN, expected/saved/authoritative/current-model/
+complete counts, per-market freshness, projection/personnel/availability coverage,
+eligible bets, unique matchups, five-leg feasibility and bounded blocking reasons.
+It performs no refresh, provider request or database write.
 
-Deploy with production cron execution, `CRON_SECRET`, Supabase service-role
-select/insert/update permissions for predictions (plus select/insert for Multis),
-and the existing provider credentials configured. The schedule function includes
-the roster ratings file and uses a 60-second limit. Keep validated exact-week
-team/player artifacts current; this pipeline does not regenerate them.
-Apply `supabase/weekly_best_multis.sql` before enabling the pipeline on legacy
-databases. It adds the lock metadata columns without rewriting any existing
-records, enforces the season/week unique key, retains immutability and reloads
-the PostgREST schema cache. Orchestration checks this schema before generating
-predictions, so an outdated deployment fails explicitly without needless refreshes.
-Retries reuse eligible complete authoritative predictions. Legacy Best Bets
-payloads can receive a server-only candidate-version upgrade using stored odds,
-the same saved projections and verified exact-week depth charts; scores, model
-version and prediction generation timestamp do not change. Frozen/post-kickoff
-records and existing Multis cannot receive this upgrade.
-Safe stage/count/freshness/status logs expose failed preparation and persistence.
+Every selected quote must match its exact bookmaker, market, selection, line,
+price, ID and original timestamp. Both quote and snapshot capture must exist
+before the cutoff. Aggregate stale/missing-market diagnostics remain intact;
+stale totals do not veto unrelated fresh moneyline/spread legs. However the
+existing model can use spread/total calibration: recorded model dependencies
+must themselves remain fresh. No scoring formula was changed. Unknown personnel
+does not become eligible: only verified AVAILABLE, EXPECTED_ACTIVE or QUESTIONABLE
+players with existing role/identity/point-in-time eligibility can qualify.
+Player roles retain the existing 55% confidence floor; availability evidence older
+than seven days, or observed after the applicable cutoff, remains ineligible.
+The dedicated Anytime TD card is a betting recommendation only for a validated
+current priced candidate passing identity, event/team, personnel, role, probability,
+positive-edge and existing edge/EV gates. Statistical TD leaders without an
+eligible bet are retained only in `statisticalProjection` diagnostics; the card
+shows Unavailable probability/price and a specific rejection reason. Supplied
+malformed prices (including zero and non-finite values) are INVALID_PRICE, never
+missing prices or a model-only betting fallback. Primary reason order is projection,
+identity, availability, role/quality, invalid price, stale price, missing price,
+non-positive edge, probability, edge/EV thresholds, then the aggregate empty state.
+Legacy saved diagnostic codes remain readable; new records use explicit
+PLAYER_IDENTITY_MISMATCH, PLAYER_AVAILABILITY_UNKNOWN,
+PLAYER_PROJECTION_UNAVAILABLE and ROLE_CONFIDENCE_INSUFFICIENT codes.
+
+Server provenance requires prediction ID, current model identity, complete inputs,
+generation cutoff and server authority. Predictions must have been generated
+strictly before the scheduled cutoff and within 24 hours. Browser saves cannot
+claim or replace server provenance, including while adding final results.
+Later predictions/quotes cannot fill missing lock-time evidence. Historical
+Week 7 and all earlier missing locks remain prohibited; existing records and
+displays are not rewritten. Late successful retries report actual execution time
+and generated-late state, never backdate generation.
+
+**Deployment prerequisite (not applied by this change):** after the existing
+`supabase/weekly_best_multis.sql`, separately review/apply
+`supabase/weekly_multi_lock_audit.sql`. It creates append-only service-role-only
+plans, manifests and execution events, adds the immutable manifest reference to
+future locks, and rejects historical or incomplete new locks. Missing audit
+storage fails closed. This is unrelated to the dormant Parlay provider-cache
+migration; do not apply that migration or activate Parlay for this repair.
+
+`dryRun=1` on prepare/lock evaluates saved inputs and appends audit evidence but
+does not save predictions or a Multi. Capture/result manifests retain safe
+prediction/quote IDs, timestamps, ranking inputs, identity/availability states,
+candidate rejections and selected offers; no raw provider bodies, credentials,
+request headers or exception text are stored. Manifest payloads carry SHA-256
+digests and are immutable alongside execution events.
+
+For scheduler diagnosis query `weekly_multi_lock_executions` ordered by `id`,
+filtered by `scheduled_at`, then group by `operation_id`.
+`summarizeLockExecution` distinguishes authorization failure, handler failure or
+incomplete execution, readiness failure, no eligible candidates, existing lock,
+and success. Missing records mean UNKNOWN/NO_INVOCATION_RECORDED, **not proof**
+that the scheduler never invoked; correlate with platform scheduler logs.
+Safe structured console events remain useful if audit storage itself fails.
+The Thursday 10:00 Brisbane schedule and Sharp-backed production provider are
+unchanged. Hobby invocation windows still cannot guarantee exact-second execution.
 Reading the page only polls shared storage; it does not generate or lock a Multi.
 All devices read the immutable `weekly_best_multis` record. The unique
 season/week constraint and duplicate-insert recovery keep concurrent invocations

@@ -1,142 +1,128 @@
-import {
-  createWeeklyMultiClient, createWeeklyMultiLockHandler, resolveLockWeekContext,
-  predictionSnapshotsForWeek, secureBearerMatches, buildWeeklyMultiSelection,
-} from "./weeklyMulti.js";
-import { createServerPredictionGenerator, readPredictionOdds, saveAuthoritativePrediction, refreshSavedBestBets } from "./serverPredictions.js";
-import { completePrediction } from "./predictionEligibility.js";
-import { FULL_MODEL_VERSION } from "../src/services/gamePredictionService.js";
-
-const finiteTree = (value) => typeof value === "number" ? Number.isFinite(value)
-  : !value || typeof value !== "object" || Object.values(value).every(finiteTree);
+import { randomUUID } from "node:crypto";
+import { createWeeklyMultiClient, getLockCycle, secureBearerMatches, makeWeeklyMultiRecord } from "./weeklyMulti.js";
+import { readPredictionOdds } from "./serverPredictions.js";
+import { evaluateWeeklyMultiReadiness, savedPredictionRows, validLockPlan } from "./weeklyMultiReadiness.js";
+import { buildLockManifest, persistLockManifest, recordLockExecution } from "./weeklyLockAudit.js";
+import { PRESERVED_LOCK_THROUGH } from "./weeklyLockProvenance.js";
 
 export function createWeeklyMultiPreparationHandler(overrides = {}) {
   const getNow = overrides.getNow || (() => new Date());
   const createClient = overrides.createClient || createWeeklyMultiClient;
-  const resolveContext = overrides.resolveContext || resolveLockWeekContext;
   const readOdds = overrides.readOdds || readPredictionOdds;
-  const save = overrides.savePrediction || saveAuthoritativePrediction;
-  const report = overrides.report || ((status) => console.info("Weekly Multi pipeline", status));
+  const recordExecution = overrides.recordExecution || recordLockExecution;
+  const persistManifest = overrides.persistManifest || persistLockManifest;
   return async (req, res) => {
     res.setHeader("Cache-Control", "no-store");
     if (!["GET", "POST"].includes(req.method)) return res.status(405).json({ error: "Method not allowed" });
-    if (!secureBearerMatches(req.headers?.authorization, process.env.CRON_SECRET)) return res.status(401).json({ error: "Unauthorized" });
-    const status = { modelVersion: FULL_MODEL_VERSION, refresh: "not started", persistence: "not started", lock: "not attempted" };
+    const now = getNow();
+    const lockAt = new Date(getLockCycle(now).targetLockAt).toISOString();
+    const operationId = randomUUID();
+    const authorized = secureBearerMatches(req.headers?.authorization, process.env.CRON_SECRET);
+    const base = {
+      operation_id: operationId, season: null, week: null, scheduled_at: lockAt,
+      invoked_at: now.toISOString(), authorization_result: authorized ? "AUTHORIZED" : "DENIED",
+      handler_reached: true, generated_late: now.getTime() > Date.parse(lockAt) + 15 * 60000,
+      readiness_result: "UNKNOWN", preparation_result: "NOT_STARTED",
+      lock_result: "NOT_ATTEMPTED", existing_lock_result: false,
+    };
+    let client, plan, predictions = [], odds, capturedId;
+    let stage = "STARTED";
     try {
-      const now = getNow();
-      const prepareOnly = req.query?.weeklyMultiMode === "prepare";
-      const dryRun = ["1", "true"].includes(String(req.query?.dryRun ?? req.query?.dry_run ?? req.body?.dryRun ?? req.body?.dry_run ?? "").toLowerCase());
-      // Hobby jobs can run anywhere within their scheduled hour. Do not wait in
-      // a serverless process or generate a distant week's data on other days.
-      if (now.getUTCDay() !== 4 && !(prepareOnly && now.getUTCDay() === 3)) {
-        return res.status(200).json({ ...status, reason: "Outside the weekly preparation day" });
+      client = createClient();
+      await recordExecution(client, { ...base, stage, result: authorized ? "HANDLER_REACHED" : "AUTHORIZATION_FAILED" });
+      if (!authorized) return res.status(401).json({ error: "Unauthorized", operationId });
+      const { data: existing, error: existingError } = await client.from("weekly_best_multis").select("*")
+        .eq("lock_at", lockAt).maybeSingle();
+      if (existingError) throw new Error("EXISTING_LOCK_READ_FAILED");
+      if (existing) {
+        base.existing_lock_result = true;
+        base.lock_result = "EXISTING";
+        await recordExecution(client, { ...base, stage: "FINISHED", result: "LOCK_ALREADY_EXISTED" });
+        return res.status(200).json({ status: "already locked", record: existing, operationId });
       }
-      const context = await resolveContext(now, { allowBeforeLock: prepareOnly });
-      if (!context.available) return res.status(200).json({ ...status, reason: context.reason });
-      const client = createClient();
-      const { data: existing, error } = await client.from("weekly_best_multis")
-        .select("id,season,week,lock_at,locked_at,legs,status,partial,model_probability_threshold,generated_late,odds_late,odds_updated_at,odds_refreshed_at,odds_cache_status,reason,reason_counts")
-        .eq("season", context.season).eq("week", context.week).maybeSingle();
-      if (error) throw new Error(["PGRST204", "42703"].includes(error.code)
-        ? "Weekly Multi schema is outdated; apply supabase/weekly_best_multis.sql before finalization"
-        : "Reading existing Weekly Multi failed");
-      if (existing) return res.status(200).json({ status: "already locked", record: existing });
-      if (!prepareOnly && !context.eligible) return res.status(200).json({ ...status, reason: "The 10:00 AEST lock has not arrived" });
-      const games = context.games || [];
-      if (!games.length) throw new Error("No scheduled games available for prediction refresh");
-      if (games.some((game) => new Date(game.date).getTime() <= now.getTime())) {
-        return res.status(200).json({ ...status, reason: "Weekly kickoff has passed; prediction refresh and lock are prohibited" });
+      const prepare = req.query?.weeklyMultiMode === "prepare";
+      const dryRun = ["1", "true"].includes(String(req.query?.dryRun ?? req.body?.dryRun ?? "").toLowerCase());
+      if (lockAt <= PRESERVED_LOCK_THROUGH) {
+        await recordExecution(client, { ...base, stage: "FINISHED", result: "HISTORICAL_LOCK_PROHIBITED" });
+        return res.status(200).json({ status: "not ready", reason: "HISTORICAL_LOCK_PROHIBITED", operationId });
       }
-      status.scheduledGames = games.length;
-      status.refresh = "started";
-      report({ ...status });
-      const odds = await readOdds(client, now, context);
-      status.oddsFreshness = odds.cacheStatus;
-      const { data: priorRows, error: priorError } = await client.from("prediction_snapshots").select("*")
-        .eq("season", context.season).eq("week", context.week);
-      if (priorError) throw new Error("Reading prepared predictions failed");
-      const prepared = new Map(predictionSnapshotsForWeek(priorRows, context, now)
-        .filter((snapshot) => snapshot.authoritative && completePrediction(snapshot))
-        .map((snapshot) => [`${snapshot.awayCode}:${snapshot.homeCode}:${Date.parse(snapshot.kickoff)}`, snapshot]));
-      const generate = overrides.generatePrediction || createServerPredictionGenerator();
-      const generated = [];
-      status.generatedPredictions = 0;
-      status.reusedPredictions = 0;
-      // Bounded concurrency stays inside the Hobby function duration.
-      for (let index = 0; index < games.length; index += 3) {
-        generated.push(...await Promise.all(games.slice(index, index + 3).map(async (game) => {
-          const saved = prepared.get(`${game.visitor_team?.abbreviation}:${game.home_team?.abbreviation}:${Date.parse(game.date)}`);
-          if (saved) {
-            status.reusedPredictions++;
-            return (overrides.refreshBestBets || refreshSavedBestBets)(saved, odds, now);
-          }
-          const snapshot = await generate({
-            season: context.season, week: context.week,
-            away: game.visitor_team?.abbreviation, home: game.home_team?.abbreviation,
-            sourceDate: game.date, venue: game.venue, scheduleContext: game.scheduleContext,
-          }, odds, now);
-          status.generatedPredictions++;
-          return snapshot;
-        })));
+      if ((!prepare && now.getTime() < Date.parse(lockAt)) ||
+          (now.getUTCDay() !== 4 && !(prepare && now.getUTCDay() === 3))) {
+        await recordExecution(client, { ...base, stage: "FINISHED", result: "OUTSIDE_LOCK_WINDOW" });
+        return res.status(200).json({ status: "not ready", reason: "OUTSIDE_LOCK_WINDOW", operationId });
       }
-      if (generated.some((snapshot, index) => !completePrediction(snapshot) || !finiteTree(snapshot) ||
-        snapshot.season !== context.season || snapshot.week !== context.week ||
-        snapshot.awayCode !== games[index].visitor_team?.abbreviation ||
-        snapshot.homeCode !== games[index].home_team?.abbreviation ||
-        !Number.isFinite(Date.parse(snapshot.generatedAt)) ||
-        getNow().getTime() - Date.parse(snapshot.generatedAt) < -60000 ||
-        getNow().getTime() - Date.parse(snapshot.generatedAt) > 24 * 3600000 ||
-        new Date(snapshot.kickoff).getTime() !== new Date(games[index].date).getTime() ||
-        new Date(snapshot.kickoff).getTime() <= getNow().getTime())) {
-        throw new Error("Incomplete, wrong-week or post-kickoff prediction; no lock attempted");
+      const { data, error } = await client.from("weekly_multi_lock_plans").select("*")
+        .eq("lock_at", lockAt).maybeSingle();
+      if (error) throw new Error("LOCK_PLAN_READ_FAILED");
+      plan = data;
+      if (plan && validLockPlan(plan, now)) {
+        base.season = plan.season;
+        base.week = plan.week;
+        const { data: rows, error: predictionError } = await client.from("prediction_snapshots").select("*")
+          .eq("season", plan.season).eq("week", plan.week);
+        if (predictionError) throw new Error("PREDICTION_READ_FAILED");
+        predictions = savedPredictionRows(rows);
+        odds = await readOdds(client, now, { season: plan.season, week: plan.week });
       }
-      status.completePredictions = generated.length;
-      if (dryRun) {
-        const selection = buildWeeklyMultiSelection(generated, odds, context, getNow());
-        return res.status(200).json({
-          ...status, refresh: "completed", persistence: "dry run", dryRun: true,
-          season: context.season, week: context.week, legCount: selection.legs.length,
-          threshold: selection.threshold, complete: selection.complete,
-          reason: selection.complete ? null : "Fewer than five eligible legs qualify at the 55% probability floor",
-        });
+      stage = "INPUTS_CAPTURED";
+      capturedId = await persistManifest(client, buildLockManifest({
+        operationId, plan, predictions, odds, now, result: "INPUTS_CAPTURED",
+      }));
+      const readiness = evaluateWeeklyMultiReadiness({ plan, predictions, odds, now });
+      const ready = readiness.canSatisfyLegCount;
+      const readinessResult = !ready && readiness.eligiblePredictionCount === readiness.expectedGameCount &&
+        readiness.eligibleBestBetCount === 0 ? "NO_ELIGIBLE_CANDIDATES" : "READINESS_FAILED";
+      base.readiness_result = readiness.status;
+      base.preparation_result = ready ? "READY" : "FAILED";
+      stage = "EVALUATED";
+      const manifestId = await persistManifest(client, buildLockManifest({
+        operationId, plan, predictions, odds, readiness, now, parentId: capturedId,
+        result: ready ? "READY" : "READINESS_FAILED",
+      }));
+      await recordExecution(client, { ...base, stage, result: ready ? "READY" : readinessResult,
+        manifest_id: manifestId, readiness_result: readiness.status });
+      if (!ready || prepare || dryRun) {
+        await recordExecution(client, { ...base, stage: "FINISHED",
+          result: !ready ? readinessResult : prepare ? "PREPARED" : "DRY_RUN",
+          manifest_id: manifestId, readiness_result: readiness.status });
+        return res.status(200).json({ status: ready ? "prepared" : "not ready", operationId,
+          manifestId, readiness, dryRun });
       }
-      // Validate the entire batch before the first write. A failed or partial
-      // persistence phase never proceeds to locking; retry safely resumes.
-      status.persistence = "started";
-      for (const snapshot of generated) await save(client, snapshot, getNow());
-      const { data: stored, error: readError } = await client.from("prediction_snapshots").select("*")
-        .eq("season", context.season).eq("week", context.week);
-      if (readError) throw new Error("Verifying shared prediction persistence failed");
-      const eligible = predictionSnapshotsForWeek(stored, context, getNow());
-      status.eligiblePredictions = eligible.length;
-      if (eligible.length !== games.length || eligible.some((snapshot) => !snapshot.authoritative || !completePrediction(snapshot))) {
-        throw new Error("Persisted predictions are not all complete, authoritative and eligible; lock aborted");
+      // No awaits that acquire new inputs after capture: retries consume only retained pre-lock evidence.
+      const record = { ...makeWeeklyMultiRecord(readiness.selection, {
+        season: plan.season, week: plan.week, lockAt,
+      }, now), manifest_id: manifestId };
+      base.lock_result = "ATTEMPTED";
+      const { data: inserted, error: insertError } = await client.from("weekly_best_multis")
+        .insert(record).select("*").single();
+      if (insertError) {
+        if (insertError.code !== "23505") throw new Error("LOCK_PERSISTENCE_FAILED");
+        const { data: winner, error: winnerError } = await client.from("weekly_best_multis").select("*")
+          .eq("lock_at", lockAt).maybeSingle();
+        if (winnerError || !winner) throw new Error("LOCK_PERSISTENCE_FAILED");
+        base.existing_lock_result = true;
+        base.lock_result = "EXISTING";
+        await recordExecution(client, { ...base, stage: "FINISHED", result: "LOCK_ALREADY_EXISTED", manifest_id: manifestId });
+        return res.status(200).json({ status: "already locked", record: winner, operationId });
       }
-      status.persistence = "completed";
-      status.refresh = "completed";
-      report({ ...status });
-      if (prepareOnly) return res.status(200).json({ ...status, season: context.season, week: context.week, lockAt: context.lockAt });
-      status.lock = "attempted";
-      report({ ...status });
-      const lock = createWeeklyMultiLockHandler({
-        createClient: () => client, getNow,
-        resolveContext: async () => context,
-        fetchOdds: async (url) => ({ ok: true, json: async () => String(url).includes("props=1")
-          ? { cacheStatus: "fresh", events: [] } : odds }),
-      });
-      return await lock(req, {
-        setHeader: (...args) => res.setHeader(...args),
-        status(code) { this.code = code; return this; },
-        json(body) {
-          status.lock = body.record ? "completed" : "not created";
-          status.reason = body.reason || body.message || body.error || body.record?.reason || null;
-          report({ ...status });
-          return res.status(this.code).json({ ...body, pipeline: status });
-        },
-      });
-    } catch (error) {
-      const reason = error instanceof Error ? error.message : "Weekly preparation failed";
-      report({ ...status, failure: true, reason });
-      return res.status(503).json({ ...status, error: "Weekly Multi preparation failed; no lock attempted", reason });
+      base.lock_result = "SUCCEEDED";
+      await recordExecution(client, { ...base, stage: "FINISHED", result: "LOCK_SUCCEEDED", manifest_id: manifestId });
+      return res.status(200).json({ status: "locked", record: inserted, operationId });
+    } catch {
+      const failure = { ...base, stage: "FAILED", result: "PIPELINE_FAILED",
+        failure_code: stage === "STARTED" ? "INPUT_OR_AUDIT_UNAVAILABLE" : "PREPARATION_OR_PERSISTENCE_FAILED" };
+      console.error("Weekly Multi execution failed", JSON.stringify(failure));
+      if (client) {
+        try {
+          await persistManifest(client, buildLockManifest({ operationId, plan, now,
+            result: failure.failure_code, parentId: capturedId || null }));
+          await recordExecution(client, failure);
+        } catch {
+          console.error("Weekly Multi audit unavailable", JSON.stringify({ operationId, code: "AUDIT_STORAGE_UNAVAILABLE" }));
+        }
+      }
+      return res.status(authorized ? 503 : 401).json({ error: authorized ? failure.failure_code : "Unauthorized",
+        operationId, lockResult: base.lock_result });
     }
   };
 }

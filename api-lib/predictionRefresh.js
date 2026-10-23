@@ -1,7 +1,9 @@
 import process from "node:process";
 import { fetchSchedule } from "../scripts/balldontlie-schedule.mjs";
 import { createSnapshotClient } from "./oddsSnapshots.js";
-import { secureBearerMatches } from "./weeklyMulti.js";
+import { secureBearerMatches, getLockCycle } from "./weeklyMulti.js";
+import { buildWeeklyLockPlan, saveWeeklyLockPlan } from "./weeklyLockAudit.js";
+import { lockPredictionRejections } from "./weeklyLockProvenance.js";
 import { createServerPredictionGenerator, readPredictionOdds, saveAuthoritativePrediction } from "./serverPredictions.js";
 import { databaseToSnapshot } from "../api/nfl/game-stats.js";
 import { getCurrentWeekWindow } from "../api/nfl/odds.js";
@@ -85,6 +87,7 @@ export function createPredictionRefreshHandler(overrides = {}) {
   const loadNetwork = overrides.loadNetwork || loadWeeklyOpponentNetwork;
   const createGenerator = overrides.createGenerator || createServerPredictionGenerator;
   const save = overrides.savePrediction || saveAuthoritativePrediction;
+  const savePlan = overrides.saveLockPlan || saveWeeklyLockPlan;
   return async (req, res) => {
     res.setHeader("Cache-Control", "no-store");
     if (!["GET", "POST"].includes(req.method)) return res.status(405).json({ error: "Method not allowed" });
@@ -94,6 +97,10 @@ export function createPredictionRefreshHandler(overrides = {}) {
       const dryRun = req.method !== "POST" || req.body?.dryRun !== false;
       const sourceGames = await readSchedule(dataset.season, { deadline: Date.now() + 55000 });
       const context = await resolveContext(sourceGames, now);
+      if (context.season === 2026 && context.week === 7) throw new Error("HISTORICAL_WEEK_7_PRESERVED");
+      const prepareWeeklyLock = req.body?.prepareWeeklyLock === true;
+      const lockContext = { ...context, lockAt: new Date(getLockCycle(new Date(context.cutoff)).lockAt).toISOString() };
+      if (prepareWeeklyLock) buildWeeklyLockPlan(lockContext, now);
       const client = createClient();
       const { data: rows, error } = await client.from("prediction_snapshots").select("*")
         .eq("season", context.season).eq("week", context.week);
@@ -115,7 +122,8 @@ export function createPredictionRefreshHandler(overrides = {}) {
         generated.push(...await Promise.all(context.games.slice(index, index + 3).map(async (game) => {
           const existing = prior.get(identity(game));
           if (existing?.authoritative && completePrediction(existing) && predictionFeatureStatus(existing).complete &&
-              Date.parse(existing.kickoff) === Date.parse(game.sourceDate)) {
+              Date.parse(existing.kickoff) === Date.parse(game.sourceDate) &&
+              (!prepareWeeklyLock || !lockPredictionRejections(existing, lockContext, now).length)) {
             reused++;
             return existing;
           }
@@ -131,7 +139,9 @@ export function createPredictionRefreshHandler(overrides = {}) {
       validatePredictionRefreshBatch(generated, context, getNow());
       if (!dryRun) {
         for (const snapshot of generated) {
-          if (prior.get(`${snapshot.awayCode}:${snapshot.homeCode}`) !== snapshot) await save(client, snapshot, getNow());
+          if (prior.get(`${snapshot.awayCode}:${snapshot.homeCode}`) !== snapshot) {
+            await save(client, snapshot, getNow(), { requireLockProvenance: prepareWeeklyLock });
+          }
         }
         const { data: stored, error: readError } = await client.from("prediction_snapshots").select("*")
           .eq("season", context.season).eq("week", context.week);
@@ -140,10 +150,17 @@ export function createPredictionRefreshHandler(overrides = {}) {
           const s = databaseToSnapshot(row);
           return [`${s.awayCode}:${s.homeCode}`, s];
         }));
-        validatePredictionRefreshBatch(context.games.map((game) => byGame.get(identity(game))), context, getNow());
+        const saved = context.games.map((game) => byGame.get(identity(game)));
+        validatePredictionRefreshBatch(saved, context, getNow());
+        if (prepareWeeklyLock) {
+          if (saved.some((snapshot) => lockPredictionRejections(snapshot, lockContext, getNow()).length)) {
+            throw new Error("AUTHORITATIVE_LOCK_PROVENANCE_REQUIRED");
+          }
+          await savePlan(client, lockContext, getNow());
+        }
       }
       return res.status(200).json({
-        status: dryRun ? "dry run" : "refreshed", dryRun, season: context.season, week: context.week,
+        status: dryRun ? "dry run" : "refreshed", dryRun, prepareWeeklyLock, season: context.season, week: context.week,
         predictionFeatureVersion: PREDICTION_FEATURE_VERSION, networkComputations: 1,
         generated: generated.length - reused, reused, writes: dryRun ? 0 : generated.length - reused,
         predictions: generated.map((s) => ({

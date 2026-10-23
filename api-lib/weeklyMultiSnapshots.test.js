@@ -13,7 +13,7 @@ import {
 import { activePersonnelRecord, personnelViewFixture } from "./personnelTestHelpers.js";
 import { CURRENT_MODEL_VERSION, CURRENT_MODEL_KEY } from "../src/services/modelIdentity.js";
 
-const THURSDAY = Date.UTC(2026, 9, 8, 0, 0, 0);
+const THURSDAY = Date.UTC(2026, 9, 29, 0, 0, 0);
 const HOUR = 60 * 60 * 1000;
 const NOW = new Date(THURSDAY + 2 * 60 * 1000);
 const QUOTE_AT = new Date(THURSDAY - 2 * HOUR).toISOString();
@@ -21,7 +21,7 @@ const CONTEXT = {
   available: true,
   eligible: true,
   season: 2026,
-  week: 5,
+  week: 8,
   lockAt: new Date(THURSDAY).toISOString(),
   deadlineAt: new Date(THURSDAY + 30 * 60 * 1000).toISOString(),
   retryDeadline: THURSDAY + 30 * 60 * 1000,
@@ -45,11 +45,11 @@ const GAMES = [
   { away: "BUF", home: "MIA", id: "e2", bets: [bet("Spread", "BUF", { line: -3.5 })], core: spread },
   { away: "DAL", home: "NYG", id: "e3", bets: [bet("Total", "Over", { line: 44.5 })], core: total },
   { away: "KC", home: "DEN", id: "e4", bets: [bet("player_pass_yds", "Named Quarterback Over 250.5 passing yards", {
-    line: 250.5, category: "Player", playerId: "named-qb", personnelId: "named-qb", playerTeam: "KC",
+    line: 250.5, category: "Player", playerId: "named-qb", personnelId: "named-qb", playerTeam: "KC", roleConfidence: .8,
   })], props: passYds },
   { away: "SEA", home: "SF", id: "e5", bets: [], core: anytimeTd, scorer: {
     source: "priced-market", market: "Anytime touchdown", selection: "K. Walker Yes",
-    playerId: "td-player", personnelId: "td-player", playerTeam: "SEA", modelProbability: 0.7,
+    playerId: "td-player", personnelId: "td-player", playerTeam: "SEA", modelProbability: 0.7, roleConfidence: .8,
     decimalOdds: 2, sportsbook: "BK", updatedAt: QUOTE_AT,
   } },
 ];
@@ -66,7 +66,10 @@ function snapshotFor(game, overrides = {}) {
   const cutoff = new Date(THURSDAY + 6 * HOUR).toISOString();
   const generatedAt = new Date(THURSDAY - HOUR).toISOString();
   return {
-    season: 2026, week: 5, kickoff: new Date(THURSDAY + 3 * HOUR).toISOString(), awayCode: game.away, homeCode: game.home,
+    id: game.id, authoritative: true, confidenceScore: .7, personnelVersion: 1,
+    lockProvenance: { version: 1, source: "server-prepared", predictionId: game.id,
+      generationCutoff: CONTEXT.lockAt, inputs: [{ source: "fixture", observedAt: generatedAt }], marketDependencies: [] },
+    season: 2026, week: 8, kickoff: new Date(THURSDAY + 3 * HOUR).toISOString(), awayCode: game.away, homeCode: game.home,
     modelVersion: CURRENT_MODEL_VERSION,
     modelKey: CURRENT_MODEL_KEY,
     fourthDownPick: game.away,
@@ -78,26 +81,25 @@ function snapshotFor(game, overrides = {}) {
     generatedAt,
     playerProjections: { available: true },
     personnelViews: {
-      away: personnelViewFixture(game.away, 2026, 5, cutoff, records.away),
-      home: personnelViewFixture(game.home, 2026, 5, cutoff, records.home),
+      away: personnelViewFixture(game.away, 2026, 8, cutoff, records.away),
+      home: personnelViewFixture(game.home, 2026, 8, cutoff, records.home),
     },
-    bestBets: { recommendations: game.bets, anytimeTdScorer: game.scorer },
-    dataQuality: { sources: { odds: { available: true } } },
+    bestBets: { assessed: 1, recommendations: structuredClone(game.bets), anytimeTdScorer: structuredClone(game.scorer) },
+    dataQuality: { personnelTiming: { cutoff }, sources: { odds: { available: true } } },
     ...overrides,
   };
 }
 
 function predictionRow(game) {
   return {
-    season: 2026, week: 5, kickoff: new Date(THURSDAY + 3 * HOUR).toISOString(), away_code: game.away, home_code: game.home,
+    season: 2026, week: 8, kickoff: new Date(THURSDAY + 3 * HOUR).toISOString(), away_code: game.away, home_code: game.home,
     fourth_down_pick: game.away, predicted_away_score: 24, predicted_home_score: 20, away_win_probability: 0.6, home_win_probability: 0.4,
     model_version: CURRENT_MODEL_VERSION, created_at: new Date(THURSDAY - HOUR).toISOString(),
     data_quality: {
       snapshot: {
         modelKey: CURRENT_MODEL_KEY, predictionPayload: {}, generatedAt: new Date(THURSDAY - HOUR).toISOString(),
         ...snapshotFor(game),
-        bestBets: { recommendations: game.bets, anytimeTdScorer: game.scorer },
-        dataQuality: { sources: { odds: { available: true } } },
+        bestBets: { assessed: 1, recommendations: structuredClone(game.bets), anytimeTdScorer: structuredClone(game.scorer) },
       },
     },
   };
@@ -129,6 +131,7 @@ function lockClient({ existing = null, predictions = GAMES.map(predictionRow), i
   const calls = [];
   return {
     calls,
+    predictions,
     client: {
       from(table) {
         calls.push(["from", table]);
@@ -155,7 +158,42 @@ async function runLock({ fetchOdds, database = lockClient(), now = NOW, context 
   delete process.env.VERCEL_URL;
   let providerCalls = 0;
   global.fetch = async () => { providerCalls += 1; throw new Error("no direct network calls allowed"); };
-  const handler = createWeeklyMultiLockHandler({ resolveContext: async () => context, getNow: () => now, createClient: () => database.client, fetchOdds });
+  const originalFrom = database.client.from.bind(database.client);
+  for (const row of database.predictions || []) {
+    for (const bet of [...(row.data_quality.snapshot.bestBets.recommendations || []),
+      row.data_quality.snapshot.bestBets.anytimeTdScorer].filter(Boolean)) {
+      if (!bet.quoteId) bet.quoteId = `${row.data_quality.snapshot.id}:${bet.market}`;
+    }
+  }
+  database.client.from = (table) => table === "weekly_multi_lock_plans" ? {
+    select() { return this; }, eq() { return this; },
+    async maybeSingle() { return { data: {
+      id: "fixture-plan", lock_at: context.lockAt, prepared_at: new Date(Date.parse(context.lockAt) - HOUR).toISOString(),
+      season: context.season, week: context.week, source: "server-prepared", expected_game_count: GAMES.length,
+      games: GAMES.map((game) => ({ away: game.away, home: game.home,
+        kickoff: context.firstKickoffAt })),
+    }, error: null }; },
+  } : originalFrom(table);
+  const handler = createWeeklyMultiLockHandler({
+    getNow: () => now, createClient: () => database.client,
+    recordExecution: async () => {}, persistManifest: async () => "fixture-manifest",
+    readOdds: async () => {
+      const core = await fetchOdds("https://example.test/api/nfl/odds");
+      const props = await fetchOdds("https://example.test/api/nfl/odds?props=1&source=snapshot");
+      const merged = mergeStoredOdds(await core.json(), await props.json());
+      for (const event of merged.events) for (const book of event.bookmakers) for (const market of book.markets) {
+        const snapshot = database.predictions?.find((row) => row.data_quality.snapshot.awayCode === event.away_team)?.data_quality.snapshot;
+        for (const outcome of market.outcomes) {
+          const bet = [...(snapshot?.bestBets.recommendations || []), snapshot?.bestBets.anytimeTdScorer].filter(Boolean)
+            .find((row) => row.market === market.key || row.market === "Moneyline" && market.key === "h2h" ||
+              row.market === "Spread" && market.key === "spreads" || row.market === "Total" && market.key === "totals" ||
+              row.market === "Anytime touchdown" && market.key === "player_anytime_td");
+          outcome.quoteSource = { id: bet?.quoteId, provider: "SharpAPI", fetchedAt: book.last_update, timestamp: book.last_update };
+        }
+      }
+      return merged;
+    },
+  });
   const res = response();
   try {
     await handler({ method: "GET", headers: { authorization: "Bearer expected-secret", host: "example.test" }, query: {} }, res);
@@ -473,6 +511,7 @@ test("the lock persists moneyline, spread, total, player prop and priced Anytime
 
 test("incomplete stored odds before the deadline do not lock; unavailable props are not treated as fresh", async () => {
   const payloads = storedPayloads(GAMES, { core: "fresh", props: "unavailable" });
+  payloads.props.events = [];
   const { res, database } = await runLock({ fetchOdds: storedOddsFetch(payloads) });
   assert.equal(res.body.status, "not ready");
   assert.equal(inserts(database).length, 0);
@@ -500,10 +539,11 @@ test("the lock only runs at the scheduled lock moment", async () => {
   const database = lockClient();
   const { res } = await runLock({
     database,
-    context: { available: false, notYetLocked: true, lockAt: CONTEXT.lockAt, deadlineAt: CONTEXT.deadlineAt, reason: "The current lock moment has not arrived" },
+    now: new Date(THURSDAY - 60000),
     fetchOdds: async () => { throw new Error("must not read odds before the lock"); },
   });
-  assert.equal(res.body.status, "not yet locked");
+  assert.equal(res.body.status, "not ready");
+  assert.equal(res.body.reason, "OUTSIDE_LOCK_WINDOW");
   assert.equal(inserts(database).length, 0);
 });
 
@@ -511,10 +551,10 @@ test("mocked AEST clock locks at exactly 10:00, never 09:59, and remains eligibl
   for (const minutes of [-1, 0, 1]) {
     const now = new Date(THURSDAY + minutes * 60000);
     const context = await resolveLockWeekContext(now, { fetchGames: async () => [
-      { season: 2026, week: 5, date: CONTEXT.firstKickoffAt },
+      { season: 2026, week: 8, date: CONTEXT.firstKickoffAt },
     ] });
     const { res, database } = await runLock({ now, context, fetchOdds: storedOddsFetch() });
-    assert.equal(res.body.status, minutes < 0 ? "not yet locked" : "locked");
+    assert.equal(res.body.status, minutes < 0 ? "not ready" : "locked");
     assert.equal(inserts(database).length, minutes < 0 ? 0 : 1);
   }
 });
@@ -530,10 +570,9 @@ test("old September snapshots cannot fabricate current-week legs; insufficient i
       database: lockClient({ predictions }), now: new Date(THURSDAY + minutes * 60000),
       fetchOdds: storedOddsFetch(),
     });
-    assert.equal(res.body.status, minutes === 0 ? "not ready" : "generated late");
-    if (minutes === 30) assert.equal(res.body.record.partial, true);
-    assert.match(res.body.reason || res.body.record.reason, /No fresh, current-model complete saved predictions/);
-    assert.equal(res.body.legCount ?? res.body.record.legs.length, 0);
+    assert.equal(res.body.status, "not ready");
+    assert.ok(res.body.readiness.blockingReasons.includes("AUTHORITATIVE_PREDICTIONS_NOT_READY"));
+    assert.equal(res.body.readiness.selection.legs.length, 0);
   }
 });
 
@@ -545,9 +584,9 @@ test("persistence failure is an explicit server error, not a successful lock", a
       database: lockClient({ insertError: { code: "storage-failure", message: "write failed" } }),
       fetchOdds: storedOddsFetch(),
     });
-    assert.equal(res.statusCode, 500);
-    assert.deepEqual(res.body, { error: "Weekly Best Multi lock failed" });
-    assert.equal(logs[0][0], "Weekly Best Multi lock failed");
+    assert.equal(res.statusCode, 503);
+    assert.equal(res.body.error, "PREPARATION_OR_PERSISTENCE_FAILED");
+    assert.equal(logs[0][0], "Weekly Multi execution failed");
   } finally { console.error = original; }
 });
 
@@ -612,9 +651,16 @@ test("a new week's lock does not overwrite an unresolved previous-week record", 
     scorer: game.scorer ? { ...game.scorer, updatedAt: quoteAt } : game.scorer,
   }));
   const shifted = newWeekGames.map(predictionRow).map((row) => ({
-    ...row, week: 6, kickoff: new Date(THURSDAY + week + 3 * HOUR).toISOString(),
+    ...row, week: 9, kickoff: new Date(THURSDAY + week + 3 * HOUR).toISOString(),
     data_quality: { snapshot: { ...row.data_quality.snapshot, generatedAt: new Date(THURSDAY + week - HOUR).toISOString() } },
   }));
+  for (const row of shifted) {
+    const snapshot = row.data_quality.snapshot;
+    snapshot.week = row.week;
+    snapshot.kickoff = row.kickoff;
+    snapshot.lockProvenance.generationCutoff = new Date(THURSDAY + week).toISOString();
+    for (const view of Object.values(snapshot.personnelViews)) view.week = row.week;
+  }
   const refreshed = storedPayloads();
   for (const payload of [refreshed.core, refreshed.props]) {
     payload.refreshedAt = quoteAt;
@@ -624,13 +670,13 @@ test("a new week's lock does not overwrite an unresolved previous-week record", 
   const { res } = await runLock({
     database,
     fetchOdds: storedOddsFetch(refreshed),
-    context: { ...CONTEXT, week: 6, lockAt: new Date(THURSDAY + 7 * 24 * HOUR).toISOString(), retryDeadline: THURSDAY + 7 * 24 * HOUR + 30 * 60 * 1000, firstKickoffAt: new Date(THURSDAY + 7 * 24 * HOUR + 3 * HOUR).toISOString() },
+    context: { ...CONTEXT, week: 9, lockAt: new Date(THURSDAY + 7 * 24 * HOUR).toISOString(), retryDeadline: THURSDAY + 7 * 24 * HOUR + 30 * 60 * 1000, firstKickoffAt: new Date(THURSDAY + 7 * 24 * HOUR + 3 * HOUR).toISOString() },
     now: new Date(THURSDAY + 7 * 24 * HOUR + 2 * 60 * 1000),
   });
   assert.equal(res.statusCode, 200);
   const writes = inserts(database);
   assert.equal(writes.length, 1);
-  assert.equal(writes[0][1].week, 6);
+  assert.equal(writes[0][1].week, 9);
   assert.equal(database.calls.some(([method]) => ["update", "delete", "upsert"].includes(method)), false);
 });
 

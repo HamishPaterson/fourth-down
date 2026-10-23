@@ -2,6 +2,7 @@ import { timingSafeEqual } from "node:crypto";
 import { resolveTeamCode } from "../../src/services/oddsApi.js";
 import {
   SNAPSHOT_PROVIDER,
+  SNAPSHOT_SEASON,
   createSnapshotClient,
   hasSnapshotData,
   readEarlierSnapshots,
@@ -213,6 +214,7 @@ async function handleCoreFromSnapshots(res, deps) {
   const rows = CORE_MARKETS.flatMap((market) =>
     hasSnapshotData(byMarket.get(market)) ? snapshotRows(byMarket.get(market)).map(row => ({
       ...row, snapshotFetchedAt: byMarket.get(market).fetched_at,
+      snapshotId: `nfl:${SNAPSHOT_SEASON}:${byMarket.get(market).week}:${market}:${byMarket.get(market).fetched_at}`,
     })) : []
   );
   // Snapshots are already filtered; the full-game check stays as a safety net.
@@ -546,6 +548,7 @@ async function handlePropsFromSnapshots(res, deps) {
   const rows = PLAYER_MARKETS.flatMap((market) =>
     hasSnapshotData(byMarket.get(market)) ? snapshotRows(byMarket.get(market)).map(row => ({
       ...row, snapshotFetchedAt: byMarket.get(market).fetched_at,
+      snapshotId: `nfl:${SNAPSHOT_SEASON}:${byMarket.get(market).week}:${market}:${byMarket.get(market).fetched_at}`,
     })) : []
   );
   const eligibleRows = rows.filter(isEligibleOddsRow);
@@ -1303,6 +1306,7 @@ function addOddsRow(event, row) {
       isStale: row.is_stale_pregame_price ?? null,
       timestamp: row.timestamp || null,
       fetchedAt: row.snapshotFetchedAt || null,
+      snapshotId: row.snapshotId || null,
     },
   };
 

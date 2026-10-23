@@ -10,9 +10,12 @@ import { getFullGamePrediction } from "../src/services/gamePredictionService.js"
 import { buildPredictionSnapshot } from "../src/services/predictionSnapshot.js";
 import { findOddsForGame } from "../src/services/oddsApi.js";
 import { completePrediction, retainPrediction } from "./predictionEligibility.js";
-import { mergeStoredOdds, isFreshOddsPayload } from "./weeklyMulti.js";
+import { mergeStoredOdds, getLockCycle } from "./weeklyMulti.js";
+import { randomUUID } from "node:crypto";
+import { PRESERVED_LOCK_THROUGH, LOCK_PROVENANCE_VERSION, lockPredictionRejections } from "./weeklyLockProvenance.js";
 import dataset from "../api/nfl/nflverse-team-metrics.js";
 import { buildBestBets, BEST_BETS_CANDIDATE_VERSION } from "../src/services/bestBetsService.js";
+import { validateOddsEvents } from "../src/services/quoteValidation.js";
 
 export function refreshSavedBestBets(snapshot, odds, now) {
   if (snapshot.bestBets?.candidateVersion === BEST_BETS_CANDIDATE_VERSION &&
@@ -56,7 +59,7 @@ export async function readPredictionOdds(client, now, context) {
     payloads.push(await invoke((req, res) => handleOddsRequest(req, res, { client, now: now.getTime() }), {}, { url }));
   }
   const merged = mergeStoredOdds(...payloads);
-  if (!isFreshOddsPayload(merged)) throw new Error(`Fresh core and stored player odds are required (${merged.cacheStatus})`);
+  if (!merged.events.length) throw new Error("Stored odds snapshots are unavailable");
   return merged;
 }
 
@@ -92,7 +95,16 @@ export function createServerPredictionInputLoader({ weeklyNetwork, sourceGames, 
 export function createServerPredictionGenerator(options = {}) {
   const loadInputs = options.loadInputs || createServerPredictionInputLoader(options);
   return async (game, odds, now) => {
-    const oddsEvent = findOddsForGame(odds.events, game);
+    const validated = validateOddsEvents(odds.events, { now });
+    const cleanEvents = validated.events.map((event) => ({ ...event,
+      bookmakers: (event.bookmakers || []).map((book) => ({ ...book,
+        markets: (book.markets || []).map((market) => ({ ...market,
+          outcomes: (market.outcomes || []).filter((outcome) => outcome.quoteValidation?.status === "validated" &&
+            outcome.quoteSource?.rolloverFallback !== true),
+        })).filter((market) => market.outcomes.length),
+      })),
+    }));
+    const oddsEvent = findOddsForGame(cleanEvents, game);
     if (!oddsEvent?.bookmakers?.length) throw new Error(`Stored odds missing for ${game.away} at ${game.home}`);
     const result = await getFullGamePrediction(game, oddsEvent, {
       season: game.season, forceRefresh: true,
@@ -102,11 +114,21 @@ export function createServerPredictionGenerator(options = {}) {
     if (!completePrediction(snapshot) || !result.dataQuality.playByPlay) {
       throw new Error(`Incomplete current-model prediction for ${game.away} at ${game.home}`);
     }
-    return snapshot;
+    const dependencies = result.prediction.market?.active ? (oddsEvent.bookmakers || []).flatMap((book) =>
+      (book.markets || []).filter((market) => ["spreads", "totals"].includes(market.key))
+        .flatMap((market) => market.outcomes.map((outcome) => ({
+          market: market.key, quoteId: outcome.quoteSource?.id || null,
+          timestamp: outcome.quoteSource?.timestamp || outcome.updatedAt || market.last_update || book.last_update,
+        })))) : [];
+    return { ...snapshot, generationMarketDependencies: dependencies };
   };
 }
 
-export async function saveAuthoritativePrediction(client, snapshot, now) {
+export async function saveAuthoritativePrediction(client, snapshot, now, { requireLockProvenance = false } = {}) {
+  const cutoff = new Date(getLockCycle(new Date(snapshot.kickoff)).lockAt).toISOString();
+  if (snapshot.season === 2026 && snapshot.week === 7) throw new Error("Historical Week 7 prediction writes prohibited");
+  const lockEligible = cutoff > PRESERVED_LOCK_THROUGH && now.getTime() < Date.parse(cutoff) &&
+    Date.parse(snapshot.generatedAt) < Date.parse(cutoff);
   if (!completePrediction(snapshot) || new Date(snapshot.kickoff).getTime() <= now.getTime()) {
     throw new Error("Only complete pre-kickoff predictions may be saved by the refresh");
   }
@@ -115,8 +137,28 @@ export async function saveAuthoritativePrediction(client, snapshot, now) {
       .eq("season", snapshot.season).eq("week", snapshot.week)
       .eq("away_code", snapshot.awayCode).eq("home_code", snapshot.homeCode).maybeSingle();
     if (error) throw new Error("Reading shared prediction failed");
-    if (retainPrediction(existing ? databaseToSnapshot(existing) : null, snapshot, now, true)) return existing;
-    const written = await writePredictionVersion(client, { ...snapshot, authoritative: true }, existing);
+    const saved = existing ? databaseToSnapshot(existing) : null;
+    if (retainPrediction(saved, snapshot, now, true) &&
+        (!requireLockProvenance || !lockEligible || saved.frozenAt || saved.actualWinner ||
+          !lockPredictionRejections(saved, { season: snapshot.season, week: snapshot.week, lockAt: cutoff }, now).length)) return existing;
+    const predictionId = existing?.data_quality?.snapshot?.id || snapshot.id || randomUUID();
+    const authoritative = {
+      ...snapshot, id: predictionId, authoritative: true,
+      lockProvenance: lockEligible ? {
+        version: LOCK_PROVENANCE_VERSION, source: "server-prepared", predictionId,
+        generationCutoff: cutoff,
+        inputs: Object.entries(snapshot.dataQuality?.sources || {})
+          .filter(([source]) => ["playByPlay", "teamForm", "personnel", "playerMetrics", "odds", "weather", "kicker", "opponentNetwork"].includes(source))
+          .map(([source, value]) => ({ source, observedAt: value.updatedAt || null, available: value.available === true })),
+        marketDependencies: snapshot.generationMarketDependencies ||
+          (snapshot.predictionPayload?.market?.active ? null : []),
+      } : null,
+    };
+    if (requireLockProvenance && (!lockEligible ||
+        lockPredictionRejections(authoritative, { season: snapshot.season, week: snapshot.week, lockAt: cutoff }, now).length)) {
+      throw new Error("AUTHORITATIVE_LOCK_PROVENANCE_REQUIRED");
+    }
+    const written = await writePredictionVersion(client, authoritative, existing);
     if (!written.error) return written.data;
     if (!["23505", "CONCURRENT_WRITE"].includes(written.error.code)) throw new Error("Saving shared prediction failed");
   }

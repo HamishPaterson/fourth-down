@@ -2,8 +2,9 @@ import { resolveFullPlayerName } from "./playerRatings.js";
 import { resolveTeamCode } from "./oddsApi.js";
 import { validDepthLineup } from "../../api-lib/depthCharts.js";
 import { validateOddsEvents, QUOTE_VALIDATION_VERSION } from "./quoteValidation.js";
-import { canonicalTeam } from "../../api-lib/personnelView.js";
-export const BEST_BETS_CANDIDATE_VERSION = 3;
+import { canonicalTeam, classifyPlayerAvailability, availableForPlayerBet } from "../../api-lib/personnelView.js";
+import { PLAYER_REJECTION_CODES, playerReasonMessage, primaryPlayerReason } from "./playerBetDiagnostics.js";
+export const BEST_BETS_CANDIDATE_VERSION = 5;
 const MIN_GAME_EDGE = 0.045;
 const MIN_GAME_EV = 0.03;
 const MIN_PROP_EDGE = 0.045;
@@ -23,12 +24,29 @@ export function buildBestBets({ game, prediction, playerProjections, personnelVi
   const gameBets = buildGameBets(game, prediction, markets, dataQuality);
   const consensusPlayerMarkets = selectConsensusPlayerMarkets(markets);
   const playerBets = buildPlayerBets(playerProjections, consensusPlayerMarkets, personnelViews, game);
+  const rejectedPrices = validation.quarantined.filter((row) => row.market?.startsWith("player_"))
+    .map((row) => {
+      const supplied = row.price !== null && row.price !== undefined && row.price !== "";
+      const reasons = row.quoteValidation.reasons;
+      const rejectionCode = reasons.includes("malformed_price") ? supplied ? "INVALID_PRICE" : "PRICE_UNAVAILABLE"
+        : reasons.includes("stale_offer") ? "PRICE_STALE" : "NO_ELIGIBLE_CANDIDATE";
+      return { providerPlayerName: safeDiagnosticName(row.playerName), projectionPlayerName: "",
+        normalizedProviderName: normalize(canonicalPlayerName(safeDiagnosticName(row.playerName))),
+        normalizedProjectionName: "", providerTeam: null, projectionTeam: null,
+        eventTeams: [game?.away, game?.home], market: row.market,
+        identityState: "NOT_EVALUATED", availabilityState: "NOT_EVALUATED", rejectionCode };
+    });
+  for (const diagnostic of rejectedPrices) {
+    playerBets.diagnostics.push(diagnostic);
+    playerBets.failureCounts[diagnostic.rejectionCode] = (playerBets.failureCounts[diagnostic.rejectionCode] || 0) + 1;
+  }
   const assessed = gameBets.assessed + playerBets.assessed;
   const anytimeTdScorer = selectAnytimeTdScorer({
     playerProjections,
     personnelViews,
-    markets,
     playerBetCandidates: playerBets.recommendations,
+    diagnostics: playerBets.diagnostics,
+    coreDataReady,
   });
   // The dedicated scorer owns its player's Anytime TD slot for this game.
   // Other players' Anytime TD bets remain eligible.
@@ -47,7 +65,8 @@ export function buildBestBets({ game, prediction, playerProjections, personnelVi
     .filter((bet) => bet.edge >= MIN_GAME_EDGE && bet.expectedValue >= MIN_GAME_EV);
 
   const qualifiedPlayerBets = selectUniquePlayerProps(
-    allCandidates.filter((bet) => bet.category !== "Game")
+    allCandidates.filter((bet) => bet.category !== "Game" &&
+      (!isAnytimeTdBet(bet) || bet.modelProbability >= .55))
   )
     .filter((bet) => coreDataReady && bet.edge >= MIN_PROP_EDGE && bet.expectedValue >= MIN_PROP_EV)
     .sort((a, b) => b.score - a.score);
@@ -102,6 +121,11 @@ export function buildBestBets({ game, prediction, playerProjections, personnelVi
       displayedPlayerProps: selectedPlayerBets.length,
       qualifiedGameMarkets: qualifiedGameBets.length,
       displayedGameMarkets: selectedGameBets.length,
+      playerDiagnostics: playerBets.diagnostics.slice(0, 500),
+      playerDiagnosticsTruncated: Math.max(0, playerBets.diagnostics.length - 500),
+      providerPlayerNames: playerBets.providerPlayerNames,
+      projectionPlayerNames: playerBets.projectionPlayerNames,
+      playerFailureCounts: playerBets.failureCounts,
     },
     highlights,
     anytimeTdScorer,
@@ -193,15 +217,16 @@ function isAnytimeTdBet(bet) {
     /anytime\s*(td|touchdown)/i.test(String(bet?.selection || ""));
 }
 
-function selectAnytimeTdScorer({ playerProjections, personnelViews, markets, playerBetCandidates }) {
-  const players = collectProjectedPlayers(playerProjections)
+function selectAnytimeTdScorer({ playerProjections, personnelViews, playerBetCandidates, diagnostics, coreDataReady }) {
+  const projected = playerProjections?.available === false ? [] : collectProjectedPlayers(playerProjections);
+  const players = projected
     .filter((player) => {
       const personnel = findPersonnelRecord(personnelViews, player);
       return playerProjections?.available !== false && player.available !== false &&
       player.eligible !== false && player.personnel?.eligible === true &&
-      personnel?.statusKnown && personnel.propEligible === true &&
+      availableForPlayerBet(personnel) &&
       Number.isFinite(Number(player.roleConfidence ?? player.confidence ?? player.role?.confidence)) &&
-      Number(player.roleConfidence ?? player.confidence ?? player.role?.confidence) > 0;
+      Number(player.roleConfidence ?? player.confidence ?? player.role?.confidence) >= 0.55;
     })
     .map((player) => ({
       player,
@@ -223,97 +248,74 @@ function selectAnytimeTdScorer({ playerProjections, personnelViews, markets, pla
 
   const pricedCandidates = (playerBetCandidates || [])
     .filter((bet) => bet.market === "Anytime touchdown")
-    .sort((a, b) => b.score - a.score);
+    .filter((bet) => coreDataReady && Number.isFinite(bet.edge) && bet.edge > 0 &&
+      bet.edge >= MIN_PROP_EDGE && bet.expectedValue >= MIN_PROP_EV && bet.modelProbability >= .55 &&
+      Number.isFinite(bet.decimalOdds) && bet.decimalOdds > 1)
+    .sort((a, b) => {
+      const rank = (bet) => players.find((row) =>
+        findPersonnelRecord(personnelViews, row.player)?.canonicalId === bet.personnelId);
+      const first = rank(a), second = rank(b);
+      return (second ? second.probability * second.roleConfidence : 0) -
+        (first ? first.probability * first.roleConfidence : 0) || b.score - a.score;
+    });
 
   const topPlayer = players[0] || null;
-  const directPricedMarket = topPlayer
-    ? markets
-        .filter((market) => market.marketKey === "player_anytime_td")
-        .filter((market) => namesMatch(topPlayer.playerName, market.playerName))
-        .filter((market) => Number.isFinite(Number(market.price)))
-        .sort((a, b) => americanToDecimal(b.price) - americanToDecimal(a.price))[0] || null
-    : null;
-  // The dedicated scorer is the top probability-times-role player, so a
-  // priced bet for any other player must not replace it.
-  let bestPriced = topPlayer
-    ? pricedCandidates.find((bet) =>
-        namesMatch(normalisePlayerFromSelection(bet.selection), topPlayer.playerName)) || null
-    : null;
-  if (!bestPriced && topPlayer && directPricedMarket) {
-    bestPriced = buildBet({
-      category: "Anytime touchdowns", market: "Anytime touchdown",
-      rawMarketType: directPricedMarket.rawMarketType,
-      period: directPricedMarket.period || "full_game",
-      selection: `${topPlayer.playerName} anytime TD`, line: null,
-      price: directPricedMarket.price, sportsbook: directPricedMarket.sportsbook,
-      modelProjection: topPlayer.probability,
-      modelProbability: topPlayer.probability,
-      marketProbability: impliedProbability(directPricedMarket.price),
-      dataQuality: topPlayer.dataQuality, roleConfidence: topPlayer.roleConfidence,
-      reason: `Fourth Down gives ${topPlayer.playerName} a ${percent(topPlayer.probability)} chance to score a touchdown.`,
-      risk: playerRisk(topPlayer.player, "player_anytime_td", topPlayer.roleConfidence),
-      updatedAt: directPricedMarket.updatedAt,
-      quoteValidation: directPricedMarket.quoteValidation,
-      quoteId: directPricedMarket.quoteSource?.id || null,
-    });
-  }
+  const bestPriced = pricedCandidates.find((bet) => players.some((row) =>
+    findPersonnelRecord(personnelViews, row.player)?.canonicalId === bet.personnelId));
 
   if (bestPriced) {
     return {
       ...bestPriced,
-      modelProbability: topPlayer.probability,
       source: "priced-market",
-      playerId: topPlayer.player.playerId,
-      personnelId: topPlayer.player.personnelId,
-      playerTeam: topPlayer.player.team,
+      bettingEligible: true,
       title: "Anytime TD scorer",
       confidenceLevel: bestPriced.confidenceLevel || confidenceLabel(bestPriced.confidenceScore || 0),
       explanation:
-        `${bestPriced.selection.replace(/ anytime TD$/i, "")} is Fourth Down's top touchdown scorer for this game. ` +
-        `The model gives the player a ${percent(topPlayer.probability)} chance at ${formatDecimalOdds(bestPriced.decimalOdds)}.`,
+        `${bestPriced.selection.replace(/ anytime TD$/i, "")} is Fourth Down's top eligible touchdown bet for this game. ` +
+        `The model gives the player a ${percent(bestPriced.modelProbability)} chance at ${formatDecimalOdds(bestPriced.decimalOdds)}.`,
     };
   }
 
   if (!topPlayer) {
+    const projections = collectProjectedPlayers(playerProjections);
+    const records = projections.map((player) => findPersonnelRecord(personnelViews, player));
+    const availability = projections.map((player) => playerDiagnosticAvailability(personnelViews, player));
+    const primaryReason = !projections.length || playerProjections?.available === false ? "PLAYER_PROJECTION_UNAVAILABLE"
+      : availability.every((state) => state === "UNKNOWN_IDENTITY") ? "IDENTITY_UNRESOLVED"
+        : availability.some((state) => state === "UNKNOWN_STALE") ? "AVAILABILITY_STALE"
+          : availability.some((state) => state.startsWith("UNKNOWN")) ? "PLAYER_AVAILABILITY_UNKNOWN"
+            : !records.some((record) => availableForPlayerBet(record)) ? "PLAYER_UNAVAILABLE"
+              : projections.every((player) => !(Number(player.roleConfidence ?? player.confidence ?? player.role?.confidence) >= 0.55))
+                ? "ROLE_CONFIDENCE_INSUFFICIENT" : "NO_ELIGIBLE_CANDIDATE";
     return {
       source: "unavailable",
       title: "Anytime TD scorer",
       selection: "No eligible scorer projection",
-      modelProbability: 0,
+      modelProbability: null,
       decimalOdds: null,
       confidenceLevel: "Cautious",
-      explanation: "Player touchdown projections were not available for this matchup.",
-      risk: "No player-level touchdown projection was available.",
+      primaryReason,
+      explanation: playerReasonMessage(primaryReason),
+      risk: "No eligible player candidate remains after filtering.",
     };
   }
 
-  const confidenceScore = clamp(
-    topPlayer.probability * 0.45 +
-      topPlayer.roleConfidence * 0.3 +
-      topPlayer.dataQuality * 0.25,
-    0,
-    1
-  );
-
+  const tdReasons = diagnostics.filter((row) => row.market === "player_anytime_td")
+    .map((row) => row.rejectionCode).filter(Boolean);
+  const primaryReason = coreDataReady ? primaryPlayerReason(tdReasons.length ? tdReasons : ["PRICE_UNAVAILABLE"])
+    : "NO_ELIGIBLE_CANDIDATE";
   return {
-    source: "model-only",
-    playerId: topPlayer.player.playerId,
-    personnelId: topPlayer.player.personnelId,
-    playerTeam: topPlayer.player.team,
+    source: "unavailable",
+    primaryReason,
     title: "Anytime TD scorer",
-    selection: `${topPlayer.playerName} anytime TD`,
-    modelProbability: round4(topPlayer.probability),
+    selection: "No eligible TD betting recommendation",
+    modelProbability: null,
     decimalOdds: null,
-    confidenceScore: round4(confidenceScore),
-    confidenceLevel: confidenceLabel(confidenceScore),
-    dataQuality: topPlayer.dataQuality,
-    roleConfidence: topPlayer.roleConfidence,
-    explanation:
-      `${topPlayer.playerName} has the highest role-adjusted touchdown score in this game, with a raw TD probability of ${percent(topPlayer.probability)}. ` +
-      `No bookmaker anytime-touchdown price matched this player, so this is a model pick rather than a priced value bet.`,
-    qualificationReason:
-      `Selected by touchdown probability multiplied by role confidence among eligible projected players.`,
-    risk: "No matched bookmaker price is available, so expected value cannot be calculated.",
+    confidenceLevel: "Cautious",
+    statisticalProjection: { playerName: topPlayer.playerName, modelProbability: round4(topPlayer.probability),
+      roleConfidence: topPlayer.roleConfidence, bettingEligible: false },
+    explanation: playerReasonMessage(primaryReason),
+    risk: "No eligible priced player candidate remains after filtering.",
   };
 }
 
@@ -448,9 +450,11 @@ function isFullPlayerName(value) {
 function buildPlayerBets(playerProjections, markets, personnelViews, game) {
   const result = [];
   const rejections = [];
+  const diagnostics = [];
+  const failureCounts = {};
   let assessed = 0;
   let matchedPlayerMarkets = 0;
-  const players = collectProjectedPlayers(playerProjections);
+  const players = playerProjections?.available === false ? [] : collectProjectedPlayers(playerProjections);
   const playerMarkets = markets.filter((market) => isPlayerMarket(market.marketKey)).length;
   const fields = {
     player_pass_yds: ["passingYards", 42, "Passing yards", "passing yards"],
@@ -468,18 +472,42 @@ function buildPlayerBets(playerProjections, markets, personnelViews, game) {
 
   for (const market of markets) {
     const config = fields[market.marketKey];
-    const rejection = (rejectionReasons, details = {}) => rejections.push({
+    let player = null;
+    let personnel = null;
+    const diagnostic = (reason) => {
+      const code = reason ? PLAYER_REJECTION_CODES[reason] || "NO_ELIGIBLE_CANDIDATE" : null;
+      if (code) failureCounts[code] = (failureCounts[code] || 0) + 1;
+      diagnostics.push({
+        providerPlayerName: safeDiagnosticName(market.playerName), projectionPlayerName: safeDiagnosticName(player && getPlayerName(player)),
+        normalizedProviderName: normalize(canonicalPlayerName(safeDiagnosticName(market.playerName))),
+        normalizedProjectionName: normalize(canonicalPlayerName(safeDiagnosticName(player && getPlayerName(player)))),
+        providerTeam: market.quoteSource?.playerTeam ? safeDiagnosticName(market.quoteSource.playerTeam) : null,
+        projectionTeam: player?.team || null, eventTeams: [game?.away, game?.home],
+        market: market.marketKey,
+        identityState: !player ? "UNRESOLVED" : reason === "ambiguous_player" ? "AMBIGUOUS"
+          : reason === "player_team_mismatch" ? "TEAM_MISMATCH" : "MATCHED",
+        availabilityState: reason === "ambiguous_player" ? "UNKNOWN_IDENTITY" :
+          playerDiagnosticAvailability(personnelViews, player), rejectionCode: code,
+      });
+    };
+    const rejection = (rejectionReasons, details = {}) => {
+      diagnostic(rejectionReasons[0]);
+      rejections.push({
       market: config?.[2] || market.marketKey, rawMarketType: market.rawMarketType,
       playerName: market.playerName, selection: market.name, line: market.point,
       price: market.price, sportsbook: market.sportsbook, ...details, rejectionReasons,
-    });
+      });
+    };
     if (!config || !market.playerName) {
       rejection([!config ? "unsupported_market" : "missing_player_identity"]);
       continue;
     }
-    const player = players.find((item) =>
+    if (!players.length) { rejection(["missing_projection"]); continue; }
+    const matchingPlayers = players.filter((item) =>
       namesMatch(canonicalPlayerName(getPlayerName(item)), canonicalPlayerName(market.playerName))
     );
+    player = matchingPlayers[0];
+    if (matchingPlayers.length > 1) { rejection(["ambiguous_player"]); continue; }
     if (!player) { rejection(["unmatched_player"]); continue; }
     const playerTeam = canonicalTeam(player.team);
     if (![game?.away, game?.home].some((team) =>
@@ -487,16 +515,21 @@ function buildPlayerBets(playerProjections, markets, personnelViews, game) {
       rejection(["player_team_mismatch"]);
       continue;
     }
-    const personnel = findPersonnelRecord(personnelViews, player);
-    if (!personnel || !personnel.statusKnown || personnel.propEligible !== true ||
+    personnel = findPersonnelRecord(personnelViews, player);
+    if (!availableForPlayerBet(personnel) ||
         !personnel.eligibleBeforeCutoff || personnel.identityConflict || personnel.sourceConflict) {
-      rejection([!personnel ? "missing_personnel_identity"
+      rejection([!personnel ? (playerDiagnosticAvailability(personnelViews, player) === "UNKNOWN_IDENTITY"
+        ? "missing_personnel_identity" : "unknown_availability")
         : !personnel.statusKnown ? "unknown_availability"
+          : classifyPlayerAvailability(personnel) === "UNKNOWN_STALE" ? "availability_stale"
           : personnel.status === "Doubtful" ? "doubtful"
             : "unavailable_or_conflicted_personnel"]);
       continue;
     }
     const displayName = resolvePlayerDisplayName(player, market.playerName);
+    if (market.marketKey === "player_anytime_td" && !Number.isFinite(Date.parse(market.updatedAt))) {
+      rejection(["price_stale"]); continue;
+    }
     if (!isPlausiblePlayerPropLine(market.marketKey, market.point)) {
       rejection(["implausible_line"]); continue;
     }
@@ -553,7 +586,14 @@ function buildPlayerBets(playerProjections, markets, personnelViews, game) {
       quoteValidation: market.quoteValidation,
       quoteId: market.quoteSource?.id || null,
     });
-    if (bet) result.push({ ...bet, playerId: player.playerId, personnelId: personnel.canonicalId, playerTeam: player.team });
+    if (bet) {
+      const reason = bet.edge <= 0 ? "non_positive_edge"
+        : bet.modelProbability < .55 ? "probability_below_threshold"
+          : bet.edge < MIN_PROP_EDGE ? "edge_below_threshold"
+            : bet.expectedValue < MIN_PROP_EV ? "ev_below_threshold" : null;
+      diagnostic(reason);
+      result.push({ ...bet, playerId: player.playerId, personnelId: personnel.canonicalId, playerTeam: player.team });
+    }
   }
 
   return {
@@ -563,8 +603,10 @@ function buildPlayerBets(playerProjections, markets, personnelViews, game) {
     matchedPlayerMarkets,
     projectedPlayers: players.length,
     rejections,
-    providerPlayerNames: [...new Set(markets.filter((market) => isPlayerMarket(market.marketKey)).map((market) => market.playerName).filter(Boolean))].slice(0, 20),
-    projectionPlayerNames: players.map(getPlayerName).filter(Boolean).slice(0, 20),
+    diagnostics,
+    failureCounts,
+    providerPlayerNames: [...new Set(markets.filter((market) => isPlayerMarket(market.marketKey)).map((market) => safeDiagnosticName(market.playerName)).filter(Boolean))].slice(0, 20),
+    projectionPlayerNames: players.map((player) => safeDiagnosticName(getPlayerName(player))).filter(Boolean).slice(0, 20),
   };
 }
 
@@ -598,6 +640,18 @@ function isPlausiblePlayerPropLine(marketKey, point) {
   return Boolean(range && line >= range[0] && line <= range[1]);
 }
 
+function safeDiagnosticName(value) {
+  return String(value || "").replace(/[^a-zA-Z .'-]/g, "").slice(0, 100);
+}
+
+function playerDiagnosticAvailability(personnelViews, player) {
+  if (!player || !(player.personnelId || player.playerId)) return "UNKNOWN_IDENTITY";
+  const record = findPersonnelRecord(personnelViews, player);
+  if (record) return classifyPlayerAvailability(record);
+  const view = Object.values(personnelViews || {}).find((row) => canonicalTeam(row.team) === canonicalTeam(player.team));
+  return view?.chart?.available || view?.live?.available ? "UNKNOWN_NOT_IN_LINEUP" : "UNKNOWN_SOURCE_UNAVAILABLE";
+}
+
 function collectProjectedPlayers(value) {
   const found = [];
   const seen = new Set();
@@ -614,7 +668,7 @@ function collectProjectedPlayers(value) {
       "anytimeTouchdownProbability", "anytime_touchdown_probability",
     ].some((key) => Number.isFinite(Number(node[key])));
     if (name && hasProjection) {
-      const key = normalize(name);
+      const key = `${node.personnelId || node.playerId || normalize(name)}:${node.team || ""}`;
       if (!seen.has(key)) { seen.add(key); found.push(node); }
     }
     Object.values(node).forEach(visit);
@@ -964,7 +1018,7 @@ function flattenMarkets(event) {
           point: nullable(outcome.point ?? outcome.line),
           price: normaliseAmericanPrice(outcome.price ?? outcome.odds ?? outcome.american),
           sportsbook: book.title || book.name || book.key || "Market",
-          updatedAt: outcome.updatedAt || market.last_update || market.updatedAt || book.last_update || book.updatedAt || null,
+          updatedAt: outcome.quoteSource?.timestamp || outcome.updatedAt || market.last_update || market.updatedAt || book.last_update || book.updatedAt || null,
           quoteValidation: outcome.quoteValidation,
           quoteSource: outcome.quoteSource,
         });
