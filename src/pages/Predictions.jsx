@@ -20,6 +20,8 @@ import { buildPredictionSnapshot } from "../services/predictionSnapshot.js";
 import { getPlayerRating, resolveFullPlayerName } from "../services/playerRatings.js";
 import { getStadiumWeather } from "../services/weatherApi.js";
 import { playerDiagnosticSummary, scorerProbabilityLabel, tdBettingDisplay } from "../services/playerBetDiagnostics.js";
+import { savedBestBetsDisplay } from "../services/savedBestBetsDisplay.js";
+import { isQualifiedBestBet } from "../services/bestBetsService.js";
 
 const SEASON = 2026;
 const SCHEDULE_CACHE_PREFIX = "fourth-down:schedule";
@@ -150,12 +152,12 @@ export default function Predictions({ onOpen }) {
         }
 
         try {
-          await refreshPredictionLedger({
+          ledger = await refreshPredictionLedger({
             season: SEASON,
             week,
+            displayBets: true,
             signal: controller.signal,
           });
-          ledger = readPredictionLedger();
 
           if (active) {
             const sharedRows = games.map((game) => {
@@ -744,12 +746,10 @@ function BestBetsPanel({ bestBets, kickoff, awayCode, homeCode }) {
 }
 
 function buildDisplayHighlights(bestBets) {
-  const stored = bestBets?.highlights || {};
   const pool = [
     ...(bestBets?.recommendations || []),
-    stored.mostLikely,
-    stored.bestValue,
-  ].filter(Boolean);
+    ...(bestBets?.candidates || []),
+  ].filter(isQualifiedBestBet);
   const unique = [];
   const seen = new Set();
   for (const bet of pool) {
@@ -1369,8 +1369,9 @@ function PredictionSummary({ icon, label, value }) {
   );
 }
 
-function enrichSavedPredictionWithCurrentMarket(saved, game, oddsEvents) {
+function enrichSavedPredictionWithCurrentMarket(saved, game, oddsEvents, now = new Date()) {
   const display = mapLedgerPrediction(saved);
+  if (saved.displayBestBetsAsOf) display.bestBets = savedBestBetsDisplay(saved, oddsEvents, now);
   const oddsEvent = findOddsForGame(oddsEvents, game);
   const market = getCoreMarket(oddsEvent);
   const hasMarket = market.away !== null && market.home !== null;

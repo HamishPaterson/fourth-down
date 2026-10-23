@@ -1646,8 +1646,21 @@ async function readSnapshots(supabase, request, response) {
     return response.status(500).json({ error: error.message });
   }
 
+  let snapshots = (data || []).map(databaseToSnapshot);
+  if (request.query?.bets === "display") {
+    const now = new Date();
+    const { getCurrentWeekWindow } = await import("./odds.js");
+    if (season === 2026 && week === getCurrentWeekWindow(now.getTime()).week) {
+      const { readPredictionOdds, refreshSavedBestBets } = await import("../../api-lib/serverPredictions.js");
+      const odds = await readPredictionOdds(supabase, now);
+      snapshots = snapshots.map((snapshot) => {
+        if (!completePrediction(snapshot)) return snapshot;
+        return refreshSavedBestBets(snapshot, odds, now, { displayOnly: true });
+      });
+    }
+  }
   return response.status(200).json({
-    snapshots: (data || []).map(databaseToSnapshot),
+    snapshots,
     count: data?.length || 0,
     source: "supabase",
   });

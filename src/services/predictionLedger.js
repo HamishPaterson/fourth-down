@@ -362,8 +362,8 @@ function writeStoredRows(rows, options = {}) {
     if (options.dispatch !== false) {
       window.dispatchEvent(new Event("fourth-down-ledger-updated"));
     }
-  } catch {
-    // Preserve the existing in-memory view when browser storage is unavailable.
+  } catch (error) {
+    console.warn("Prediction browser cache unavailable; loaded predictions remain available in memory.", error?.name || "StorageError");
   }
 }
 

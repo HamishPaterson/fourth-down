@@ -203,6 +203,17 @@ compatibility path never recovers a betting candidate, recalculates model output
 fetches providers or rewrites a saved prediction. Empty betting probabilities
 display `Unavailable`, not a fabricated zero.
 
+The Predictions page consumes the returned shared ledger directly, even when
+browser storage is full or unavailable. Saved Best Bets remain display-only:
+each saved candidate must retain a validated current quote at the same bookmaker,
+selection, line and price, plus existing eligibility/edge/EV gates. The page requests a read-only current betting assessment using the existing saved
+model output, verified lineup evidence and stored quotes; it does not generate
+predictions, fetch providers or write saved rows. Changed quotes require that
+assessment rather than borrowing a saved line's probability. Highlights
+use qualifying candidates only, never legacy highlight-only rejected offers.
+The current display list includes every qualifying candidate, so a one-game
+recommendation shortlist cannot hide an independently eligible spread.
+
 ## Matchup Intelligence Phase 2A: third down and red zone
 
 ### Protected prediction-only refresh

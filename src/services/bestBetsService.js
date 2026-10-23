@@ -10,6 +10,13 @@ const MIN_GAME_EV = 0.03;
 const MIN_PROP_EDGE = 0.045;
 const MIN_PROP_EV = 0.03;
 
+export function isQualifiedBestBet(bet) {
+  return Number.isFinite(bet?.modelProbability) && bet.modelProbability >= 0 && bet.modelProbability <= 1 &&
+    Number.isFinite(bet.edge) && Number.isFinite(bet.expectedValue) &&
+    bet.edge >= (bet.category === "Game" ? MIN_GAME_EDGE : MIN_PROP_EDGE) &&
+    bet.expectedValue >= (bet.category === "Game" ? MIN_GAME_EV : MIN_PROP_EV);
+}
+
 export function buildBestBets({ game, prediction, playerProjections, personnelViews, oddsEvent, dataQuality, teamMetrics, asOf, quoteAsOf = new Date(), audit = false }) {
   const validation = validateOddsEvents(oddsEvent ? [oddsEvent] : [], { now: new Date(quoteAsOf) });
   const markets = flattenMarkets(validation.events[0]);
@@ -62,13 +69,13 @@ export function buildBestBets({ game, prediction, playerProjections, personnelVi
   const qualifiedGameBets = allCandidates
     .filter(() => coreDataReady)
     .filter((bet) => bet.category === "Game")
-    .filter((bet) => bet.edge >= MIN_GAME_EDGE && bet.expectedValue >= MIN_GAME_EV);
+    .filter(isQualifiedBestBet);
 
   const qualifiedPlayerBets = selectUniquePlayerProps(
     allCandidates.filter((bet) => bet.category !== "Game" &&
       (!isAnytimeTdBet(bet) || bet.modelProbability >= .55))
   )
-    .filter((bet) => coreDataReady && bet.edge >= MIN_PROP_EDGE && bet.expectedValue >= MIN_PROP_EV)
+    .filter((bet) => coreDataReady && isQualifiedBestBet(bet))
     .sort((a, b) => b.score - a.score);
 
   const selectedPlayerBets = selectDiversePlayerProps(qualifiedPlayerBets, 6);
