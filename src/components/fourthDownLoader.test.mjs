@@ -179,4 +179,5 @@ test("loader layout is centered, constrained, responsive, and reduced-motion saf
   assert.match(css, /\.fourth-down-loader-animation\s*\{[^}]*max-height:\s*min\(38svh,\s*300px\)/s);
   assert.match(css, /object-fit:\s*contain/);
   assert.match(css, /@media \(prefers-reduced-motion:\s*reduce\)/);
+  assert.match(css, /\.fourth-down-loader-reduced\s*\{[^}]*grid-row:\s*2/s);
 });
