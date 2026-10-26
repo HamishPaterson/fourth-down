@@ -19,11 +19,13 @@ import {
 import TeamLogo from "../components/TeamLogo.jsx";
 import BettingOdds from "../components/BettingOdds.jsx";
 import MatchupPrediction from "../components/MatchupPrediction.jsx";
+import FourthDownLoader from "../components/FourthDownLoader.jsx";
+import { shouldShowBlockingLoader } from "../components/fourthDownLoader.js";
 
 export default function Matchup({ game, onBack }) {
   const [liveGame, setLiveGame] = useState(null);
   const [status, setStatus] = useState("");
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(() => Boolean(game?.id));
   const [oddsEvent, setOddsEvent] = useState(
     game?.oddsEvent || null
   );
@@ -216,6 +218,14 @@ export default function Matchup({ game, onBack }) {
       loadOdds(),
       refreshWeather(),
     ]);
+  }
+
+  if (shouldShowBlockingLoader({
+    loading,
+    hasContent: Boolean(liveGame),
+    error: isErrorMessage(status),
+  })) {
+    return <FourthDownLoader />;
   }
 
   return (

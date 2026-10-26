@@ -4,6 +4,8 @@ import { TEAM_NAMES } from "../data.js";
 import { getTeamTheme } from "../services/teamThemes.js";
 import { findOddsForGame, getNflOdds } from "../services/oddsApi.js";
 import TeamLogo from "../components/TeamLogo.jsx";
+import FourthDownLoader from "../components/FourthDownLoader.jsx";
+import { shouldShowBlockingLoader } from "../components/fourthDownLoader.js";
 
 const SEASON = 2026;
 const SCHEDULE_CACHE_PREFIX = "fourth-down:schedule";
@@ -192,6 +194,14 @@ export default function Schedule({ onOpen, favoriteTeam, initialMode = "all" }) 
   const visibleGames = viewMode === "favorite"
     ? games.filter((game) => game.away === normalizedFavoriteTeam || game.home === normalizedFavoriteTeam)
     : games;
+
+  if (shouldShowBlockingLoader({
+    loading,
+    hasContent: visibleGames.length > 0,
+    error: isErrorMessage(status),
+  })) {
+    return <FourthDownLoader />;
+  }
 
   return (
     <section className="schedule-page">

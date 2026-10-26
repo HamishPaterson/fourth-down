@@ -5,6 +5,8 @@ import { getTeamTheme } from "../services/teamThemes.js";
 import { getTeamRatings } from "../services/teamRatings.js";
 import TeamLogo from "../components/TeamLogo.jsx";
 import Divisions from "./Divisions.jsx";
+import FourthDownLoader from "../components/FourthDownLoader.jsx";
+import { shouldShowBlockingLoader } from "../components/fourthDownLoader.js";
 
 // All 16 teams per conference, grouped by division.
 const CONFERENCES = [
@@ -134,6 +136,13 @@ export default function Conference({ onSelectTeam }) {
     conferenceCodes(conference),
     standingsByCode
   );
+
+  if (shouldShowBlockingLoader({
+    loading: status.startsWith("Loading"),
+    hasContent: teams.length > 0,
+  })) {
+    return <FourthDownLoader />;
+  }
 
   return (
     <section className="conference-page">

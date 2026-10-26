@@ -23,6 +23,8 @@ import { playerDiagnosticSummary, scorerProbabilityLabel, tdBettingDisplay } fro
 import { savedBestBetsDisplay } from "../services/savedBestBetsDisplay.js";
 import { isQualifiedBestBet, selectTdModelPick } from "../services/bestBetsService.js";
 import { isFinalGame, resultGameKey, withGameResult, completedPickLabel } from "../services/gameResults.js";
+import FourthDownLoader from "../components/FourthDownLoader.jsx";
+import { shouldShowBlockingLoader } from "../components/fourthDownLoader.js";
 
 const SEASON = 2026;
 const SCHEDULE_CACHE_PREFIX = "fourth-down:schedule";
@@ -292,6 +294,10 @@ export default function Predictions({ onOpen }) {
   const weeklyParlay = useWeeklyParlay(predictions);
 
   const filtered = filterPredictions(predictions, filter);
+  const showInitialLoader = shouldShowBlockingLoader({
+    loading: status.startsWith("Loading"),
+    hasContent: rows.length > 0,
+  });
 
   const agreement = predictions.filter(
     (row) => row.oddsPick && row.oddsPick === row.fourthDownPick
@@ -304,6 +310,8 @@ export default function Predictions({ onOpen }) {
   const closeGames = predictions.filter(
     (row) => projectedMargin(row) <= 3
   ).length;
+
+  if (showInitialLoader) return <FourthDownLoader />;
 
   return (
     <section className="predictions-page">

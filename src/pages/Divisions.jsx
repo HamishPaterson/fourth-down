@@ -4,6 +4,8 @@ import { getTeams, getStandings } from "../services/nflApi.js";
 import { getTeamTheme } from "../services/teamThemes.js";
 import { getTeamRatings } from "../services/teamRatings.js";
 import TeamLogo from "../components/TeamLogo.jsx";
+import FourthDownLoader from "../components/FourthDownLoader.jsx";
+import { shouldShowBlockingLoader } from "../components/fourthDownLoader.js";
 
 // Canonical league structure. Controls dropdown order and division buckets.
 const LEAGUE_STRUCTURE = [
@@ -137,6 +139,13 @@ export default function Divisions({
   const division =
     ALL_DIVISIONS.find((d) => d.id === selectedDivision) || ALL_DIVISIONS[0];
   const rankedCodes = rankDivision(division.teams, standingsByCode);
+
+  if (!embedded && shouldShowBlockingLoader({
+    loading: status.startsWith("Loading"),
+    hasContent: teams.length > 0,
+  })) {
+    return <FourthDownLoader />;
+  }
 
   return (
     <section className={embedded ? "divisions-page embedded" : "divisions-page"}>

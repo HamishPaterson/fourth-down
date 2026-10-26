@@ -32,6 +32,85 @@ button { cursor: pointer; }
 .nav-button:hover { color: white; background: #142036; }
 .nav-button.active { color: #07101f; background: #a3e635; font-weight: 800; }
 .content { max-width: 1180px; margin: auto; padding: 28px 24px 60px; }
+.fourth-down-loader {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  justify-items: center;
+  align-items: center;
+  gap: 18px;
+  padding: max(24px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right))
+    max(24px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
+  overflow: hidden;
+  background: #03070b;
+  color: #f8fafc;
+}
+.fourth-down-loader-brand {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  justify-self: start;
+  width: min(100%, 1180px);
+  margin: 0 auto;
+  font-size: 14px;
+}
+.fourth-down-loader-brand strong,
+.fourth-down-loader-brand small { display: block; }
+.fourth-down-loader-brand small {
+  margin-top: 3px;
+  color: #a3e635;
+  font-size: 9px;
+  letter-spacing: .14em;
+}
+.fourth-down-loader-mark {
+  width: 40px;
+  height: 40px;
+  display: grid;
+  place-items: center;
+  border-radius: 11px;
+  background: #a3e635;
+  color: #07101f;
+  font-weight: 900;
+}
+.fourth-down-loader-animation {
+  display: block;
+  width: min(100%, 430px);
+  max-height: min(66svh, 610px);
+  object-fit: contain;
+  object-position: center;
+}
+.fourth-down-loader-label {
+  align-self: end;
+  color: #94a3b8;
+  font-size: 13px;
+}
+.fourth-down-loader-reduced { display: none; }
+@media (max-width: 600px) {
+  .fourth-down-loader { gap: 12px; }
+  .fourth-down-loader-animation {
+    width: min(100%, 390px);
+    max-height: min(64svh, 540px);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .fourth-down-loader-animation { display: none; }
+  .fourth-down-loader-reduced {
+    display: grid;
+    place-items: center;
+    width: 112px;
+    height: 112px;
+    border: 1px solid rgba(163, 230, 53, .45);
+    border-radius: 28px;
+    background: rgba(163, 230, 53, .08);
+  }
+  .fourth-down-loader-reduced .fourth-down-loader-mark {
+    width: 64px;
+    height: 64px;
+    font-size: 20px;
+  }
+}
 h1, h2, p { margin-top: 0; }
 .card { border: 1px solid #26344b; background: rgba(15, 23, 42, .78); border-radius: 20px; box-shadow: 0 14px 35px rgba(0,0,0,.2); }
 .hero { padding: 36px; }

@@ -11,6 +11,8 @@ import {
   refreshPredictionLedger,
   saveGradedPredictions,
 } from "../services/predictionLedger.js";
+import FourthDownLoader from "../components/FourthDownLoader.jsx";
+import { shouldShowBlockingLoader } from "../components/fourthDownLoader.js";
 
 const CURRENT_SCORING_MODEL_START_WEEK = 2;
 
@@ -18,6 +20,7 @@ export default function Results() {
   const [rows, setRows] = useState(() => readPredictionLedger());
   const [week, setWeek] = useState("all");
   const [syncStatus, setSyncStatus] = useState("Checking final scores...");
+  const [initialLoading, setInitialLoading] = useState(true);
 
   useEffect(() => {
     let cancelled = false;
@@ -56,6 +59,7 @@ export default function Results() {
 
       if (!authoritativeRows.length) {
         setSyncStatus("No saved predictions to grade");
+        setInitialLoading(false);
         return;
       }
 
@@ -78,10 +82,12 @@ export default function Results() {
         setSyncStatus(
           `Results updated · ${count} graded game${count === 1 ? "" : "s"}`
         );
+        setInitialLoading(false);
       } catch (error) {
         if (!cancelled && error?.name !== "AbortError") {
           console.error("Results sync failed", error);
           setSyncStatus("Could not refresh final scores");
+          setInitialLoading(false);
         }
       }
     };
@@ -122,6 +128,14 @@ export default function Results() {
   const scoring = calculateScoringAccuracy(currentModelScoreRows);
   const marketScoring = calculateMarketScoringAccuracy(currentModelScoreRows);
   const weeklyBreakdown = calculateWeeklyBreakdown(completed);
+
+  if (shouldShowBlockingLoader({
+    loading: initialLoading,
+    hasContent: completed.length > 0,
+    error: syncStatus.startsWith("Could not"),
+  })) {
+    return <FourthDownLoader />;
+  }
 
   return (
     <section className="results-page">

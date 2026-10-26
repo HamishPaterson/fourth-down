@@ -4,6 +4,8 @@ import { getTeams } from "../services/nflApi.js";
 import { getTeamTheme } from "../services/teamThemes.js";
 import { getTeamRatings } from "../services/teamRatings.js";
 import TeamLogo from "../components/TeamLogo.jsx";
+import FourthDownLoader from "../components/FourthDownLoader.jsx";
+import { shouldShowBlockingLoader } from "../components/fourthDownLoader.js";
 
 export default function Teams({ onOpenTeam, onOpenConference }) {
   const [teams, setTeams] = useState([]);
@@ -21,6 +23,13 @@ export default function Teams({ onOpenTeam, onOpenConference }) {
       });
     return () => controller.abort();
   }, []);
+
+  if (shouldShowBlockingLoader({
+    loading: status.startsWith("Loading"),
+    hasContent: teams.length > 0,
+  })) {
+    return <FourthDownLoader />;
+  }
 
   return (
     <section className="teams-page">
