@@ -1,9 +1,4 @@
-import { useState } from "react";
-import { createFourthDownLoaderSession } from "./fourthDownLoader.js";
-
 export default function FourthDownLoader() {
-  const [session] = useState(createFourthDownLoaderSession);
-
   return (
     <div className="fourth-down-loader" role="status" aria-live="polite" aria-busy="true">
       <div className="fourth-down-loader-brand" aria-hidden="true">
@@ -15,7 +10,7 @@ export default function FourthDownLoader() {
       </div>
       <img
         className="fourth-down-loader-animation"
-        src={session.asset}
+        src="/loaders/football_spinning.webp"
         alt=""
         aria-hidden="true"
       />

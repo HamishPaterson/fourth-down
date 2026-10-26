@@ -1,16 +1,11 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { createServer } from "vite";
-import {
-  FOURTH_DOWN_LOADER_ASSETS,
-  createFourthDownLoaderSession,
-  selectFourthDownLoaderAsset,
-  shouldShowBlockingLoader,
-} from "./fourthDownLoader.js";
+import { shouldShowBlockingLoader } from "./fourthDownLoader.js";
 
 let vite;
 
@@ -26,13 +21,28 @@ test.after(async () => {
   await vite?.close();
 });
 
-test("all four approved loader GIFs are present as GIF assets", () => {
-  assert.equal(FOURTH_DOWN_LOADER_ASSETS.length, 4);
+test("FourthDownLoader always renders the spinning football asset", async () => {
+  const { default: FourthDownLoader } = await vite.ssrLoadModule(
+    "/src/components/FourthDownLoader.jsx"
+  );
+  const markup = renderToStaticMarkup(createElement(FourthDownLoader));
 
-  for (const asset of FOURTH_DOWN_LOADER_ASSETS) {
-    const content = readFileSync(resolve("public", asset.slice(1)));
-    assert.equal(content.toString("ascii", 0, 3), "GIF");
-  }
+  assert.match(markup, /src="\/loaders\/football_spinning\.webp"/);
+  assert.doesNotMatch(markup, /portrait\.gif|Math\.random|random/i);
+});
+
+test("old portrait loader assets are not referenced in application source", () => {
+  const source = [
+    readFileSync(resolve("src", "components", "FourthDownLoader.jsx"), "utf8"),
+    readFileSync(resolve("src", "index.css"), "utf8"),
+  ].join("\n");
+
+  assert.doesNotMatch(source, /portrait\.gif/i);
+  assert.deepEqual(
+    readdirSync(resolve("public", "loaders")).filter((name) => name.endsWith("_portrait.gif")),
+    []
+  );
+  assert.equal(existsSync(resolve("public", "loaders", "football_spinning.webp")), true);
 });
 
 test("Predictions and Matchup render the loader during their initial blocking load", async () => {
@@ -64,6 +74,20 @@ test("Predictions and Matchup render the loader during their initial blocking lo
   assert.match(matchup, /class="fourth-down-loader"/);
 });
 
+test("Conference and Divisions use the loader while initial teams are unavailable", async () => {
+  const { default: Conference } = await vite.ssrLoadModule(
+    "/src/pages/Conference.jsx"
+  );
+  const { default: Divisions } = await vite.ssrLoadModule(
+    "/src/pages/Divisions.jsx"
+  );
+
+  assert.match(renderToStaticMarkup(createElement(Conference, {
+    onSelectTeam() {},
+  })), /class="fourth-down-loader"/);
+  assert.match(renderToStaticMarkup(createElement(Divisions)), /class="fourth-down-loader"/);
+});
+
 test("Schedule and Teams use the loader when no initial data exists", async () => {
   const { default: Schedule } = await vite.ssrLoadModule(
     "/src/pages/Schedule.jsx"
@@ -82,56 +106,52 @@ test("Schedule and Teams use the loader when no initial data exists", async () =
   })), /class="fourth-down-loader"/);
 });
 
-test("Results with already-available results remains visible instead of loading", async () => {
+test("Results remains visible rather than blocking when ledger results are available", async () => {
   const { default: Results } = await vite.ssrLoadModule(
     "/src/pages/Results.jsx"
   );
-  const markup = renderToStaticMarkup(createElement(Results));
+  const storageRow = {
+    id: "2026-W2-KC-BUF",
+    season: 2026,
+    week: 2,
+    kickoff: "2026-09-20T17:00:00.000Z",
+    awayCode: "KC",
+    homeCode: "BUF",
+    actualAwayScore: 20,
+    actualHomeScore: 17,
+    actualWinner: "KC",
+    fourthDownPick: "KC",
+    fourthDownCorrect: true,
+    savedBeforeKickoff: true,
+  };
+  const originalWindow = globalThis.window;
+  const values = new Map([
+    ["fourth-down:prediction-ledger:v1", JSON.stringify([storageRow])],
+    ["fourth-down:shared-ledger-migrated:v1", "done"],
+  ]);
+  globalThis.window = {
+    localStorage: {
+      getItem: (key) => values.get(key) || null,
+      setItem: (key, value) => values.set(key, value),
+    },
+    setInterval: () => 1,
+    clearInterval() {},
+    addEventListener() {},
+    removeEventListener() {},
+    dispatchEvent() {},
+  };
 
-  assert.match(markup, /<h1>Results<\/h1>/);
-  assert.doesNotMatch(markup, /class="fourth-down-loader"/);
-});
-
-test("the selector can select each approved asset with equal probability buckets", () => {
-  const selected = [0, 0.25, 0.5, 0.75].map((value) =>
-    selectFourthDownLoaderAsset(() => value)
-  );
-
-  assert.deepEqual(selected, FOURTH_DOWN_LOADER_ASSETS);
-  assert.equal(new Set(selected).size, 4);
-});
-
-test("the selector never returns an unapproved asset", () => {
-  for (const value of [0, 0.1, 0.25, 0.49, 0.5, 0.74, 0.75, 0.999]) {
-    assert.ok(FOURTH_DOWN_LOADER_ASSETS.includes(
-      selectFourthDownLoaderAsset(() => value)
-    ));
+  try {
+    const markup = renderToStaticMarkup(createElement(Results));
+    assert.match(markup, /<h1>Results<\/h1>/);
+    assert.doesNotMatch(markup, /class="fourth-down-loader"/);
+  } finally {
+    if (originalWindow === undefined) delete globalThis.window;
+    else globalThis.window = originalWindow;
   }
 });
 
-test("a loading session retains its selection across rerenders", () => {
-  let randomCalls = 0;
-  const random = () => {
-    randomCalls += 1;
-    return 0.5;
-  };
-
-  const session = createFourthDownLoaderSession(random);
-  const rerenderedAsset = session.asset;
-
-  assert.equal(rerenderedAsset, FOURTH_DOWN_LOADER_ASSETS[2]);
-  assert.equal(randomCalls, 1);
-  assert.ok(Object.isFrozen(session));
-});
-
-test("a new independent loading session can select a different asset", () => {
-  const firstSession = createFourthDownLoaderSession(() => 0);
-  const nextSession = createFourthDownLoaderSession(() => 0.75);
-
-  assert.notEqual(firstSession.asset, nextSession.asset);
-});
-
-test("blocking loader visibility ends on failure and preserves usable content", () => {
+test("blocking loader lifecycle preserves failure handling and background content", async () => {
   assert.equal(shouldShowBlockingLoader({
     loading: true,
     hasContent: false,
@@ -151,12 +171,12 @@ test("blocking loader visibility ends on failure and preserves usable content", 
   }), false);
 });
 
-test("loader layout is viewport-fixed, constrained, responsive, and reduced-motion safe", () => {
+test("loader layout is centered, constrained, responsive, and reduced-motion safe", () => {
   const css = readFileSync(resolve("src", "index.css"), "utf8");
 
   assert.match(css, /\.fourth-down-loader\s*\{[^}]*position:\s*fixed/s);
-  assert.match(css, /\.fourth-down-loader\s*\{[^}]*overflow:\s*hidden/s);
-  assert.match(css, /width:\s*min\(100%,\s*430px\)/);
-  assert.match(css, /@media \(max-width:\s*600px\)[\s\S]*?max-height:\s*min\(64svh,\s*540px\)/);
+  assert.match(css, /\.fourth-down-loader-animation\s*\{[^}]*width:\s*clamp\(160px,\s*20vw,\s*250px\)/s);
+  assert.match(css, /\.fourth-down-loader-animation\s*\{[^}]*max-height:\s*min\(38svh,\s*300px\)/s);
+  assert.match(css, /object-fit:\s*contain/);
   assert.match(css, /@media \(prefers-reduced-motion:\s*reduce\)/);
 });
