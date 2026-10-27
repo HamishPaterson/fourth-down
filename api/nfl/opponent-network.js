@@ -1,5 +1,6 @@
 import process from "node:process";
 import { fetchSchedule } from "../../scripts/balldontlie-schedule.mjs";
+import teamArtifact from "./nflverse-team-metrics.js";
 
 const TEAM_ALIASES = {
   WAS: "WSH",
@@ -79,7 +80,7 @@ export default async function handler(req, res, { loadNetwork = loadWeeklyOppone
   }
 
   try {
-    const { games, ratings } = await loadNetwork(season, week);
+    const { games, ratings, provenance } = await loadNetwork(season, week);
 
     if (!games.length) {
       return sendNeutral(
@@ -205,7 +206,8 @@ export default async function handler(req, res, { loadNetwork = loadWeeklyOppone
       home,
 
       source:
-        "BALLDONTLIE completed games",
+        provenance?.source || "BALLDONTLIE completed games",
+      ...(provenance ? { provenance } : {}),
 
       methodology:
         "Iterative opponent-adjusted scoring network",
@@ -267,6 +269,10 @@ export default async function handler(req, res, { loadNetwork = loadWeeklyOppone
 }
 
 export async function loadWeeklyOpponentNetwork(season, week, { sourceGames, cutoff, now = new Date(), ...fetchOptions } = {}) {
+  const stored = teamArtifact.season === season && teamArtifact.opponentNetworkByWeek?.[week];
+  if (!sourceGames && stored && (!cutoff || stored.provenance?.cutoff === cutoff)) {
+    return validateWeeklyOpponentNetwork(stored, season, week);
+  }
   const source = sourceGames || await fetchSchedule(season, { deadline: Date.now() + 55000, ...fetchOptions });
   const limit = cutoff ? Date.parse(cutoff) : null;
   const eligible = limit === null ? source : source.filter((game) => {

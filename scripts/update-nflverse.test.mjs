@@ -234,3 +234,41 @@ test("context-only API handoff preserves lineup and kicker identity without supp
   assert.equal(response.kickerFallback.ARI.extraPointMakeRate, .945);
   assert.equal(response.modelLayers.playByPlayEfficiency.available, false);
 });
+
+test("Week 8 excludes future/non-final games and post-observation personnel without copying Week 7 context", () => {
+  const final = { ...games[0], week: 7, date: "2026-10-23T00:15:00Z",
+    completed_at: "2026-10-23T04:00:00Z" };
+  const future = { ...final, id: 8, week: 8, date: "2026-10-30T00:15:00Z",
+    completed_at: "2026-10-30T04:00:00Z" };
+  const nonFinal = { ...games[5], status: "In Progress" };
+  const late = { ...games[4], completed_at: "2026-10-30T04:00:00Z" };
+  const ctx = { season: 2026, predictionWeek: 8, cutoff: future.date,
+    sourceAsOf: "2026-10-27T06:00:00Z", generatedAt: "2026-10-27T06:00:00Z" };
+  const currentDepth = ["ARI", "LAC"].map((team) => ({
+    dt: "2026-10-27T05:00:00Z", team, espn_id: `${team}-current-qb`,
+    pos_grp: "3WR 1TE", pos_abb: "QB", pos_slot: "1", pos_rank: "1",
+  }));
+  const baseline = buildPredictionWeek(rowsFor(final), [final], [], currentDepth, ctx);
+  const contaminated = buildPredictionWeek([final, future, nonFinal, late].flatMap(rowsFor),
+    [final, future, nonFinal, late], [], [
+      ...depth,
+      ...currentDepth,
+      ...currentDepth.map((row) => ({ ...row, dt: "2026-10-27T07:00:00Z", espn_id: "future-qb" })),
+    ], ctx);
+  assert.deepEqual(contaminated.metrics, baseline.metrics);
+  assert.deepEqual(contaminated.audit, baseline.audit);
+  assert.deepEqual(contaminated.situational.teams, baseline.situational.teams);
+  assert.deepEqual(contaminated.kickers.profilesByTeam, baseline.kickers.profilesByTeam);
+  assert.deepEqual(contaminated.kickers.leaguePriors, baseline.kickers.leaguePriors);
+  assert.equal(contaminated.kickers.eligibleGames, 1);
+  assert.equal(contaminated.kickers.eligiblePlays, baseline.kickers.eligiblePlays);
+  assert.equal(contaminated.kickers.excluded.incompleteOrUnresolvedGame, 4);
+  assert.equal(contaminated.audit.eligibleGames, 1);
+  assert.equal(contaminated.audit.referenceWeek, 7);
+  assert.equal(contaminated.metrics.ARI.expectedLineup.predictionWeek, 8);
+  assert.equal(contaminated.metrics.ARI.expectedLineup.startingQuarterback.playerId, "ARI-current-qb");
+  assert.equal(contaminated.metrics.ARI.expectedLineup.snapshotAt, "2026-10-27T05:00:00.000Z");
+  const missingPbp = buildPredictionWeek([], [final], [], currentDepth, ctx);
+  assert.equal(missingPbp.audit.eligibleGames, 0);
+  assert.equal(missingPbp.metrics.ARI.epaPerPlay, null);
+});

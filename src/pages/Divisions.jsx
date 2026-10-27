@@ -219,7 +219,7 @@ export default function Divisions({
                 <small>{division.id}</small>
                 <small>{formatRecord(standing)}</small>
                 <small>
-                  OVR {ratings.overall}
+                  ESPN FPI {ratings.overall}
                   {" • "}
                   OFF {ratings.offense}
                   {" • "}

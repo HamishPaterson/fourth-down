@@ -481,6 +481,7 @@ export default function MatchupPrediction({ awayCode, homeCode, kickoff, venue, 
     personnel?.cutoff
   );
   const localPrediction = predictMatchup(awayCode, homeCode, {
+    opponentNetwork,
     season: kickoff ? new Date(kickoff).getUTCFullYear() : 2026,
     teamMetrics: playByPlayData,
     kickoff,

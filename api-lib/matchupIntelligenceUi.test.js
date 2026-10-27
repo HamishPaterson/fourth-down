@@ -131,7 +131,9 @@ test("Seattle-Denver uses football language without altering predictions or diag
   assert.match(markup, /Seattle Seahawks/);
   assert.match(markup, /Denver Broncos/);
   assert.match(markup, /pass protection|pressure/);
-  assert.match(markup, /THIRD-DOWN ADVANTAGE/);
+  const thirdDown = input.matchupIntelligence.signals.find((signal) => signal.layer === "thirdDownMatchup");
+  assert.equal(thirdDown.explanationSafe, false);
+  assert.doesNotMatch(markup, /THIRD-DOWN ADVANTAGE/);
   assert.match(markup, /RED-ZONE ADVANTAGE/);
   assert.doesNotMatch(markup, /EPA|proxy|ablation|layer|metric-specific|%|\d+\.\d+|the opponent|the opposing team|the opposing defense|the offense|the defense|the quarterback|blitz|play-action|screen|route-depth|special-teams/i);
   assert.ok(input.matchupIntelligence.signals.some((signal) => signal.explanation?.includes("Removing only")));

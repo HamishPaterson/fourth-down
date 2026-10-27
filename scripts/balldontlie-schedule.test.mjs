@@ -86,6 +86,14 @@ test("retry exhaustion fails explicitly after initial attempt plus three retries
   assert.doesNotMatch(h.diagnostics.join("\n"), /test-secret-not-for-output|authorization|BALLDONTLIE_API_KEY/i);
 });
 
+test("strict single-run regeneration can stop on the first 429 without retrying", async (t) => {
+  const h = harness(t, [limited("60")]);
+  await assert.rejects(h.run({ maxRetries: 0 }), /failed \(429\): exhausted 0 retries/);
+  assert.equal(h.calls.length, 1);
+  assert.deepEqual(h.waits, []);
+  assert.deepEqual(h.diagnostics, []);
+});
+
 for (const cursors of [[100, 100], [100, 200, 100]]) {
   test(`repeated/cyclic cursor ${cursors.join(",")} fails before requesting it again`, async (t) => {
     const h = harness(t, cursors.map((cursor) => ok([], cursor)));

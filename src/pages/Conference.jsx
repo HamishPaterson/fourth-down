@@ -239,7 +239,7 @@ export default function Conference({ onSelectTeam }) {
                     <small>{division}</small>
                     <small>{formatRecord(standing)}</small>
                     <small>
-                      OVR {ratings.overall}
+                      ESPN FPI {ratings.overall}
                       {" • "}
                       OFF {ratings.offense}
                       {" • "}

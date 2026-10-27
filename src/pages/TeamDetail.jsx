@@ -275,14 +275,14 @@ const offense = deduplicatePlayers([
       <div className="card ratings-card">
         <div className="ratings-heading">
           <div>
-            <span className="eyebrow">TEAM RATINGS</span>
-            <h2>Performance ratings</h2>
+            <span className="eyebrow">ESPN FPI</span>
+            <h2>ESPN team components</h2>
           </div>
-          <span className="ratings-note">Waiting for season statistics</span>
+          <span className="ratings-note">{ratings.source}</span>
         </div>
 
         <div className="ratings-grid">
-          <Rating label="OVR" value={ratings.overall} />
+          <Rating label="FPI" value={ratings.overall} />
 <Rating label="OFF" value={ratings.offense} />
 <Rating label="DEF" value={ratings.defense} />
 

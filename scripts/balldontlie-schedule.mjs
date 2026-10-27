@@ -11,7 +11,11 @@ export async function fetchSchedule(season, {
   random = Math.random,
   warn = console.warn,
   deadline = Infinity,
+  maxRetries = MAX_RETRIES,
 } = {}) {
+  if (!Number.isInteger(maxRetries) || maxRetries < 0 || maxRetries > MAX_RETRIES) {
+    throw new Error("Invalid BALLDONTLIE schedule retry cap");
+  }
   const key = process.env.BALLDONTLIE_API_KEY;
   if (!key) throw new Error("BALLDONTLIE_API_KEY required for schedule provenance");
   const games = [];
@@ -39,8 +43,8 @@ export async function fetchSchedule(season, {
         throw new Error(`BALLDONTLIE schedule page ${page} transport failed`);
       }
       if (response.status !== 429) break;
-      if (retry >= MAX_RETRIES) {
-        throw new Error(`BALLDONTLIE schedule page ${page} failed (429): exhausted ${MAX_RETRIES} retries`);
+      if (retry >= maxRetries) {
+        throw new Error(`BALLDONTLIE schedule page ${page} failed (429): exhausted ${maxRetries} retries`);
       }
       const header = response.headers.get("Retry-After");
       const seconds = header?.trim() && /^\d+(?:\.\d+)?$/.test(header.trim())
@@ -51,7 +55,7 @@ export async function fetchSchedule(season, {
         : Number.isFinite(date) ? Math.max(0, date - now()) : NaN;
       const wait = Number.isFinite(retryAfter) ? retryAfter
         : Math.min(8_000, 1000 * 2 ** retry + Math.floor(random() * 250));
-      warn(`BALLDONTLIE schedule page ${page}: HTTP 429, retry ${retry + 1}/${MAX_RETRIES}, wait ${wait}ms`);
+      warn(`BALLDONTLIE schedule page ${page}: HTTP 429, retry ${retry + 1}/${maxRetries}, wait ${wait}ms`);
       await response.body?.cancel();
       await waitWithinBudget(wait);
     }

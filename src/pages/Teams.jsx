@@ -136,7 +136,7 @@ export default function Teams({ onOpenTeam, onOpenConference }) {
                 <strong>{team.full_name}</strong>
                 <small>{team.conference} {team.division}</small>
                 <small>
-                  OVR {ratings.overall} {" • "}
+                  ESPN FPI {ratings.overall} {" • "}
                   OFF {ratings.offense} {" • "}
                   DEF {ratings.defense}
                 </small>

@@ -1,6 +1,6 @@
 // services/predictionEngine.js
 // Deterministic matchup projection with component-level weather effects.
-import { getTeamRatings } from "./teamRatings.js";
+import { getTeamRatings, getTeamRatingsHealth } from "./teamRatings.js";
 import { getHomeFieldAdvantage } from "./homeFieldAdvantage.js";
 import { buildExpectedPlayMix, buildMatchupIntelligence, pressureSignal, explainMatchupSignal } from "./matchupIntelligence.js";
 import { buildSituationalMatchups, explainSituationalSignal } from "./situationalMatchups.js";
@@ -12,6 +12,8 @@ import {
 } from "./specialTeams.js";
 
 const RATING_BASELINE = 75;
+// Existing ingestion scale, now applied only inside the model, never stored as ESPN data.
+const FPI_MODEL_SCALE = 3;
 const BASE_PASS_RATIO = 0.6;
 const CORRELATED_MATCHUP_LAYERS = ["rushMatchup", "passMatchup", "successMatchup", "explosiveMatchup"];
 const SITUATIONAL_MATCHUP_LAYERS = ["thirdDownMatchup", "redZoneMatchup"];
@@ -41,7 +43,8 @@ const DIVISIONAL_MARGIN_COMPRESSION_POINTS = 1.2;
 export function predictMatchup(awayCode, homeCode, options = {}) {
   const away = normalizeTeamCode(awayCode), home = normalizeTeamCode(homeCode);
   const specialTeams = options.specialTeams || createDefaultSpecialTeamsModel(away, home);
-  const predictionOptions = { ...options, specialTeams };
+  const predictionOptions = { ...options, specialTeams,
+    inputEvidence: buildModelInputEvidence(away, home, options) };
   const baseline = predictCore(awayCode, homeCode, predictionOptions);
   const data = options.teamMetrics;
   if (!data || data.season !== options.season || data.week !== Number(options.week) ||
@@ -136,6 +139,33 @@ export function predictMatchup(awayCode, homeCode, options = {}) {
   };
 }
 
+export function buildModelInputEvidence(away, home, options = {}) {
+  const espn = { provenance: getTeamRatingsHealth({ snapshot: options.espnSnapshot }),
+    ...Object.fromEntries([["away", away], ["home", home]].map(([side, code]) => {
+    const ratings = getTeamRatings(code, { snapshot: options.espnSnapshot });
+    return [side, { team: code, source: ratings.source, available: ratings.available,
+      fpi: ratings.espnFpi, efficiencies: ratings.efficiencies, record: ratings.record ?? null }];
+  })) };
+  return structuredClone({
+    espn,
+    nflverse: options.teamMetrics ? {
+      source: options.teamMetrics.source,
+      season: options.teamMetrics.season, week: options.teamMetrics.week,
+      away: options.teamMetrics.away, home: options.teamMetrics.home,
+      kickerProfiles: options.teamMetrics.kickerProfiles,
+    } : null,
+    opponentNetwork: options.opponentNetwork ?? null,
+    personnel: options.personnelViews ?? null,
+    context: { kickoff: options.kickoff ?? null, weather: options.weather ?? null,
+      schedule: options.scheduleContext ?? null },
+    diagnosticOnlyEspnFields: [
+      "FPI rank", "trend", "FPI special teams", "efficiencies and efficiency ranks",
+      "SOS", "remaining SOS", "AVGWP", "record",
+    ],
+    espnModelMapping: "Existing 75 + FPI component * 3 rating scale, bounded 50-100; no efficiency pre-blend",
+  });
+}
+
 function buildSpecialTeamsDiagnostics(actual, leagueOnly, model) {
   const awayDelta = round3(actual.away.expectedPoints - leagueOnly.away.expectedPoints);
   const homeDelta = round3(actual.home.expectedPoints - leagueOnly.home.expectedPoints);
@@ -214,8 +244,8 @@ function predictCore(awayCode, homeCode, options = {}) {
   const modelLayers = createModelLayers(options.modelLayers);
   const market = computeMarketProjection(options.market, options.week);
   const ratingAdjustments = {
-    away: getRatingAdjustment(awayTeam, homeTeam, 0),
-    home: getRatingAdjustment(homeTeam, awayTeam, hfa.total),
+    away: getRatingAdjustment(awayTeam, homeTeam, 0, options.espnSnapshot),
+    home: getRatingAdjustment(homeTeam, awayTeam, hfa.total, options.espnSnapshot),
   };
   const formBlend = buildTeamSpecificProjection(
     ratingAdjustments,
@@ -223,7 +253,8 @@ function predictCore(awayCode, homeCode, options = {}) {
     market,
     options.week,
     awayTeam,
-    homeTeam
+    homeTeam,
+    options.espnSnapshot
   );
   const fourthDownAway = formBlend.away
     + schedule.awayPoints
@@ -248,7 +279,7 @@ function predictCore(awayCode, homeCode, options = {}) {
     fieldGoalOpportunityMultiplier: playerLayer.awayFieldGoalOpportunityMultiplier,
     seed: `${awayTeam}-${homeTeam}-${options.week || 1}-away`,
     kicker: specialTeams.away,
-  });
+  }, options.espnSnapshot);
   const home = projectTeam(homeTeam, awayTeam, adjustedExpected.home, weatherImpact, {
     expectedPossessions,
     passingMultiplier: playerLayer.homePassingMultiplier,
@@ -256,7 +287,7 @@ function predictCore(awayCode, homeCode, options = {}) {
     fieldGoalOpportunityMultiplier: playerLayer.homeFieldGoalOpportunityMultiplier,
     seed: `${awayTeam}-${homeTeam}-${options.week || 1}-home`,
     kicker: specialTeams.home,
-  });
+  }, options.espnSnapshot);
   const projectedMargin = home.score - away.score;
   const continuousMargin = Number(home.expectedPoints) - Number(away.expectedPoints);
   const probability = calculateWinProbability(continuousMargin, modelLayers, market);
@@ -267,6 +298,7 @@ function predictCore(awayCode, homeCode, options = {}) {
   else if (probability.away > probability.home) winner = awayTeam;
 
   return {
+    inputEvidence: options.inputEvidence,
     away: { code: awayTeam, ...away },
     home: { code: homeTeam, ...home },
     winner,
@@ -364,7 +396,8 @@ function buildTeamSpecificProjection(
   market,
   week,
   awayCode,
-  homeCode
+  homeCode,
+  espnSnapshot
 ) {
   const awayExpected = nullableNum(scoringBaseline?.awayExpected);
   const homeExpected = nullableNum(scoringBaseline?.homeExpected);
@@ -409,11 +442,11 @@ function buildTeamSpecificProjection(
   if (hasTeamProjection) {
     const awayFallback = market?.active
       ? market.awayExpected
-      : getRatingOnlyScoringLevel(awayCode, homeCode);
+      : getRatingOnlyScoringLevel(awayCode, homeCode, espnSnapshot);
 
     const homeFallback = market?.active
       ? market.homeExpected
-      : getRatingOnlyScoringLevel(homeCode, awayCode);
+      : getRatingOnlyScoringLevel(homeCode, awayCode, espnSnapshot);
 
     const awayTeamLevel =
       awayExpected * sampleReliability +
@@ -439,8 +472,8 @@ function buildTeamSpecificProjection(
     homeBase = market.homeExpected;
     source = "market-implied team totals";
   } else {
-    awayBase = getRatingOnlyScoringLevel(awayCode, homeCode);
-    homeBase = getRatingOnlyScoringLevel(homeCode, awayCode);
+    awayBase = getRatingOnlyScoringLevel(awayCode, homeCode, espnSnapshot);
+    homeBase = getRatingOnlyScoringLevel(homeCode, awayCode, espnSnapshot);
     source = "team-rating scoring fallback";
   }
 
@@ -875,13 +908,18 @@ export function computeWeatherImpact(weather) {
   };
 }
 
-function getRatingAdjustment(code, oppCode, homeEdge) {
-  const ratings = getTeamRatings(code);
-  const opponent = getTeamRatings(oppCode);
-  const offense = num(ratings.offense, RATING_BASELINE);
-  const defense = num(opponent.defense, RATING_BASELINE);
-  const overall = num(ratings.overall, RATING_BASELINE);
-  const opponentOverall = num(opponent.overall, RATING_BASELINE);
+function modelRating(rawFpi) {
+  return rawFpi == null ? RATING_BASELINE
+    : Math.round(clamp(RATING_BASELINE + rawFpi * FPI_MODEL_SCALE, 50, 100));
+}
+
+function getRatingAdjustment(code, oppCode, homeEdge, snapshot) {
+  const ratings = getTeamRatings(code, { snapshot });
+  const opponent = getTeamRatings(oppCode, { snapshot });
+  const offense = modelRating(ratings.espnFpi?.offense);
+  const defense = modelRating(opponent.espnFpi?.defense);
+  const overall = modelRating(ratings.espnFpi?.overall);
+  const opponentOverall = modelRating(opponent.espnFpi?.overall);
 
   return clamp(
     (offense - defense) * 0.1 +
@@ -892,11 +930,11 @@ function getRatingAdjustment(code, oppCode, homeEdge) {
   );
 }
 
-function getRatingOnlyScoringLevel(code, oppCode) {
-  const ratings = getTeamRatings(code);
-  const opponent = getTeamRatings(oppCode);
-  const offense = num(ratings.offense, RATING_BASELINE);
-  const defense = num(opponent.defense, RATING_BASELINE);
+function getRatingOnlyScoringLevel(code, oppCode, snapshot) {
+  const ratings = getTeamRatings(code, { snapshot });
+  const opponent = getTeamRatings(oppCode, { snapshot });
+  const offense = modelRating(ratings.espnFpi?.offense);
+  const defense = modelRating(opponent.espnFpi?.defense);
 
   return clamp(
     8 + offense * 0.22 - (defense - RATING_BASELINE) * 0.1,
@@ -909,9 +947,9 @@ function possessionsFromPaceLayer(layer) {
   const totalShift = num(layer?.awayPoints, 0) + num(layer?.homePoints, 0);
   return clamp(10.7 + totalShift * 0.75, 9.2, 12.8);
 }
-function projectTeam(code, oppCode, calibratedPoints, weatherImpact, playerImpact = {}) {
-  const ratings = getTeamRatings(code);
-  const opponent = getTeamRatings(oppCode);
+function projectTeam(code, oppCode, calibratedPoints, weatherImpact, playerImpact = {}, snapshot) {
+  const ratings = getTeamRatings(code, { snapshot });
+  const opponent = getTeamRatings(oppCode, { snapshot });
   const passRatio = clamp(BASE_PASS_RATIO - weatherImpact.passRatioShift, 0.45, 0.6);
 
   return buildScoringEvents(
@@ -932,10 +970,10 @@ function buildScoringEvents(
   weather,
   playerImpact
 ) {
-  const offenseRating = num(ratings.offense, RATING_BASELINE);
-  const opponentDefense = num(opponent.defense, RATING_BASELINE);
-  const ownDefense = num(ratings.defense, RATING_BASELINE);
-  const opponentOffense = num(opponent.offense, RATING_BASELINE);
+  const offenseRating = modelRating(ratings.espnFpi?.offense);
+  const opponentDefense = modelRating(opponent.espnFpi?.defense);
+  const ownDefense = modelRating(ratings.espnFpi?.defense);
+  const opponentOffense = modelRating(opponent.espnFpi?.offense);
   const matchupEdge = offenseRating - opponentDefense;
   const defensiveEdge = ownDefense - opponentOffense;
 
