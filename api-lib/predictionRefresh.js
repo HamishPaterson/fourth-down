@@ -20,7 +20,7 @@ const identity = (game) => `${game.away}:${game.home}`;
 export function predictionRefreshContext(sourceGames, now) {
   const season = dataset.season;
   const { week } = getCurrentWeekWindow(now.getTime());
-  const selected = new Map(), teams = new Set();
+  const selected = new Map(), teams = new Set(), scheduleIds = new Map();
   for (const game of sourceGames) {
     const type = String(game.season_type || game.game_type || "").toUpperCase();
     if (Number(game.season) !== season || Number(game.week) !== week ||
@@ -30,11 +30,26 @@ export function predictionRefreshContext(sourceGames, now) {
     if (!NFL_TEAMS.includes(away) || !NFL_TEAMS.includes(home) || away === home || !Number.isFinite(Date.parse(game.date))) {
       throw new Error("Invalid prediction refresh schedule game");
     }
-    const entry = { season, week, away, home, sourceDate: game.date,
+    const id = String(game.id ?? "");
+    if (!/^[1-9]\d*$/.test(id) || !Number.isSafeInteger(Number(id))) {
+      throw new Error("Missing or malformed canonical schedule ID");
+    }
+    const entry = { id, season, week, away, home, sourceDate: game.date,
       venue: game.venue, scheduleContext: game.scheduleContext };
+    const sameId = sourceGames.filter((source) => String(source.id) === id);
+    if (sameId.some((source) => Number(source.season) !== season || Number(source.week) !== week ||
+        playerTeam(source.visitor_team?.abbreviation) !== away ||
+        playerTeam(source.home_team?.abbreviation) !== home ||
+        Date.parse(source.date) !== Date.parse(entry.sourceDate))) {
+      throw new Error("Conflicting canonical schedule ID provenance");
+    }
+    if (scheduleIds.has(id) && scheduleIds.get(id) !== identity(entry)) {
+      throw new Error("Canonical schedule ID assigned to multiple matchups");
+    }
+    scheduleIds.set(id, identity(entry));
     const key = identity(entry), existing = selected.get(key);
     if (existing) {
-      if (Date.parse(existing.sourceDate) !== Date.parse(entry.sourceDate)) throw new Error("Conflicting prediction schedule duplicate");
+      if (existing.id !== id || Date.parse(existing.sourceDate) !== Date.parse(entry.sourceDate)) throw new Error("Conflicting prediction schedule duplicate");
       continue;
     }
     if (teams.has(away) || teams.has(home)) throw new Error("Team scheduled more than once in prediction week");

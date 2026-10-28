@@ -11,6 +11,8 @@ import { FULL_MODEL_VERSION, FULL_MODEL_KEY } from "../src/services/gamePredicti
 import { BEST_BETS_CANDIDATE_VERSION } from "../src/services/bestBetsService.js";
 import { createServerPredictionInputLoader, refreshSavedBestBets } from "./serverPredictions.js";
 import { PERSONNEL_VIEW_VERSION } from "./personnelView.js";
+import { findOddsForGame, resolveOddsForGame } from "../src/services/oddsApi.js";
+import { buildPredictionSnapshot } from "../src/services/predictionSnapshot.js";
 
 const NOW = new Date("2026-10-15T05:00:00Z"), KICKOFF = "2026-10-18T17:00:00Z";
 const games = Array.from({ length: 14 }, (_, i) => ({
@@ -323,11 +325,96 @@ test("weekly loader excludes future completions and computes matchups from the s
   assert.equal(res.body.modelLayer.awayPoints, -res.body.modelLayer.homePoints);
 });
 test("schedule validation refuses conflicting duplicate identities, repeated teams and post-kickoff writes", () => {
-  const raw = games.map((g) => ({ season: 2026, week: 6, date: g.sourceDate,
+  const raw = games.map((g, index) => ({ id: index + 1, season: 2026, week: 6, date: g.sourceDate,
     visitor_team: { abbreviation: g.away }, home_team: { abbreviation: g.home } }));
   assert.throws(() => predictionRefreshContext([...raw, { ...raw[0], date: "2026-10-19T00:00Z" }], NOW), /Conflicting/);
-  assert.throws(() => predictionRefreshContext([...raw, { ...raw[0], home_team: { abbreviation: "TB" } }], NOW), /more than once/);
+  assert.throws(() => predictionRefreshContext([...raw, { ...raw[0], id: 100, home_team: { abbreviation: "TB" } }], NOW), /more than once/);
   assert.throws(() => predictionRefreshContext(raw, new Date("2026-10-18T18:00Z")), /after the weekly first kickoff/);
+});
+
+test("refresh preserves canonical schedule IDs through normalization, cloning, snapshot and database serialization", () => {
+  const source = [{ id: 1392336, season: 2026, week: 8, date: "2026-11-03T01:15:00.000Z",
+    visitor_team: { abbreviation: "CHI" }, home_team: { abbreviation: "SEA" }, venue: "Lumen Field" },
+  { id: 1392323, season: 2026, week: 8, date: "2026-10-30T00:15:00.000Z",
+    visitor_team: { abbreviation: "CAR" }, home_team: { abbreviation: "GB" } }];
+  const refreshed = predictionRefreshContext(source, new Date("2026-10-28T00:00:00Z"));
+  const game = JSON.parse(JSON.stringify(refreshed.games.find((g) => g.away === "CHI")));
+  assert.equal(game.id, "1392336");
+  assert.equal(refreshed.games[0].id, "1392323");
+  const event = { id: "nfl_bears_seahawks_2026-11-02_b3", away_team: "CHI", home_team: "SEA",
+    commence_time: "2026-11-03T01:16:00.000Z", bookmakers: [{ key: "fanduel", markets: [{
+      key: "h2h", outcomes: [{ name: "SEA", price: -176, quoteSource: { provider: "SharpAPI",
+        eventId: "nfl_bears_seahawks_2026-11-02_b3", snapshotId: "nfl:2026:8:moneyline:2026-10-27T12:34:16Z" } }],
+    }] }] };
+  const before = structuredClone(event);
+  assert.equal(findOddsForGame([event], { ...game, id: undefined }), null);
+  for (const minutes of [1, 5]) {
+    const shifted = { ...event, commence_time: new Date(Date.parse(game.sourceDate) + minutes * 60000).toISOString() };
+    const mapped = findOddsForGame([shifted], game);
+    assert.equal(mapped.id, event.id);
+    assert.equal(mapped.scheduleMapping.scheduleGameId, game.id);
+  }
+  assert.equal(findOddsForGame([{ ...event, commence_time: "2026-11-03T01:21:00Z" }], game), null);
+  for (const change of [{ id: "1" }, { season: 2025 }, { week: 7 }, { away: "SEA", home: "CHI" }]) {
+    assert.equal(findOddsForGame([event], { ...game, ...change }), null);
+  }
+  assert.equal(resolveOddsForGame([event, { ...event, id: "second" }], game).status, "AMBIGUOUS");
+  const snap = fixture(game, new Date("2026-10-28T00:00:00Z"));
+  const built = buildPredictionSnapshot(game, { prediction: snap.predictionPayload,
+    playerProjections: snap.playerProjections, bestBets: snap.bestBets, dataQuality: snap.dataQuality,
+    generatedAt: snap.generatedAt }, findOddsForGame([event], game));
+  const saved = databaseToSnapshot(snapshotToDatabase(built));
+  assert.equal(saved.game.id, game.id);
+  assert.equal(saved.game.oddsEvent.id, event.id);
+  assert.equal(saved.game.oddsEvent.scheduleMapping.scheduleGameId, game.id);
+  assert.deepEqual(event, before);
+});
+
+test("refresh fails closed for missing/malformed IDs and conflicting ID provenance", () => {
+  const source = { id: 1, season: 2026, week: 8, date: "2026-10-30T00:15:00Z",
+    visitor_team: { abbreviation: "CAR" }, home_team: { abbreviation: "GB" } };
+  const now = new Date("2026-10-28T00:00:00Z");
+  for (const id of [undefined, null, "", "0", "-1", "1.5", "event-1", "9007199254740992"]) {
+    assert.throws(() => predictionRefreshContext([{ ...source, id }], now), /schedule ID/);
+  }
+  for (const change of [{ season: 2025 }, { week: 7 }, { date: "2026-10-31T00:15:00Z" },
+    { visitor_team: { abbreviation: "GB" }, home_team: { abbreviation: "CAR" } }]) {
+    assert.throws(() => predictionRefreshContext([source, { ...source, ...change }], now), /schedule ID provenance/);
+  }
+  assert.throws(() => predictionRefreshContext([source, { ...source, id: 2 }], now), /Conflicting prediction schedule duplicate/);
+});
+
+test("all 14 normalized refresh games pass canonical identity to server generation and stored-event matching", async () => {
+  const pairs = ["CAR-GB", "BAL-BUF", "TEN-CIN", "ARI-DAL", "MIN-DET", "LV-NYJ", "CLE-PIT",
+    "ATL-TB", "IND-JAX", "LAC-LAR", "KC-DEN", "NE-MIA", "PHI-WSH", "CHI-SEA"];
+  const source = pairs.map((pair, index) => {
+    const [away, home] = pair.split("-");
+    return { id: index === 13 ? 1392336 : 1392323 + index, season: 2026, week: 8,
+      date: index === 13 ? "2026-11-03T01:15:00Z" : "2026-10-30T00:15:00Z",
+      visitor_team: { abbreviation: away }, home_team: { abbreviation: home } };
+  });
+  const now = new Date("2026-10-28T00:00:00Z");
+  const expected = predictionRefreshContext(source, now);
+  const events = expected.games.map((game) => ({ id: `provider-${game.id}`,
+    away_team: game.away, home_team: game.home, commence_time: game.sourceDate }));
+  const before = structuredClone(events);
+  let received = 0;
+  const result = await run({
+    getNow: () => now, readSchedule: async () => source,
+    resolveContext: predictionRefreshContext,
+    loadNetwork: async () => ({ ...network, week: 8 }),
+    readOdds: async () => ({ events }),
+    createGenerator: () => async (game, odds) => {
+      assert.equal(game.id, String(source.find((s) => s.visitor_team.abbreviation === game.away).id));
+      assert.equal(findOddsForGame(odds.events, game).id, `provider-${game.id}`);
+      received++;
+      return fixture(game, now);
+    },
+  });
+  assert.equal(result.res.statusCode, 200, result.res.body.reason);
+  assert.equal(received, 14);
+  assert.deepEqual(events, before);
+  assert.deepEqual(result.db.writes, []);
 });
 
 test("actual server input loader reuses weekly network, season schedule and personnel cutoff across all 14 games", async () => {
