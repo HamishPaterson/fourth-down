@@ -18,11 +18,6 @@ import {
 } from "../api-lib/playerMetrics.js";
 import { fetchSchedule as fetchPlayerSchedule } from "./balldontlie-schedule.mjs";
 
-const season = Number(
-  process.argv[2] ||
-    new Date().getUTCFullYear()
-);
-
 const outputPath = path.resolve(
   "data/nflverse-player-metrics.js"
 );
@@ -31,6 +26,23 @@ const teamArtifactPath = path.resolve(
 );
 const artifactPrefix = "const NFLVERSE_PLAYER_METRICS = ";
 const artifactSuffix = ";\n\nexport default NFLVERSE_PLAYER_METRICS;\n";
+const teamArtifactPrefix = "const NFLVERSE_TEAM_METRICS = ";
+const teamArtifactSuffix = ";\n\nexport default NFLVERSE_TEAM_METRICS;\n";
+export const PLAYER_SOURCE_REQUIRED_FIELDS = [
+  "season", "season_type", "week", "game_id", "play_id", "posteam", "defteam",
+  "play_type", "wp", "sack", "pass_attempt", "qb_scramble", "rush_attempt",
+  "rush", "complete_pass", "interception", "receiver_player_name", "receiver",
+  "yardline_100", "air_yards", "passer_player_id", "passer_player_name", "passer",
+  "rusher_player_id", "rusher_player_name", "rusher", "receiver_player_id",
+  "pass_touchdown", "rush_touchdown", "fumble", "fumble_lost", "passing_yards",
+  "rushing_yards", "receiving_yards", "yards_after_catch", "pass", "two_point_attempt",
+];
+const sourceNumericFields = [
+  "season", "week", "play_id", "wp", "sack", "pass_attempt", "pass", "qb_scramble",
+  "rush_attempt", "rush", "complete_pass", "interception", "yardline_100", "air_yards",
+  "pass_touchdown", "rush_touchdown", "fumble", "fumble_lost", "passing_yards",
+  "rushing_yards", "receiving_yards", "yards_after_catch", "two_point_attempt",
+];
 const canonicalTeams = [
   "ARI", "ATL", "BAL", "BUF", "CAR", "CHI", "CIN", "CLE",
   "DAL", "DEN", "DET", "GB", "HOU", "IND", "JAX", "KC",
@@ -47,12 +59,21 @@ const aliases = {
   STL: "LAR",
 };
 
-export async function main() {
+export async function main(args = process.argv.slice(2)) {
+  const [seasonText, weekText, ...extra] = args;
+  if (!/^\d{4}$/.test(seasonText || "") || !/^\d{1,2}$/.test(weekText || "") || extra.length) {
+    throw new Error("Usage: node scripts/update-nflverse-players.mjs <season> <prediction-week>");
+  }
+  const season = Number(seasonText);
+  const predictionWeek = Number(weekText);
+  if (!Number.isInteger(predictionWeek) || predictionWeek < 2 || predictionWeek > 18) {
+    throw new Error("Prediction week must be an integer from 2 through 18");
+  }
   if (!process.env.BALLDONTLIE_API_KEY) {
     throw new Error("BALLDONTLIE_API_KEY required for player game completion/cutoff provenance");
   }
   console.log(`Downloading nflverse ${season} play-by-play for player metrics...`);
-  const result = await regeneratePlayerMetrics({ season, outputPath });
+  const result = await regeneratePlayerMetrics({ season, predictionWeek, outputPath });
   console.log(`Wrote ${outputPath}`);
   console.log(`Eligible plays: ${result.eligiblePlayCount} | latest player profiles: ${result.playerCount}`);
 }
@@ -61,18 +82,32 @@ if (process.argv[1] && import.meta.url === pathToFileURL(path.resolve(process.ar
 
 export async function regeneratePlayerMetrics({
   season,
+  predictionWeek,
   outputPath: destination = outputPath,
   fetchImpl = globalThis.fetch,
   scheduleFetcher = fetchPlayerSchedule,
   now = () => new Date(),
   io = { readFile, writeFile, rename, unlink },
   generateWeek = buildWeeklyPlayerMetrics,
+  teamArtifact,
+  teamArtifactPath: localTeamPath = teamArtifactPath,
 }) {
+  if (!Number.isInteger(season) || season < 2000 || season > 9999) {
+    throw new Error("Season must be provided as a four-digit integer");
+  }
+  if (!Number.isInteger(predictionWeek) || predictionWeek < 2 || predictionWeek > 18) {
+    throw new Error("Prediction week must be explicitly provided as an integer from 2 through 18");
+  }
   const resolvedOutput = path.resolve(destination);
   if (resolvedOutput === teamArtifactPath) {
     throw new Error("Player updater cannot write the team artifact");
   }
 
+  const localTeamArtifact = teamArtifact || parseTeamArtifact(await io.readFile(localTeamPath, "utf8"));
+  const targetContext = validateTeamArtifactTarget(localTeamArtifact, { season, predictionWeek });
+  const preflightAsOf = now().toISOString();
+  validateObservationTime(targetContext, preflightAsOf);
+  const identityContext = createPlayerIdentityContext(targetContext.teams);
   const existing = parsePlayerArtifact(await io.readFile(resolvedOutput, "utf8"));
   validatePlayerArtifact(existing, { season });
 
@@ -82,29 +117,53 @@ export async function regeneratePlayerMetrics({
   const compressedBytes = Buffer.from(await response.arrayBuffer());
   const text = gunzipSync(compressedBytes).toString("utf8");
   const rows = parseCsv(text);
-  for (const field of ["season", "game_id", "play_id", "week", "posteam", "defteam", "play_type"]) {
-    if (!rows.length || !(field in rows[0])) throw new Error(`Player source missing ${field}`);
-  }
-
+  validatePlayerSourceRows(rows);
   const plays = rows.map(parsePlay).filter(isEligible);
   const schedule = await scheduleFetcher(season);
   const sourceAsOf = now().toISOString();
+  validateObservationTime(targetContext, sourceAsOf);
+  if (Date.parse(sourceAsOf) < Date.parse(preflightAsOf)) {
+    throw new Error("Player source observation time moved backwards");
+  }
   const scheduleCutoffs = weeklyDepthCutoffs(schedule, season);
-  const latestCompletedWeek = Math.max(0, ...plays.map((play) => play.week));
-  const predictionWeek = latestCompletedWeek + 1;
   const cutoff = scheduleCutoffs[predictionWeek];
-  if (!Number.isInteger(predictionWeek) || predictionWeek < 2 || predictionWeek > 18 || !cutoff) {
-    throw new Error(`Unable to determine a valid target prediction week from nflverse data (${predictionWeek})`);
+  if (!cutoff || instant(cutoff) !== instant(targetContext.cutoff)) {
+    throw new Error(`Schedule cutoff does not match local team artifact for Week ${predictionWeek}`);
   }
 
-  const targetMetrics = generateWeek(plays, schedule, { season, predictionWeek, cutoff });
-  validateTargetWeek(targetMetrics, { season, predictionWeek, cutoff, sourceAsOf });
+  const observedSchedule = schedule.filter((game) =>
+    instant(game.completed_at || game.updated_at) !== null &&
+    Date.parse(game.completed_at || game.updated_at) <= Date.parse(sourceAsOf));
+  const completed = completedPlayerGames(observedSchedule, season, predictionWeek, cutoff);
+  const completedKeys = new Set(completed.map((game) => game.key));
+  const eligiblePlays = plays.filter((play) =>
+    play.season === season && Number.isInteger(play.week) && play.week < predictionWeek &&
+    completedKeys.has(`${season}:${play.week}:${[play.team, play.opponent].sort().join(":")}`));
+  const identifiedPlays = applyCanonicalPlayerIdentity(eligiblePlays, identityContext);
+  const targetMetrics = generateWeek(identifiedPlays, observedSchedule, {
+    season, predictionWeek, cutoff, identityContext,
+  });
+  validateTargetWeek(targetMetrics, {
+    season, predictionWeek, cutoff, sourceAsOf, referenceWeek: targetContext.referenceWeek,
+    sourceColumns: PLAYER_SOURCE_REQUIRED_FIELDS,
+  });
 
   const cutoffs = { ...existing.cutoffs, [predictionWeek]: cutoff };
   const playerMetricsByWeek = Object.fromEntries(
     Object.entries({ ...existing.playerMetricsByWeek, [predictionWeek]: targetMetrics })
       .sort(([first], [second]) => Number(first) - Number(second)),
   );
+  const targetMetadataByWeek = {
+    ...(existing.targetMetadataByWeek || {}),
+    [predictionWeek]: {
+      season,
+      predictionWeek,
+      cutoff,
+      referenceWeek: targetContext.referenceWeek,
+      sourceAsOf,
+      sourceColumns: [...PLAYER_SOURCE_REQUIRED_FIELDS],
+    },
+  };
   const payload = {
     ...existing,
     sourceAsOf,
@@ -114,31 +173,39 @@ export async function regeneratePlayerMetrics({
     source: "nflverse/nflfastR play-by-play",
     sourceUrl: requestedSourceUrl,
     garbageTimeFilter: "Win probability between 5% and 95%",
-    latestCompletedWeek,
-    requiredFields: ["season", "game_id", "play_id", "week", "posteam", "defteam", "play_type"],
+    latestCompletedWeek: targetContext.referenceWeek,
+    requiredFields: PLAYER_SOURCE_REQUIRED_FIELDS,
+    targetMetadataByWeek,
     playerMetricsByWeek,
   };
-  validatePlayerArtifact(payload, { season });
+  validatePlayerArtifact(payload, { season, targetWeek: predictionWeek });
 
   const serialized = serializePlayerArtifact(payload);
   const validatedSerialization = parsePlayerArtifact(serialized);
-  validatePlayerArtifact(validatedSerialization, { season });
-  await writePlayerArtifactAtomically(resolvedOutput, serialized, { season, io, targetWeek: predictionWeek });
+  validatePlayerArtifact(validatedSerialization, { season, targetWeek: predictionWeek });
+  await writePlayerArtifactAtomically(resolvedOutput, serialized, {
+    season, io, targetWeek: predictionWeek, targetMetadata: targetMetadataByWeek[predictionWeek],
+  });
 
   const playerCount = Object.values(targetMetrics).reduce(
     (total, teamEntry) => total + Object.keys(teamEntry.players || {}).length,
     0,
   );
-  return { payload, predictionWeek, cutoff, eligiblePlayCount: plays.length, playerCount };
+  return { payload, predictionWeek, cutoff, eligiblePlayCount: identifiedPlays.length, playerCount };
 }
 
-export async function writePlayerArtifactAtomically(destination, serialized, { season, io, targetWeek }) {
+export async function writePlayerArtifactAtomically(destination, serialized, {
+  season, io, targetWeek, targetMetadata,
+}) {
   const directory = path.dirname(destination);
   const temporaryPath = path.join(directory, `.${path.basename(destination)}.${process.pid}.${randomUUID()}.tmp`);
   try {
     await io.writeFile(temporaryPath, serialized, { flag: "wx" });
     const temporaryArtifact = parsePlayerArtifact(await io.readFile(temporaryPath, "utf8"));
     validatePlayerArtifact(temporaryArtifact, { season, targetWeek });
+    if (JSON.stringify(temporaryArtifact.targetMetadataByWeek?.[targetWeek]) !== JSON.stringify(targetMetadata)) {
+      throw new Error(`Temporary player artifact target metadata changed for Week ${targetWeek}`);
+    }
     await io.rename(temporaryPath, destination);
   } catch (error) {
     try {
@@ -161,6 +228,284 @@ export function parsePlayerArtifact(source) {
 
 export function serializePlayerArtifact(artifact) {
   return `${artifactPrefix}${JSON.stringify(artifact, null, 2)}${artifactSuffix}`;
+}
+
+function parseTeamArtifact(source) {
+  if (!source.startsWith(teamArtifactPrefix) || !source.endsWith(teamArtifactSuffix)) {
+    throw new Error("Local team artifact has an invalid JavaScript wrapper");
+  }
+  return JSON.parse(source.slice(teamArtifactPrefix.length, -teamArtifactSuffix.length));
+}
+
+function validateTeamArtifactTarget(artifact, { season, predictionWeek }) {
+  const audit = artifact?.teamMetricsAuditsByWeek?.[predictionWeek];
+  if (artifact?.season !== season || !audit || audit.available !== true ||
+      audit.season !== season || audit.predictionWeek !== predictionWeek ||
+      audit.referenceWeek !== predictionWeek - 1 || instant(audit.cutoff) === null ||
+      instant(audit.sourceAsOf) === null || Date.parse(audit.sourceAsOf) > Date.parse(audit.cutoff)) {
+    throw new Error(`Local team artifact has no valid Week ${predictionWeek} cutoff/referenceWeek evidence`);
+  }
+  const teams = artifact.metricsByWeek?.[predictionWeek];
+  if (!teams || typeof teams !== "object" || Array.isArray(teams)) {
+    throw new Error(`Local team artifact is missing target Week ${predictionWeek}`);
+  }
+  const actualTeams = Object.keys(teams).sort();
+  const expectedTeams = [...canonicalTeams].sort();
+  if (actualTeams.length !== expectedTeams.length ||
+      actualTeams.some((team, index) => team !== expectedTeams[index])) {
+    throw new Error(`Local team artifact has incomplete target Week ${predictionWeek}`);
+  }
+  for (const code of canonicalTeams) {
+    const teamMetrics = teams[code];
+    const lineup = teamMetrics?.expectedLineup;
+    if (teamMetrics?.team !== code || teamMetrics.predictionWeek !== predictionWeek ||
+        instant(teamMetrics.cutoff) !== instant(audit.cutoff) ||
+        lineup?.available !== true || lineup.schemaVersion !== 2 || lineup.schemaValidated !== true ||
+        lineup.season !== season ||
+        lineup.predictionWeek !== predictionWeek || instant(lineup.cutoff) !== instant(audit.cutoff) ||
+        instant(lineup.snapshotAt) === null || Date.parse(lineup.snapshotAt) > Date.parse(audit.cutoff) ||
+        !Array.isArray(lineup.players) || !Array.isArray(lineup.roster) || !lineup.roster.length) {
+      throw new Error(`Local team artifact has invalid target lineup/cutoff for ${code} Week ${predictionWeek}`);
+    }
+  }
+  return { cutoff: audit.cutoff, referenceWeek: audit.referenceWeek, sourceAsOf: audit.sourceAsOf, teams };
+}
+
+export function validatePlayerSourceRows(rows) {
+  if (!rows.length) throw new Error("Player source contains no data rows");
+  for (const field of PLAYER_SOURCE_REQUIRED_FIELDS) {
+    if (!(field in rows[0])) throw new Error(`Player source missing required column ${field}`);
+  }
+  for (const [index, row] of rows.entries()) {
+    for (const field of PLAYER_SOURCE_REQUIRED_FIELDS) {
+      if (!(field in row)) throw new Error(`Malformed player source row ${index + 2}: missing ${field}`);
+    }
+    for (const field of ["season", "week", "play_id"]) {
+      if (row[field] === "" || number(row[field]) === null) {
+        throw new Error(`Malformed player source row ${index + 2}: invalid ${field}`);
+      }
+    }
+    for (const field of sourceNumericFields) {
+      if (!isMissingNumber(row[field]) && number(row[field]) === null) {
+        throw new Error(`Malformed player source row ${index + 2}: invalid numeric ${field}`);
+      }
+    }
+    const play = parsePlay(row);
+    if (!isEligible(play)) continue;
+    const scramble = number(row.qb_scramble) === 1;
+    const passing = row.play_type === "pass" || number(row.pass) === 1 ||
+      number(row.pass_attempt) === 1 || number(row.sack) === 1 || number(row.complete_pass) === 1;
+    const rushing = row.play_type === "run" || number(row.rush) === 1 ||
+      number(row.rush_attempt) === 1 || scramble;
+    const relevant = [];
+    if (passing && !scramble) relevant.push("sack");
+    if (passing && !play.sack && !scramble) relevant.push("pass_attempt");
+    if (play.passAttempt) relevant.push("complete_pass", "interception", "pass_touchdown");
+    if (rushing) relevant.push("rush_attempt");
+    if (passing || rushing) relevant.push("fumble", "fumble_lost", "qb_scramble");
+    if (play.completePass) relevant.push("passing_yards");
+    if (play.rushAttempt) relevant.push("rushing_yards", "rush_touchdown", "yardline_100");
+    if (play.target) relevant.push("yardline_100", "air_yards", "pass_touchdown");
+    if (play.target && play.completePass) relevant.push("receiving_yards", "yards_after_catch");
+    for (const field of relevant) {
+      if (number(row[field]) === null) {
+        throw new Error(`Malformed player source row ${index + 2}: missing relevant numeric ${field}`);
+      }
+    }
+  }
+}
+
+function validateObservationTime(context, sourceAsOf) {
+  if (instant(sourceAsOf) === null || Date.parse(sourceAsOf) > Date.parse(context.cutoff)) {
+    throw new Error("Player source timestamp is invalid or later than the target cutoff");
+  }
+  if (Date.parse(context.sourceAsOf) > Date.parse(sourceAsOf)) {
+    throw new Error("Local team artifact evidence is later than sourceAsOf");
+  }
+  for (const [team, metrics] of Object.entries(context.teams)) {
+    if (Date.parse(metrics.expectedLineup.snapshotAt) > Date.parse(sourceAsOf)) {
+      throw new Error(`Local team lineup snapshot for ${team} is later than sourceAsOf`);
+    }
+  }
+}
+
+export function createPlayerIdentityContext(teams) {
+  const byTeamId = new Map();
+  const byTeamName = new Map();
+  const idTeams = new Map();
+  const unavailableRosterRecords = [];
+  for (const [teamCode, metrics] of Object.entries(teams)) {
+    const lineup = metrics.expectedLineup;
+    if (!Array.isArray(lineup.roster) || !lineup.roster.length) {
+      throw new Error(`Missing authoritative roster for ${teamCode}`);
+    }
+    const selectedIds = new Set(lineup.players.map((player) => clean(player.gsisId)).filter(Boolean));
+    const rosterIds = new Set();
+    if (selectedIds.size !== lineup.players.filter((player) => clean(player.gsisId)).length) {
+      throw new Error(`Contradictory authoritative duplicate selected GSIS identity for ${teamCode}`);
+    }
+    const candidates = [...lineup.roster];
+    for (const selected of lineup.players) {
+      const id = clean(selected.gsisId);
+      if (!id || lineup.roster.some((player) => clean(player.gsisId) === id)) continue;
+      if (!/^00-\d{7}$/.test(id) || !isCanonicalFullName(selected.name) ||
+          lineup.available !== true || lineup.schemaVersion !== 2 || lineup.schemaValidated !== true ||
+          !Number.isInteger(lineup.season) || !Number.isInteger(lineup.predictionWeek) ||
+          instant(lineup.cutoff) === null || instant(lineup.snapshotAt) === null ||
+          Date.parse(lineup.snapshotAt) > Date.parse(lineup.cutoff) ||
+          (lineup.team && team(lineup.team) !== teamCode) ||
+          lineup.roster.some((player) => canonicalNameKey(player.name) === canonicalNameKey(selected.name))) {
+        throw new Error(`Contradictory authoritative selected-lineup supplement for ${teamCode} ${id}`);
+      }
+      candidates.push(selected);
+    }
+    for (const player of candidates) {
+      const gsisId = clean(player.gsisId);
+      const name = clean(player.name);
+      if (player.team && team(player.team) !== teamCode) {
+        throw new Error(`Contradictory authoritative roster team for ${teamCode} ${gsisId}`);
+      }
+      if (gsisId && /^00-\d{7}$/.test(gsisId)) {
+        if (rosterIds.has(gsisId)) {
+          throw new Error(`Contradictory authoritative duplicate GSIS mapping for ${teamCode} ${gsisId}`);
+        }
+        rosterIds.add(gsisId);
+        if (idTeams.has(gsisId) && !idTeams.get(gsisId).has(teamCode)) {
+          throw new Error(`Contradictory authoritative cross-team GSIS mapping for ${gsisId}`);
+        }
+        idTeams.set(gsisId, new Set([teamCode]));
+      }
+      if (!gsisId || !/^00-\d{7}$/.test(gsisId) || !isCanonicalFullName(name)) {
+        unavailableRosterRecords.push({ team: teamCode, gsisId, name,
+          reason: !gsisId ? "MISSING_GSIS" : !/^00-\d{7}$/.test(gsisId) ? "INVALID_GSIS" : "NON_CANONICAL_NAME" });
+        continue;
+      }
+      const record = {
+        gsisId,
+        playerName: name,
+        position: clean(player.position),
+        team: teamCode,
+        positionSource: selectedIds.has(gsisId) ? "expectedLineup" : "expectedRoster",
+      };
+      byTeamId.set(`${teamCode}:${gsisId}`, record);
+      const nameKey = `${teamCode}:${canonicalNameKey(name)}`;
+      const candidates = byTeamName.get(nameKey) || [];
+      candidates.push(record);
+      byTeamName.set(nameKey, candidates);
+    }
+    for (const selected of lineup.players) {
+      const id = clean(selected.gsisId);
+      if (!id) continue;
+      const identity = byTeamId.get(`${teamCode}:${id}`);
+      if (!identity || identity.playerName !== clean(selected.name) ||
+          identity.position !== clean(selected.position)) {
+        throw new Error(`Contradictory authoritative selected-lineup identity for ${teamCode} ${id}`);
+      }
+    }
+  }
+  if (unavailableRosterRecords.length) {
+    console.warn(`Player roster identity filtering: ${unavailableRosterRecords.length} records excluded without a valid GSIS/full canonical name`);
+  }
+  return { byTeamId, byTeamName, idTeams, unavailableRosterRecords,
+    unresolved: 0, mismatchedTeam: 0, ambiguous: 0, idConflict: 0 };
+}
+
+export function applyCanonicalPlayerIdentity(plays, context) {
+  let unresolved = 0;
+  let mismatchedTeam = 0;
+  let ambiguous = 0;
+  let idConflict = 0;
+  const activeRole = (play, role) => {
+    if (role === "passer") return Boolean(play.passAttempt || play.sack);
+    if (role === "rusher") return Boolean(play.rushAttempt);
+    return Boolean(play.target);
+  };
+  const observedTeamsById = new Map();
+  for (const play of plays) {
+    for (const role of ["passer", "rusher", "receiver"]) {
+      const id = play[`${role}Id`];
+      if (!id || !activeRole(play, role)) continue;
+      const observed = observedTeamsById.get(id) || new Set();
+      observed.add(play.team);
+      observedTeamsById.set(id, observed);
+    }
+  }
+  const identified = plays.map((play) => {
+    const next = { ...play };
+    for (const role of ["passer", "rusher", "receiver"]) {
+      const idKey = `${role}Id`;
+      const nameKey = `${role}Name`;
+      const sourceId = play[idKey];
+      const sourceName = play[nameKey];
+      if (!activeRole(play, role) || (!sourceId && !sourceName)) continue;
+      let identity = sourceId ? context.byTeamId.get(`${play.team}:${sourceId}`) : null;
+      if (sourceId && !identity && context.idTeams.has(sourceId)) {
+        if (context.idTeams.get(sourceId).size > 1 || !context.idTeams.get(sourceId).has(play.team)) {
+          mismatchedTeam += 1;
+          next[idKey] = null;
+          next[nameKey] = null;
+          next[`${role}IdentityState`] = "TEAM_MISMATCH";
+          continue;
+        }
+      }
+      if (sourceId && !identity && !context.idTeams.has(sourceId) &&
+          (observedTeamsById.get(sourceId)?.size || 0) > 1) {
+        mismatchedTeam += 1;
+        next[idKey] = null;
+        next[nameKey] = null;
+        next[`${role}IdentityState`] = "TEAM_MISMATCH";
+        continue;
+      }
+      let state = "UNRESOLVED";
+      if (!identity && sourceName && isCanonicalFullName(sourceName)) {
+        const matches = context.byTeamName.get(`${play.team}:${canonicalNameKey(sourceName)}`) || [];
+        if (sourceId && matches.length) {
+          state = "ID_CONFLICT";
+          idConflict += 1;
+        } else if (!sourceId && matches.length === 1) {
+          identity = matches[0];
+        } else if (!sourceId && matches.length > 1) {
+          state = "AMBIGUOUS";
+          ambiguous += 1;
+        }
+      }
+      if (identity) {
+        next[idKey] = identity.gsisId;
+        next[nameKey] = identity.playerName;
+        next[`${role}Position`] = identity.position;
+        next[`${role}PositionSource`] = identity.position ? identity.positionSource : "inferred";
+        next[`${role}IdentityState`] = "RESOLVED";
+        continue;
+      }
+      next[idKey] = null;
+      next[nameKey] = null;
+      next[`${role}IdentityState`] = state;
+      unresolved += 1;
+    }
+    return next;
+  });
+  context.unresolved = unresolved;
+  context.mismatchedTeam = mismatchedTeam;
+  context.ambiguous = ambiguous;
+  context.idConflict = idConflict;
+  if (unresolved || mismatchedTeam) {
+    console.warn(`Player identity filtering: ${unresolved} unresolved role records; ${mismatchedTeam} cross-team role records excluded`);
+  }
+  return identified;
+}
+
+function isCanonicalFullName(value) {
+  const parts = String(value || "").trim().split(/\s+/);
+  const nameParts = parts.filter((part) => !/^(?:Jr\.?|Sr\.?|II|III|IV|V)$/i.test(part));
+  const substantive = (part) => part.replace(/[^A-Za-z]/g, "").length >= 2;
+  return nameParts.filter(substantive).length >= 2 &&
+    nameParts.every((part) => /^[A-Za-z][A-Za-z.'’-]*$/.test(part) &&
+      (substantive(part) || /^[A-Za-z]\.?$/.test(part)));
+}
+
+function canonicalNameKey(value) {
+  return String(value || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase().replace(/[^a-z]/g, "");
 }
 
 export function validatePlayerArtifact(artifact, { season, targetWeek } = {}) {
@@ -212,6 +557,18 @@ export function validatePlayerArtifact(artifact, { season, targetWeek } = {}) {
     }
   }
   if (targetWeek !== undefined) {
+    const metadata = artifact.targetMetadataByWeek?.[targetWeek];
+    if (!metadata || metadata.season !== season || metadata.predictionWeek !== targetWeek ||
+        instant(metadata.cutoff) !== instant(artifact.cutoffs[targetWeek]) ||
+        metadata.referenceWeek !== targetWeek - 1 ||
+        instant(metadata.sourceAsOf) === null ||
+        Date.parse(metadata.sourceAsOf) > Date.parse(metadata.cutoff) ||
+        instant(metadata.sourceAsOf) !== instant(artifact.sourceAsOf) ||
+        !Array.isArray(metadata.sourceColumns) ||
+        JSON.stringify(metadata.sourceColumns) !== JSON.stringify(PLAYER_SOURCE_REQUIRED_FIELDS) ||
+        JSON.stringify(artifact.requiredFields) !== JSON.stringify(PLAYER_SOURCE_REQUIRED_FIELDS)) {
+      throw new Error(`Player target metadata is invalid for Week ${targetWeek}`);
+    }
     const targetTeams = artifact.playerMetricsByWeek[targetWeek];
     const targetCodes = Object.keys(targetTeams || {}).sort();
     const expectedCodes = [...canonicalTeams].sort();
@@ -219,11 +576,16 @@ export function validatePlayerArtifact(artifact, { season, targetWeek } = {}) {
         targetCodes.some((team, index) => team !== expectedCodes[index])) {
       throw new Error(`Player artifact target week ${targetWeek} must contain all 32 canonical teams`);
     }
+    validateStrictTargetTeams(targetTeams, {
+      season, targetWeek, cutoff: metadata.cutoff, sourceAsOf: metadata.sourceAsOf,
+    });
   }
   return true;
 }
 
-function validateTargetWeek(teams, { season, predictionWeek, cutoff, sourceAsOf }) {
+function validateTargetWeek(teams, {
+  season, predictionWeek, cutoff, sourceAsOf, referenceWeek, sourceColumns,
+}) {
   if (!teams || typeof teams !== "object" || Array.isArray(teams)) {
     throw new Error(`Generated player week ${predictionWeek} is invalid`);
   }
@@ -238,8 +600,80 @@ function validateTargetWeek(teams, { season, predictionWeek, cutoff, sourceAsOf 
     sourceAsOf,
     generatedAt: sourceAsOf,
     cutoffs: { [predictionWeek]: cutoff },
+    requiredFields: sourceColumns,
+    targetMetadataByWeek: {
+      [predictionWeek]: {
+        season, predictionWeek, cutoff, referenceWeek, sourceAsOf, sourceColumns,
+      },
+    },
     playerMetricsByWeek: { [predictionWeek]: teams },
   }, { season, targetWeek: predictionWeek });
+}
+
+function validateStrictTargetTeams(teams, { season, targetWeek, cutoff, sourceAsOf }) {
+  if (instant(sourceAsOf) === null || Date.parse(sourceAsOf) > Date.parse(cutoff)) {
+    throw new Error(`Target Week ${targetWeek} sourceAsOf is later than the cutoff`);
+  }
+  const seenIds = new Set();
+  for (const [team, metrics] of Object.entries(teams)) {
+    if (metrics.season !== undefined && metrics.season !== season) {
+      throw new Error(`Target Week ${targetWeek} ${team} season mismatch`);
+    }
+    const names = new Set();
+    const players = Object.values(metrics.players || {});
+    if (!players.length) throw new Error(`Target Week ${targetWeek} ${team} has no canonical players`);
+    const categoryCoverage = {
+      qb: players.some((player) => player.passing?.attempts > 0),
+      rushing: players.some((player) => player.rushing?.attempts > 0),
+      receiving: players.some((player) => player.receiving?.targets > 0),
+    };
+    for (const [category, covered] of Object.entries(categoryCoverage)) {
+      const teamTotal = category === "qb"
+        ? metrics.teamTotals.passAttempts + metrics.teamTotals.sacksAllowed
+        : category === "rushing"
+          ? metrics.teamTotals.rushingAttempts
+          : metrics.teamTotals.targets;
+      if (teamTotal > 0 && !covered) {
+        throw new Error(`Target Week ${targetWeek} ${team} has missing ${category} player coverage`);
+      }
+    }
+    for (const [key, player] of Object.entries(metrics.players)) {
+      const stableId = player.gsisId;
+      const nameKey = canonicalNameKey(player.playerName);
+      if (key !== stableId || !/^00-\d{7}$/.test(stableId || "") ||
+          player.playerId !== stableId || player.team !== team ||
+          !isCanonicalFullName(player.playerName) || names.has(nameKey) ||
+          seenIds.has(stableId)) {
+        throw new Error(`Invalid or duplicate GSIS/name/team identity in target Week ${targetWeek} ${team}`);
+      }
+      if (!["expectedLineup", "expectedRoster", "inferred"].includes(player.positionSource) ||
+          (["expectedLineup", "expectedRoster"].includes(player.positionSource) && !String(player.position || "").trim()) ||
+          (player.positionSource === "inferred" && !/inferred/i.test(player.positionSource)) ||
+          player.health !== "Unknown" || player.healthSource !== "Unavailable") {
+        throw new Error(`Invalid target identity/health metadata in Week ${targetWeek} ${team}`);
+      }
+      if (!Array.isArray(player.gameLog) || !player.gameLog.length ||
+          player.gameLog.some((row) => !row.gameId || !Number.isInteger(row.week) ||
+            row.week < 1 || row.week >= targetWeek)) {
+        throw new Error(`Malformed target player game log in Week ${targetWeek} ${team}`);
+      }
+      names.add(nameKey);
+      seenIds.add(stableId);
+    }
+    if (metrics.predictionWeek !== targetWeek || metrics.team !== team ||
+        instant(metrics.cutoff) !== instant(cutoff) || !Number.isFinite(metrics.games) ||
+        metrics.games < 1 || metrics.expectedCompletedGames !== metrics.games ||
+        !Array.isArray(metrics.gameProvenance) || !metrics.gameProvenance.length ||
+        metrics.gameProvenance.some((game) =>
+          !game.gameId || !Number.isInteger(game.week) || game.week < 1 ||
+          game.week >= targetWeek || instant(game.completedAsOf) === null ||
+          Date.parse(game.completedAsOf) > Date.parse(cutoff))) {
+      throw new Error(`Malformed target team/game provenance in Week ${targetWeek} ${team}`);
+    }
+    if (metrics.games !== metrics.gameProvenance.length) {
+      throw new Error(`Target Week ${targetWeek} ${team} game coverage mismatch`);
+    }
+  }
 }
 
 export function buildWeeklyPlayerMetrics(plays, schedule, { season, predictionWeek, cutoff }) {
@@ -432,7 +866,8 @@ export function buildTeamPlayerMetrics(
           play.passerId,
           play.passerName,
           teamCode,
-          "QB"
+          play.passerPosition || "QB",
+          play.passerPositionSource || "inferred"
         );
 
       recordGame(
@@ -478,7 +913,8 @@ export function buildTeamPlayerMetrics(
           play.rusherId,
           play.rusherName,
           teamCode,
-          null
+          play.rusherPosition,
+          play.rusherPositionSource || "inferred"
         );
 
       recordGame(
@@ -545,7 +981,8 @@ export function buildTeamPlayerMetrics(
           play.receiverId,
           play.receiverName,
           teamCode,
-          null
+          play.receiverPosition,
+          play.receiverPositionSource || "inferred"
         );
 
       recordGame(
@@ -666,13 +1103,11 @@ function getPlayer(
   id,
   name,
   teamCode,
-  position
+  position,
+  positionSource
 ) {
-  const key =
-    id ||
-    `${teamCode}:${normaliseName(
-      name
-    )}`;
+  if (!id || !name) return null;
+  const key = id;
 
   if (!map.has(key)) {
     map.set(
@@ -683,6 +1118,9 @@ function getPlayer(
         playerName: name,
         team: teamCode,
         position,
+        positionSource,
+        health: "Unknown",
+        healthSource: "Unavailable",
 
         gameIds: new Set(),
         weeks: new Set(),
@@ -721,12 +1159,17 @@ function getPlayer(
   const player =
     map.get(key);
 
+  if (canonicalNameKey(player.playerName) !== canonicalNameKey(name)) {
+    throw new Error(`Conflicting canonical names for GSIS identity ${id}`);
+  }
+
   if (
     !player.position &&
     position
   ) {
     player.position =
       position;
+    player.positionSource = positionSource;
   }
 
   return player;
@@ -881,6 +1324,7 @@ function finalisePlayer(
   const position =
     player.position ||
     inferPosition(player);
+  const positionSource = player.positionSource || "inferred";
 
   return {
     playerId:
@@ -896,6 +1340,10 @@ function finalisePlayer(
       player.team,
 
     position,
+    positionSource,
+
+    health: "Unknown",
+    healthSource: "Unavailable",
 
     games:
       player.gameIds.size,
@@ -1399,6 +1847,7 @@ export function parsePlay(row) {
 
     seasonType:
       row.season_type || "",
+    twoPointAttempt: number(row.two_point_attempt) === 1,
 
     week:
       number(row.week) || 0,
@@ -1444,12 +1893,12 @@ export function parsePlay(row) {
     receivingTouchdown,
 
     airYards:
-      airYards || 0,
+      airYards,
 
     yardsAfterCatch:
       number(
         row.yards_after_catch
-      ) || 0,
+      ),
 
     passerId,
     passerName,
@@ -1488,6 +1937,7 @@ export function parsePlay(row) {
 
 function isEligible(play) {
   return (
+    !play.twoPointAttempt &&
     play.seasonType ===
       "REG" &&
 
@@ -1520,12 +1970,18 @@ function parseCsv(text) {
     parseCsvLine(
       lines.shift() || ""
     );
+  if (!headers.length || headers.some((header) => !header) || new Set(headers).size !== headers.length) {
+    throw new Error("Player source has malformed or duplicate CSV headers");
+  }
 
   return lines
     .filter(Boolean)
-    .map((line) => {
+    .map((line, index) => {
       const values =
         parseCsvLine(line);
+      if (values.length !== headers.length) {
+        throw new Error(`Malformed player source CSV row ${index + 2}`);
+      }
 
       return Object.fromEntries(
         headers.map(
@@ -1578,6 +2034,7 @@ function parseCsvLine(line) {
     }
   }
 
+  if (quoted) throw new Error("Malformed quoted player source CSV value");
   values.push(value);
 
   return values;
@@ -1633,9 +2090,16 @@ function clean(value) {
   );
 }
 
+function isMissingNumber(value) {
+  return value == null || typeof value === "string" &&
+    (value.trim() === "" || value.trim() === "NA");
+}
+
 function number(value) {
   if (
     value === undefined ||
+    value === null ||
+    String(value).trim() === "" ||
     value === "" ||
     value === "NA"
   ) {

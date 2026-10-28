@@ -558,6 +558,16 @@ existing discrete scoring simulation; this repair does not change that engine.
 
 ## Point-in-time player projections
 
+The audited 2026 Week 8 CHI-at-SEA core event has provider kickoffs one to five
+minutes after schedule game `1392336` (`2026-11-03T01:15:00.000Z`). Its read-side
+mapping is narrowly reconciled only for that exact season/week/team order,
+schedule ID/kickoff and provider event ID, with matching SharpAPI snapshot
+provenance and exactly one candidate within five minutes. Ambiguity fails closed.
+The returned event retains its provider ID/time and adds `scheduleMapping`
+discrepancy provenance; no stored odds or schedule timestamps are rewritten.
+Every other event retains exact kickoff matching. Moneyline consensus and the
+existing spread/total display fallback are unchanged.
+
 Player metrics now require schema 2, the exact season/prediction week and the same
 weekly cutoff as the depth lineup. Older-week fallback and the legacy checked-in
 player artifact are rejected with explicit reasons, not silently treated as current.
@@ -595,9 +605,14 @@ display fallback never enters those candidate pools.
 
 After explicit approval, regenerate depth context using
 `npm run update:nflverse -- 2026`, then player metrics using
-`node scripts/update-nflverse-players.mjs 2026`, with `BALLDONTLIE_API_KEY` set.
-NFLverse downloads need no key. Both existing production artifacts remain untouched
-during this repair. Regeneration replaces only the target weekly entry, never saved predictions.
+`node scripts/update-nflverse-players.mjs 2026 8`, with `BALLDONTLIE_API_KEY` set.
+The player updater requires an explicit season and prediction week; it never infers
+the target from the latest PBP row. Before network access it checks the exact local
+team-artifact week, cutoff and `referenceWeek`, including all 32 target lineups.
+The source timestamp is observed after fetches and rechecked against that cutoff;
+lineup snapshots must precede observation. Completed season/week/cutoff/observation
+filtering happens before identity resolution. Only the requested player week is
+replaced; earlier weeks remain unchanged.
 The team updater requires complete cumulative PBP coverage, including games already
 represented by older contexts. All three NFLverse sources (PBP, snaps and depth)
 are required; an unavailable source fails without replacing the runtime artifact.
@@ -614,6 +629,36 @@ https://nflreadr.nflverse.com/articles/dictionary_depth_charts.html.
 A uniquely named same-directory temporary file is reread, parsed and validated
 before atomic rename. Failure cleans only that temporary file and preserves the
 original runtime bytes. The player artifact is never a team-updater destination.
+For player PBP, all 37 directly consumed source columns are required: game/team/week
+identity, regular-season/play fields, play-level passing/rushing/receiving values,
+and player IDs/names (`PLAYER_SOURCE_REQUIRED_FIELDS` in the updater). There are
+no optional source columns whose absence is treated as zero (including
+`yards_after_catch` and the `pass` fallback input). Malformed numeric values fail;
+blank relevant metric inputs fail, while non-applicable blanks remain legitimate.
+Passing and rushing applicability uses NFLverse play types and pass/rush,
+sack and scramble indicators, not player identifiers alone. Administrative
+end-quarter rows may have null attempt fields. Two-point attempts are excluded
+from ordinary player-stat totals; their null ordinary yardage is not zero-filled.
+Air yards and YAC remain null in parsed non-applicable plays.
+Targets, red/goal-line
+and end-zone flags, and receiving touchdowns are derived from those inputs. Target
+players require a GSIS ID and full canonical name. The complete authoritative
+`expectedLineup.roster`, not just selected starters, supplies canonical identity
+and cutoff-team ownership. Valid pre-cutoff selected-lineup identities absent from
+the roster may supplement that universe only without ID/name/team conflicts;
+this does not fabricate roster membership or transaction history.
+An exact GSIS match takes priority over source-name similarity. Exact unique
+full-name/team roster evidence can resolve missing PBP IDs; abbreviated names,
+unknown/conflicting IDs and ambiguous names cannot. Invalid/missing roster IDs
+are excluded and reported, never synthesized. Historical PBP on another team
+remains excluded against authoritative cutoff ownership.
+Canonical names such as `J. Michael Sturdivant` retain two fully specified name
+components; `B.Allen`, `B. Allen` and partial names cannot establish identity.
+Roster-only positions are labeled `expectedRoster`; selected-lineup positions
+retain `expectedLineup`. Roster membership never grants starter confidence,
+confirmed activity or verified health: downstream depth/slot/rank evidence
+continues to govern projected participation. Position and health are explicitly labeled
+`inferred` and `Unknown`/`Unavailable` when unavailable from the lineup/source.
 Historical reconstruction requires archived depth plus proven
 pre-cutoff final timestamps; missing completion evidence cannot be invented.
 Generation may occur later than the cutoff, but included games must have proven

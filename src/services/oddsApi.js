@@ -238,18 +238,61 @@ export function clearNflOddsCache() {
 }
 
 export function findOddsForGame(events, game) {
-  if (!Array.isArray(events) || !game) return null;
+  return resolveOddsForGame(events, game).event;
+}
+
+export function resolveOddsForGame(events, game) {
+  const unavailable = (status) => ({ event: null, status });
+  if (!Array.isArray(events) || !game) return unavailable("UNAVAILABLE");
   const awayCode = resolveTeamCode(game.away || game.awayCode || game.awayName);
   const homeCode = resolveTeamCode(game.home || game.homeCode || game.homeName);
 
-  if (!awayCode || !homeCode || awayCode === homeCode) return null;
+  if (!awayCode || !homeCode || awayCode === homeCode) return unavailable("UNAVAILABLE");
   const kickoff = Date.parse(game.kickoff || game.sourceDate || game.commence_time || game.date);
   const direct = events.filter((event) =>
     resolveTeamCode(event?.away_team_code || event?.away_code || event?.away_team) === awayCode &&
     resolveTeamCode(event?.home_team_code || event?.home_code || event?.home_team) === homeCode &&
     (!Number.isFinite(kickoff) || !event.commence_time || Date.parse(event.commence_time) === kickoff)
   );
-  return direct.length === 1 ? direct[0] : null;
+  if (direct.length) return direct.length === 1
+    ? { event: direct[0], status: "EXACT" } : unavailable("AMBIGUOUS");
+
+  // Audited Week 8 source discrepancy; all other events retain exact-time matching.
+  const scheduleId = "1392336";
+  const canonicalKickoff = "2026-11-03T01:15:00.000Z";
+  const providerEventId = "nfl_bears_seahawks_2026-11-02_b3";
+  const toleranceMs = 5 * 60 * 1000;
+  if (Number(game.season) !== 2026 || Number(game.week) !== 8 ||
+      String(game.id) !== scheduleId || awayCode !== "CHI" || homeCode !== "SEA" ||
+      kickoff !== Date.parse(canonicalKickoff)) return unavailable("UNAVAILABLE");
+  const candidates = events.filter((event) =>
+    resolveTeamCode(event?.away_team_code || event?.away_code || event?.away_team) === awayCode &&
+    resolveTeamCode(event?.home_team_code || event?.home_code || event?.home_team) === homeCode &&
+    Number.isFinite(Date.parse(event.commence_time)) &&
+    Math.abs(Date.parse(event.commence_time) - kickoff) <= toleranceMs
+  );
+  if (candidates.length > 1) return unavailable("AMBIGUOUS");
+  const candidate = candidates[0];
+  if (!candidate || candidate.id !== providerEventId ||
+      (candidate.season != null && Number(candidate.season) !== 2026) ||
+      (candidate.week != null && Number(candidate.week) !== 8)) return unavailable("UNAVAILABLE");
+  const quotes = (candidate.bookmakers || []).flatMap((book) =>
+    (book.markets || []).filter((market) => ["h2h", "spreads", "totals"].includes(market.key))
+      .flatMap((market) => market.outcomes || []));
+  if (!quotes.length || !quotes.every((quote) => {
+    const source = quote.quoteSource;
+    return source?.provider === "SharpAPI" && source.eventId === providerEventId &&
+      /^nfl:2026:8:(moneyline|point_spread|total_points):/.test(source.snapshotId || "");
+  })) return unavailable("PROVENANCE_UNAVAILABLE");
+  return {
+    status: "RECONCILED",
+    event: { ...candidate, scheduleMapping: {
+      status: "RECONCILED", rule: "2026-week-8-chi-sea-kickoff",
+      season: 2026, week: 8, scheduleGameId: scheduleId,
+      providerEventId, canonicalKickoff, providerKickoff: candidate.commence_time,
+      discrepancyMs: Date.parse(candidate.commence_time) - kickoff, toleranceMs,
+    } },
+  };
 }
 
 export function resolveTeamCode(value) {

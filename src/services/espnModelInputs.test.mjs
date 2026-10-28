@@ -129,7 +129,9 @@ test("Week 8 network changes reach the engine without mutating ESPN or raw NFLve
 
 test("missing Week 8 player data stays unavailable while team-level predictions remain deterministic", () => {
   const teamMetrics = buildTeamMetricsResponse(artifact, { season: 2026, week: 8, away: "NE", home: "MIA" });
-  const playerMetrics = playerMetricsResponse(playerArtifact, { season: 2026, week: 8, away: "NE", home: "MIA" });
+  const missingWeekArtifact = structuredClone(playerArtifact);
+  delete missingWeekArtifact.playerMetricsByWeek[8];
+  const playerMetrics = playerMetricsResponse(missingWeekArtifact, { season: 2026, week: 8, away: "NE", home: "MIA" });
   assert.equal(playerMetrics.available, false);
   assert.match(playerMetrics.reason, /Exact prediction-week player data unavailable/);
   assert.equal(playerMetrics.away, null);
