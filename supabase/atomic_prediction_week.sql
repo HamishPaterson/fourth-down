@@ -61,6 +61,7 @@ declare
   g jsonb;
   m jsonb;
   key text;
+  bet jsonb;
   r public.prediction_snapshots%rowtype;
   written integer := 0;
   changed integer;
@@ -96,10 +97,15 @@ begin
     ) teams) <> 28 then raise exception 'invalid'; end if;
     for item in select value from jsonb_array_elements(p->'rows') loop
       s := item#>'{data_quality,snapshot}'; g := s->'game';
+      if exists (
+        select 1 from jsonb_path_query(item, 'strict $.** ? (@.type() == "number")') numbers(value)
+        where abs((numbers.value #>> '{}')::numeric) > 1.7976931348623157e308
+      ) then raise exception 'invalid'; end if;
       select value into m from jsonb_array_elements(p->'manifest')
         where value->>'id' = g->>'id';
       if m is null or coalesce(g->>'id','') !~ '^[1-9][0-9]*$' or
          (g->>'id')::numeric > 9007199254740991 or
+         coalesce(s->>'id','') = '' or
          s->>'season' is distinct from '2026' or s->>'week' is distinct from '8' or
          g->>'season' is distinct from '2026' or g->>'week' is distinct from '8' or
          s->>'awayCode' is distinct from m->>'away' or s->>'homeCode' is distinct from m->>'home' or
@@ -172,6 +178,24 @@ begin
          s->>'opponentNetworkStatus' is distinct from 'available' or
          s#>>'{predictionPayload,modelLayers,opponentNetwork,available}' is distinct from 'true' or
          s#>>'{dataQuality,sources,opponentNetwork,available}' is distinct from 'true' then raise exception 'invalid'; end if;
+      for bet in
+        select value from jsonb_array_elements(s#>'{bestBets,candidates}')
+        union all
+        select value from jsonb_array_elements(s#>'{bestBets,recommendations}')
+      loop
+        if jsonb_typeof(bet) is distinct from 'object' or
+           coalesce(bet->>'market','') = '' or coalesce(bet->>'selection','') = '' or
+           coalesce(bet->>'sportsbook','') = '' then raise exception 'invalid'; end if;
+        foreach key in array array['modelProbability','marketProbability','edge','expectedValue','price','decimalOdds'] loop
+          if jsonb_typeof(bet->key) is distinct from 'number' then raise exception 'invalid'; end if;
+        end loop;
+        if (bet->>'modelProbability')::numeric not between 0 and 1 or
+           (bet->>'marketProbability')::numeric not between 0 and 1 or
+           (bet->>'decimalOdds')::numeric <= 1 or abs((bet->>'price')::numeric) < 100 or
+           (bet ? 'line' and bet->'line' <> 'null'::jsonb and jsonb_typeof(bet->'line') <> 'number') then
+          raise exception 'invalid';
+        end if;
+      end loop;
       foreach key in array array['away','home'] loop
         if s#>'{personnelViews}'->key->>'version' is distinct from '1' or
            s#>'{personnelViews}'->key->>'team' is distinct from m->>key or

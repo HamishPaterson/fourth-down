@@ -233,6 +233,9 @@ instead validates a complete, unchanged 14-game 2026 Week 8 batch and calls
 `replace_prediction_week` once. It has no browser endpoint and never retries.
 Apply only the reviewed `supabase/atomic_prediction_week.sql` migration before
 using this module. The additive RPC is executable only by `service_role`.
+The database validates required candidate/recommendation probabilities, edge,
+expected value, prices and optional lines, and rejects numeric overflow before
+prediction mutation. This checks payload integrity without changing betting rules.
 It checks the database-issued preflight fingerprint, takes a transaction advisory
 lock and a short table write fence (also covering existing single-row writers),
 upserts on `(season, week, away_code, home_code)` without changing existing row

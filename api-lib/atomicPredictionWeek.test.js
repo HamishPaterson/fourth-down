@@ -133,6 +133,21 @@ for (const [name, mutate] of [
   ["missing provenance", b => { delete b.rows[13].data_quality.snapshot.predictionPayload.inputEvidence; }],
   ["fractional integer score", b => { b.rows[13].predicted_away_score = 20.5; }],
   ["missing TD probability", b => { delete b.rows[13].data_quality.snapshot.bestBets.anytimeTdModelPick.modelProbability; }],
+  ["empty prediction ID", b => { b.rows[13].data_quality.snapshot.id = ""; }],
+  ["non-finite betting probability", b => {
+    const s = b.rows[13].data_quality.snapshot;
+    s.bestBets.candidates.push({ market: "Moneyline", selection: "CHI", sportsbook: "fixture",
+      modelProbability: "Infinity", marketProbability: .5, edge: .1, expectedValue: .2, price: 100, decimalOdds: 2 });
+    s.dataQuality.bestBetsPayload = structuredClone(s.bestBets);
+    b.rows[13].data_quality.quality = structuredClone(s.dataQuality);
+  }],
+  ["missing betting edge", b => {
+    const s = b.rows[13].data_quality.snapshot;
+    s.bestBets.candidates.push({ market: "Moneyline", selection: "CHI", sportsbook: "fixture",
+      modelProbability: .6, marketProbability: .5, expectedValue: .2, price: 100, decimalOdds: 2 });
+    s.dataQuality.bestBetsPayload = structuredClone(s.bestBets);
+    b.rows[13].data_quality.quality = structuredClone(s.dataQuality);
+  }],
   ["unexpected canonical manifest", b => {
     b.manifest[13].id = "9999999";
     b.rows[13].data_quality.snapshot.game.id = "9999999";
