@@ -564,6 +564,15 @@ existing discrete scoring simulation; this repair does not change that engine.
 
 ## Point-in-time player projections
 
+Explicitly unavailable weather (`weatherAvailable: false`) uses the existing
+neutral multipliers and zero additive shift, without synthesizing observations.
+The saved weather object retains its unavailable reason and provenance. Indoor
+and null-weather behavior is unchanged; validated measured fallbacks retain
+normal weather effects. Supposedly available outdoor weather requires finite
+wind, temperature and rain/precipitation measurements; malformed supplied
+measurements fail explicitly. Weather-impact and special-teams simulation outputs
+are checked for non-finite values before they can enter a saved prediction.
+
 The audited 2026 Week 8 CHI-at-SEA core event has provider kickoffs one to five
 minutes after schedule game `1392336` (`2026-11-03T01:15:00.000Z`). Its read-side
 mapping is narrowly reconciled only for that exact season/week/team order,

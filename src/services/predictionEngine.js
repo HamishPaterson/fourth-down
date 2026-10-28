@@ -802,12 +802,36 @@ export function computeWeatherImpact(weather) {
 
   if (!weather) return neutral;
   if (weather.dome) return { ...neutral, dome: true };
+  if (weather.weatherAvailable === false) return {
+    ...neutral, weatherAvailable: false, fallbackActive: true,
+    fallbackReason: weather.fallbackReason || "Weather measurements unavailable",
+    weatherSource: weather.weatherSource ?? null,
+  };
+  if (typeof weather !== "object" || Array.isArray(weather)) {
+    throw new Error("Malformed available outdoor weather: expected measurement object");
+  }
+  const measurementFields = ["windSpeed", "windGust", "rain", "precipitation", "maxHourlyRain",
+    "snowfall", "temperature", "humidity", "visibility", "weatherCode"];
+  for (const field of measurementFields) {
+    if (weather[field] !== undefined && weather[field] !== null &&
+        (typeof weather[field] !== "number" || !Number.isFinite(weather[field]))) {
+      throw new Error(`Malformed available outdoor weather: ${field} must be finite`);
+    }
+  }
+  if (weather.weatherAvailable === true) {
+    for (const field of ["windSpeed", "temperature"]) {
+      if (!Number.isFinite(weather[field])) throw new Error(`Malformed available outdoor weather: missing ${field}`);
+    }
+    if (!Number.isFinite(weather.rain) && !Number.isFinite(weather.precipitation)) {
+      throw new Error("Malformed available outdoor weather: missing rain/precipitation");
+    }
+  }
 
   const windKmh = num(weather.windSpeed, 0);
   const gustKmh = Math.max(windKmh, num(weather.windGust, windKmh));
   const windMph = windKmh * 0.621371;
   const gustMph = gustKmh * 0.621371;
-  const rain = Math.max(0, num(weather.rain, weather.precipitation));
+  const rain = Math.max(0, num(weather.rain, num(weather.precipitation, 0)));
   const peakRain = Math.max(0, num(weather.maxHourlyRain, 0));
   const snow = Math.max(0, num(weather.snowfall, 0));
   const tempC = nullableNum(weather.temperature);
@@ -891,7 +915,7 @@ export function computeWeatherImpact(weather) {
   const reduction = 1 - coefficient;
   const severity = reduction >= 0.12 ? "Severe" : reduction >= 0.07 ? "High" : reduction >= 0.03 ? "Moderate" : conditions.length ? "Low" : "None";
 
-  return {
+  const impact = {
     active: conditions.length > 0,
     dome: false,
     coefficient: round3(coefficient),
@@ -906,6 +930,17 @@ export function computeWeatherImpact(weather) {
     passRatioShift: round3(passRatioShift),
     turnoverRisk: round3(turnoverRisk),
   };
+  assertFiniteSimulation(impact, "available outdoor weather impact");
+  return impact;
+}
+
+function assertFiniteSimulation(value, path) {
+  for (const [field, item] of Object.entries(value)) {
+    if (typeof item === "number" && !Number.isFinite(item)) {
+      throw new Error(`Non-finite ${path}.${field}`);
+    }
+    if (item && typeof item === "object") assertFiniteSimulation(item, `${path}.${field}`);
+  }
 }
 
 function modelRating(rawFpi) {
@@ -1108,7 +1143,7 @@ function buildScoringEvents(
     )])
   );
 
-  return {
+  const result = {
     ...representative,
     expectedPoints: round3(expectedPoints),
     expectedPossessions: round3(expectedPossessions),
@@ -1151,6 +1186,18 @@ function buildScoringEvents(
       provenance: kicker.provenance || null,
     },
   };
+  for (const field of ["expectedPoints", "expectedPossessions"]) {
+    if (!Number.isFinite(result[field])) throw new Error(`Non-finite score simulation.${field}`);
+  }
+  for (const field of ["expectedFieldGoalAttempts", "expectedFieldGoals", "expectedExtraPoints",
+    "fieldGoalAttemptRate", "expectedFieldGoalMakeRate", "extraPointMakeRate",
+    "fieldGoalWeatherMultiplier", "extraPointWeatherMultiplier"]) {
+    if (!Number.isFinite(result.specialTeamsSimulation[field])) {
+      throw new Error(`Non-finite special-teams simulation.${field}`);
+    }
+  }
+  assertFiniteSimulation(result.specialTeamsSimulation, "special-teams simulation");
+  return result;
 }
 
 function normalizedKickShares(priors) {
