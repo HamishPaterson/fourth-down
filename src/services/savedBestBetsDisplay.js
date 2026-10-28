@@ -2,6 +2,7 @@ import { findOddsForGame, resolveTeamCode } from "./oddsApi.js";
 import { canonicalQuoteMarket, validateOddsEvents } from "./quoteValidation.js";
 import { BEST_BETS_CANDIDATE_VERSION, isQualifiedBestBet, selectTdModelPick } from "./bestBetsService.js";
 import { tdBettingDisplay } from "./playerBetDiagnostics.js";
+import { savedGameIdentity } from "./savedGameIdentity.js";
 
 const key = (value) => String(value || "").toLowerCase().replace(/[^a-z0-9]/g, "");
 const marketKey = (bet) => canonicalQuoteMarket(bet.rawMarketType || (bet.market === "Game total" ? "totals" : bet.market));
@@ -40,13 +41,13 @@ function rejection(bet, snapshot, event, now) {
 export function savedBestBetsDisplay(snapshot, events, now = new Date()) {
   const saved = snapshot.bestBets || snapshot.dataQuality?.bestBetsPayload;
   if (!saved) return null;
-  const event = findOddsForGame(events || [], { away: snapshot.awayCode, home: snapshot.homeCode,
-    kickoff: snapshot.kickoff });
+  const game = savedGameIdentity(snapshot);
+  const event = game ? findOddsForGame(events || [], game) : null;
   const pool = [...(saved.candidates || []), ...(saved.recommendations || [])];
   const unique = new Map(pool.map((bet) => [[bet.market, bet.selection, bet.sportsbook, bet.line].join(":"), bet]));
   const candidateDiagnostics = [];
   const candidates = [...unique.values()].flatMap((bet) => {
-    const result = rejection(bet, snapshot, event, now);
+    const result = game ? rejection(bet, snapshot, event, now) : { code: "CANONICAL_GAME_IDENTITY_UNAVAILABLE" };
     candidateDiagnostics.push({ market: bet.market, selection: bet.selection, sportsbook: bet.sportsbook,
       price: bet.price, line: bet.line, modelProbability: bet.modelProbability,
       marketProbability: bet.marketProbability, edge: bet.edge, expectedValue: bet.expectedValue,

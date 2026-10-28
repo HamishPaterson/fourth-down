@@ -53,7 +53,7 @@ function fixture([away, home] = PAIRS[0]) {
     sources: { odds: { available: true }, opponentNetwork: { available: true } }, personnelTiming: { cutoff } };
   prediction.matchupIntelligence = feature.predictionPayloadFeatures;
   prediction.modelLayers = { opponentNetwork: feature.predictionPayloadFeatures.opponentNetwork };
-  return { ...feature, game: { away, home, season: 2026, week: 6 }, prediction, playerProjections: players,
+  return { ...feature, game: { id: "1000", away, home, season: 2026, week: 6, sourceDate: KICKOFF }, prediction, playerProjections: players,
     personnelViews: feature.personnelViews, oddsEvent, dataQuality,
     teamMetrics: { away: { team: away, ...dataset.metricsByWeek[6][away] },
       home: { team: home, ...dataset.metricsByWeek[6][home] } },

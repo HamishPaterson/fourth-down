@@ -16,6 +16,7 @@ import { PRESERVED_LOCK_THROUGH, LOCK_PROVENANCE_VERSION, lockPredictionRejectio
 import dataset from "../api/nfl/nflverse-team-metrics.js";
 import { buildBestBets, BEST_BETS_CANDIDATE_VERSION } from "../src/services/bestBetsService.js";
 import { validateOddsEvents } from "../src/services/quoteValidation.js";
+import { savedGameIdentity } from "../src/services/savedGameIdentity.js";
 
 export function refreshSavedBestBets(snapshot, odds, now, { displayOnly = false } = {}) {
   if (!displayOnly && snapshot.bestBets?.candidateVersion === BEST_BETS_CANDIDATE_VERSION &&
@@ -23,9 +24,10 @@ export function refreshSavedBestBets(snapshot, odds, now, { displayOnly = false 
   if (!completePrediction(snapshot) || (!displayOnly && Date.parse(snapshot.kickoff) <= now.getTime())) {
     throw new Error("Candidate repair requires a complete pre-kickoff prediction");
   }
-  const event = findOddsForGame(odds.events, snapshot);
+  const game = savedGameIdentity(snapshot);
+  if (!game) throw new Error("Saved prediction canonical schedule identity unavailable or conflicting");
+  const event = findOddsForGame(odds.events, game);
   if (!displayOnly && !event?.bookmakers?.length) throw new Error(`Stored odds missing for ${snapshot.awayCode} at ${snapshot.homeCode}`);
-  const game = { ...snapshot.game, season: snapshot.season, week: snapshot.week, away: snapshot.awayCode, home: snapshot.homeCode };
   const teamMetrics = Number(dataset.season) === snapshot.season ? {
     away: { team: snapshot.awayCode, ...dataset.metricsByWeek?.[snapshot.week]?.[snapshot.awayCode] },
     home: { team: snapshot.homeCode, ...dataset.metricsByWeek?.[snapshot.week]?.[snapshot.homeCode] },

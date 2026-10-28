@@ -8,6 +8,10 @@ import { refreshPredictionLedger } from "../src/services/predictionLedger.js";
 import { savedBestBetsDisplay } from "../src/services/savedBestBetsDisplay.js";
 import { refreshSavedBestBets } from "./serverPredictions.js";
 const rows = JSON.parse(readFileSync(new URL("./fixtures/week7-rendered-bets.json", import.meta.url)));
+rows.forEach((row, index) => {
+  row.game = { id: String(1000 + index), season: row.season, week: row.week,
+    away: row.awayCode, home: row.homeCode, sourceDate: row.kickoff };
+});
 const nyjPersonnel = rows.find((row) => row.awayCode === "MIA").personnelViews.home.players;
 nyjPersonnel.find((player) => player.canonicalId === "00-0039794").name = "Braelon Allen";
 nyjPersonnel.find((player) => player.canonicalId === "00-0038120").name = "Breece Hall";

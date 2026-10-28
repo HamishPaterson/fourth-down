@@ -237,6 +237,10 @@ integer string through generation and the saved snapshot's `game.id`. Missing or
 malformed IDs, conflicting season/week/team/kickoff provenance for one ID, and
 different IDs for the same matchup fail before generation. The audited CHI–SEA
 reconciliation receives that canonical ID; it is never reconstructed from names.
+Saved-bet reassessment and client quote validation share `savedGameIdentity`:
+only `snapshot.game.id` supplies schedule identity, while the top-level snapshot
+ID remains prediction-record identity. Missing or conflicting canonical context
+fails closed with an explicit error or candidate diagnostic.
 
 The refresh loads the complete current-week schedule and stored core/player odds,
 loads completed season games once, and computes one validated 32-team weekly
