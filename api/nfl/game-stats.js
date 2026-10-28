@@ -2019,7 +2019,7 @@ function mergeSnapshots(existing, incoming) {
     : { ...incoming, ...existing };
 }
 
-function normaliseSnapshot(snapshot) {
+export function normaliseSnapshot(snapshot) {
   const kickoff = snapshot?.kickoff || snapshot?.date || snapshot?.datetime || null;
   const season = ledgerIntegerOrNull(snapshot?.season) || getSeason(kickoff);
   const week = ledgerIntegerOrNull(snapshot?.week) || 0;

@@ -227,6 +227,27 @@ recommendation shortlist cannot hide an independently eligible spread.
 
 ### Protected prediction-only refresh
 
+The existing refresh route saves one snapshot at a time; it is not an atomic
+weekly replacement. The trusted-server module `api-lib/atomicPredictionWeek.js`
+instead validates a complete, unchanged 14-game 2026 Week 8 batch and calls
+`replace_prediction_week` once. It has no browser endpoint and never retries.
+Apply only the reviewed `supabase/atomic_prediction_week.sql` migration before
+using this module. The additive RPC is executable only by `service_role`.
+It checks the database-issued preflight fingerprint, takes a transaction advisory
+lock and a short table write fence (also covering existing single-row writers),
+upserts on `(season, week, away_code, home_code)` without changing existing row
+UUIDs or creation timestamps, and verifies all 14 plus their complete payload
+fingerprint before commit. The locked existing manifest must match, so this
+repair cannot add an unexpected game. Other weeks are never updated. Function
+owners are `postgres`, execution is security-invoker, and `search_path` is limited
+to `pg_catalog` with application objects schema-qualified. Existing prediction
+RLS and browser read policy are unchanged. Failure rolls back prediction
+writes in a subtransaction and commits only a bounded rejection audit; transport
+or outer-transaction failures may also roll back that audit. Replayed operation
+IDs, changed fingerprints, frozen/graded rows, and incomplete batches fail closed.
+The table write fence briefly serializes unrelated prediction writers, but does
+not change the existing single-snapshot persistence contract.
+
 `/api/nfl/game-stats?action=refresh-predictions` requires `Authorization: Bearer <CRON_SECRET>`.
 GET and POST default to an in-memory dry run; only POST with JSON
 `{"dryRun":false}` saves. No cron invokes this route. Do not call the write mode
