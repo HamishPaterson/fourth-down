@@ -303,3 +303,73 @@ test("server caller validates finite unchanged outputs and sanitizes RPC errors 
   input.snapshots[13].predictionPayload.continuousMargin = Infinity;
   assert.throws(() => prepareAtomicPredictionWeek({ ...input, operationId: op }));
 });
+
+test("timeout diagnostics retain only SQLSTATE and HTTP status and never retry", async () => {
+  const input = await candidates();
+  let calls = 0;
+  await assert.rejects(replaceAuthoritativePredictionWeek({ rpc: async () => {
+    calls++;
+    return { status: 500, error: { code: "57014", message: "private token",
+      details: "private payload", hint: "private header" } };
+  } }, { ...input, operationId: randomUUID(), expectedFingerprint: "a".repeat(32) }), error => {
+    assert.equal(error.message, "ATOMIC_WEEK_RPC_FAILED");
+    assert.deepEqual(error.cause, { code: "57014", status: 500 });
+    assert(!JSON.stringify(error).includes("private"));
+    return true;
+  });
+  assert.equal(calls, 1);
+});
+
+test("caller sends one JSON object under p with matching operation IDs and PostgreSQL MD5", async () => {
+  const input = await candidates(), operationId = randomUUID(), expectedFingerprint = "a".repeat(32);
+  let calls = 0;
+  const result = await replaceAuthoritativePredictionWeek({ rpc: async (name, args) => {
+    calls++;
+    assert.equal(name, "replace_prediction_week");
+    assert.deepEqual(Object.keys(args), ["p"]);
+    assert.equal(typeof args.p, "object");
+    const request = JSON.parse(JSON.stringify(args)).p;
+    assert.equal(request.expectedFingerprint, expectedFingerprint);
+    assert.equal(request.operationId, operationId);
+    assert.equal(request.manifest.length, 14);
+    assert.equal(request.rows.length, 14);
+    assert(request.rows.every(r => r.data_quality.snapshot.batchProvenance.operationId === operationId));
+    return { data: { result: "committed", writtenCount: 14, operationId } };
+  } }, { ...input, operationId, expectedFingerprint });
+  assert.equal(result.result, "committed");
+  assert.equal(calls, 1);
+});
+
+for (const value of ["1e309", "-1e309"]) {
+  test(`recursive overflow rejection remains complete for nested ${value}`, async (t) => {
+    const { db, batch, dump, before } = await database(t);
+    batch.rows[13].data_quality.nested = [{ optional: ["overflow-marker"] }];
+    const encoded = JSON.stringify(batch).replace('"overflow-marker"', value);
+    const result = (await db.query("select public.replace_prediction_week($1::jsonb) as result", [encoded])).rows[0].result;
+    assert.equal(result.failureCode, "BATCH_INVALID");
+    assert.equal(await dump(), before);
+  });
+}
+
+test("keyed final verification checks physical fields as well as complete JSON payloads", async (t) => {
+  const { db, run, dump, before } = await database(t);
+  await db.exec(`reset role;
+    create function fixture_market_corruption() returns trigger language plpgsql as $$
+    begin new.market_total := coalesce(new.market_total,0) + 1; return new; end $$;
+    create trigger fixture_market_corruption before update on public.prediction_snapshots
+      for each row execute function fixture_market_corruption(); set role service_role;`);
+  assert.equal((await run()).failureCode, "FINAL_VERIFICATION_FAILED");
+  assert.equal(await dump(), before);
+});
+
+test("RPC timeout is bounded and scoped to replacement without weakening security configuration", async (t) => {
+  const { db } = await database(t);
+  const config = (await db.query(`select proconfig from pg_proc
+    where oid='public.replace_prediction_week(jsonb)'::regprocedure`)).rows[0].proconfig;
+  assert.deepEqual(config.sort(), ["search_path=pg_catalog", "statement_timeout=30s"].sort());
+  const stateConfig = (await db.query(`select proconfig from pg_proc
+    where oid='public.prediction_week_state()'::regprocedure`)).rows[0].proconfig;
+  assert.deepEqual(stateConfig, ["search_path=pg_catalog"]);
+  assert.match(migration, /jsonb_populate_recordset/);
+  assert.match(migration, /t\.away_code = expected\.away_code and t\.home_code = expected\.home_code/);
+});

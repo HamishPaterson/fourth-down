@@ -51,6 +51,7 @@ end $$;
 create or replace function public.replace_prediction_week(p jsonb)
 returns jsonb language plpgsql security invoker
 set search_path = pg_catalog
+set statement_timeout = '30s'
 as $$
 declare
   op uuid;
@@ -97,10 +98,9 @@ begin
     ) teams) <> 28 then raise exception 'invalid'; end if;
     for item in select value from jsonb_array_elements(p->'rows') loop
       s := item#>'{data_quality,snapshot}'; g := s->'game';
-      if exists (
-        select 1 from jsonb_path_query(item, 'strict $.** ? (@.type() == "number")') numbers(value)
-        where abs((numbers.value #>> '{}')::numeric) > 1.7976931348623157e308
-      ) then raise exception 'invalid'; end if;
+      if jsonb_path_exists(item,
+        'strict $.** ? (@.type() == "number" && (@ > 1.7976931348623157e308 || @ < -1.7976931348623157e308))')
+      then raise exception 'invalid'; end if;
       select value into m from jsonb_array_elements(p->'manifest')
         where value->>'id' = g->>'id';
       if m is null or coalesce(g->>'id','') !~ '^[1-9][0-9]*$' or
@@ -286,11 +286,27 @@ begin
        (select count(distinct data_quality#>>'{snapshot,game,id}') from public.prediction_snapshots
         where season = 2026 and week = 8 and data_quality#>>'{snapshot,authoritative}' = 'true'
           and data_quality#>>'{snapshot,batchProvenance,operationId}' = op::text) <> 14 or
-       exists (select 1 from jsonb_array_elements(p->'rows') e where not exists (
-         select 1 from public.prediction_snapshots t where t.season = 2026 and t.week = 8 and
-           (to_jsonb(t) - array['id','created_at','updated_at']) =
-             (to_jsonb(jsonb_populate_record(null::public.prediction_snapshots, e)) -
-               array['id','created_at','updated_at']))) then raise exception 'final'; end if;
+       exists (
+         select 1 from jsonb_populate_recordset(null::public.prediction_snapshots, p->'rows') expected
+         left join public.prediction_snapshots t
+           on t.season = expected.season and t.week = expected.week
+           and t.away_code = expected.away_code and t.home_code = expected.home_code
+         where t.id is null or
+           row(t.season,t.week,t.game_key,t.kickoff,t.away_code,t.home_code,t.fourth_down_pick,
+             t.predicted_away_score,t.predicted_home_score,t.away_win_probability,t.home_win_probability,
+             t.market_pick,t.market_away_score,t.market_home_score,t.market_total,t.market_spread,
+             t.confidence_score,t.confidence_label,t.model_version,t.data_quality,t.active_layers,
+             t.frozen_at,t.actual_away_score,t.actual_home_score,t.actual_winner,
+             t.fourth_down_correct,t.market_correct,t.graded_at) is distinct from
+           row(expected.season,expected.week,expected.game_key,expected.kickoff,expected.away_code,
+             expected.home_code,expected.fourth_down_pick,expected.predicted_away_score,
+             expected.predicted_home_score,expected.away_win_probability,expected.home_win_probability,
+             expected.market_pick,expected.market_away_score,expected.market_home_score,expected.market_total,
+             expected.market_spread,expected.confidence_score,expected.confidence_label,expected.model_version,
+             expected.data_quality,expected.active_layers,expected.frozen_at,expected.actual_away_score,
+             expected.actual_home_score,expected.actual_winner,expected.fourth_down_correct,
+             expected.market_correct,expected.graded_at)
+       ) then raise exception 'final'; end if;
   exception when others then
     -- The exception subtransaction rolls back every prediction write first.
     update public.prediction_week_replacements set result = 'rejected', failure_code = failure,

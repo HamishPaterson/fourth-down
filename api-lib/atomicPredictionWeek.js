@@ -53,10 +53,13 @@ export async function replaceAuthoritativePredictionWeek(client, {
 }, now = new Date()) {
   const batch = prepareAtomicPredictionWeek({ context, snapshots, operationId }, now);
   if (!/^[0-9a-f]{32}$/.test(expectedFingerprint || "")) fail();
-  const { data, error } = await client.rpc("replace_prediction_week", {
+  const { data, error, status } = await client.rpc("replace_prediction_week", {
     p: { ...batch, expectedFingerprint },
   });
-  if (error) throw new Error("ATOMIC_WEEK_RPC_FAILED");
+  if (error) throw new Error("ATOMIC_WEEK_RPC_FAILED", { cause: {
+    code: /^(?:[0-9A-Z]{5}|PGRST[0-9]{3})$/.test(error.code || "") ? error.code : null,
+    status: Number.isInteger(status) && status >= 100 && status <= 599 ? status : null,
+  } });
   if (data?.result !== "committed" || data.writtenCount !== 14 || data.operationId !== operationId) {
     const codes = ["BATCH_INVALID", "STALE_STATE", "SCOPE_BUSY", "WRITE_FAILED", "FINAL_VERIFICATION_FAILED"];
     throw new Error(`ATOMIC_WEEK_${codes.includes(data?.failureCode) ? data.failureCode : "FAILED"}`);

@@ -250,6 +250,11 @@ or outer-transaction failures may also roll back that audit. Replayed operation
 IDs, changed fingerprints, frozen/graded rows, and incomplete batches fail closed.
 The table write fence briefly serializes unrelated prediction writers, but does
 not change the existing single-snapshot persistence contract.
+Final row verification joins the authoritative matchup key and compares typed
+values directly, avoiding repeated serialization of large JSON payloads.
+Replacement alone has a bounded 30-second function-level statement timeout;
+other RPC, role and database timeouts are unchanged. Transport errors retain
+only SQLSTATE/PostgREST code and HTTP status, never raw payloads or credentials.
 
 `/api/nfl/game-stats?action=refresh-predictions` requires `Authorization: Bearer <CRON_SECRET>`.
 GET and POST default to an in-memory dry run; only POST with JSON
