@@ -11,7 +11,7 @@ import { createOpponentNetworkHandler } from "../api/nfl/opponent-network.js";
 import team from "../api/nfl/nflverse-team-metrics.js";
 import players from "../data/nflverse-player-metrics.js";
 
-const migration = await readFile(new URL("../supabase/atomic_prediction_week.sql", import.meta.url), "utf8");
+const migration = (await readFile(new URL("../supabase/atomic_prediction_week.sql", import.meta.url), "utf8")).replace(/\r\n/g, "\n");
 const pairs = ["CAR-GB", "BAL-BUF", "TEN-CIN", "ARI-DAL", "MIN-DET", "LV-NYJ", "CLE-PIT",
   "ATL-TB", "IND-JAX", "LAC-LAR", "KC-DEN", "NE-MIA", "PHI-WSH", "CHI-SEA"];
 let fixture;
@@ -366,10 +366,62 @@ test("RPC timeout is bounded and scoped to replacement without weakening securit
   const { db } = await database(t);
   const config = (await db.query(`select proconfig from pg_proc
     where oid='public.replace_prediction_week(jsonb)'::regprocedure`)).rows[0].proconfig;
-  assert.deepEqual(config.sort(), ["search_path=pg_catalog", "statement_timeout=30s"].sort());
+  assert.deepEqual(config.sort(), ["search_path=pg_catalog", "statement_timeout=45s"].sort());
   const stateConfig = (await db.query(`select proconfig from pg_proc
     where oid='public.prediction_week_state()'::regprocedure`)).rows[0].proconfig;
   assert.deepEqual(stateConfig, ["search_path=pg_catalog"]);
   assert.match(migration, /jsonb_populate_recordset/);
   assert.match(migration, /t\.away_code = expected\.away_code and t\.home_code = expected\.home_code/);
+  assert.equal((migration.match(/jsonb_populate_recordset\(/g) || []).length, 1);
+  assert(!migration.includes("jsonb_populate_record("));
+  assert.match(migration, /notify pgrst, 'reload schema'/i);
+});
+
+test("production-sized transaction retains complete payloads with bounded execution headroom", async (t) => {
+  const { db, batch, run, beforeRows, week7Before } = await database(t);
+  const initialBytes = Buffer.byteLength(JSON.stringify({ p: batch }));
+  const sample = JSON.parse(JSON.stringify(batch.rows[0].data_quality.snapshot.predictionPayload));
+  const sampleBytes = Buffer.byteLength(JSON.stringify(sample));
+  const copies = Math.max(1, Math.ceil((13_500_000 - initialBytes) / 14 / sampleBytes));
+  for (const row of batch.rows) {
+    row.data_quality.performanceFixture = Array(copies).fill(sample);
+  }
+  assert(Buffer.byteLength(JSON.stringify({ p: batch })) >= 13_500_000);
+  const wireBatch = JSON.parse(JSON.stringify(batch));
+  const started = performance.now();
+  const result = await run();
+  const elapsed = performance.now() - started;
+  assert.equal(result.result, "committed", JSON.stringify(result));
+  assert.equal(result.writtenCount, 14);
+  assert(elapsed < 20_000, `Production-sized fixture took ${elapsed.toFixed(0)}ms; require >2x headroom below 45s`);
+  assert.deepEqual((await db.query("select id,away_code,home_code,created_at from public.prediction_snapshots where week=8 order by away_code")).rows, beforeRows);
+  assert.equal((await db.query("select to_jsonb(t)::text as value from public.prediction_snapshots t where week=7")).rows[0].value, week7Before);
+  const stored = (await db.query("select data_quality from public.prediction_snapshots where week=8")).rows;
+  assert.equal(stored.length, 14);
+  for (const row of stored) {
+    const expected = wireBatch.rows.find(r => r.data_quality.snapshot.game.id === row.data_quality.snapshot.game.id);
+    assert.deepEqual(row.data_quality, expected.data_quality);
+  }
+});
+
+test("statement cancellation rolls back the outer audit and every prediction update", async (t) => {
+  const { db, run, dump, before } = await database(t);
+  await db.exec(`reset role;
+    create function fixture_timeout() returns trigger language plpgsql as $$
+    begin
+      if new.away_code = 'ATL' then raise exception 'canceling statement due to statement timeout' using errcode='57014'; end if;
+      return new;
+    end $$;
+    create trigger fixture_timeout before update on public.prediction_snapshots
+      for each row execute function fixture_timeout(); set role service_role;`);
+  await assert.rejects(run(), error => error.code === "57014");
+  assert.equal(await dump(), before);
+  assert.equal((await db.query("select count(*)::integer as count from public.prediction_week_replacements")).rows[0].count, 0);
+});
+
+test("function-only correction exactly matches migration and reloads cached RPC settings", async () => {
+  const correction = await readFile(new URL("../supabase/atomic-timeout-function-correction.sql", import.meta.url), "utf8");
+  const start = migration.indexOf("create or replace function public.replace_prediction_week(p jsonb)");
+  const end = migration.indexOf("\nend $$;", start) + "\nend $$;".length;
+  assert.equal(correction.replace(/\r\n/g, "\n"), `${migration.slice(start, end)}\nnotify pgrst, 'reload schema';\n`);
 });

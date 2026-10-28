@@ -252,9 +252,13 @@ The table write fence briefly serializes unrelated prediction writers, but does
 not change the existing single-snapshot persistence contract.
 Final row verification joins the authoritative matchup key and compares typed
 values directly, avoiding repeated serialization of large JSON payloads.
-Replacement alone has a bounded 30-second function-level statement timeout;
+Candidate rows are parsed into a typed array once and reused for validation,
+writing, payload fingerprinting and final verification.
+Replacement alone has a bounded 45-second function-level statement timeout;
 other RPC, role and database timeouts are unchanged. Transport errors retain
 only SQLSTATE/PostgREST code and HTTP status, never raw payloads or credentials.
+After replacing the function, reload PostgREST's schema cache so the REST request
+uses the updated function-level timeout (`NOTIFY pgrst, 'reload schema'`).
 
 `/api/nfl/game-stats?action=refresh-predictions` requires `Authorization: Bearer <CRON_SECRET>`.
 GET and POST default to an in-memory dry run; only POST with JSON

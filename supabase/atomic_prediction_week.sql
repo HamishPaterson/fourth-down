@@ -51,13 +51,13 @@ end $$;
 create or replace function public.replace_prediction_week(p jsonb)
 returns jsonb language plpgsql security invoker
 set search_path = pg_catalog
-set statement_timeout = '30s'
+set statement_timeout = '45s'
 as $$
 declare
   op uuid;
   before_state jsonb;
   after_state jsonb;
-  item jsonb;
+  candidate_rows public.prediction_snapshots[];
   s jsonb;
   g jsonb;
   m jsonb;
@@ -88,19 +88,21 @@ begin
        (select count(distinct (e->>'away',e->>'home')) from jsonb_array_elements(p->'manifest') e) <> 14 then
       raise exception 'invalid';
     end if;
-    if (select count(distinct e#>>'{data_quality,snapshot,id}') from jsonb_array_elements(p->'rows') e) <> 14 or
-       (select count(distinct e#>>'{data_quality,snapshot,game,id}') from jsonb_array_elements(p->'rows') e) <> 14 then
+    if jsonb_path_exists(p->'rows',
+      'strict $.** ? (@.type() == "number" && (@ > 1.7976931348623157e308 || @ < -1.7976931348623157e308))')
+    then raise exception 'invalid'; end if;
+    select array_agg(parsed) into candidate_rows
+      from jsonb_populate_recordset(null::public.prediction_snapshots, p->'rows') parsed;
+    if (select count(distinct e.data_quality#>>'{snapshot,id}') from unnest(candidate_rows) e) <> 14 or
+       (select count(distinct e.data_quality#>>'{snapshot,game,id}') from unnest(candidate_rows) e) <> 14 then
       raise exception 'invalid';
     end if;
     if (select count(distinct team) from (
       select e->>'away' team from jsonb_array_elements(p->'manifest') e
       union all select e->>'home' from jsonb_array_elements(p->'manifest') e
     ) teams) <> 28 then raise exception 'invalid'; end if;
-    for item in select value from jsonb_array_elements(p->'rows') loop
-      s := item#>'{data_quality,snapshot}'; g := s->'game';
-      if jsonb_path_exists(item,
-        'strict $.** ? (@.type() == "number" && (@ > 1.7976931348623157e308 || @ < -1.7976931348623157e308))')
-      then raise exception 'invalid'; end if;
+    for r in select * from unnest(candidate_rows) loop
+      s := r.data_quality->'snapshot'; g := s->'game';
       select value into m from jsonb_array_elements(p->'manifest')
         where value->>'id' = g->>'id';
       if m is null or coalesce(g->>'id','') !~ '^[1-9][0-9]*$' or
@@ -210,7 +212,6 @@ begin
           raise exception 'invalid';
         end if;
       end loop;
-      r := jsonb_populate_record(null::public.prediction_snapshots, item);
       if r.season is distinct from 2026 or r.week is distinct from 8 or
          r.game_key is distinct from '2026:8:' || (m->>'away') || ':' || (m->>'home') or
          r.game_key is distinct from s->>'gameKey' or
@@ -250,8 +251,7 @@ begin
         and t.data_quality#>>'{snapshot,game,id}' = expected.value->>'id'
     )) then raise exception 'stale'; end if;
     failure := 'WRITE_FAILED';
-    for item in select value from jsonb_array_elements(p->'rows') loop
-      r := jsonb_populate_record(null::public.prediction_snapshots, item);
+    for r in select * from unnest(candidate_rows) loop
       insert into public.prediction_snapshots (
         season,week,game_key,kickoff,away_code,home_code,fourth_down_pick,
         predicted_away_score,predicted_home_score,away_win_probability,home_win_probability,
@@ -277,8 +277,8 @@ begin
     end loop;
     failure := 'FINAL_VERIFICATION_FAILED';
     after_state := public.prediction_week_state();
-    select md5(jsonb_agg(e->'data_quality' order by e#>>'{data_quality,snapshot,game,id}')::text)
-      into expected_payload from jsonb_array_elements(p->'rows') e;
+    select md5(jsonb_agg(e.data_quality order by e.data_quality#>>'{snapshot,game,id}')::text)
+      into expected_payload from unnest(candidate_rows) e;
     select md5(jsonb_agg(t.data_quality order by t.data_quality#>>'{snapshot,game,id}')::text)
       into actual_payload from public.prediction_snapshots t where season = 2026 and week = 8;
     if after_state->>'count' is distinct from '14' or
@@ -287,7 +287,7 @@ begin
         where season = 2026 and week = 8 and data_quality#>>'{snapshot,authoritative}' = 'true'
           and data_quality#>>'{snapshot,batchProvenance,operationId}' = op::text) <> 14 or
        exists (
-         select 1 from jsonb_populate_recordset(null::public.prediction_snapshots, p->'rows') expected
+         select 1 from unnest(candidate_rows) expected
          left join public.prediction_snapshots t
            on t.season = expected.season and t.week = expected.week
            and t.away_code = expected.away_code and t.home_code = expected.home_code
@@ -327,4 +327,5 @@ revoke all on function public.prediction_week_state() from public, anon, authent
 revoke all on function public.replace_prediction_week(jsonb) from public, anon, authenticated;
 grant execute on function public.prediction_week_state() to service_role;
 grant execute on function public.replace_prediction_week(jsonb) to service_role;
+notify pgrst, 'reload schema';
 commit;
