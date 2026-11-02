@@ -2,7 +2,9 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { evaluateWeeklyMultiReadiness, validLockPlan, READINESS_MARKETS } from "./weeklyMultiReadiness.js";
 import { lockFixture, FUTURE_LOCK, PREPARED_AT } from "./weeklyLockTestHelpers.js";
-import { lockPredictionRejections } from "./weeklyLockProvenance.js";
+import { lockPredictionRejections, snapshotAuthority } from "./weeklyLockProvenance.js";
+import { predictionFeatureFixture } from "./personnelTestHelpers.js";
+import { CURRENT_MODEL_KEY, CURRENT_MODEL_VERSION } from "../src/services/modelIdentity.js";
 
 test("current moneyline and spread remain ready while stale totals and missing props are explicitly degraded", () => {
   const fixture = lockFixture(), before = structuredClone(fixture);
@@ -156,6 +158,130 @@ test("freshness coverage never labels quotes current without pre-lock persisted 
   const result = evaluateWeeklyMultiReadiness(fixture);
   assert.equal(result.markets.h2h.freshGames, 4);
   assert.equal(result.canSatisfyLegCount, false);
+});
+
+// Week 8 production-shaped state: 14 authoritative snapshots persisted by the
+// atomic replacement carry batchProvenance (not lockProvenance) and top-level
+// generationMarketDependencies, with saved Best Bet quotes from before the lock.
+const WEEK8_LOCK = "2026-10-29T00:00:00.000Z";
+const WEEK8_GENERATED = "2026-10-28T05:36:59.000Z";
+const WEEK8_QUOTE = "2026-10-27T12:34:16.012515305Z";
+const WEEK8_PAIRS = [["ARI", "DAL"], ["ATL", "TB"], ["BAL", "BUF"], ["CAR", "GB"], ["CHI", "SEA"],
+  ["CLE", "PIT"], ["IND", "JAX"], ["KC", "DEN"], ["LAC", "LAR"], ["LV", "NYJ"], ["MIN", "DET"],
+  ["NE", "MIA"], ["PHI", "WSH"], ["TEN", "CIN"]];
+
+function week8Fixture({ candidateCount = 2, matchups = WEEK8_PAIRS } = {}) {
+  const games = matchups.map(([away, home], index) => ({
+    away, home, kickoff: index === 3 ? "2026-10-30T00:15:00Z" : "2026-11-01T18:00:00Z",
+  }));
+  const plan = { id: "00000000-0000-4000-8000-000000000008", season: 2026, week: 8,
+    lock_at: WEEK8_LOCK, source: "server-prepared", prepared_at: "2026-10-28T23:00:00.000Z",
+    expected_game_count: games.length, games };
+  const predictions = games.map((game, index) => {
+    const features = predictionFeatureFixture(game.away, game.home, 2026, 8, game.kickoff);
+    const bets = Array.from({ length: candidateCount }, (_, betIndex) => ({
+      market: "Moneyline", category: "Game", selection: game.away, sportsbook: "Book",
+      price: 100, decimalOdds: 2, modelProbability: .7 - betIndex * .05,
+      updatedAt: WEEK8_QUOTE, quoteId: `q${index}-${betIndex}` }));
+    return {
+      id: `8:${game.away}:${game.home}`, season: 2026, week: 8, awayCode: game.away, homeCode: game.home,
+      kickoff: game.kickoff, generatedAt: WEEK8_GENERATED, authoritative: true,
+      batchProvenance: { version: 1, source: "server-week-replacement", operationId: "23b1c421-93c5-4e3c-b820-8d1a3b647e8e" },
+      generationMarketDependencies: [],
+      modelKey: CURRENT_MODEL_KEY, modelVersion: CURRENT_MODEL_VERSION, ...features,
+      fourthDownPick: game.away, fourthDownAwayScore: 24, fourthDownHomeScore: 20,
+      fourthDownAwayWinProbability: .7, fourthDownHomeWinProbability: .3, confidenceScore: .7,
+      predictionPayload: { modelLayers: { opponentNetwork: features.predictionPayloadFeatures.opponentNetwork },
+        matchupIntelligence: features.predictionPayloadFeatures },
+      playerProjections: { available: true, away: { players: [] }, home: { players: [] } },
+      dataQuality: { sources: { odds: { available: true } }, personnelTiming: { cutoff: game.kickoff } },
+      bestBets: { assessed: candidateCount, recommendations: bets.slice(0, 1), candidates: bets },
+    };
+  });
+  const odds = { cacheStatus: "fresh", refreshedAt: WEEK8_QUOTE,
+    events: games.map((game, index) => ({
+      id: `game${index}`, away_team: game.away, home_team: game.home, commence_time: game.kickoff,
+      bookmakers: [{ key: "book", title: "Book", last_update: WEEK8_QUOTE, markets: [
+        { key: "h2h", outcomes: Array.from({ length: candidateCount }, (_, betIndex) => ({
+          name: game.away, price: 100, updatedAt: WEEK8_QUOTE,
+          quoteValidation: { status: "validated" },
+          quoteSource: { id: `q${index}-${betIndex}`, provider: "SharpAPI", timestamp: WEEK8_QUOTE, fetchedAt: WEEK8_QUOTE } })) },
+      ] }],
+    })) };
+  return { plan, predictions, odds, now: new Date(WEEK8_LOCK) };
+}
+
+test("Week 8 atomic batchProvenance snapshots are recognized as authoritative without a physical column", () => {
+  const context = { season: 2026, week: 8, lockAt: WEEK8_LOCK };
+  const fixture = week8Fixture();
+  assert.equal(fixture.predictions.every((row) => row.lockProvenance === undefined), true);
+  assert.equal(fixture.predictions.every((row) => snapshotAuthority(row, context).authoritative), true);
+  assert.equal(fixture.predictions.every((row) =>
+    lockPredictionRejections(row, context, new Date(WEEK8_LOCK)).length === 0), true);
+  const result = evaluateWeeklyMultiReadiness(fixture);
+  assert.equal(result.authoritativePredictionCount, 14);
+  assert.equal(result.eligiblePredictionCount, 14);
+  assert.equal(result.blockingReasons.includes("AUTHORITATIVE_PREDICTIONS_NOT_READY"), false);
+});
+
+test("Week 8 catch-up after the lock consumes saved Best Bets without reassessment or fresh quotes", () => {
+  const fixture = week8Fixture();
+  fixture.now = new Date("2026-11-02T06:00:00Z"); // after the lock and after the 30h quote window
+  const result = evaluateWeeklyMultiReadiness(fixture);
+  assert.equal(result.canSatisfyLegCount, true);
+  assert.equal(result.selection.legs.length, 5);
+  assert.equal(result.selection.complete, true);
+  assert.equal(new Set(result.selection.legs.map((leg) => leg.matchupKey)).size, 5);
+  assert.ok(result.selection.legs.every((leg) => leg.updatedAt === WEEK8_QUOTE));
+  assert.equal(result.selection.reasonCounts.staleOdds, 0);
+});
+
+test("Week 8 catch-up still rejects post-lock and future quotes", () => {
+  const fixture = week8Fixture();
+  fixture.now = new Date("2026-11-02T06:00:00Z");
+  fixture.predictions[0].bestBets.candidates[0].updatedAt = "2026-10-29T00:01:00Z";
+  const result = evaluateWeeklyMultiReadiness(fixture);
+  const rejected = result.selection.candidateDiagnostics.find((row) => row.predictionId === fixture.predictions[0].id);
+  assert.ok(rejected.reasons.includes("POST_LOCK_QUOTE"));
+});
+
+test("Week 8 catch-up keeps the 30h dependency freshness bound off but still rejects post-lock dependencies", () => {
+  const fixture = week8Fixture();
+  fixture.now = new Date("2026-11-02T06:00:00Z");
+  fixture.predictions[0].generationMarketDependencies = [{ market: "totals", timestamp: "2026-10-27T10:00:00Z" }];
+  assert.equal(lockPredictionRejections(fixture.predictions[0], { season: 2026, week: 8, lockAt: WEEK8_LOCK },
+    fixture.now).includes("MODEL_MARKET_DEPENDENCY_STALE"), false);
+  fixture.predictions[0].generationMarketDependencies = [{ market: "totals", timestamp: "2026-10-29T00:01:00Z" }];
+  assert.ok(lockPredictionRejections(fixture.predictions[0], { season: 2026, week: 8, lockAt: WEEK8_LOCK },
+    fixture.now).includes("MODEL_MARKET_DEPENDENCY_STALE"));
+});
+
+test("Week 8 catch-up enforces distinct matchups and never pads to five", () => {
+  const fixture = week8Fixture({ matchups: WEEK8_PAIRS.slice(0, 4) });
+  fixture.plan.expected_game_count = 4;
+  fixture.now = new Date("2026-11-02T06:00:00Z");
+  const result = evaluateWeeklyMultiReadiness(fixture);
+  assert.equal(result.selection.legs.length, 4);
+  assert.equal(result.selection.complete, false);
+  assert.equal(result.canSatisfyLegCount, false);
+  assert.ok(result.blockingReasons.includes("INSUFFICIENT_ELIGIBLE_MATCHUPS"));
+});
+
+test("Week 8 catch-up rejects contradictory same-matchup candidates and duplicate markets", () => {
+  const fixture = week8Fixture({ matchups: WEEK8_PAIRS.slice(0, 5) });
+  fixture.plan.expected_game_count = 5;
+  fixture.now = new Date("2026-11-02T06:00:00Z");
+  // Add a contradictory home moneyline to game 0; only one leg per matchup survives.
+  fixture.predictions[0].bestBets.candidates.push({ market: "Moneyline", category: "Game",
+    selection: fixture.predictions[0].homeCode, sportsbook: "Book", price: 100, decimalOdds: 2,
+    modelProbability: .9, updatedAt: WEEK8_QUOTE, quoteId: "q0-home" });
+  fixture.odds.events[0].bookmakers[0].markets[0].outcomes.push({ name: fixture.predictions[0].homeCode,
+    price: 100, updatedAt: WEEK8_QUOTE, quoteValidation: { status: "validated" },
+    quoteSource: { id: "q0-home", provider: "SharpAPI", timestamp: WEEK8_QUOTE, fetchedAt: WEEK8_QUOTE } });
+  const result = evaluateWeeklyMultiReadiness(fixture);
+  const game0Legs = result.selection.legs.filter((leg) => leg.matchupKey.includes("ARI") && leg.matchupKey.includes("DAL"));
+  assert.equal(game0Legs.length, 1);
+  assert.equal(new Set(result.selection.legs.map((leg) => leg.matchupKey)).size, result.selection.legs.length);
 });
 
 test("a rollover fallback remains ineligible even if its quote timestamp appears current", () => {

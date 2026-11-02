@@ -234,3 +234,55 @@ test("scheduler time and strict late/deadline boundaries remain unchanged", () =
   assert.deepEqual(config.crons.filter((job) => job.path === "/api/weekly-multi/lock")
     .map((job) => job.schedule), ["0 0 * * *", "0 1 * * *"]);
 });
+
+// Week 8 catch-up: the atomic batch carries batchProvenance (not lockProvenance)
+// and no pre-lock plan was ever saved. A post-lock invocation derives the plan
+// from the persisted batch, locks exactly once, and a second invocation returns
+// the same record without duplication.
+function week8CatchUpFixture() {
+  const fixture = lockFixture();
+  for (const [index, row] of fixture.predictions.entries()) {
+    delete row.lockProvenance;
+    row.id = `8:${row.awayCode}:${row.homeCode}`;
+    row.generatedAt = "2026-10-28T05:36:59.000Z";
+    row.batchProvenance = { version: 1, source: "server-week-replacement", operationId: "23b1c421-93c5-4e3c-b820-8d1a3b647e8e" };
+    row.generationMarketDependencies = [];
+    for (const bet of row.bestBets.candidates) bet.updatedAt = "2026-10-27T12:34:16.012515305Z";
+    for (const bet of row.bestBets.recommendations) bet.updatedAt = "2026-10-27T12:34:16.012515305Z";
+    const outcome = fixture.odds.events[index].bookmakers[0].markets[0].outcomes[0];
+    outcome.updatedAt = "2026-10-27T12:34:16.012515305Z";
+    outcome.quoteValidation = { status: "validated" };
+    outcome.quoteSource = { id: `q${index}`, provider: "SharpAPI",
+      timestamp: "2026-10-27T12:34:16.012515305Z", fetchedAt: "2026-10-27T12:34:16.012515305Z" };
+  }
+  return fixture;
+}
+
+test("Week 8 catch-up derives the plan from the atomic batch, locks once, and is idempotent", async () => {
+  const fixture = week8CatchUpFixture();
+  fixture.plan = null; // no pre-lock plan was ever saved
+  fixture.now = new Date("2026-11-02T06:00:00Z"); // after the lock and the 30h quote window
+  const db = lockDatabase(fixture);
+  const first = await run({ fixture, db });
+  assert.equal(first.res.body.status, "locked", JSON.stringify(first.res.body));
+  assert.equal(first.res.body.record.week, 8);
+  assert.equal(first.res.body.record.legs.length, 5);
+  assert.equal(db.tables.weekly_best_multis.length, 1);
+  assert.equal(db.writes.some((row) => row.table === "prediction_snapshots"), false);
+  // A second invocation returns the same record without duplication.
+  const second = await run({ fixture, db });
+  assert.equal(second.res.body.status, "already locked");
+  assert.equal(second.res.body.record.lock_at, first.res.body.record.lock_at);
+  assert.equal(db.tables.weekly_best_multis.length, 1);
+});
+
+test("Week 8 catch-up never fabricates a lock without the persisted atomic batch", async () => {
+  const fixture = week8CatchUpFixture();
+  fixture.plan = null;
+  fixture.now = new Date("2026-11-02T06:00:00Z");
+  for (const row of fixture.predictions) delete row.batchProvenance; // not the atomic batch
+  const db = lockDatabase(fixture);
+  const { res } = await run({ fixture, db });
+  assert.equal(res.body.status, "not ready");
+  assert.equal(db.tables.weekly_best_multis.length, 0);
+});

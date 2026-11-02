@@ -395,6 +395,15 @@ Both invocations now execute the same **saved-state-only** audited pipeline:
 5. Append the result manifest, then insert a lock only with five eligible unique
    matchups. Insufficient candidates leave no fabricated partial/empty lock.
 
+If the scheduled Thursday run was blocked only because the authoritative
+prediction batch was unavailable, a post-lock invocation of the same endpoint
+performs an idempotent catch-up: it derives the expected-game plan from the
+persisted atomic batch (snapshots marked `batchProvenance.source =
+"server-week-replacement"`), re-reads the persisted pre-lock quotes without the
+rolling staleness bound, and locks only when the existing readiness rules are
+satisfied. It never runs before the lock moment, never re-locks an existing
+record, and never fabricates a lock without the persisted atomic batch.
+
 Before the scheduled lock, a separately authorized administrator must prepare the
 complete current-model prediction batch. Use the existing protected prediction-only
 refresh with JSON `{"dryRun":true,"prepareWeeklyLock":true}` first. Only an

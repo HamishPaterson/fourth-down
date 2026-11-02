@@ -6,6 +6,8 @@ import { usableDecimalOdds } from "../src/services/oddsDisplay.js";
 import { validateOddsEvents, canonicalQuoteMarket } from "../src/services/quoteValidation.js";
 import { createWeeklyMultiPreparationHandler } from "./weeklyMultiPreparation.js";
 import { canonicalTeam, availableForPlayerBet, classifyPlayerAvailability } from "./personnelView.js";
+import { snapshotAuthority } from "./weeklyLockProvenance.js";
+import { savedPredictionRows } from "./weeklyMultiReadiness.js";
 import { isCurrentModelIdentity } from "../src/services/modelIdentity.js";
 
 const BALLDONTLIE_GAMES_URL = "https://api.balldontlie.io/nfl/v1/games";
@@ -311,7 +313,11 @@ export function buildWeeklyMultiSelection(snapshots, oddsPayload, context, now =
     ...candidatePersonnelAssessment(snapshot, bet, now), reasons, eligible: false,
   });
   const candidates = [];
-  const quoteAudit = validateOddsEvents(Array.isArray(oddsPayload?.events) ? oddsPayload.events : [], { now });
+  // A post-lock catch-up over the persisted atomic batch validates persisted
+  // pre-lock quotes without the rolling staleness bound.
+  const catchUp = context.catchUp === true;
+  const quoteAsOf = catchUp ? context.lockAt : undefined;
+  const quoteAudit = validateOddsEvents(Array.isArray(oddsPayload?.events) ? oddsPayload.events : [], { now, quoteAsOf });
   const oddsEvents = quoteAudit.events;
   for (const snapshot of snapshots || []) {
     const predictionReasons = isCurrentModelIdentity(snapshot?.modelVersion, snapshot?.modelKey) ? [] : ["WRONG_MODEL"];
@@ -358,7 +364,11 @@ export function buildWeeklyMultiSelection(snapshots, oddsPayload, context, now =
       const decimalOdds = getDecimalOddsValue(bet);
       const modelProbability = Number(bet.modelProbability);
       const quoteTime = new Date(bet.updatedAt || 0).getTime();
-      if (!Number.isFinite(quoteTime) || quoteTime <= 0 || now.getTime() - quoteTime > ODDS_MAX_AGE_MS ||
+      // Saved Best Bet quotes are pre-lock evidence. The rolling freshness bound
+      // applies only while the scheduled pre-lock pipeline runs; a post-lock
+      // catch-up re-reads the already-persisted pre-lock quotes, which stay valid.
+      const catchUp = context.catchUp === true;
+      if (!Number.isFinite(quoteTime) || quoteTime <= 0 || (!catchUp && now.getTime() - quoteTime > ODDS_MAX_AGE_MS) ||
           quoteTime > Math.min(now.getTime(), Date.parse(context.lockAt))) {
         reasonCounts.staleOdds += 1;
         reject(snapshot, bet, [quoteTime > Date.parse(context.lockAt) ? "POST_LOCK_QUOTE" :
@@ -573,18 +583,22 @@ function currentBookQuote(event, bet, now, context) {
   const selection = normalizeText(bet.selection);
   const suppliedLine = bet.line ?? bet.point ?? bet.handicap;
   const line = suppliedLine === null || suppliedLine === undefined ? null : Number(suppliedLine);
+  // A post-lock catch-up re-reads persisted pre-lock quotes; the rolling freshness
+  // bound and exact live-quote identity apply only to the scheduled pre-lock run.
+  const catchUp = context.catchUp === true;
   for (const market of matches) for (const outcome of market.outcomes || []) {
     const matchesOutcome = () => {
     if (outcome.quoteValidation?.status !== "validated" || outcome.quoteSource?.rolloverFallback === true) return false;
     const timestamp = outcome.quoteSource?.timestamp || outcome.updatedAt || market.last_update || bookmaker.last_update;
     const time = Date.parse(timestamp);
     if (!Number.isFinite(time) || time > Date.parse(context.lockAt) || time > now.getTime() + 60000 ||
-        now.getTime() - time > ODDS_MAX_AGE_MS || time !== Date.parse(bet.updatedAt)) return false;
+        (!catchUp && now.getTime() - time > ODDS_MAX_AGE_MS) ||
+        (!catchUp && time !== Date.parse(bet.updatedAt))) return false;
     const fetchedAt = Date.parse(outcome.quoteSource?.fetchedAt);
     if (context.requireSnapshotEvidence && (!outcome.quoteSource?.id ||
         !Number.isFinite(fetchedAt) || fetchedAt > now.getTime() || !bet.quoteId)) return false;
     if (Number.isFinite(fetchedAt) && fetchedAt > Date.parse(context.lockAt)) return false;
-    if (bet.quoteId && outcome.quoteSource?.id !== bet.quoteId) return false;
+    if (!catchUp && bet.quoteId && outcome.quoteSource?.id !== bet.quoteId) return false;
     if (bet.price !== null && bet.price !== undefined && bet.price !== "" &&
         (!Number.isFinite(Number(bet.price)) || Number(bet.price) !== Number(outcome.price))) return false;
     const name = normalizeText(outcome.name || outcome.selection || "");
@@ -745,8 +759,23 @@ export function createWeeklyMultiCurrentHandler(overrides = {}) {
       }
       const firstKickoff = new Date(context.firstKickoffAt || "").getTime();
       if (Number.isFinite(firstKickoff) && now.getTime() >= firstKickoff) {
+        // A persisted authoritative batch may still be lockable through the
+        // catch-up path; only report a missed week when no such batch exists.
+        const { data: rows, error: predictionError } = await createClient()
+          .from("prediction_snapshots").select("data_quality")
+          .eq("season", context.season).eq("week", context.week);
+        if (predictionError) throw predictionError;
+        const lockable = savedPredictionRows(rows).some((row) =>
+          snapshotAuthority(row, { season: context.season, week: context.week, lockAt: context.lockAt }).authoritative);
         setWeeklyMultiReadCache(res, 30);
-        return res.status(200).json({
+        return res.status(200).json(lockable ? {
+          status: "not ready",
+          locked: false,
+          season: context.season,
+          week: context.week,
+          lockAt: context.lockAt,
+          message: `No shared Weekly Best Multi has been locked for Week ${context.week}. Scheduled locking requires fresh, complete saved predictions and eligible Best Bets with current odds.`,
+        } : {
           status: "missed",
           locked: false,
           season: context.season,

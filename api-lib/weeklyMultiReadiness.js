@@ -1,5 +1,5 @@
 import { buildWeeklyMultiSelection, candidateIdentity } from "./weeklyMulti.js";
-import { lockPredictionRejections, PRESERVED_LOCK_THROUGH } from "./weeklyLockProvenance.js";
+import { lockPredictionRejections, snapshotAuthority, PRESERVED_LOCK_THROUGH } from "./weeklyLockProvenance.js";
 import { completePrediction } from "./predictionEligibility.js";
 import { isCurrentModelIdentity } from "../src/services/modelIdentity.js";
 import { canonicalQuoteMarket, validateOddsEvents } from "../src/services/quoteValidation.js";
@@ -43,7 +43,12 @@ export function evaluateWeeklyMultiReadiness({ plan, predictions = [], odds, now
     prediction.awayCode === game.away && prediction.homeCode === game.home &&
     Date.parse(prediction.kickoff) === Date.parse(game.kickoff))).filter(Boolean);
   const accepted = considered.filter((prediction) => !lockPredictionRejections(prediction, context, now).length);
-  const validation = validateOddsEvents(odds?.events || [], { now });
+  // A post-lock catch-up over the persisted atomic batch re-reads pre-lock quotes
+  // without the rolling staleness bound.
+  const catchUp = now.getTime() > Date.parse(plan?.lock_at) && considered.length > 0 &&
+    considered.every((row) => row.batchProvenance?.source === "server-week-replacement");
+  const quoteAsOf = catchUp ? plan.lock_at : undefined;
+  const validation = validateOddsEvents(odds?.events || [], { now, quoteAsOf });
   const coverage = Object.fromEntries(READINESS_MARKETS.map((market) => {
     let present = 0, fresh = 0, rejected = 0;
     for (const game of expected) {
@@ -67,7 +72,7 @@ export function evaluateWeeklyMultiReadiness({ plan, predictions = [], odds, now
       missingGames: expected.length - present,
       status: !planValid ? "UNKNOWN" : fresh === expected.length ? "READY" : "DEGRADED_NON_BLOCKING" }];
   }));
-  const selection = buildWeeklyMultiSelection(accepted, odds, { ...context, requireSnapshotEvidence: true }, now);
+  const selection = buildWeeklyMultiSelection(accepted, odds, { ...context, requireSnapshotEvidence: true, catchUp }, now);
   for (const prediction of considered.filter((row) => !accepted.includes(row))) {
     const reasons = lockPredictionRejections(prediction, context, now);
     const bets = [...(prediction.bestBets?.candidates || prediction.bestBets?.recommendations || []),
@@ -90,8 +95,8 @@ export function evaluateWeeklyMultiReadiness({ plan, predictions = [], odds, now
     scheduledLockAt: plan?.lock_at || null,
     expectedGameCount: planValid ? expected.length : null,
     savedPredictionCount: considered.length,
-    authoritativePredictionCount: considered.filter((row) => row.authoritative &&
-      row.lockProvenance?.source === "server-prepared").length,
+    authoritativePredictionCount: considered.filter((row) =>
+      snapshotAuthority(row, context).authoritative).length,
     currentModelIdentityCount: considered.filter((row) => isCurrentModelIdentity(row.modelVersion, row.modelKey)).length,
     completePredictionCount: considered.filter(completePrediction).length,
     eligiblePredictionCount: accepted.length,

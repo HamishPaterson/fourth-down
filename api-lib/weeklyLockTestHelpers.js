@@ -47,7 +47,7 @@ export function lockDatabase(fixture = lockFixture(), { failTable, existing = []
   const tables = {
     weekly_multi_lock_plans: fixture.plan ? [structuredClone(fixture.plan)] : [],
     prediction_snapshots: fixture.predictions.map((row) => ({ id: row.id, season: row.season, week: row.week,
-      data_quality: { snapshot: structuredClone(row) } })),
+      kickoff: row.kickoff, data_quality: { snapshot: structuredClone(row) } })),
     weekly_best_multis: structuredClone(existing),
     weekly_multi_lock_manifests: [], weekly_multi_lock_executions: [],
   };
@@ -67,11 +67,17 @@ export function lockDatabase(fixture = lockFixture(), { failTable, existing = []
           writes.push({ table, row: structuredClone(insert) });
           return { data: single ? insert : [insert], error: null };
         }
-        const rows = tables[table].filter((row) => filters.every(([key, value]) => row[key] === value));
+        const rows = tables[table].filter((row) => filters.every(([key, value, op]) => {
+          if (op === "gte") return Date.parse(row[key]) >= Date.parse(value);
+          if (op === "lt") return Date.parse(row[key]) < Date.parse(value);
+          return row[key] === value;
+        }));
         return { data: single ? rows[0] || null : rows, error: null };
       };
       return {
         select() { return this; }, eq(key, value) { filters.push([key, value]); return this; },
+        gte(key, value) { filters.push([key, value, "gte"]); return this; },
+        lt(key, value) { filters.push([key, value, "lt"]); return this; },
         insert(value) { insert = value; return this; },
         single() { return execute(true); }, maybeSingle() { return execute(true); },
         then(resolve, reject) { return execute().then(resolve, reject); },

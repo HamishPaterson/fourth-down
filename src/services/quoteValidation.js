@@ -45,7 +45,10 @@ function periodKey(value) {
 // The margins below identify gross contradictions, not normal book movement:
 // 3x payout plus 20 probability points, with two agreeing peers for same-line
 // outliers. No maximum price is imposed, including on legitimate longshots.
-export function validateOddsEvents(events, { now = new Date() } = {}) {
+export function validateOddsEvents(events, { now = new Date(), quoteAsOf } = {}) {
+  // quoteAsOf marks a post-lock catch-up: persisted pre-lock quotes are immutable
+  // evidence, so the rolling staleness bound is disabled (other checks still run).
+  const catchUp = Number.isFinite(Date.parse(quoteAsOf));
   const offers = [];
   for (const event of events || []) for (const book of event.bookmakers || []) {
     for (const market of book.markets || []) for (const outcome of market.outcomes || []) {
@@ -72,7 +75,7 @@ export function validateOddsEvents(events, { now = new Date() } = {}) {
       if (source?.isActive === false) reject("inactive_offer");
       if (source?.isStale === true) reject("stale_offer");
       const updatedAt = source?.timestamp || outcome.updatedAt || source?.fetchedAt || market.last_update || book.last_update;
-      if (present(updatedAt)) {
+      if (!catchUp && present(updatedAt)) {
         const age = now.getTime() - Date.parse(updatedAt);
         if (!Number.isFinite(age) || age > MAX_AGE_MS || age < -60000) reject("stale_offer");
       }

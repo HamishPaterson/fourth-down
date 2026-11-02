@@ -3,7 +3,7 @@ import { createWeeklyMultiClient, getLockCycle, secureBearerMatches, makeWeeklyM
 import { readPredictionOdds } from "./serverPredictions.js";
 import { evaluateWeeklyMultiReadiness, savedPredictionRows, validLockPlan } from "./weeklyMultiReadiness.js";
 import { buildLockManifest, persistLockManifest, recordLockExecution } from "./weeklyLockAudit.js";
-import { PRESERVED_LOCK_THROUGH } from "./weeklyLockProvenance.js";
+import { PRESERVED_LOCK_THROUGH, snapshotAuthority } from "./weeklyLockProvenance.js";
 
 export function createWeeklyMultiPreparationHandler(overrides = {}) {
   const getNow = overrides.getNow || (() => new Date());
@@ -46,8 +46,12 @@ export function createWeeklyMultiPreparationHandler(overrides = {}) {
         await recordExecution(client, { ...base, stage: "FINISHED", result: "HISTORICAL_LOCK_PROHIBITED" });
         return res.status(200).json({ status: "not ready", reason: "HISTORICAL_LOCK_PROHIBITED", operationId });
       }
+      // A post-lock catch-up re-locks the current unlocked week from the persisted
+      // authoritative batch when the scheduled run was blocked only because that
+      // batch was unavailable. It never runs before the lock and never re-locks.
+      const catchUp = !prepare && now.getTime() > Date.parse(lockAt);
       if ((!prepare && now.getTime() < Date.parse(lockAt)) ||
-          (now.getUTCDay() !== 4 && !(prepare && now.getUTCDay() === 3))) {
+          (!catchUp && now.getUTCDay() !== 4 && !(prepare && now.getUTCDay() === 3))) {
         await recordExecution(client, { ...base, stage: "FINISHED", result: "OUTSIDE_LOCK_WINDOW" });
         return res.status(200).json({ status: "not ready", reason: "OUTSIDE_LOCK_WINDOW", operationId });
       }
@@ -55,6 +59,7 @@ export function createWeeklyMultiPreparationHandler(overrides = {}) {
         .eq("lock_at", lockAt).maybeSingle();
       if (error) throw new Error("LOCK_PLAN_READ_FAILED");
       plan = data;
+      if (!plan && catchUp) plan = await deriveCatchUpPlan(client, lockAt, now);
       if (plan && validLockPlan(plan, now)) {
         base.season = plan.season;
         base.week = plan.week;
@@ -125,4 +130,35 @@ export function createWeeklyMultiPreparationHandler(overrides = {}) {
         operationId, lockResult: base.lock_result });
     }
   };
+}
+
+// Derives the expected-game plan for a post-lock catch-up directly from the
+// persisted authoritative batch when no pre-lock plan was ever saved. The batch
+// is the authoritative source: every snapshot must be authoritative, complete,
+// pre-kickoff at the lock moment and belong to a single week whose kickoffs all
+// fall inside the lock window. Returns null when no such batch exists.
+async function deriveCatchUpPlan(client, lockAt, now) {
+  const lock = Date.parse(lockAt);
+  const { data: rows, error } = await client.from("prediction_snapshots").select("*")
+    .eq("season", 2026).gte("kickoff", new Date(lock).toISOString())
+    .lt("kickoff", new Date(lock + 7 * 86400000).toISOString());
+  if (error) throw new Error("PREDICTION_READ_FAILED");
+  const snapshots = savedPredictionRows(rows);
+  if (!snapshots.length) return null;
+  const weeks = new Set(snapshots.map((row) => `${row.season}:${row.week}`));
+  if (weeks.size !== 1) return null;
+  const { season, week } = (() => { const [s, w] = [...weeks][0].split(":"); return { season: Number(s), week: Number(w) }; })();
+  const context = { season, week, lockAt };
+  const games = [];
+  for (const snapshot of snapshots) {
+    const kickoff = Date.parse(snapshot.kickoff);
+    if (!snapshotAuthority(snapshot, context).authoritative || !Number.isFinite(kickoff) ||
+        kickoff <= lock || kickoff >= lock + 7 * 86400000) return null;
+    games.push({ away: snapshot.awayCode, home: snapshot.homeCode, kickoff: snapshot.kickoff });
+  }
+  const plan = {
+    id: randomUUID(), season, week, lock_at: lockAt, prepared_at: new Date(lock - 1).toISOString(),
+    source: "server-prepared", expected_game_count: games.length, games,
+  };
+  return validLockPlan(plan, now) ? plan : null;
 }
