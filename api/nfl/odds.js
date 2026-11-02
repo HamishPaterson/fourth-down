@@ -183,7 +183,12 @@ async function withRolloverFallback(client, snapshots, missingMarkets, week, now
 async function handleCoreFromSnapshots(res, deps) {
   const now = deps.now ?? Date.now();
   const { week } = getCurrentWeekWindow(now);
+  return handleCoreSnapshotsForWeek(res, deps, week, now);
+}
 
+// Week-scoped stored core read. The Weekly Multi catch-up passes the lock week
+// so persisted pre-lock quotes are read instead of the current display week.
+async function handleCoreSnapshotsForWeek(res, deps, week, now) {
   let snapshots;
   try {
     const client = deps.client || createSnapshotClient();
@@ -523,7 +528,11 @@ async function refreshPlayerMarket({ market, apiKey, client, now }) {
 async function handlePropsFromSnapshots(res, deps) {
   const now = deps.now ?? Date.now();
   const { week } = getCurrentWeekWindow(now);
+  return handlePropsSnapshotsForWeek(res, deps, week, now);
+}
 
+// Week-scoped stored props read for the Weekly Multi catch-up.
+async function handlePropsSnapshotsForWeek(res, deps, week, now) {
   let snapshots;
   try {
     snapshots = await readSnapshots(deps.client || createSnapshotClient(), { week });
@@ -583,6 +592,21 @@ async function handlePropsFromSnapshots(res, deps) {
 
   setSnapshotCacheHeaders(res, summary.cacheStatus === "fresh");
   return res.status(200).json(payload);
+}
+
+// Reads the persisted core and prop snapshots for an explicit week and merges
+// them into one payload. Used by the Weekly Multi catch-up to re-read the lock
+// week's persisted pre-lock quotes instead of the current display week.
+export async function readStoredOddsForWeek(client, week, now = Date.now()) {
+  const capture = () => {
+    let body;
+    return { setHeader() {}, status() { return this; }, json(value) { body = value; return this; }, body: () => body };
+  };
+  const coreRes = capture();
+  await handleCoreSnapshotsForWeek(coreRes, { client, now }, week, now);
+  const propsRes = capture();
+  await handlePropsSnapshotsForWeek(propsRes, { client, now }, week, now);
+  return { core: coreRes.body(), props: propsRes.body() };
 }
 
 async function loadOdds(scope, apiKey) {

@@ -254,6 +254,8 @@ function week8CatchUpFixture() {
     outcome.quoteValidation = { status: "validated" };
     outcome.quoteSource = { id: `q${index}`, provider: "SharpAPI",
       timestamp: "2026-10-27T12:34:16.012515305Z", fetchedAt: "2026-10-27T12:34:16.012515305Z" };
+    // The atomic batch embeds the exact pre-lock odds event in each snapshot.
+    row.game = { id: `game${index}`, oddsEvent: fixture.odds.events[index] };
   }
   return fixture;
 }

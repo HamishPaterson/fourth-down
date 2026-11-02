@@ -5,7 +5,7 @@ import teamForm, { databaseToSnapshot, writePredictionVersion } from "../api/nfl
 import opponentNetwork, { createOpponentNetworkHandler, validateWeeklyOpponentNetwork } from "../api/nfl/opponent-network.js";
 import playByPlay from "../api/nfl/play-by-play.js";
 import roster from "../api/nfl/sleeper-players.js";
-import { handleOddsRequest, getCurrentWeekWindow } from "../api/nfl/odds.js";
+import { handleOddsRequest, getCurrentWeekWindow, readStoredOddsForWeek } from "../api/nfl/odds.js";
 import { getFullGamePrediction } from "../src/services/gamePredictionService.js";
 import { buildPredictionSnapshot } from "../src/services/predictionSnapshot.js";
 import { findOddsForGame } from "../src/services/oddsApi.js";
@@ -53,7 +53,15 @@ export async function invoke(handler, query = {}, options = {}) {
 }
 
 export async function readPredictionOdds(client, now, context) {
-  if (context && (context.season !== 2026 || getCurrentWeekWindow(now.getTime()).week !== context.week)) {
+  const currentWeek = getCurrentWeekWindow(now.getTime()).week;
+  if (context && context.season === 2026 && context.week !== currentWeek) {
+    // A post-lock catch-up re-reads the lock week's persisted snapshots directly.
+    const { core, props } = await readStoredOddsForWeek(client, context.week, now.getTime());
+    const merged = mergeStoredOdds(core, props);
+    if (!merged.events.length) throw new Error("Stored odds snapshots are unavailable");
+    return merged;
+  }
+  if (context && (context.season !== 2026 || currentWeek !== context.week)) {
     throw new Error("Stored odds season/week does not match the schedule lock week");
   }
   const payloads = [];

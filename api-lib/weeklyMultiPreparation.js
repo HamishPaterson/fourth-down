@@ -67,7 +67,12 @@ export function createWeeklyMultiPreparationHandler(overrides = {}) {
           .eq("season", plan.season).eq("week", plan.week);
         if (predictionError) throw new Error("PREDICTION_READ_FAILED");
         predictions = savedPredictionRows(rows);
-        odds = await readOdds(client, now, { season: plan.season, week: plan.week });
+        // A catch-up over the atomic batch re-reads the exact pre-lock quotes
+        // embedded in each persisted snapshot; the current-week snapshot table
+        // has since been refreshed and no longer holds them.
+        odds = catchUp && predictions.every((row) => row.batchProvenance?.source === "server-week-replacement")
+          ? embeddedOddsPayload(predictions)
+          : await readOdds(client, now, { season: plan.season, week: plan.week });
       }
       stage = "INPUTS_CAPTURED";
       capturedId = await persistManifest(client, buildLockManifest({
@@ -129,6 +134,23 @@ export function createWeeklyMultiPreparationHandler(overrides = {}) {
       return res.status(authorized ? 503 : 401).json({ error: authorized ? failure.failure_code : "Unauthorized",
         operationId, lockResult: base.lock_result });
     }
+  };
+}
+
+// Builds the odds payload from the exact pre-lock quotes embedded in each
+// persisted atomic-batch snapshot (game.oddsEvent). These are the quotes the
+// saved Best Bets were assessed against; the snapshot table has since moved on.
+function embeddedOddsPayload(predictions) {
+  const events = (predictions || []).map((row) => row.game?.oddsEvent).filter((event) =>
+    event && Array.isArray(event.bookmakers) && event.bookmakers.length);
+  const times = events.flatMap((event) => event.bookmakers.flatMap((book) =>
+    (book.markets || []).flatMap((market) => (market.outcomes || []).map((outcome) =>
+      Date.parse(outcome.quoteSource?.timestamp || outcome.updatedAt || market.last_update || book.last_update)))))
+    .filter(Number.isFinite);
+  return {
+    events,
+    cacheStatus: events.length ? "fresh" : "unavailable",
+    refreshedAt: times.length ? new Date(Math.min(...times)).toISOString() : null,
   };
 }
 
