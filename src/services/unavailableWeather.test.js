@@ -74,6 +74,8 @@ test("unavailable weather preserves neutral score, TD and special-teams simulati
 test("all 14 Week 8 server candidates including 11 outdoor venues are finite and pass batch validation", async () => {
   const pairs = ["CAR-GB", "BAL-BUF", "TEN-CIN", "ARI-DAL", "MIN-DET", "LV-NYJ", "CLE-PIT",
     "ATL-TB", "IND-JAX", "LAC-LAR", "KC-DEN", "NE-MIA", "PHI-WSH", "CHI-SEA"];
+  // Deterministic clock: the frozen "now" (Oct 28) is before the real Week 8 first
+  // kickoff (Oct 30), which the situational artifact cutoff requires.
   const now = new Date("2026-10-28T00:00:00Z");
   const source = pairs.map((pair, i) => {
     const [away, home] = pair.split("-");
@@ -89,20 +91,28 @@ test("all 14 Week 8 server candidates including 11 outdoor venues are finite and
     opponentNetwork: invoke(handler, query),
   }) });
   const originalFetch = globalThis.fetch;
+  const originalKey = process.env.BALLDONTLIE_API_KEY;
+  process.env.BALLDONTLIE_API_KEY = "fixture-only-key";
   const OriginalDate = globalThis.Date;
   globalThis.Date = class extends OriginalDate {
     constructor(...args) { super(...(args.length ? args : [now.getTime()])); }
     static now() { return now.getTime(); }
+    static parse(value) { return OriginalDate.parse(value); }
+    static UTC(...args) { return OriginalDate.UTC(...args); }
   };
   globalThis.fetch = () => assert.fail("Weather and odds providers must not be fetched");
   try {
     const snapshots = [];
     for (const game of context.games) {
       const prepared = { ...game, weather: unavailable };
+      const quoteAt = now.toISOString();
+      const outcome = (name) => ({ name, price: 100, updatedAt: quoteAt,
+        quoteValidation: { status: "validated" },
+        quoteSource: { id: `q-${game.id}-${name}`, provider: "SharpAPI", timestamp: quoteAt, fetchedAt: quoteAt } });
       const odds = { events: [{ id: `stored-${game.id}`, commence_time: game.sourceDate,
         away_team: game.away, home_team: game.home, bookmakers: [{ key: "fixture",
-          last_update: now.toISOString(), markets: [{ key: "h2h", outcomes: [
-            { name: game.away, price: 100 }, { name: game.home, price: 100 },
+          last_update: quoteAt, markets: [{ key: "h2h", outcomes: [
+            outcome(game.away), outcome(game.home),
           ] }] }] }] };
       const snapshot = await generate(prepared, odds, now);
       assertFinite(snapshot);
@@ -111,5 +121,10 @@ test("all 14 Week 8 server candidates including 11 outdoor venues are finite and
       snapshots.push(snapshot);
     }
     validatePredictionRefreshBatch(snapshots, context, now);
-  } finally { globalThis.fetch = originalFetch; globalThis.Date = OriginalDate; }
+  } finally {
+    globalThis.fetch = originalFetch;
+    globalThis.Date = OriginalDate;
+    if (originalKey === undefined) delete process.env.BALLDONTLIE_API_KEY;
+    else process.env.BALLDONTLIE_API_KEY = originalKey;
+  }
 });

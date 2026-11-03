@@ -10,15 +10,27 @@ import { playerMetricsResponse } from "./playerMetrics.js";
 import { createOpponentNetworkHandler } from "../api/nfl/opponent-network.js";
 import team from "../api/nfl/nflverse-team-metrics.js";
 import players from "../data/nflverse-player-metrics.js";
+import { FIXED_TEST_TIME } from "./testClock.js";
 
 const migration = (await readFile(new URL("../supabase/atomic_prediction_week.sql", import.meta.url), "utf8")).replace(/\r\n/g, "\n");
 const pairs = ["CAR-GB", "BAL-BUF", "TEN-CIN", "ARI-DAL", "MIN-DET", "LV-NYJ", "CLE-PIT",
   "ATL-TB", "IND-JAX", "LAC-LAR", "KC-DEN", "NE-MIA", "PHI-WSH", "CHI-SEA"];
+// Deterministic clock: the fixture must stay valid regardless of when the suite runs.
+// The kickoff stays 7 days in the future so the RPC's clock_timestamp() kickoff check
+// passes; the frozen Date keeps quote freshness and generatedAt deterministic.
+const FIXTURE_NOW = new Date(FIXED_TEST_TIME);
 let fixture;
 async function candidates() {
   if (!fixture) fixture = (async () => {
-    const now = new Date();
-    const kickoff = new Date(now.getTime() + 7 * 86400000).toISOString();
+    const now = FIXTURE_NOW;
+    const kickoff = new Date(Date.now() + 7 * 86400000).toISOString();
+    const OriginalDate = globalThis.Date;
+    globalThis.Date = class extends OriginalDate {
+      constructor(...args) { super(...(args.length ? args : [now.getTime()])); }
+      static now() { return now.getTime(); }
+      static parse(value) { return OriginalDate.parse(value); }
+      static UTC(...args) { return OriginalDate.UTC(...args); }
+    };
     const games = pairs.map((pair, index) => {
       const [away, home] = pair.split("-");
       return { id: String(1392323 + index), season: 2026, week: 8, away, home, sourceDate: kickoff };
@@ -30,19 +42,30 @@ async function candidates() {
       opponentNetwork: invoke(network, query),
     }) });
     const original = globalThis.fetch;
+    const originalKey = process.env.BALLDONTLIE_API_KEY;
+    process.env.BALLDONTLIE_API_KEY = "fixture-only-key";
     globalThis.fetch = () => assert.fail("Atomic tests cannot call providers");
     try {
       const snapshots = [];
       for (const game of games) {
+        const quoteAt = now.toISOString();
+        const outcome = (name) => ({ name, price: 100, updatedAt: quoteAt,
+          quoteValidation: { status: "validated" },
+          quoteSource: { id: `q-${game.id}-${name}`, provider: "SharpAPI", timestamp: quoteAt, fetchedAt: quoteAt } });
         snapshots.push(await generate({ ...game, weather: { weatherAvailable: false, fallbackActive: true } },
           { events: [{ id: `stored-${game.id}`, commence_time: kickoff,
             away_team: game.away, home_team: game.home, bookmakers: [{ key: "fixture",
-              last_update: now.toISOString(), markets: [{ key: "h2h", outcomes: [
-                { name: game.away, price: 100 }, { name: game.home, price: 100 },
+              last_update: quoteAt, markets: [{ key: "h2h", outcomes: [
+                outcome(game.away), outcome(game.home),
               ] }] }] }] }, now));
       }
       return { context: { season: 2026, week: 8, games }, snapshots };
-    } finally { globalThis.fetch = original; }
+    } finally {
+      globalThis.fetch = original;
+      globalThis.Date = OriginalDate;
+      if (originalKey === undefined) delete process.env.BALLDONTLIE_API_KEY;
+      else process.env.BALLDONTLIE_API_KEY = originalKey;
+    }
   })();
   return structuredClone(await fixture);
 }
@@ -73,7 +96,7 @@ async function database(t) {
   await db.exec(migration);
   await db.exec(migration);
   const input = await candidates();
-  const batch = prepareAtomicPredictionWeek({ ...input, operationId: randomUUID() });
+  const batch = prepareAtomicPredictionWeek({ ...input, operationId: randomUUID() }, FIXTURE_NOW);
   for (const [index, row] of batch.rows.entries()) {
     await db.query(`insert into public.prediction_snapshots
       (season,week,game_key,kickoff,away_code,home_code,data_quality)
@@ -291,7 +314,7 @@ test("server caller validates finite unchanged outputs and sanitizes RPC errors 
   const input = await candidates(), original = JSON.stringify(input);
   let calls = 0;
   const op = randomUUID();
-  const batch = prepareAtomicPredictionWeek({ ...input, operationId: op });
+  const batch = prepareAtomicPredictionWeek({ ...input, operationId: op }, FIXTURE_NOW);
   assert.equal(JSON.stringify(input), original);
   assert.deepEqual(batch.rows.map(r => r.data_quality.snapshot.predictionPayload),
     input.snapshots.map(s => s.predictionPayload));
@@ -301,7 +324,7 @@ test("server caller validates finite unchanged outputs and sanitizes RPC errors 
   } }, { ...input, operationId: op, expectedFingerprint: "a".repeat(32) }), /^Error: ATOMIC_WEEK_RPC_FAILED$/);
   assert.equal(calls, 1);
   input.snapshots[13].predictionPayload.continuousMargin = Infinity;
-  assert.throws(() => prepareAtomicPredictionWeek({ ...input, operationId: op }));
+  assert.throws(() => prepareAtomicPredictionWeek({ ...input, operationId: op }, FIXTURE_NOW));
 });
 
 test("timeout diagnostics retain only SQLSTATE and HTTP status and never retry", async () => {
