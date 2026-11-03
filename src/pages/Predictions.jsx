@@ -49,10 +49,14 @@ export default function Predictions({ onOpen }) {
   useEffect(() => {
     let active = true;
     const controller = new AbortController();
-    fetchSchedule(SEASON, calendarWeek, controller.signal)
-      .then((payload) => {
+    // Fetch both the calendar week and the prior week so the lifecycle check can
+    // hold the default on a prior week whose final game is still in progress.
+    Promise.all([calendarWeek, calendarWeek - 1].filter((w) => w >= 1).map((w) =>
+      fetchSchedule(SEASON, w, controller.signal).catch(() => null)))
+      .then((payloads) => {
         if (!active) return;
-        const games = extractScheduleGames(payload).map(mapScheduleGame);
+        const games = payloads.filter(Boolean).flatMap((payload) =>
+          extractScheduleGames(payload).map(mapScheduleGame));
         const defaultWeek = getDefaultWeek(games);
         if (defaultWeek !== calendarWeek) setWeek((current) => current === calendarWeek ? defaultWeek : current);
       })

@@ -185,10 +185,14 @@ export default function Schedule({ onOpen, favoriteTeam, initialMode = "all" }) 
   useEffect(() => {
     let active = true;
     const controller = new AbortController();
-    getSchedule(SEASON, calendarWeek)
-      .then((payload) => {
+    // Fetch both the calendar week and the prior week so the lifecycle check can
+    // hold the default on a prior week whose final game is still in progress.
+    Promise.all([calendarWeek, calendarWeek - 1].filter((w) => w >= 1).map((w) =>
+      getSchedule(SEASON, w).catch(() => null)))
+      .then((payloads) => {
         if (!active) return;
-        const defaultWeek = getDefaultWeek(payload?.games || []);
+        const games = payloads.filter(Boolean).flatMap((payload) => payload?.games || []);
+        const defaultWeek = getDefaultWeek(games);
         if (defaultWeek !== calendarWeek) setWeek((current) => current === calendarWeek ? defaultWeek : current);
       })
       .catch(() => {});
