@@ -3,6 +3,7 @@ import { MapPin, RefreshCw } from "lucide-react";
 import { TEAM_NAMES } from "../data.js";
 import { getTeamTheme } from "../services/teamThemes.js";
 import { findOddsForGame, getNflOdds } from "../services/oddsApi.js";
+import { getCalendarWeek, getDefaultWeek } from "../services/weekLifecycle.js";
 import TeamLogo from "../components/TeamLogo.jsx";
 import FourthDownLoader from "../components/FourthDownLoader.jsx";
 import { shouldShowBlockingLoader } from "../components/fourthDownLoader.js";
@@ -13,7 +14,8 @@ const SCHEDULE_CACHE_TTL_MS = 6 * 60 * 60 * 1000;
 const pendingScheduleRequests = new Map();
 
 export default function Schedule({ onOpen, favoriteTeam, initialMode = "all" }) {
-  const [week, setWeek] = useState(getCurrentWeek());
+  const calendarWeek = getCalendarWeek();
+  const [week, setWeek] = useState(calendarWeek);
   const [games, setGames] = useState([]);
   const [viewMode, setViewMode] = useState(initialMode);
   const [oddsEvents, setOddsEvents] = useState([]);
@@ -178,6 +180,21 @@ export default function Schedule({ onOpen, favoriteTeam, initialMode = "all" }) 
     }
   }
 
+  // The default displayed week follows the authoritative game lifecycle: while
+  // any calendar-week game is not FINAL, the default remains the calendar week.
+  useEffect(() => {
+    let active = true;
+    const controller = new AbortController();
+    getSchedule(SEASON, calendarWeek)
+      .then((payload) => {
+        if (!active) return;
+        const defaultWeek = getDefaultWeek(payload?.games || []);
+        if (defaultWeek !== calendarWeek) setWeek((current) => current === calendarWeek ? defaultWeek : current);
+      })
+      .catch(() => {});
+    return () => { active = false; controller.abort(); };
+  }, [calendarWeek]);
+
   useEffect(() => {
     loadSchedule();
   }, [week]);
@@ -290,15 +307,6 @@ export default function Schedule({ onOpen, favoriteTeam, initialMode = "all" }) 
   );
 }
 
-
-function getCurrentWeek() {
-  // NFL weeks roll forward after the previous week's Monday night game.
-  // Tuesday 8 September 2026 is the start of the Week 1 display window.
-  const weekOneWindowStart = Date.UTC(2026, 8, 8, 0, 0, 0);
-  const elapsed = Date.now() - weekOneWindowStart;
-  const week = Math.floor(elapsed / (7 * 24 * 60 * 60 * 1000)) + 1;
-  return Math.min(18, Math.max(1, week));
-}
 
 function getScheduleCacheKey(season, week) {
   return `${SCHEDULE_CACHE_PREFIX}:${season}:${week}`;

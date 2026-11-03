@@ -23,6 +23,7 @@ import { playerDiagnosticSummary, scorerProbabilityLabel, tdBettingDisplay } fro
 import { savedBestBetsDisplay } from "../services/savedBestBetsDisplay.js";
 import { isQualifiedBestBet, selectTdModelPick } from "../services/bestBetsService.js";
 import { isFinalGame, resultGameKey, withGameResult, completedPickLabel } from "../services/gameResults.js";
+import { getCalendarWeek, getDefaultWeek } from "../services/weekLifecycle.js";
 import FourthDownLoader from "../components/FourthDownLoader.jsx";
 import { shouldShowBlockingLoader } from "../components/fourthDownLoader.js";
 
@@ -35,15 +36,33 @@ const WEEKLY_PARLAY_MODEL_PROBABILITY_FLOOR = 0.55;
 const WEEKLY_PARLAY_LEG_COUNT = 5;
 
 export default function Predictions({ onOpen }) {
-  const availableWeek = getCurrentWeek();
-  const [week, setWeek] = useState(() => availableWeek);
+  const calendarWeek = getCalendarWeek();
+  const [week, setWeek] = useState(() => calendarWeek);
   const [rows, setRows] = useState([]);
   const [filter, setFilter] = useState("all");
   const [status, setStatus] = useState("Loading predictions...");
 
+  // The default displayed week follows the authoritative game lifecycle: while
+  // any calendar-week game is not FINAL, the default remains the calendar week.
+  // Once every calendar-week game is FINAL, the default rolls forward. Manual
+  // selection still allows any week up to the calendar week.
   useEffect(() => {
-    if (week > availableWeek) setWeek(availableWeek);
-  }, [week, availableWeek]);
+    let active = true;
+    const controller = new AbortController();
+    fetchSchedule(SEASON, calendarWeek, controller.signal)
+      .then((payload) => {
+        if (!active) return;
+        const games = extractScheduleGames(payload).map(mapScheduleGame);
+        const defaultWeek = getDefaultWeek(games);
+        if (defaultWeek !== calendarWeek) setWeek((current) => current === calendarWeek ? defaultWeek : current);
+      })
+      .catch(() => {});
+    return () => { active = false; controller.abort(); };
+  }, [calendarWeek]);
+
+  useEffect(() => {
+    if (week > calendarWeek) setWeek(calendarWeek);
+  }, [week, calendarWeek]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -332,7 +351,7 @@ export default function Predictions({ onOpen }) {
               value={week}
               onChange={(event) => setWeek(Number(event.target.value))}
             >
-              {Array.from({ length: availableWeek }, (_, index) => index + 1).map(
+              {Array.from({ length: calendarWeek }, (_, index) => index + 1).map(
                 (value) => (
                   <option key={value} value={value}>
                     Week {value}
@@ -492,7 +511,7 @@ export function PredictionCard({ prediction, onOpen }) {
   const projectedTie =
     Number(prediction.fourthDownAwayScore) ===
       Number(prediction.fourthDownHomeScore);
-  const currentWeek = getCurrentWeek();
+  const currentWeek = getCalendarWeek();
   const bestBetsAvailable =
     isFinal ? Boolean(prediction.bestBets) : Number(prediction.week) === Number(currentWeek);
 
@@ -1753,13 +1772,6 @@ async function mapWithConcurrency(items, limit, mapper) {
   );
 
   return results;
-}
-
-function getCurrentWeek() {
-  const weekOneStart = Date.UTC(2026, 8, 8, 0, 0, 0);
-  const elapsed = Date.now() - weekOneStart;
-  const week = Math.floor(elapsed / (7 * 24 * 60 * 60 * 1000)) + 1;
-  return Math.min(18, Math.max(1, week));
 }
 
 function normalizeName(value) {
