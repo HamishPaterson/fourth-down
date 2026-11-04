@@ -257,40 +257,50 @@ export function resolveOddsForGame(events, game) {
   if (direct.length) return direct.length === 1
     ? { event: direct[0], status: "EXACT" } : unavailable("AMBIGUOUS");
 
-  // Audited Week 8 source discrepancy; all other events retain exact-time matching.
-  const scheduleId = "1392336";
-  const canonicalKickoff = "2026-11-03T01:15:00.000Z";
-  const providerEventId = "nfl_bears_seahawks_2026-11-02_b3";
-  const toleranceMs = 5 * 60 * 1000;
-  if (Number(game.season) !== 2026 || Number(game.week) !== 8 ||
-      String(game.id) !== scheduleId || awayCode !== "CHI" || homeCode !== "SEA" ||
-      kickoff !== Date.parse(canonicalKickoff)) return unavailable("UNAVAILABLE");
+  // Audited provider/schedule kickoff discrepancies; all other events retain
+  // exact-time matching.
+  const auditedRules = [{
+    rule: "2026-week-8-chi-sea-kickoff", season: 2026, week: 8, scheduleId: "1392336",
+    away: "CHI", home: "SEA", canonicalKickoff: "2026-11-03T01:15:00.000Z",
+    providerEventId: "nfl_bears_seahawks_2026-11-02_b3", toleranceMs: 5 * 60 * 1000,
+  }, {
+    rule: "2026-week-9-lv-sf-kickoff", season: 2026, week: 9, scheduleId: "1392347",
+    away: "LV", home: "SF", canonicalKickoff: "2026-11-08T21:25:00.000Z",
+    providerEventId: "nfl_49ers_raiders_2026-11-08_b2", toleranceMs: 30 * 60 * 1000,
+  }];
+  const audited = auditedRules.find((mapping) =>
+    Number(game.season) === mapping.season && Number(game.week) === mapping.week &&
+    String(game.id) === mapping.scheduleId && awayCode === mapping.away && homeCode === mapping.home &&
+    kickoff === Date.parse(mapping.canonicalKickoff));
+  if (!audited) return unavailable("UNAVAILABLE");
   const candidates = events.filter((event) =>
     resolveTeamCode(event?.away_team_code || event?.away_code || event?.away_team) === awayCode &&
     resolveTeamCode(event?.home_team_code || event?.home_code || event?.home_team) === homeCode &&
     Number.isFinite(Date.parse(event.commence_time)) &&
-    Math.abs(Date.parse(event.commence_time) - kickoff) <= toleranceMs
+    Math.abs(Date.parse(event.commence_time) - kickoff) <= audited.toleranceMs
   );
   if (candidates.length > 1) return unavailable("AMBIGUOUS");
   const candidate = candidates[0];
-  if (!candidate || candidate.id !== providerEventId ||
-      (candidate.season != null && Number(candidate.season) !== 2026) ||
-      (candidate.week != null && Number(candidate.week) !== 8)) return unavailable("UNAVAILABLE");
+  if (!candidate || candidate.id !== audited.providerEventId ||
+      (candidate.season != null && Number(candidate.season) !== audited.season) ||
+      (candidate.week != null && Number(candidate.week) !== audited.week)) return unavailable("UNAVAILABLE");
   const quotes = (candidate.bookmakers || []).flatMap((book) =>
     (book.markets || []).filter((market) => ["h2h", "spreads", "totals"].includes(market.key))
       .flatMap((market) => market.outcomes || []));
+  const snapshotPattern = new RegExp(`^nfl:${audited.season}:${audited.week}:(moneyline|point_spread|total_points):`);
   if (!quotes.length || !quotes.every((quote) => {
     const source = quote.quoteSource;
-    return source?.provider === "SharpAPI" && source.eventId === providerEventId &&
-      /^nfl:2026:8:(moneyline|point_spread|total_points):/.test(source.snapshotId || "");
+    return source?.provider === "SharpAPI" && source.eventId === audited.providerEventId &&
+      snapshotPattern.test(source.snapshotId || "");
   })) return unavailable("PROVENANCE_UNAVAILABLE");
   return {
     status: "RECONCILED",
     event: { ...candidate, scheduleMapping: {
-      status: "RECONCILED", rule: "2026-week-8-chi-sea-kickoff",
-      season: 2026, week: 8, scheduleGameId: scheduleId,
-      providerEventId, canonicalKickoff, providerKickoff: candidate.commence_time,
-      discrepancyMs: Date.parse(candidate.commence_time) - kickoff, toleranceMs,
+      status: "RECONCILED", rule: audited.rule,
+      season: audited.season, week: audited.week, scheduleGameId: audited.scheduleId,
+      providerEventId: audited.providerEventId, canonicalKickoff: audited.canonicalKickoff,
+      providerKickoff: candidate.commence_time,
+      discrepancyMs: Date.parse(candidate.commence_time) - kickoff, toleranceMs: audited.toleranceMs,
     } },
   };
 }

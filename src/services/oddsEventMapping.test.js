@@ -72,6 +72,58 @@ test("wrong or missing quote season/week/provider/event provenance cannot reconc
   assert.equal(findOddsForGame([{ ...event(), id: "unverified-event" }], game), null);
 });
 
+const week9Game = { id: "1392347", season: 2026, week: 9, away: "LV", home: "SF",
+  kickoff: "2026-11-08T21:25:00.000Z" };
+const week9Event = (minutes = 20) => ({
+  id: "nfl_49ers_raiders_2026-11-08_b2",
+  away_team: "Las Vegas Raiders", home_team: "San Francisco 49ers",
+  commence_time: new Date(Date.parse(week9Game.kickoff) - minutes * 60000).toISOString(),
+  bookmakers: [{ key: "fanduel", markets: [{ key: "h2h", outcomes: [
+    { name: "LV Raiders", price: 320 }, { name: "SF 49ers", price: -410 },
+  ].map((quote) => ({ ...quote, quoteSource: { provider: "SharpAPI",
+    eventId: "nfl_49ers_raiders_2026-11-08_b2",
+    snapshotId: "nfl:2026:9:moneyline:2026-11-03T12:34:16.771Z" } })) }] }],
+});
+
+test("audited Week 9 LV–SF twenty-minute provider shift reconciles with provenance", () => {
+  for (const minutes of [20, 30]) {
+    const source = week9Event(minutes), before = structuredClone(source);
+    const result = resolveOddsForGame([source], week9Game);
+    assert.equal(result.status, "RECONCILED");
+    assert.equal(result.event.id, source.id);
+    assert.equal(result.event.commence_time, source.commence_time);
+    assert.deepEqual(result.event.scheduleMapping, {
+      status: "RECONCILED", rule: "2026-week-9-lv-sf-kickoff",
+      season: 2026, week: 9, scheduleGameId: week9Game.id, providerEventId: source.id,
+      canonicalKickoff: week9Game.kickoff, providerKickoff: source.commence_time,
+      discrepancyMs: -minutes * 60000, toleranceMs: 1800000,
+    });
+    assert.deepEqual(source, before);
+  }
+  const exact = week9Event(0);
+  assert.equal(findOddsForGame([exact], week9Game), exact);
+  assert.equal(resolveOddsForGame([exact], week9Game).status, "EXACT");
+});
+
+test("Week 9 LV–SF reconciliation rejects beyond tolerance, wrong identity and bad provenance", () => {
+  assert.equal(findOddsForGame([week9Event(31)], week9Game), null);
+  for (const wrong of [
+    { ...week9Game, away: "SF", home: "LV" }, { ...week9Game, away: "HOU" },
+    { ...week9Game, week: 8 }, { ...week9Game, season: 2025 },
+    { ...week9Game, id: "1392346" }, { ...week9Game, kickoff: "2026-11-08T21:20:00.000Z" },
+  ]) assert.equal(findOddsForGame([week9Event()], wrong), null);
+  assert.equal(findOddsForGame([{ ...week9Event(), id: "unverified-event" }], week9Game), null);
+  for (const change of [
+    { snapshotId: "nfl:2026:8:moneyline:2026-11-03T12:34:16Z" },
+    { provider: "unverified" }, { eventId: "different-event" }, { snapshotId: null },
+  ]) {
+    const source = week9Event();
+    Object.assign(source.bookmakers[0].markets[0].outcomes[0].quoteSource, change);
+    assert.equal(resolveOddsForGame([source], week9Game).status, "PROVENANCE_UNAVAILABLE");
+  }
+  assert.equal(resolveOddsForGame([week9Event(), week9Event()], week9Game).status, "AMBIGUOUS");
+});
+
 test("other 13 Week 8 mappings and historical Week 7 retain exact-only behavior", () => {
   const pairs = ["CAR-GB", "BAL-BUF", "TEN-CIN", "ARI-DAL", "MIN-DET", "LV-NYJ", "CLE-PIT",
     "ATL-TB", "IND-JAX", "LAC-LAR", "KC-DEN", "NE-MIA", "PHI-WSH"];
