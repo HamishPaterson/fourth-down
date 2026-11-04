@@ -1,3 +1,38 @@
+-- Minimal production correction: generic atomic weekly prediction persistence.
+-- Replaces the hard-coded 2026 Week 8 / 14-game production scope with validated
+-- request values. Apply once in the Supabase SQL editor; do NOT rerun the
+-- original migration. Preserves every guarantee: service-role only, atomic
+-- all-or-nothing, stale fingerprint, season/week-specific locking, UUID
+-- preservation, identity/provenance validation, rollback on failure.
+begin;
+
+-- Relax the audit-table scope checks so any validated season/week/count is recorded.
+alter table public.prediction_week_replacements drop constraint prediction_week_replacements_season_check;
+alter table public.prediction_week_replacements drop constraint prediction_week_replacements_week_check;
+alter table public.prediction_week_replacements drop constraint prediction_week_replacements_expected_count_check;
+alter table public.prediction_week_replacements add constraint prediction_week_replacements_season_check check (season >= 2002);
+alter table public.prediction_week_replacements add constraint prediction_week_replacements_week_check check (week between 1 and 18);
+alter table public.prediction_week_replacements add constraint prediction_week_replacements_expected_count_check check (expected_count between 1 and 16);
+
+-- Drop the legacy no-arg state reader; the generic form replaces it.
+drop function if exists public.prediction_week_state();
+
+create or replace function public.prediction_week_state(p_season integer, p_week integer)
+returns jsonb language plpgsql security invoker
+set search_path = pg_catalog
+as $$
+declare state jsonb;
+begin
+  if current_user <> 'service_role' then raise exception 'SERVER_ONLY' using errcode = '42501'; end if;
+  if p_season is null or p_week is null or p_season < 2002 or p_week < 1 or p_week > 18 then
+    raise exception 'INVALID_WEEK' using errcode = '22023';
+  end if;
+  select jsonb_build_object('count', count(*), 'fingerprint',
+    md5(coalesce(jsonb_agg(to_jsonb(s) order by s.id), '[]'::jsonb)::text))
+    into state from public.prediction_snapshots s where season = p_season and week = p_week;
+  return state;
+end $$;
+
 create or replace function public.replace_prediction_week(p jsonb)
 returns jsonb language plpgsql security invoker
 set search_path = pg_catalog
@@ -5,6 +40,9 @@ set statement_timeout = '45s'
 as $$
 declare
   op uuid;
+  v_season integer;
+  v_week integer;
+  v_expected_count integer;
   before_state jsonb;
   after_state jsonb;
   candidate_rows public.prediction_snapshots[];
@@ -23,19 +61,23 @@ begin
   if current_user <> 'service_role' then raise exception 'SERVER_ONLY' using errcode = '42501'; end if;
   -- Authorization and operation identity precede the bounded failure-audit scope.
   op := (p->>'operationId')::uuid;
+  v_season := (p->>'season')::integer;
+  v_week := (p->>'week')::integer;
+  v_expected_count := jsonb_array_length(p->'manifest');
   insert into public.prediction_week_replacements
     (operation_id, season, week, caller_class, expected_count, result)
-    values (op, 2026, 8, 'service_role', 14, 'started');
+    values (op, v_season, v_week, 'service_role', v_expected_count, 'started');
   begin
-    if p->>'season' is distinct from '2026' or p->>'week' is distinct from '8' or
+    if v_season is null or v_week is null or v_season < 2002 or v_week < 1 or v_week > 18 or
         jsonb_typeof(p->'manifest') is distinct from 'array' or
         jsonb_typeof(p->'rows') is distinct from 'array' or
-        jsonb_array_length(p->'manifest') <> 14 or jsonb_array_length(p->'rows') <> 14 or
+        v_expected_count < 1 or v_expected_count > 16 or
+        jsonb_array_length(p->'rows') <> v_expected_count or
         coalesce(p->>'expectedFingerprint','') !~ '^[0-9a-f]{32}$' then
       raise exception 'invalid';
     end if;
-    if (select count(distinct e->>'id') from jsonb_array_elements(p->'manifest') e) <> 14 or
-       (select count(distinct (e->>'away',e->>'home')) from jsonb_array_elements(p->'manifest') e) <> 14 then
+    if (select count(distinct e->>'id') from jsonb_array_elements(p->'manifest') e) <> v_expected_count or
+       (select count(distinct (e->>'away',e->>'home')) from jsonb_array_elements(p->'manifest') e) <> v_expected_count then
       raise exception 'invalid';
     end if;
     if jsonb_path_exists(p->'rows',
@@ -43,14 +85,14 @@ begin
     then raise exception 'invalid'; end if;
     select array_agg(parsed) into candidate_rows
       from jsonb_populate_recordset(null::public.prediction_snapshots, p->'rows') parsed;
-    if (select count(distinct e.data_quality#>>'{snapshot,id}') from unnest(candidate_rows) e) <> 14 or
-       (select count(distinct e.data_quality#>>'{snapshot,game,id}') from unnest(candidate_rows) e) <> 14 then
+    if (select count(distinct e.data_quality#>>'{snapshot,id}') from unnest(candidate_rows) e) <> v_expected_count or
+       (select count(distinct e.data_quality#>>'{snapshot,game,id}') from unnest(candidate_rows) e) <> v_expected_count then
       raise exception 'invalid';
     end if;
     if (select count(distinct team) from (
       select e->>'away' team from jsonb_array_elements(p->'manifest') e
       union all select e->>'home' from jsonb_array_elements(p->'manifest') e
-    ) teams) <> 28 then raise exception 'invalid'; end if;
+    ) teams) <> v_expected_count * 2 then raise exception 'invalid'; end if;
     for r in select * from unnest(candidate_rows) loop
       s := r.data_quality->'snapshot'; g := s->'game';
       select value into m from jsonb_array_elements(p->'manifest')
@@ -58,8 +100,8 @@ begin
       if m is null or coalesce(g->>'id','') !~ '^[1-9][0-9]*$' or
          (g->>'id')::numeric > 9007199254740991 or
          coalesce(s->>'id','') = '' or
-         s->>'season' is distinct from '2026' or s->>'week' is distinct from '8' or
-         g->>'season' is distinct from '2026' or g->>'week' is distinct from '8' or
+         s->>'season' is distinct from v_season::text or s->>'week' is distinct from v_week::text or
+         g->>'season' is distinct from v_season::text or g->>'week' is distinct from v_week::text or
          s->>'awayCode' is distinct from m->>'away' or s->>'homeCode' is distinct from m->>'home' or
          g->>'away' is distinct from m->>'away' or g->>'home' is distinct from m->>'home' or
          m->>'away' = m->>'home' or
@@ -151,8 +193,8 @@ begin
       foreach key in array array['away','home'] loop
         if s#>'{personnelViews}'->key->>'version' is distinct from '1' or
            s#>'{personnelViews}'->key->>'team' is distinct from m->>key or
-           s#>'{personnelViews}'->key->>'season' is distinct from '2026' or
-           s#>'{personnelViews}'->key->>'week' is distinct from '8' or
+           s#>'{personnelViews}'->key->>'season' is distinct from v_season::text or
+           s#>'{personnelViews}'->key->>'week' is distinct from v_week::text or
            s#>'{personnelViews}'->key->'cutoff' is distinct from s#>'{dataQuality,personnelTiming,cutoff}' then
           raise exception 'invalid';
         end if;
@@ -162,8 +204,8 @@ begin
           raise exception 'invalid';
         end if;
       end loop;
-      if r.season is distinct from 2026 or r.week is distinct from 8 or
-         r.game_key is distinct from '2026:8:' || (m->>'away') || ':' || (m->>'home') or
+      if r.season is distinct from v_season or r.week is distinct from v_week or
+         r.game_key is distinct from v_season::text || ':' || v_week::text || ':' || (m->>'away') || ':' || (m->>'home') or
          r.game_key is distinct from s->>'gameKey' or
          r.away_code is distinct from m->>'away' or r.home_code is distinct from m->>'home' or
          r.kickoff is distinct from (m->>'kickoff')::timestamptz or
@@ -182,20 +224,20 @@ begin
       end if;
     end loop;
     failure := 'SCOPE_BUSY';
-    if not pg_try_advisory_xact_lock(hashtextextended('prediction-week:2026:8', 0)) then raise exception 'busy'; end if;
+    if not pg_try_advisory_xact_lock(hashtextextended('prediction-week:' || v_season || ':' || v_week, 0)) then raise exception 'busy'; end if;
     -- Single-row writers do not take the advisory lock. This short table lock
     -- also fences their writes and inserts while the expected state is checked.
     lock table public.prediction_snapshots in share row exclusive mode nowait;
-    before_state := public.prediction_week_state();
+    before_state := public.prediction_week_state(v_season, v_week);
     failure := 'STALE_STATE';
     if before_state->>'fingerprint' is distinct from p->>'expectedFingerprint' or
-       before_state->>'count' is distinct from '14' then raise exception 'stale'; end if;
-    if exists (select 1 from public.prediction_snapshots where season = 2026 and week = 8
+       before_state->>'count' is distinct from v_expected_count::text then raise exception 'stale'; end if;
+    if exists (select 1 from public.prediction_snapshots where season = v_season and week = v_week
         and (frozen_at is not null or actual_winner is not null or graded_at is not null or
           actual_away_score is not null or actual_home_score is not null or
           fourth_down_correct is not null or market_correct is not null)) then raise exception 'stale'; end if;
     if exists (select 1 from jsonb_array_elements(p->'manifest') expected(value) where not exists (
-      select 1 from public.prediction_snapshots t where t.season = 2026 and t.week = 8
+      select 1 from public.prediction_snapshots t where t.season = v_season and t.week = v_week
         and t.away_code = expected.value->>'away' and t.home_code = expected.value->>'home'
         and t.kickoff = (expected.value->>'kickoff')::timestamptz
         and t.data_quality#>>'{snapshot,game,id}' = expected.value->>'id'
@@ -208,7 +250,7 @@ begin
         market_pick,market_away_score,market_home_score,market_total,market_spread,
         confidence_score,confidence_label,model_version,data_quality,active_layers
       ) values (
-        2026,8,r.game_key,r.kickoff,r.away_code,r.home_code,r.fourth_down_pick,
+        v_season,v_week,r.game_key,r.kickoff,r.away_code,r.home_code,r.fourth_down_pick,
         r.predicted_away_score,r.predicted_home_score,r.away_win_probability,r.home_win_probability,
         r.market_pick,r.market_away_score,r.market_home_score,r.market_total,r.market_spread,
         r.confidence_score,r.confidence_label,r.model_version,r.data_quality,r.active_layers
@@ -226,16 +268,16 @@ begin
       written := written + changed;
     end loop;
     failure := 'FINAL_VERIFICATION_FAILED';
-    after_state := public.prediction_week_state();
+    after_state := public.prediction_week_state(v_season, v_week);
     select md5(jsonb_agg(e.data_quality order by e.data_quality#>>'{snapshot,game,id}')::text)
       into expected_payload from unnest(candidate_rows) e;
     select md5(jsonb_agg(t.data_quality order by t.data_quality#>>'{snapshot,game,id}')::text)
-      into actual_payload from public.prediction_snapshots t where season = 2026 and week = 8;
-    if after_state->>'count' is distinct from '14' or
+      into actual_payload from public.prediction_snapshots t where season = v_season and week = v_week;
+    if after_state->>'count' is distinct from v_expected_count::text or
        actual_payload is distinct from expected_payload or
        (select count(distinct data_quality#>>'{snapshot,game,id}') from public.prediction_snapshots
-        where season = 2026 and week = 8 and data_quality#>>'{snapshot,authoritative}' = 'true'
-          and data_quality#>>'{snapshot,batchProvenance,operationId}' = op::text) <> 14 or
+        where season = v_season and week = v_week and data_quality#>>'{snapshot,authoritative}' = 'true'
+          and data_quality#>>'{snapshot,batchProvenance,operationId}' = op::text) <> v_expected_count or
        exists (
          select 1 from unnest(candidate_rows) expected
          left join public.prediction_snapshots t
@@ -270,4 +312,13 @@ begin
     'preFingerprint',before_state->>'fingerprint','postFingerprint',after_state->>'fingerprint',
     'payloadFingerprint',actual_payload);
 end $$;
+
+alter function public.prediction_week_state(integer, integer) owner to postgres;
+alter function public.replace_prediction_week(jsonb) owner to postgres;
+revoke all on function public.prediction_week_state(integer, integer) from public, anon, authenticated;
+revoke all on function public.replace_prediction_week(jsonb) from public, anon, authenticated;
+grant execute on function public.prediction_week_state(integer, integer) to service_role;
+grant execute on function public.replace_prediction_week(jsonb) to service_role;
+
 notify pgrst, 'reload schema';
+commit;

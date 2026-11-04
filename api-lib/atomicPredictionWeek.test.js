@@ -12,16 +12,18 @@ import team from "../api/nfl/nflverse-team-metrics.js";
 import players from "../data/nflverse-player-metrics.js";
 import { FIXED_TEST_TIME } from "./testClock.js";
 
-const migration = (await readFile(new URL("../supabase/atomic_prediction_week.sql", import.meta.url), "utf8")).replace(/\r\n/g, "\n");
+const migration = (await readFile(new URL("../supabase/atomic-prediction-week-generic.sql", import.meta.url), "utf8")).replace(/\r\n/g, "\n");
 const pairs = ["CAR-GB", "BAL-BUF", "TEN-CIN", "ARI-DAL", "MIN-DET", "LV-NYJ", "CLE-PIT",
   "ATL-TB", "IND-JAX", "LAC-LAR", "KC-DEN", "NE-MIA", "PHI-WSH", "CHI-SEA"];
 // Deterministic clock: the fixture must stay valid regardless of when the suite runs.
 // The kickoff stays 7 days in the future so the RPC's clock_timestamp() kickoff check
 // passes; the frozen Date keeps quote freshness and generatedAt deterministic.
 const FIXTURE_NOW = new Date(FIXED_TEST_TIME);
-let fixture;
-async function candidates() {
-  if (!fixture) fixture = (async () => {
+const week9Pairs = ["SF-ARI", "ATL-NO", "BAL-CLE", "BUF-MIA", "CAR-TB", "CHI-DET", "CIN-PIT",
+  "DAL-NYG", "DEN-KC", "GB-MIN", "HOU-JAX", "IND-TEN", "LAC-LAR", "LV-NE", "NYJ-PHI"];
+const fixtures = new Map();
+async function buildFixture(pairList, week, idBase) {
+  if (!fixtures.has(week)) fixtures.set(week, (async () => {
     const now = FIXTURE_NOW;
     const kickoff = new Date(Date.now() + 7 * 86400000).toISOString();
     const OriginalDate = globalThis.Date;
@@ -31,11 +33,11 @@ async function candidates() {
       static parse(value) { return OriginalDate.parse(value); }
       static UTC(...args) { return OriginalDate.UTC(...args); }
     };
-    const games = pairs.map((pair, index) => {
+    const games = pairList.map((pair, index) => {
       const [away, home] = pair.split("-");
-      return { id: String(1392323 + index), season: 2026, week: 8, away, home, sourceDate: kickoff };
+      return { id: String(idBase + index), season: 2026, week, away, home, sourceDate: kickoff };
     });
-    const network = createOpponentNetworkHandler({ loadNetwork: async () => team.opponentNetworkByWeek[8] });
+    const network = createOpponentNetworkHandler({ loadNetwork: async () => team.opponentNetworkByWeek[week] });
     const generate = createServerPredictionGenerator({ loadInputs: (query) => ({
       playByPlay: Promise.resolve(buildTeamMetricsResponse(team, query)),
       playerMetrics: Promise.resolve(playerMetricsResponse(players, query)),
@@ -59,18 +61,20 @@ async function candidates() {
                 outcome(game.away), outcome(game.home),
               ] }] }] }] }, now));
       }
-      return { context: { season: 2026, week: 8, games }, snapshots };
+      return { context: { season: 2026, week, games }, snapshots };
     } finally {
       globalThis.fetch = original;
       globalThis.Date = OriginalDate;
       if (originalKey === undefined) delete process.env.BALLDONTLIE_API_KEY;
       else process.env.BALLDONTLIE_API_KEY = originalKey;
     }
-  })();
-  return structuredClone(await fixture);
+  })());
+  return structuredClone(await fixtures.get(week));
 }
+const candidates = () => buildFixture(pairs, 8, 1392323);
+const week9Candidates = () => buildFixture(week9Pairs, 9, 1392345);
 
-async function database(t) {
+async function database(t, inputPromise) {
   const db = new PGlite();
   t.after(() => db.close());
   await db.exec(`
@@ -95,28 +99,36 @@ async function database(t) {
   `);
   await db.exec(migration);
   await db.exec(migration);
-  const input = await candidates();
+  const input = await (inputPromise ?? candidates());
+  const { season, week } = input.context;
   const batch = prepareAtomicPredictionWeek({ ...input, operationId: randomUUID() }, FIXTURE_NOW);
   for (const [index, row] of batch.rows.entries()) {
     await db.query(`insert into public.prediction_snapshots
       (season,week,game_key,kickoff,away_code,home_code,data_quality)
-      values (2026,8,$1,$2,$3,$4,$5::jsonb)`,
+      values ($6,$7,$1,$2,$3,$4,$5::jsonb)`,
     [`old-${index}`, row.kickoff, row.away_code, row.home_code,
-      JSON.stringify({ stale: true, snapshot: { game: { id: batch.manifest[index].id } } })]);
+      JSON.stringify({ stale: true, snapshot: { game: { id: batch.manifest[index].id } } }), season, week]);
   }
   await db.exec(`insert into public.prediction_snapshots
     (season,week,game_key,kickoff,away_code,home_code,data_quality)
     values (2026,7,'protected-week7','2026-10-23T00:15:00Z','NE','CHI','{"original":[24,28],"final":[24,30]}')`);
+  let week8Before;
+  if (week !== 8) {
+    await db.exec(`insert into public.prediction_snapshots
+      (season,week,game_key,kickoff,away_code,home_code,data_quality)
+      values (2026,8,'protected-week8','2026-10-30T00:15:00Z','NE','CHI','{"original":[24,28],"final":[24,30]}')`);
+    week8Before = (await db.query("select to_jsonb(t)::text as value from public.prediction_snapshots t where week=8")).rows[0].value;
+  }
   const dump = async () => (await db.query("select jsonb_agg(to_jsonb(t) order by id)::text as value from public.prediction_snapshots t")).rows[0].value;
   const before = await dump();
-  const beforeRows = (await db.query("select id,away_code,home_code,created_at from public.prediction_snapshots where week=8 order by away_code")).rows;
+  const beforeRows = (await db.query(`select id,away_code,home_code,created_at from public.prediction_snapshots where week=${week} order by away_code`)).rows;
   const week7Before = (await db.query("select to_jsonb(t)::text as value from public.prediction_snapshots t where week=7")).rows[0].value;
   await db.exec("set role service_role");
-  const state = (await db.query("select public.prediction_week_state() as result")).rows[0].result;
+  const state = (await db.query(`select public.prediction_week_state(${season}, ${week}) as result`)).rows[0].result;
   batch.expectedFingerprint = state.fingerprint;
   const run = async (value = batch) => (await db.query(
     "select public.replace_prediction_week($1::jsonb) as result", [JSON.stringify(value)])).rows[0].result;
-  return { db, input, batch, dump, before, beforeRows, week7Before, run };
+  return { db, input, batch, dump, before, beforeRows, week7Before, week8Before, run };
 }
 
 test("atomic replacement commits all 14, preserves Week 7 and records bounded success audit", async (t) => {
@@ -240,6 +252,57 @@ test("final count mismatch rolls back every update and the unexpected inserted r
   assert.equal(await dump(), before);
 });
 
+test("generic Week 9: commits all 15, preserves Week 8 and Week 7", async (t) => {
+  const { db, batch, run, week7Before, week8Before } = await database(t, week9Candidates());
+  const result = await run();
+  assert.equal(result.result, "committed", JSON.stringify(result));
+  assert.equal(result.writtenCount, 15);
+  const rows = (await db.query("select * from public.prediction_snapshots where week=9")).rows;
+  assert.equal(rows.length, 15);
+  assert.equal(new Set(rows.map(r => r.data_quality.snapshot.game.id)).size, 15);
+  assert.deepEqual(rows.map(r => r.data_quality.snapshot.game.id).sort(), batch.manifest.map(g => g.id).sort());
+  assert(rows.every(r => r.data_quality.snapshot.authoritative === true));
+  assert.equal((await db.query("select to_jsonb(t)::text as value from public.prediction_snapshots t where week=8")).rows[0].value, week8Before);
+  assert.equal((await db.query("select to_jsonb(t)::text as value from public.prediction_snapshots t where week=7")).rows[0].value, week7Before);
+  const audit = (await db.query("select * from public.prediction_week_replacements")).rows[0];
+  assert.equal(audit.result, "committed");
+  assert.equal(audit.week, 9);
+  assert.equal(audit.expected_count, 15);
+  assert.equal(audit.written_count, 15);
+});
+
+for (const [name, mutate, code] of [
+  ["wrong count", b => { b.rows.pop(); }, "BATCH_INVALID"],
+  ["mixed week", b => { b.rows[14].week = 8; }, "BATCH_INVALID"],
+  ["stale expected fingerprint", b => { b.expectedFingerprint = "0".repeat(32); }, "STALE_STATE"],
+]) {
+  test(`generic Week 9 rejection: ${name} changes zero rows`, async (t) => {
+    const { batch, run, dump, before } = await database(t, week9Candidates());
+    mutate(batch);
+    const result = await run();
+    assert.equal(result.result, "rejected");
+    assert.equal(result.failureCode, code);
+    assert.equal(result.writtenCount, 0);
+    assert.equal(await dump(), before);
+  });
+}
+
+test("generic Week 9: rollback after write failure", async (t) => {
+  const { db, run, dump, before } = await database(t, week9Candidates());
+  await db.exec("reset role");
+  await db.exec(`create function fixture_failure() returns trigger language plpgsql as $$
+    begin
+      if new.away_code = 'ATL' then raise exception 'private database error'; end if;
+      return new;
+    end $$;
+    create trigger fixture_failure before update on public.prediction_snapshots
+      for each row execute function fixture_failure(); set role service_role;`);
+  const result = await run();
+  assert.equal(result.failureCode, "WRITE_FAILED");
+  assert.equal(await dump(), before);
+  assert(!JSON.stringify(result).includes("private database error"));
+});
+
 test("malformed JSON cannot enter the operation and changes nothing", async (t) => {
   const { db, dump, before } = await database(t);
   await assert.rejects(db.query("select public.replace_prediction_week($1::jsonb)", ['{"rows": [NaN]}']), /json/i);
@@ -257,7 +320,7 @@ test("browser roles lack RPC and audit privileges; service role has only require
   for (const role of ["anon", "authenticated"]) {
     const rights = (await db.query(`select
       has_function_privilege($1,'public.replace_prediction_week(jsonb)','execute') as rpc,
-      has_function_privilege($1,'public.prediction_week_state()','execute') as state,
+      has_function_privilege($1,'public.prediction_week_state(integer,integer)','execute') as state,
       has_table_privilege($1,'public.prediction_week_replacements','insert') as audit`, [role])).rows[0];
     assert.deepEqual(rights, { rpc: false, state: false, audit: false });
     await db.exec(`set role ${role}`);
@@ -276,7 +339,7 @@ test("browser roles lack RPC and audit privileges; service role has only require
   assert.deepEqual((await db.query("select policyname,roles,cmd,qual from pg_policies where tablename='prediction_snapshots'")).rows,
     [{ policyname: "Anyone can read official predictions", roles: ["anon", "authenticated"], cmd: "SELECT", qual: "true" }]);
   const functions = (await db.query(`select pg_get_userbyid(proowner) as owner,prosecdef,proconfig
-    from pg_proc where oid in ('public.prediction_week_state()'::regprocedure,'public.replace_prediction_week(jsonb)'::regprocedure)`)).rows;
+    from pg_proc where oid in ('public.prediction_week_state(integer,integer)'::regprocedure,'public.replace_prediction_week(jsonb)'::regprocedure)`)).rows;
   assert(functions.every(f => f.owner === "postgres" && !f.prosecdef && f.proconfig.includes("search_path=pg_catalog")));
 });
 
@@ -391,7 +454,7 @@ test("RPC timeout is bounded and scoped to replacement without weakening securit
     where oid='public.replace_prediction_week(jsonb)'::regprocedure`)).rows[0].proconfig;
   assert.deepEqual(config.sort(), ["search_path=pg_catalog", "statement_timeout=45s"].sort());
   const stateConfig = (await db.query(`select proconfig from pg_proc
-    where oid='public.prediction_week_state()'::regprocedure`)).rows[0].proconfig;
+    where oid='public.prediction_week_state(integer,integer)'::regprocedure`)).rows[0].proconfig;
   assert.deepEqual(stateConfig, ["search_path=pg_catalog"]);
   assert.match(migration, /jsonb_populate_recordset/);
   assert.match(migration, /t\.away_code = expected\.away_code and t\.home_code = expected\.home_code/);
@@ -443,8 +506,21 @@ test("statement cancellation rolls back the outer audit and every prediction upd
 });
 
 test("function-only correction exactly matches migration and reloads cached RPC settings", async () => {
-  const correction = await readFile(new URL("../supabase/atomic-timeout-function-correction.sql", import.meta.url), "utf8");
-  const start = migration.indexOf("create or replace function public.replace_prediction_week(p jsonb)");
-  const end = migration.indexOf("\nend $$;", start) + "\nend $$;".length;
-  assert.equal(correction.replace(/\r\n/g, "\n"), `${migration.slice(start, end)}\nnotify pgrst, 'reload schema';\n`);
+  const correction = (await readFile(new URL("../supabase/atomic-timeout-function-correction.sql", import.meta.url), "utf8")).replace(/\r\n/g, "\n");
+  const extract = (signature) => {
+    const start = migration.indexOf(`create or replace function public.${signature}`);
+    assert.notEqual(start, -1, signature);
+    const end = migration.indexOf("\nend $$;", start);
+    assert.notEqual(end, -1, signature);
+    return migration.slice(start, end + "\nend $$;".length);
+  };
+  assert.ok(correction.includes(extract("prediction_week_state(p_season integer, p_week integer)")),
+    "correction must carry the generic state function verbatim");
+  assert.ok(correction.includes(extract("replace_prediction_week(p jsonb)")),
+    "correction must carry the generic replace function verbatim");
+  assert.match(correction, /drop constraint prediction_week_replacements_season_check/);
+  assert.match(correction, /drop constraint prediction_week_replacements_week_check/);
+  assert.match(correction, /drop constraint prediction_week_replacements_expected_count_check/);
+  assert.match(correction, /drop function if exists public\.prediction_week_state\(\)/);
+  assert.match(correction, /notify pgrst, 'reload schema'/i);
 });

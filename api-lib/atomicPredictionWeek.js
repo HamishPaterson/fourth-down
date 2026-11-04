@@ -8,8 +8,12 @@ const finite = (value) => typeof value === "number" ? Number.isFinite(value)
   : value === null || typeof value !== "object" || Object.values(value).every(finite);
 
 export function prepareAtomicPredictionWeek({ context, snapshots, operationId }, now = new Date()) {
-  if (context?.season !== 2026 || context?.week !== 8 || context.games?.length !== 14 ||
-      snapshots?.length !== 14 || !/^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(operationId || "")) fail();
+  const season = Number(context?.season), week = Number(context?.week);
+  const expectedCount = context?.games?.length;
+  if (!Number.isInteger(season) || season < 2002 || !Number.isInteger(week) || week < 1 || week > 18 ||
+      !Number.isInteger(expectedCount) || expectedCount < 1 || expectedCount > 16 ||
+      snapshots?.length !== expectedCount ||
+      !/^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(operationId || "")) fail();
   validatePredictionRefreshBatch(snapshots, context, now);
   const ids = new Set(), predictions = new Set(), matchups = new Set(), teams = new Set();
   const rows = snapshots.map((snapshot, index) => {
@@ -31,7 +35,7 @@ export function prepareAtomicPredictionWeek({ context, snapshots, operationId },
   // Detect unsupported/cyclic JSON before crossing the RPC boundary.
   JSON.stringify(rows);
   return {
-    season: 2026, week: 8, operationId,
+    season, week, operationId,
     manifest: context.games.map(({ id, away, home, sourceDate }) => ({
       id: String(id), away, home, kickoff: new Date(sourceDate).toISOString(),
     })),
@@ -39,9 +43,9 @@ export function prepareAtomicPredictionWeek({ context, snapshots, operationId },
   };
 }
 
-export async function readAtomicPredictionWeekState(client) {
-  const { data, error } = await client.rpc("prediction_week_state");
-  if (error || !data || data.count !== 14 || !/^[0-9a-f]{32}$/.test(data.fingerprint || "")) {
+export async function readAtomicPredictionWeekState(client, { season, week, expectedCount } = {}) {
+  const { data, error } = await client.rpc("prediction_week_state", { p_season: season, p_week: week });
+  if (error || !data || data.count !== expectedCount || !/^[0-9a-f]{32}$/.test(data.fingerprint || "")) {
     throw new Error("ATOMIC_WEEK_PREFLIGHT_FAILED");
   }
   return data;
@@ -60,7 +64,7 @@ export async function replaceAuthoritativePredictionWeek(client, {
     code: /^(?:[0-9A-Z]{5}|PGRST[0-9]{3})$/.test(error.code || "") ? error.code : null,
     status: Number.isInteger(status) && status >= 100 && status <= 599 ? status : null,
   } });
-  if (data?.result !== "committed" || data.writtenCount !== 14 || data.operationId !== operationId) {
+  if (data?.result !== "committed" || data.writtenCount !== context.games.length || data.operationId !== operationId) {
     const codes = ["BATCH_INVALID", "STALE_STATE", "SCOPE_BUSY", "WRITE_FAILED", "FINAL_VERIFICATION_FAILED"];
     throw new Error(`ATOMIC_WEEK_${codes.includes(data?.failureCode) ? data.failureCode : "FAILED"}`);
   }

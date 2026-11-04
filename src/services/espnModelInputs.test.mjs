@@ -38,21 +38,21 @@ test("all 32 supplied ESPN teams, rank sets and records are complete and indepen
   ]) assert.deepEqual(Object.values(snapshot.teams).map(getRank).sort((a, b) => a - b), rankSet);
   assert.equal(snapshot.teams.SF.espnFpi.overall, 5.9);
   assert.equal(snapshot.teams.MIA.espnFpi.overall, -7.3);
-  assert.equal(snapshot.teams.TB.espnFpi.trend, "UP 16");
-  assert.equal(snapshot.teams.PHI.espnFpi.trend, "DOWN 9");
-  assert.equal(snapshot.teams.WSH.record, "1-4-1");
-  assert.equal(snapshot.teams.MIN.efficiencies.overall, 68.4);
+  assert.equal(snapshot.teams.JAX.espnFpi.trend, "UP 3");
+  assert.equal(snapshot.teams.BAL.espnFpi.trend, "DOWN 19");
+  assert.equal(snapshot.teams.WSH.record, "2-4-1");
+  assert.equal(snapshot.teams.JAX.efficiencies.overall, 71.5);
   assert.equal(snapshot.teams.LAC.efficiencies.specialTeamsRank, 28);
-  assert.equal(snapshot.teams.CHI.record, "5-2-0");
-  assert.deepEqual(snapshot.teams.CHI.espnFpi, { overall: 3.9, rank: 7, trend: "UP 5",
-    offense: 2.3, defense: 1.1, specialTeams: 0.5, strengthOfScheduleRank: 25,
-    remainingStrengthOfScheduleRank: 3, averageWinProbabilityRank: 2 });
-  assert.equal(snapshot.teams.CHI.efficiencies.overall, 65.4);
-  assert.equal(snapshot.teams.CHI.efficiencies.overallRank, 4);
-  assert.equal(snapshot.teams.NE.record, "4-3-0");
-  assert.equal(snapshot.teams.NE.espnFpi.overall, 2.3);
+  assert.equal(snapshot.teams.CHI.record, "6-2-0");
+  assert.deepEqual(snapshot.teams.CHI.espnFpi, { overall: 4.7, rank: 4, trend: "UP 3",
+    offense: 2.8, defense: 1.3, specialTeams: 0.5, strengthOfScheduleRank: 24,
+    remainingStrengthOfScheduleRank: 4, averageWinProbabilityRank: 3 });
+  assert.equal(snapshot.teams.CHI.efficiencies.overall, 68.3);
+  assert.equal(snapshot.teams.CHI.efficiencies.overallRank, 2);
+  assert.equal(snapshot.teams.NE.record, "5-3-0");
+  assert.equal(snapshot.teams.NE.espnFpi.overall, 2.4);
   assert.equal(snapshot.teams.NE.espnFpi.rank, 9);
-  assert.equal(snapshot.teams.NE.efficiencies.overall, 57.7);
+  assert.equal(snapshot.teams.NE.efficiencies.overall, 59.3);
   assert.equal(snapshot.teams.NE.efficiencies.overallRank, 10);
 });
 
