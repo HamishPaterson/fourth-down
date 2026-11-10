@@ -122,7 +122,11 @@ export async function fetchPlayerStatsForGames(gameIds, { fetchImpl = fetch } = 
     const response = await fetchImpl(`${BALLDONTLIE_STATS_URL}?${params.toString()}`, {
       headers: { Authorization: apiKey, Accept: "application/json" },
     });
-    if (!response.ok) throw new Error(`Player stats request failed (${response.status})`);
+    if (!response.ok) {
+      const error = new Error(`Player stats request failed (${response.status})`);
+      error.status = response.status;
+      throw error;
+    }
     const body = await response.json();
     records.push(...(body.data || []));
     cursor = body.meta?.next_cursor ?? null;
@@ -142,6 +146,7 @@ export async function settleLockedLegs(record, { fetchGames, fetchStats = fetchP
   const legs = Array.isArray(record?.legs) ? record.legs : [];
   if (!legs.length) return { legResults: [], unresolved: false };
   const empty = legs.map(() => null);
+  let allGamesFinal = false;
   try {
     const lockAt = new Date(record.lock_at).getTime();
     const games = await fetchGames(lockAt, lockAt + 7 * DAY_MS);
@@ -150,6 +155,10 @@ export async function settleLockedLegs(record, { fetchGames, fetchStats = fetchP
       game,
     ]));
     const gameFor = (leg) => byMatchup.get(`${normaliseCode(leg.awayCode)}:${normaliseCode(leg.homeCode)}`);
+    allGamesFinal = legs.every((leg) => {
+      const game = gameFor(leg);
+      return Boolean(game && isFinalGame(game));
+    });
     const finalPlayerGames = [...new Set(legs.filter(isPlayerLeg).map(gameFor).filter((game) => game && isFinalGame(game)).map((game) => game.id))];
     const stats = finalPlayerGames.length ? await fetchStats(finalPlayerGames) : [];
     const legResults = legs.map((leg) => {
@@ -169,6 +178,11 @@ export async function settleLockedLegs(record, { fetchGames, fetchStats = fetchP
     return { legResults, unresolved };
   } catch (error) {
     console.error("Weekly Best Multi settlement lookup failed", error?.message || error);
+    const providerAccessUnavailable = error?.status === 401 || error?.status === 403;
+    if (providerAccessUnavailable && allGamesFinal) {
+      console.warn("Player settlement stats unavailable after all Multi games became final; allowing weekly rollover");
+      return { legResults: empty, unresolved: false, settlementUnavailable: true };
+    }
     return { legResults: empty, unresolved: true };
   }
 }
