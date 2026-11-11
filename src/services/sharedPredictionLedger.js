@@ -1,3 +1,5 @@
+import { apiFetch as fetch } from "./supabaseAuth.js";
+
 const ENDPOINT = "/api/nfl/game-stats?action=predictions";
 const GRADE_ENDPOINT = "/api/nfl/game-stats?action=predictions&mode=grade";
 

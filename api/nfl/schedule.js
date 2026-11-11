@@ -1,4 +1,5 @@
 import { createWeeklyMultiCurrentHandler } from "../../api-lib/weeklyMulti.js";
+import { withApprovedUser } from "../../api-lib/authorization.js";
 
 const API_URL =
   "https://api.balldontlie.io/nfl/v1/games";
@@ -54,7 +55,7 @@ export function createScheduleHandler({
   };
 }
 
-export default createScheduleHandler();
+export default withApprovedUser(createScheduleHandler());
 
 async function handleScheduleRequest(req, res) {
   if (req.method !== "GET") {

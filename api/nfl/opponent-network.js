@@ -25,7 +25,10 @@ export function createOpponentNetworkHandler({ loadNetwork = loadWeeklyOpponentN
   return (req, res) => handler(req, res, { loadNetwork });
 }
 
-export default async function handler(req, res, { loadNetwork = loadWeeklyOpponentNetwork } = {}) {
+import { withApprovedUser } from "../../api-lib/authorization.js";
+
+export default withApprovedUser(handler);
+export async function handler(req, res, { loadNetwork = loadWeeklyOpponentNetwork } = {}) {
   if (req.method !== "GET") {
     return res.status(405).json({
       error: "Method not allowed",

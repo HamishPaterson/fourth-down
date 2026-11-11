@@ -2138,3 +2138,37 @@ body {
 .best-bet-highlight > p { margin:6px 0 0; opacity:.62; font-size:9px; line-height:1.35; }
 .best-bets-market-note { margin:8px 0 12px; padding:10px 12px; border:1px solid rgba(255,196,100,.26); border-radius:10px; background:rgba(92,54,0,.2); color:#ffd79d; font-size:10px; line-height:1.4; }
 @media (max-width:520px) { .best-bet-highlights { grid-template-columns:1fr; } .best-bet-highlight > strong { white-space:normal; } }
+.auth-page {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+}
+
+.auth-card {
+  width: min(100%, 440px);
+  padding: 28px;
+}
+
+.auth-card form, .auth-card label {
+  display: grid;
+  gap: 12px;
+}
+
+.auth-card input {
+  width: 100%;
+  padding: 10px;
+}
+
+.auth-card button {
+  margin-top: 16px;
+}
+
+.auth-account-bar {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 20px;
+}

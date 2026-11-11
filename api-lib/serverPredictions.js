@@ -1,10 +1,10 @@
-import standings from "../api/nfl/standings.js";
-import personnel from "../api/nfl/qb-roster-health.js";
-import kicker from "../api/nfl/kicker-stats.js";
-import teamForm, { databaseToSnapshot, writePredictionVersion } from "../api/nfl/game-stats.js";
-import opponentNetwork, { createOpponentNetworkHandler, validateWeeklyOpponentNetwork } from "../api/nfl/opponent-network.js";
-import playByPlay from "../api/nfl/play-by-play.js";
-import roster from "../api/nfl/sleeper-players.js";
+import { handler as standings } from "../api/nfl/standings.js";
+import { handler as personnel } from "../api/nfl/qb-roster-health.js";
+import { handler as kicker } from "../api/nfl/kicker-stats.js";
+import { handler as teamForm, databaseToSnapshot, writePredictionVersion } from "../api/nfl/game-stats.js";
+import { handler as opponentNetwork, createOpponentNetworkHandler, validateWeeklyOpponentNetwork } from "../api/nfl/opponent-network.js";
+import { handler as playByPlay } from "../api/nfl/play-by-play.js";
+import { handler as roster } from "../api/nfl/sleeper-players.js";
 import { handleOddsRequest, getCurrentWeekWindow, readStoredOddsForWeek } from "../api/nfl/odds.js";
 import { getFullGamePrediction } from "../src/services/gamePredictionService.js";
 import { buildPredictionSnapshot } from "../src/services/predictionSnapshot.js";

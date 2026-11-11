@@ -1,3 +1,5 @@
+import { apiFetch as fetch } from "./supabaseAuth.js";
+
 export async function getTeams(signal) {
   const response = await fetch(
     "/api/nfl/teams",

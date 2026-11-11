@@ -1,3 +1,5 @@
+import { apiFetch as fetch } from "./supabaseAuth.js";
+
 const ODDS_CACHE_KEY = "fourth-down:nfl-odds";
 const ODDS_CACHE_TTL_MS = 5 * 60 * 1000;
 

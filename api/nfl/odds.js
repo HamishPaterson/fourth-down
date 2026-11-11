@@ -73,7 +73,10 @@ const memoryCache = { props: null };
 const inFlightRequests = new Map();
 let rateLimitedUntil = 0;
 
-export default function handler(req, res) {
+import { withApprovedUser } from "../../api-lib/authorization.js";
+
+export default withApprovedUser(handler);
+export function handler(req, res) {
   return handleOddsRequest(req, res);
 }
 

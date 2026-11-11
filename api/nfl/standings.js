@@ -5,7 +5,10 @@
 
 const BALLDONTLIE_BASE = "https://api.balldontlie.io/nfl/v1";
 
-export default async function handler(req, res) {
+import { withApprovedUser } from "../../api-lib/authorization.js";
+
+export default withApprovedUser(handler);
+export async function handler(req, res) {
   const apiKey = process.env.BALLDONTLIE_API_KEY;
 
   if (!apiKey) {

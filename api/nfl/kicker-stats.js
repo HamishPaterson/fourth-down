@@ -6,7 +6,10 @@ const normalizeTeam = (value) => {
   return aliases[code] || code;
 };
 
-export default function handler(req, res) {
+import { withApprovedUser } from "../../api-lib/authorization.js";
+
+export default withApprovedUser(handler);
+export function handler(req, res) {
   if (req.method !== "GET") return res.status(405).json({ error: "Method not allowed" });
   const season = Number(req.query.season);
   const week = Number(req.query.week);

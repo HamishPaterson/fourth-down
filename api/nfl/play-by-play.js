@@ -4,7 +4,10 @@ import { KICKER_LEAGUE_FALLBACK } from "../../src/services/specialTeams.js";
 
 const TEAM_ALIASES = { WAS: "WSH", LA: "LAR", OAK: "LV", SD: "LAC", STL: "LAR" };
 
-export default async function handler(req, res) {
+import { withApprovedUser } from "../../api-lib/authorization.js";
+
+export default withApprovedUser(handler);
+export async function handler(req, res) {
   if (req.method !== "GET") return res.status(405).json({ error: "Method not allowed" });
   const season = Number(req.query.season);
   const week = Number(req.query.week);

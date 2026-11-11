@@ -1,3 +1,4 @@
+import { apiFetch as fetch } from "./supabaseAuth.js";
 import { predictMatchup } from "./predictionEngine.js";
 import { buildPlayerProjections } from "./playerProjectionService.js";
 import * as nflApi from "./nflApi.js";

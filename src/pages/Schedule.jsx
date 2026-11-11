@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { apiFetch as fetch } from "../services/supabaseAuth.js";
 import { MapPin, RefreshCw } from "lucide-react";
 import { TEAM_NAMES } from "../data.js";
 import { getTeamTheme } from "../services/teamThemes.js";

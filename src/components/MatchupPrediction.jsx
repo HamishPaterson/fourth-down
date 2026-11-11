@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { apiFetch as fetch } from "../services/supabaseAuth.js";
 import { predictMatchup } from "../services/predictionEngine.js";
 import { findOddsForGame, getCoreMarket, getNflOdds } from "../services/oddsApi.js";
 import { applyPredictionSnapshot } from "../services/predictionSnapshot.js";

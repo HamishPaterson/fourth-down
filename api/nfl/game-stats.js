@@ -22,7 +22,10 @@ const TEAM_ALIASES = {
   STL: "LAR",
 };
 
-export default async function handler(req, res) {
+import { withApprovedUser } from "../../api-lib/authorization.js";
+
+export default withApprovedUser(handler);
+export async function handler(req, res) {
   if (String(req.query?.action || "").toLowerCase() === "refresh-predictions") {
     const { createPredictionRefreshHandler } = await import("../../api-lib/predictionRefresh.js");
     return createPredictionRefreshHandler()(req, res);

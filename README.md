@@ -1,5 +1,35 @@
 # React + Vite
 
+## Authentication and approval
+
+Set `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` in Vercel's Production
+environment (and Preview/Development where needed), then redeploy: Vite embeds
+these browser-safe values at build time. They must identify the same Supabase
+project as the server's `SUPABASE_URL`. The API authorization helper uses the
+same anon key, or `SUPABASE_ANON_KEY` when separately configured.
+Never prefix service-role/secret keys or `CRON_SECRET` with `VITE_`.
+Retain the existing unprefixed server credentials for trusted jobs.
+
+Email/password authentication uses Supabase's persistent, auto-refreshed session.
+The normal application is lazy-mounted only after reading the signed-in user's
+own `app_users` row and finding `approved === true`. New accounts are not approved
+by signup. Pending users can check approval or sign out; approval errors fail
+closed. No browser approval controls, database migrations, or profile writes are
+added. The existing trigger and own-row SELECT-only RLS must remain in place.
+Configure Supabase Auth's Site URL and permitted confirmation redirect URLs for
+the deployed app, and enable the email/password provider as appropriate.
+
+All executable `/api/nfl/*` endpoints (including Weekly Multi rewrites) verify
+the JWT with Supabase Auth and re-read approval before route/provider work:
+missing/invalid sessions return 401, pending accounts 403, verification outages
+503. These responses and successful protected responses are private/no-store so
+a shared CDN cannot bypass authorization. Browser API calls send the current
+session bearer token; 401/403 responses remove the application from the auth gate.
+Static app assets remain public. Existing exact `CRON_SECRET` bearer authentication
+bypasses interactive approval, while each job's existing authorization remains
+in force. Internal server prediction loaders call named in-process handlers.
+External tools reading the ledger now also need an authorized bearer token.
+
 ## Favourite team preference
 
 Settings saves the canonical team code immediately to the existing `favoriteTeam`

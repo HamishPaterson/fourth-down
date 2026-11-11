@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { apiFetch as fetch } from "../services/supabaseAuth.js";
 import {
   Activity,
   MapPin,

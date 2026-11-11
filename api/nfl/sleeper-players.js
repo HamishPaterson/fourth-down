@@ -55,7 +55,10 @@ const TEAM_CODES = {
   "Washington Commanders": "WSH",
 };
 
-export default async function handler(req, res) {
+import { withApprovedUser } from "../../api-lib/authorization.js";
+
+export default withApprovedUser(handler);
+export async function handler(req, res) {
   if (req.method !== "GET") {
     return res.status(405).json({
       error: "Method not allowed",
