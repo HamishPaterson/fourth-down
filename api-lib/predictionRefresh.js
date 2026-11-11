@@ -8,9 +8,10 @@ import { createServerPredictionGenerator, readPredictionOdds, saveAuthoritativeP
 import { databaseToSnapshot } from "../api/nfl/game-stats.js";
 import { getCurrentWeekWindow } from "../api/nfl/odds.js";
 import { loadWeeklyOpponentNetwork, validateWeeklyOpponentNetwork, NFL_TEAMS } from "../api/nfl/opponent-network.js";
-import { completePrediction } from "./predictionEligibility.js";
+import { completePrediction, predictionMissingOdds } from "./predictionEligibility.js";
 import { predictionFeatureStatus, PREDICTION_FEATURE_VERSION } from "../src/services/predictionFeatures.js";
 import { playerTeam } from "./playerMetrics.js";
+import { findOddsForGame } from "../src/services/oddsApi.js";
 import dataset from "../api/nfl/nflverse-team-metrics.js";
 
 const finiteTree = (value) => typeof value === "number" ? Number.isFinite(value)
@@ -136,14 +137,23 @@ export function createPredictionRefreshHandler(overrides = {}) {
       for (let index = 0; index < context.games.length; index += 3) {
         generated.push(...await Promise.all(context.games.slice(index, index + 3).map(async (game) => {
           const existing = prior.get(identity(game));
+          const currentEvent = findOddsForGame(odds?.events, game);
+          const missingOddsNowAvailable = !existing?.frozenAt && !existing?.actualWinner &&
+            Date.parse(existing?.kickoff) > now.getTime() &&
+            predictionMissingOdds(existing) &&
+            currentEvent?.bookmakers?.some((book) => book.markets?.some((market) =>
+              market.key && market.outcomes?.some((outcome) => Number(outcome.price) > 1)));
           if (existing?.authoritative && completePrediction(existing) && predictionFeatureStatus(existing).complete &&
               Date.parse(existing.kickoff) === Date.parse(game.sourceDate) &&
+              !missingOddsNowAvailable &&
               (!prepareWeeklyLock || !lockPredictionRejections(existing, lockContext, now).length)) {
             reused++;
             return existing;
           }
           try {
-            if (existing?.frozenAt || existing?.actualWinner) throw new Error("Frozen or graded prediction cannot be refreshed");
+            if (existing?.frozenAt || existing?.actualWinner || Date.parse(existing?.kickoff) <= now.getTime()) {
+              throw new Error("Frozen, graded or started prediction cannot be refreshed");
+            }
             const snapshot = await generate(game, odds, now);
             return snapshot;
           } catch (error) {

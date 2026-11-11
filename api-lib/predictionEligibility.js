@@ -4,6 +4,11 @@ import { predictionFeatureStatus } from "../src/services/predictionFeatures.js";
 
 const number = (value) => value !== null && value !== undefined && value !== "" && Number.isFinite(Number(value));
 
+export function predictionMissingOdds(snapshot) {
+  const diagnostics = snapshot?.bestBets?.marketDiagnostics;
+  return diagnostics?.bookmakerCount === 0 || diagnostics?.marketCount === 0;
+}
+
 export function completePrediction(snapshot) {
   const bets = snapshot?.bestBets || snapshot?.dataQuality?.bestBetsPayload;
   return Boolean(snapshot && isCurrentModelIdentity(snapshot.modelVersion, snapshot.modelKey) && snapshot.predictionPayload &&
@@ -27,6 +32,10 @@ export function retainPrediction(existing, incoming, now, authoritative = false)
   if (!completePrediction(incoming)) return true;
   const age = now.getTime() - new Date(existing.generatedAt).getTime();
   if (authoritative) {
+    const incomingMarkets = incoming.bestBets?.marketDiagnostics;
+    if (existing.authoritative && predictionMissingOdds(existing) &&
+        Date.parse(existing.kickoff) === Date.parse(incoming.kickoff) &&
+        incomingMarkets?.bookmakerCount > 0 && incomingMarkets?.marketCount > 0) return false;
     const existingFeatures = predictionFeatureStatus(existing);
     const currentFeatures = existingFeatures.complete;
     const incomingFeatures = predictionFeatureStatus(incoming).complete;

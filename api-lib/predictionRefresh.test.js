@@ -114,7 +114,7 @@ async function run({ db = database(), dryRun = true, method = "POST", authorizat
     loadNetwork: async () => { loads++; return structuredClone(network); },
     createGenerator: ({ weeklyNetwork }) => {
       generators++; assert.equal(weeklyNetwork.week, 6);
-      return async (game) => { generated++; return build(game, NOW); };
+      return async (game, odds) => { generated++; return build(game, NOW, odds); };
     }, ...overrides,
   };
   const handler = createPredictionRefreshHandler(dependencies);
@@ -189,6 +189,132 @@ test("Phase2A-missing v11 records upgrade, complete current schema is reused irr
   assert.equal(reused.res.statusCode, 200, reused.res.body.reason);
   assert.equal(reused.res.body.reused, 14); assert.deepEqual(reused.db.writes, []);
 });
+const coreOddsEvent = (game) => ({
+  id: `odds-${game.away}-${game.home}`, away_team: game.away, home_team: game.home,
+  commence_time: game.sourceDate,
+  bookmakers: ["book-one", "book-two"].map((key) => ({ key, markets: [
+    { key: "h2h", outcomes: [{ name: game.away, price: 1.9 }, { name: game.home, price: 2 }] },
+    { key: "spreads", outcomes: [{ name: game.away, point: -1.5, price: 1.9 }] },
+    { key: "totals", outcomes: [{ name: "Over", point: 44.5, price: 1.9 }] },
+  ] })),
+});
+const noOddsSnapshot = (game) => ({
+  ...fixture(game), authoritative: true,
+  bestBets: { candidateVersion: BEST_BETS_CANDIDATE_VERSION, available: false,
+    candidates: [], recommendations: [], assessed: 1, qualified: 0,
+    marketDiagnostics: { bookmakerCount: 0, marketCount: 0 } },
+});
+
+for (const diagnostics of [
+  { bookmakerCount: 0, marketCount: 0 },
+  { bookmakerCount: 0, marketCount: 3 },
+  { bookmakerCount: 2, marketCount: 0 },
+]) {
+  test(`pre-kickoff no-odds snapshot regenerates with current exact-match odds: ${JSON.stringify(diagnostics)}`, async () => {
+    const saved = noOddsSnapshot(games[0]);
+    saved.bestBets.marketDiagnostics = diagnostics;
+    assert.equal(completePrediction(saved), true, "exercise the reuse gate, not the existing assessed=0 rejection");
+    const event = coreOddsEvent(games[0]);
+    const result = await run({
+      db: database([saved]), dryRun: false,
+      resolveContext: () => ({ ...context, games: [games[0]] }),
+      readOdds: async () => ({ events: [event] }),
+      build(game, now, odds) {
+        const received = findOddsForGame(odds.events, game);
+        assert.deepEqual(received.bookmakers, event.bookmakers);
+        const snapshot = fixture(game, now);
+        snapshot.bestBets.marketDiagnostics = {
+          bookmakerCount: received.bookmakers.length,
+          marketCount: received.bookmakers.reduce((total, book) => total + book.markets.length, 0),
+        };
+        snapshot.game = { ...game, oddsEvent: received };
+        return snapshot;
+      },
+    });
+    assert.equal(result.res.statusCode, 200, result.res.body.reason);
+    assert.equal(result.generated, 1);
+    assert.equal(result.res.body.reused, 0);
+    assert.equal(result.db.writes.length, 1);
+    const refreshed = databaseToSnapshot(result.db.rows[0]);
+    assert.deepEqual(refreshed.game.oddsEvent.bookmakers, event.bookmakers);
+    assert.deepEqual(refreshed.bestBets.marketDiagnostics, { bookmakerCount: 2, marketCount: 6 });
+  });
+}
+
+test("production-shaped snapshot with zero assessed markets regenerates with current odds", async () => {
+  const saved = noOddsSnapshot(games[0]);
+  saved.bestBets.assessed = 0;
+  const event = coreOddsEvent(games[0]);
+  const result = await run({
+    db: database([saved]), dryRun: false,
+    resolveContext: () => ({ ...context, games: [games[0]] }),
+    readOdds: async () => ({ events: [event] }),
+    build(game, now, odds) {
+      assert.deepEqual(findOddsForGame(odds.events, game).bookmakers, event.bookmakers);
+      return fixture(game, now);
+    },
+  });
+  assert.equal(result.res.statusCode, 200, result.res.body.reason);
+  assert.equal(result.generated, 1);
+  assert.equal(result.db.writes.length, 1);
+});
+
+test("assessed markets with zero qualified recommendations remain reusable", async () => {
+  const saved = noOddsSnapshot(games[0]);
+  Object.assign(saved.bestBets, { available: true, assessed: 6, qualified: 0,
+    marketDiagnostics: { bookmakerCount: 2, marketCount: 6 } });
+  const result = await run({
+    db: database([saved]), dryRun: false,
+    resolveContext: () => ({ ...context, games: [games[0]] }),
+    readOdds: async () => ({ events: [coreOddsEvent(games[0])] }),
+    build: () => assert.fail("assessed markets with no qualifying bets must be reused"),
+  });
+  assert.equal(result.res.statusCode, 200, result.res.body.reason);
+  assert.equal(result.res.body.reused, 1);
+  assert.deepEqual(result.db.writes, []);
+});
+
+for (const kind of ["unavailable", "different-matchup", "different-kickoff", "empty-markets", "empty-outcomes"]) {
+  test(`no-odds snapshot remains reusable when current odds are ${kind}`, async () => {
+    const event = coreOddsEvent(games[0]);
+    if (kind === "different-matchup") event.home_team = games[1].home;
+    if (kind === "different-kickoff") event.commence_time = "2026-10-19T17:00:00Z";
+    if (kind === "empty-markets") event.bookmakers.forEach((book) => { book.markets = []; });
+    if (kind === "empty-outcomes") event.bookmakers.forEach((book) =>
+      book.markets.forEach((market) => { market.outcomes = []; }));
+    const result = await run({
+      db: database([noOddsSnapshot(games[0])]), dryRun: false,
+      resolveContext: () => ({ ...context, games: [games[0]] }),
+      readOdds: async () => ({ events: kind === "unavailable" ? [] : [event] }),
+      build: () => assert.fail("no usable exact-match odds must not trigger regeneration"),
+    });
+    assert.equal(result.res.statusCode, 200, result.res.body.reason);
+    assert.equal(result.res.body.reused, 1);
+    assert.deepEqual(result.db.writes, []);
+  });
+}
+
+for (const state of ["frozen", "graded", "started"]) {
+  for (const complete of [true, false]) {
+    test(`${state} snapshot is never regenerated when odds arrive (complete: ${complete})`, async () => {
+      const saved = noOddsSnapshot(games[0]);
+      if (state === "frozen") saved.frozenAt = NOW.toISOString();
+      if (state === "graded") saved.actualWinner = games[0].away;
+      if (!complete) saved.predictionFeatureVersion = 0;
+      const result = await run({
+        db: database([saved]), dryRun: false,
+        getNow: () => state === "started" ? new Date(KICKOFF) : NOW,
+        resolveContext: () => ({ ...context, games: [games[0]] }),
+        readOdds: async () => ({ events: [coreOddsEvent(games[0])] }),
+        build: () => assert.fail("protected snapshot must never be regenerated"),
+      });
+      assert.equal(result.generated, 0);
+      assert.deepEqual(result.db.writes, []);
+      assert.equal(result.res.statusCode, complete && state !== "started" ? 200 : 502);
+    });
+  }
+}
+
 test("partial browser predictions neither block complete server refresh nor overwrite authoritative current records", async () => {
   const incoming = fixture(games[0]);
   assert.ok(completePrediction(incoming));
