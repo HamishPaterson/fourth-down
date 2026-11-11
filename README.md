@@ -1,5 +1,13 @@
 # React + Vite
 
+## Favourite team preference
+
+Settings saves the canonical team code immediately to the existing `favoriteTeam`
+localStorage key. Refreshing or reopening the app restores it after validation
+against `TEAM_NAMES`; absent or invalid values use SF without writing that fallback
+over storage. Preferences remain browser-local; there is no account preference store.
+Storage failures are reported in Settings rather than shown as successful saves.
+
 ## Matchup Intelligence Phase 1
 
 New predictions with exact-season/week team context include `matchupIntelligence`.

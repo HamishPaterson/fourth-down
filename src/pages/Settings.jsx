@@ -3,8 +3,20 @@ import { Activity, ChevronRight, Layers, Settings as SettingsIcon } from "lucide
 import { TEAM_NAMES } from "../data.js";
 
 export default function Settings({ favoriteTeam, onSave, onNavigate }) {
-  const [draft, setDraft] = useState(favoriteTeam);
   const [saved, setSaved] = useState(false);
+  const [saveError, setSaveError] = useState(null);
+
+  function saveTeam(team) {
+    try {
+      onSave(team);
+      setSaved(true);
+      setSaveError(null);
+    } catch (error) {
+      console.warn("Favourite team preference could not be saved", error);
+      setSaved(false);
+      setSaveError("Your favourite team could not be saved. Please try again.");
+    }
+  }
 
   return (
     <section className="settings-page">
@@ -24,12 +36,13 @@ export default function Settings({ favoriteTeam, onSave, onNavigate }) {
           </div>
           <label>
             Favourite team
-            <select value={draft} onChange={(event) => { setDraft(event.target.value); setSaved(false); }}>
+            <select value={favoriteTeam} onChange={(event) => saveTeam(event.target.value)}>
               {Object.entries(TEAM_NAMES).map(([code, name]) => <option key={code} value={code}>{name}</option>)}
             </select>
           </label>
-          <button className="primary settings-save-button" onClick={() => { onSave(draft); setSaved(true); }}>Save settings</button>
+          <button className="primary settings-save-button" onClick={() => saveTeam(favoriteTeam)}>Save settings</button>
           {saved && <p className="success">Settings saved</p>}
+          {saveError && <p role="alert">{saveError}</p>}
         </section>
 
         <section className="card settings-card settings-tools-card">

@@ -13,13 +13,14 @@ import DataHealth from "./pages/DataHealth.jsx";
 import { getTeamTheme } from "./services/teamThemes.js";
 import { getTeams } from "./services/nflApi.js";
 import { TEAM_NAMES } from "./data.js";
+import { readFavoriteTeam, saveFavoriteTeamPreference } from "./services/favoriteTeamPreference.js";
 
 export default function App() {
   const [page, setPage] = useState("home");
   const [selectedGame, setSelectedGame] = useState(null);
   const predictionsScrollPosition = useRef(0);
   const [selectedTeam, setSelectedTeam] = useState(null);
-  const [favoriteTeam, setFavoriteTeam] = useState(() => localStorage.getItem("favoriteTeam") || "SF");
+  const [favoriteTeam, setFavoriteTeam] = useState(readFavoriteTeam);
   const [updateAvailable, setUpdateAvailable] = useState(false);
 
   useEffect(() => {
@@ -117,8 +118,8 @@ export default function App() {
   }
 
   function saveFavoriteTeam(team) {
+    saveFavoriteTeamPreference(team);
     setFavoriteTeam(team);
-    localStorage.setItem("favoriteTeam", team);
   }
 
   return (
