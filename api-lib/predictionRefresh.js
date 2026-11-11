@@ -8,7 +8,7 @@ import { createServerPredictionGenerator, readPredictionOdds, saveAuthoritativeP
 import { databaseToSnapshot } from "../api/nfl/game-stats.js";
 import { getCurrentWeekWindow } from "../api/nfl/odds.js";
 import { loadWeeklyOpponentNetwork, validateWeeklyOpponentNetwork, NFL_TEAMS } from "../api/nfl/opponent-network.js";
-import { completePrediction, predictionCompletenessStatus, predictionMissingOdds } from "./predictionEligibility.js";
+import { completePrediction, predictionCompletenessStatus, predictionMissingOdds, predictionMissingExternalFactors } from "./predictionEligibility.js";
 import { predictionFeatureStatus, PREDICTION_FEATURE_VERSION } from "../src/services/predictionFeatures.js";
 import { playerTeam } from "./playerMetrics.js";
 import { findOddsForGame } from "../src/services/oddsApi.js";
@@ -153,6 +153,8 @@ export function createPredictionRefreshHandler(overrides = {}) {
           const missingOddsNowAvailable = !existing?.frozenAt && !existing?.actualWinner &&
             Date.parse(existing?.kickoff) > now.getTime() &&
             predictionMissingOdds(existing) && currentOddsAvailable;
+          const missingExternalFactors = existing?.authoritative && !existing.frozenAt && !existing.actualWinner && !existing.gradedAt &&
+            Date.parse(existing.kickoff) > now.getTime() && predictionMissingExternalFactors(existing);
           // Keep the original evidence untouched while there are still no odds to recover.
           const waitingForOdds = !prepareWeeklyLock && predictionMissingOdds(existing) && !currentOddsAvailable &&
             !existing?.frozenAt && !existing?.actualWinner && Date.parse(existing?.kickoff) > now.getTime() &&
@@ -166,7 +168,7 @@ export function createPredictionRefreshHandler(overrides = {}) {
           }
           if (existing?.authoritative && completePrediction(existing) && predictionFeatureStatus(existing).complete &&
               Date.parse(existing.kickoff) === Date.parse(game.sourceDate) &&
-              !missingOddsNowAvailable &&
+              !missingOddsNowAvailable && !missingExternalFactors &&
               (!prepareWeeklyLock || !lockPredictionRejections(existing, lockContext, now).length)) {
             validatePredictionRefreshBatch([existing], { ...context, games: [game] }, getNow());
             reused++;
@@ -180,6 +182,7 @@ export function createPredictionRefreshHandler(overrides = {}) {
               throw new Error("Frozen, graded or started prediction cannot be refreshed");
             }
             const snapshot = await generate(game);
+            if (predictionMissingExternalFactors(snapshot)) throw new Error("Missing current active external-factor evidence");
             return snapshot;
           } catch (error) {
             throw new Error(`${game.away} at ${game.home}: ${error instanceof Error ? error.message : "Prediction generation failed"}`, { cause: error });
@@ -204,6 +207,7 @@ export function createPredictionRefreshHandler(overrides = {}) {
         }));
         const saved = processedGames.map((game) => byGame.get(identity(game)));
         validatePredictionRefreshBatch(saved, batchContext, getNow());
+        if (saved.some(predictionMissingExternalFactors)) throw new Error("Saved prediction missing current active external-factor evidence");
         if (prepareWeeklyLock && remaining === 0) {
           const saved = context.games.map((game) => byGame.get(identity(game)));
           validatePredictionRefreshBatch(saved, context, getNow());

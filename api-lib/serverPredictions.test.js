@@ -149,11 +149,15 @@ test("real saved odds readers retain market-specific stale diagnostics and never
       const event = { away_team: away, home_team: home, commence_time: game.sourceDate,
         bookmakers: ["one", "two"].map((key) => ({ key, last_update: now.toISOString(), markets: [
           { key: "h2h", outcomes: [{ name: away, price: 100 }, { name: home, price: 100 }] },
-          { key: "spreads", outcomes: [{ name: away, point: -1.5, price: 100 }, { name: home, point: 1.5, price: 100 }] },
+          // Keep this completeness fixture away from a legitimate no-pick tie.
+          { key: "spreads", outcomes: [{ name: away, point: -7.5, price: 100 }, { name: home, point: 7.5, price: 100 }] },
           { key: "totals", outcomes: [{ name: "Over", point: 44.5, price: 100 }, { name: "Under", point: 44.5, price: 100 }] },
         ] })) };
       const snapshot = await generate(game, { events: [event] }, now);
       const pick = snapshot.bestBets.anytimeTdModelPick;
+      assert.equal(snapshot.predictionPayload.externalFactors2026.active, true, matchup);
+      assert.ok(Number.isFinite(snapshot.predictionPayload.externalFactors2026.totalExternalAdjustment), matchup);
+      assert.ok(Math.abs(snapshot.predictionPayload.externalFactors2026.totalExternalAdjustment) <= 2, matchup);
       assert.ok(completePrediction(snapshot), matchup);
       assert.equal(snapshot.playerProjections.available, true, matchup);
       assert.equal(snapshot.bestBets.marketDiagnostics.bookmakerCount, 2, matchup);
@@ -244,6 +248,7 @@ test("explicit pre-lock administrative preparation saves verified provenance and
         createGenerator: () => async (game) => {
           const snapshot = structuredClone(fixture.predictions.find((row) => row.awayCode === game.away));
           snapshot.predictionPayload = { ...snapshot.predictionPayload,
+            externalFactors2026: { active: true, totalExternalAdjustment: 2 },
             away: { score: 24 }, home: { score: 20 }, total: 44, continuousMargin: -4,
             awayWinProbability: .7, homeWinProbability: .3 };
           snapshot.playerProjections = { available: true, away: { players: [{ position: "QB" }] },

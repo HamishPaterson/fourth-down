@@ -308,6 +308,13 @@ refresh. Frozen, graded, started and preserved historical predictions remain
 protected. Explicit weekly-lock preparation saves its plan only after all games
 have passed full-slate validation.
 
+When the 2026 external-factor layer is enabled, pre-kickoff authoritative
+snapshots missing an active `predictionPayload.externalFactors2026` result with
+a finite `totalExternalAdjustment` within the configured combined cap are also
+eligible for the same bounded refresh. The refreshed evidence is verified before
+and after persistence; valid active evidence is reused on subsequent invocations.
+Existing protection rules and the wait for usable odds remain unchanged.
+
 `bestBets.anytimeTdModelPick` persists the highest eligible player touchdown
 probability from existing player projections, including team, canonical personnel
 identity, rushing/receiving touchdown evidence, explanation and risk. Existing

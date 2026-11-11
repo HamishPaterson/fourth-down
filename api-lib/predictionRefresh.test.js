@@ -55,6 +55,7 @@ function fixture(game, now = NOW) {
     personnelVersion: PERSONNEL_VIEW_VERSION,
     personnelViews: { away: personnelView(game.away), home: personnelView(game.home) },
     predictionPayload: { winner: game.away, away: { score: 24 }, home: { score: 20 }, total: 44, continuousMargin: -4,
+      externalFactors2026: { active: true, totalExternalAdjustment: -2 },
       awayWinProbability: .65, homeWinProbability: .35,
       modelLayers: { opponentNetwork: { available: true, homePoints: -.5, awayPoints: .5, confidence: .6 } },
       matchupIntelligence: { schemaVersion: MATCHUP_INTELLIGENCE_SCHEMA_VERSION, signals, situational } },
@@ -269,6 +270,76 @@ const noOddsSnapshot = (game) => ({
   bestBets: { candidateVersion: BEST_BETS_CANDIDATE_VERSION, available: false,
     candidates: [], recommendations: [], assessed: 1, qualified: 0,
     marketDiagnostics: { bookmakerCount: 0, marketCount: 0 } },
+});
+
+test("missing external-factor evidence resumes in two-game batches and persists once without changing Best Bets or TD evidence", async () => {
+  const slate = games.slice(0, 5);
+  const snapshots = slate.map((game) => {
+    const snapshot = { ...fixture(game), authoritative: true };
+    delete snapshot.predictionPayload.externalFactors2026;
+    snapshot.bestBets.anytimeTdModelPick = { modelPickEligible: true, playerName: "Fixture Scorer",
+      personnelId: "fixture-scorer", modelProbability: .6 };
+    return snapshot;
+  });
+  const db = database(snapshots.reverse()), generated = [];
+  for (const [round, expected] of [2, 2, 1, 0].entries()) {
+    const result = await run({
+      db, dryRun: false, batchLimit: undefined,
+      resolveContext: () => ({ ...context, games: [...slate].reverse() }),
+      build(game) {
+        generated.push(`${game.away}:${game.home}`);
+        const snapshot = fixture(game);
+        snapshot.bestBets = structuredClone(snapshots.find((s) => s.awayCode === game.away).bestBets);
+        return snapshot;
+      },
+    });
+    assert.equal(result.res.statusCode, 200, result.res.body.reason);
+    assert.equal(result.res.body.regenerated, expected);
+    assert.equal(result.res.body.remaining, Math.max(0, 5 - (round + 1) * 2));
+    assert.equal(result.res.body.complete, round >= 2);
+    assert.ok(result.res.body.processed <= 2);
+  }
+  assert.deepEqual(generated, [...slate].sort((a, b) =>
+    `${a.away}:${a.home}`.localeCompare(`${b.away}:${b.home}`)).map((g) => `${g.away}:${g.home}`));
+  assert.equal(db.writes.length, 5);
+  for (const row of db.rows) {
+    const saved = databaseToSnapshot(row);
+    const external = saved.predictionPayload.externalFactors2026;
+    assert.equal(external.active, true);
+    assert.ok(Number.isFinite(external.totalExternalAdjustment) && Math.abs(external.totalExternalAdjustment) <= 2);
+    assert.deepEqual(saved.bestBets, snapshots.find((s) => s.awayCode === saved.awayCode).bestBets);
+  }
+});
+
+for (const state of ["frozen", "graded", "gradedAt", "started"]) {
+  test(`missing external-factor evidence does not regenerate ${state} authority`, async () => {
+    const snapshot = { ...fixture(games[0]), authoritative: true };
+    delete snapshot.predictionPayload.externalFactors2026;
+    if (state === "frozen") snapshot.frozenAt = NOW.toISOString();
+    if (state === "graded") snapshot.actualWinner = games[0].away;
+    if (state === "gradedAt") snapshot.gradedAt = NOW.toISOString();
+    const result = await run({
+      db: database([snapshot]), dryRun: false,
+      getNow: () => state === "started" ? new Date(KICKOFF) : NOW,
+      resolveContext: () => ({ ...context, games: [games[0]] }),
+      build: () => assert.fail("protected external-factor snapshot must never regenerate"),
+    });
+    assert.equal(result.generated, 0);
+    assert.deepEqual(result.db.writes, []);
+  });
+}
+
+test("regeneration cannot save an inactive external-factor result", async () => {
+  const snapshot = { ...fixture(games[0]), authoritative: true };
+  delete snapshot.predictionPayload.externalFactors2026;
+  const result = await run({
+    db: database([snapshot]), dryRun: false,
+    resolveContext: () => ({ ...context, games: [games[0]] }),
+    build: () => structuredClone(snapshot),
+  });
+  assert.equal(result.res.statusCode, 502);
+  assert.match(result.res.body.reason, /Missing current active external-factor evidence/);
+  assert.deepEqual(result.db.writes, []);
 });
 
 test("14-game refresh resumes deterministic two-game batches without rebuilding repaired authority", async (t) => {

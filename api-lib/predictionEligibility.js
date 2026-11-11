@@ -1,8 +1,16 @@
 import { isCurrentModelIdentity } from "../src/services/modelIdentity.js";
 import { BEST_BETS_CANDIDATE_VERSION } from "../src/services/bestBetsService.js";
 import { predictionFeatureStatus } from "../src/services/predictionFeatures.js";
+import { EXTERNAL_FACTORS_2026_ENABLED, MAX_COMBINED_EXTERNAL_MARGIN_ADJUSTMENT } from "../src/services/externalFactors2026.js";
 
 const number = (value) => value !== null && value !== undefined && value !== "" && Number.isFinite(Number(value));
+
+export function predictionMissingExternalFactors(snapshot) {
+  const result = snapshot?.predictionPayload?.externalFactors2026;
+  return EXTERNAL_FACTORS_2026_ENABLED && Number(snapshot?.season) === 2026 &&
+    !(result?.active === true && Number.isFinite(result.totalExternalAdjustment) &&
+      Math.abs(result.totalExternalAdjustment) <= MAX_COMBINED_EXTERNAL_MARGIN_ADJUSTMENT);
+}
 
 export function predictionMissingOdds(snapshot) {
   const diagnostics = snapshot?.bestBets?.marketDiagnostics;
@@ -51,6 +59,10 @@ export function retainPrediction(existing, incoming, now, authoritative = false)
     const existingFeatures = predictionFeatureStatus(existing);
     const currentFeatures = existingFeatures.complete;
     const incomingFeatures = predictionFeatureStatus(incoming).complete;
+    if (existing.authoritative && !existing.gradedAt && currentFeatures && incomingFeatures &&
+        predictionMissingExternalFactors(existing) && !predictionMissingExternalFactors(incoming) &&
+        ["season", "week", "awayCode", "homeCode"].every((key) => existing[key] === incoming[key]) &&
+        Date.parse(existing.kickoff) === Date.parse(incoming.kickoff)) return false;
     const candidateUpgrade = incoming.bestBets?.candidateVersion === BEST_BETS_CANDIDATE_VERSION &&
       (existing.bestBets?.candidateVersion !== BEST_BETS_CANDIDATE_VERSION || !Array.isArray(existing.bestBets?.candidates)) &&
       Array.isArray(incoming.bestBets.candidates) &&

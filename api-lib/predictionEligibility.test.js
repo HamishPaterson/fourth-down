@@ -3,12 +3,41 @@ import assert from "node:assert/strict";
 import { CURRENT_MODEL_VERSION, CURRENT_MODEL_KEY } from "../src/services/modelIdentity.js";
 import { FULL_MODEL_VERSION, FULL_MODEL_KEY } from "../src/services/gamePredictionService.js";
 import * as ledger from "../src/services/predictionLedger.js";
-import { completePrediction, predictionCompletenessStatus, retainPrediction } from "./predictionEligibility.js";
+import { completePrediction, predictionCompletenessStatus, retainPrediction, predictionMissingExternalFactors } from "./predictionEligibility.js";
 import { predictionFeatureFixture } from "./personnelTestHelpers.js";
 import { BEST_BETS_CANDIDATE_VERSION } from "../src/services/bestBetsService.js";
 import { fixedTestNow, useFixedTestClock } from "./testClock.js";
 
 useFixedTestClock();
+test("external-factor refresh evidence requires active numeric persisted adjustment within two points", () => {
+  for (const evidence of [undefined, { active: false, totalExternalAdjustment: 0 },
+    { active: true, totalExternalAdjustment: null }, { active: true, totalExternalAdjustment: "2" },
+    { active: true, totalExternalAdjustment: NaN }, { active: true, totalExternalAdjustment: Infinity },
+    { active: true, totalExternalAdjustment: -2.01 }, { active: true, totalExternalAdjustment: 2.01 }]) {
+    assert.equal(predictionMissingExternalFactors({ season: 2026,
+      predictionPayload: { externalFactors2026: evidence } }), true);
+  }
+  for (const value of [-2, 0, 2]) assert.equal(predictionMissingExternalFactors({ season: 2026,
+    predictionPayload: { externalFactors2026: { active: true, totalExternalAdjustment: value } } }), false);
+  assert.equal(predictionMissingExternalFactors({ season: 2025 }), false);
+});
+
+test("external-factor authority upgrade persists only complete matching current evidence and preserves protected rows", () => {
+  const existing = fixture(), incoming = structuredClone(existing);
+  incoming.predictionPayload.externalFactors2026 = { active: true, totalExternalAdjustment: -2 };
+  assert.equal(retainPrediction(existing, incoming, fixedTestNow(), true), false);
+  assert.equal(retainPrediction(incoming, incoming, fixedTestNow(), true), true);
+  assert.equal(retainPrediction(existing, incoming, fixedTestNow(), false), true);
+  for (const protectedRow of [{ ...existing, frozenAt: cutoff }, { ...existing, actualWinner: "SEA" },
+    { ...existing, gradedAt: cutoff }]) {
+    assert.equal(retainPrediction(protectedRow, incoming, fixedTestNow(), true), true);
+  }
+  assert.equal(retainPrediction(existing, incoming, new Date(cutoff), true), true);
+  for (const change of [{ kickoff: "2026-10-17T00:00:00Z" }, { week: 10 },
+    { predictionFeatureVersion: 0 }, { predictionPayload: null }]) {
+    assert.equal(retainPrediction(existing, { ...incoming, ...change }, fixedTestNow(), true), true);
+  }
+});
 const cutoff = "2026-10-16T00:15:00Z";
 function fixture() {
   const feature = predictionFeatureFixture("SEA", "DEN", 2026, 6, cutoff);
