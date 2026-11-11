@@ -1,0 +1,2389 @@
+{
+  "generatedAt": "2026-11-10T06:11:01.025Z",
+  "season": 2026,
+  "status": "review-only report; production consumes src/services/externalFactors2026Data.js read-only",
+  "productionDataset": "src/services/externalFactors2026Data.js",
+  "maxCompletedWeek": 9,
+  "gamesCompleted": 136,
+  "gamesWithValidPreGamePredictions": 104,
+  "gamesExcluded": 32,
+  "outdoorGamesWithWeather": 91,
+  "currentProductionModelVersion": 12,
+  "reconciliation": [
+    {
+      "game": "2026:1:NE:SEA",
+      "week": 1,
+      "reason": "prediction created after kickoff (backfill) - excluded",
+      "modelVersion": null,
+      "createdAt": "2026-09-25T00:00:26.486559+00:00",
+      "kickoff": "2026-09-10T00:20:00+00:00"
+    },
+    {
+      "game": "2026:1:SF:LAR",
+      "week": 1,
+      "reason": "no prediction snapshot stored",
+      "modelVersion": null,
+      "createdAt": null,
+      "kickoff": "2026-09-11T00:35:00.000Z"
+    },
+    {
+      "game": "2026:1:TB:CIN",
+      "week": 1,
+      "reason": "prediction created after kickoff (backfill) - excluded",
+      "modelVersion": null,
+      "createdAt": "2026-09-25T00:00:28.538521+00:00",
+      "kickoff": "2026-09-13T17:00:00+00:00"
+    },
+    {
+      "game": "2026:1:NO:DET",
+      "week": 1,
+      "reason": "no prediction snapshot stored",
+      "modelVersion": null,
+      "createdAt": null,
+      "kickoff": "2026-09-13T17:00:00.000Z"
+    },
+    {
+      "game": "2026:1:NYJ:TEN",
+      "week": 1,
+      "reason": "no prediction snapshot stored",
+      "modelVersion": null,
+      "createdAt": null,
+      "kickoff": "2026-09-13T17:00:00.000Z"
+    },
+    {
+      "game": "2026:1:BAL:IND",
+      "week": 1,
+      "reason": "prediction created after kickoff (backfill) - excluded",
+      "modelVersion": null,
+      "createdAt": "2026-09-25T00:00:30.530245+00:00",
+      "kickoff": "2026-09-13T17:00:00+00:00"
+    },
+    {
+      "game": "2026:1:ATL:PIT",
+      "week": 1,
+      "reason": "no prediction snapshot stored",
+      "modelVersion": null,
+      "createdAt": null,
+      "kickoff": "2026-09-13T17:00:00.000Z"
+    },
+    {
+      "game": "2026:1:CHI:CAR",
+      "week": 1,
+      "reason": "no prediction snapshot stored",
+      "modelVersion": null,
+      "createdAt": null,
+      "kickoff": "2026-09-13T17:00:00.000Z"
+    },
+    {
+      "game": "2026:1:CLE:JAX",
+      "week": 1,
+      "reason": "no prediction snapshot stored",
+      "modelVersion": null,
+      "createdAt": null,
+      "kickoff": "2026-09-13T17:00:00.000Z"
+    },
+    {
+      "game": "2026:1:BUF:HOU",
+      "week": 1,
+      "reason": "no prediction snapshot stored",
+      "modelVersion": null,
+      "createdAt": null,
+      "kickoff": "2026-09-13T17:00:00.000Z"
+    },
+    {
+      "game": "2026:1:MIA:LV",
+      "week": 1,
+      "reason": "no prediction snapshot stored",
+      "modelVersion": null,
+      "createdAt": null,
+      "kickoff": "2026-09-13T20:25:00.000Z"
+    },
+    {
+      "game": "2026:1:GB:MIN",
+      "week": 1,
+      "reason": "no prediction snapshot stored",
+      "modelVersion": null,
+      "createdAt": null,
+      "kickoff": "2026-09-13T20:25:00.000Z"
+    },
+    {
+      "game": "2026:1:WSH:PHI",
+      "week": 1,
+      "reason": "no prediction snapshot stored",
+      "modelVersion": null,
+      "createdAt": null,
+      "kickoff": "2026-09-13T20:25:00.000Z"
+    },
+    {
+      "game": "2026:1:ARI:LAC",
+      "week": 1,
+      "reason": "no prediction snapshot stored",
+      "modelVersion": null,
+      "createdAt": null,
+      "kickoff": "2026-09-13T20:25:00.000Z"
+    },
+    {
+      "game": "2026:1:DAL:NYG",
+      "week": 1,
+      "reason": "no prediction snapshot stored",
+      "modelVersion": null,
+      "createdAt": null,
+      "kickoff": "2026-09-14T00:20:00.000Z"
+    },
+    {
+      "game": "2026:1:DEN:KC",
+      "week": 1,
+      "reason": "prediction created after kickoff (backfill) - excluded",
+      "modelVersion": null,
+      "createdAt": "2026-09-25T00:01:01.094831+00:00",
+      "kickoff": "2026-09-15T00:00:00+00:00"
+    },
+    {
+      "game": "2026:2:DET:BUF",
+      "week": 2,
+      "reason": "prediction created after kickoff (backfill) - excluded",
+      "modelVersion": "2",
+      "createdAt": "2026-09-25T00:01:02.079797+00:00",
+      "kickoff": "2026-09-18T00:15:00+00:00"
+    },
+    {
+      "game": "2026:2:CAR:ATL",
+      "week": 2,
+      "reason": "prediction created after kickoff (backfill) - excluded",
+      "modelVersion": "2",
+      "createdAt": "2026-09-25T00:01:03.063489+00:00",
+      "kickoff": "2026-09-20T17:00:00+00:00"
+    },
+    {
+      "game": "2026:2:MIN:CHI",
+      "week": 2,
+      "reason": "prediction created after kickoff (backfill) - excluded",
+      "modelVersion": "2",
+      "createdAt": "2026-09-25T00:01:03.996122+00:00",
+      "kickoff": "2026-09-20T17:00:00+00:00"
+    },
+    {
+      "game": "2026:2:PHI:TEN",
+      "week": 2,
+      "reason": "prediction created after kickoff (backfill) - excluded",
+      "modelVersion": "2.0.0",
+      "createdAt": "2026-09-25T00:01:05.289624+00:00",
+      "kickoff": "2026-09-20T17:00:00+00:00"
+    },
+    {
+      "game": "2026:2:PIT:NE",
+      "week": 2,
+      "reason": "prediction created after kickoff (backfill) - excluded",
+      "modelVersion": "2.0.0",
+      "createdAt": "2026-09-25T00:01:06.310378+00:00",
+      "kickoff": "2026-09-20T17:00:00+00:00"
+    },
+    {
+      "game": "2026:2:GB:NYJ",
+      "week": 2,
+      "reason": "prediction created after kickoff (backfill) - excluded",
+      "modelVersion": "2.0.0",
+      "createdAt": "2026-09-25T00:01:06.782759+00:00",
+      "kickoff": "2026-09-20T17:00:00+00:00"
+    },
+    {
+      "game": "2026:2:CLE:TB",
+      "week": 2,
+      "reason": "prediction created after kickoff (backfill) - excluded",
+      "modelVersion": "2.0.0",
+      "createdAt": "2026-09-25T00:01:07.695531+00:00",
+      "kickoff": "2026-09-20T17:00:00+00:00"
+    },
+    {
+      "game": "2026:2:NO:BAL",
+      "week": 2,
+      "reason": "prediction created after kickoff (backfill) - excluded",
+      "modelVersion": "2.0.0",
+      "createdAt": "2026-09-25T00:01:09.631459+00:00",
+      "kickoff": "2026-09-20T17:00:00+00:00"
+    },
+    {
+      "game": "2026:2:CIN:HOU",
+      "week": 2,
+      "reason": "prediction created after kickoff (backfill) - excluded",
+      "modelVersion": "2.0.0",
+      "createdAt": "2026-09-25T00:01:08.645958+00:00",
+      "kickoff": "2026-09-20T17:00:00+00:00"
+    },
+    {
+      "game": "2026:2:JAX:DEN",
+      "week": 2,
+      "reason": "prediction created after kickoff (backfill) - excluded",
+      "modelVersion": "2.0.0",
+      "createdAt": "2026-09-25T00:01:10.448662+00:00",
+      "kickoff": "2026-09-20T20:05:00+00:00"
+    },
+    {
+      "game": "2026:2:LV:LAC",
+      "week": 2,
+      "reason": "prediction created after kickoff (backfill) - excluded",
+      "modelVersion": "2",
+      "createdAt": "2026-09-25T00:01:10.972689+00:00",
+      "kickoff": "2026-09-20T20:05:00+00:00"
+    },
+    {
+      "game": "2026:2:WSH:DAL",
+      "week": 2,
+      "reason": "prediction created after kickoff (backfill) - excluded",
+      "modelVersion": "2.0.0",
+      "createdAt": "2026-09-25T00:01:11.910963+00:00",
+      "kickoff": "2026-09-20T20:25:00+00:00"
+    },
+    {
+      "game": "2026:2:SEA:ARI",
+      "week": 2,
+      "reason": "prediction created after kickoff (backfill) - excluded",
+      "modelVersion": "2",
+      "createdAt": "2026-09-25T00:01:13.361185+00:00",
+      "kickoff": "2026-09-20T20:25:00+00:00"
+    },
+    {
+      "game": "2026:2:MIA:SF",
+      "week": 2,
+      "reason": "prediction created after kickoff (backfill) - excluded",
+      "modelVersion": "2.0.0",
+      "createdAt": "2026-09-25T00:01:14.287396+00:00",
+      "kickoff": "2026-09-20T20:25:00+00:00"
+    },
+    {
+      "game": "2026:2:IND:KC",
+      "week": 2,
+      "reason": "prediction created after kickoff (backfill) - excluded",
+      "modelVersion": "2.0.0",
+      "createdAt": "2026-09-25T00:01:14.78415+00:00",
+      "kickoff": "2026-09-21T00:20:00+00:00"
+    },
+    {
+      "game": "2026:2:NYG:LAR",
+      "week": 2,
+      "reason": "prediction created after kickoff (backfill) - excluded",
+      "modelVersion": "2",
+      "createdAt": "2026-09-25T00:01:15.632538+00:00",
+      "kickoff": "2026-09-22T00:15:00+00:00"
+    }
+  ],
+  "shrinkage": {
+    "K": 25,
+    "teamK": 8,
+    "smallSampleN": 30,
+    "maxDerivedAdjustment": 2,
+    "note": "derivedAdjustment2026 = observed * n/(n+K), capped; small samples collapse toward 0. Team venue effects are shrunk toward the league baseline with K=8."
+  },
+  "variance": {
+    "games": 104,
+    "weeksCovered": [
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9
+    ],
+    "winnerAccuracy": 0.709,
+    "marketWinnerAccuracy": 0.673,
+    "meanAbsMarginError": 9.43,
+    "residualSd": 11.85,
+    "residualMean": -2.68,
+    "marketMeanAbsMarginError": 9.46,
+    "marketResidualSd": 12.2,
+    "meanAbsModelVsMarket": 4.46,
+    "correctWinnerMarginError": 7.41,
+    "incorrectWinnerMarginError": 14.5,
+    "correctWinnerBigErrorShare": 0.26,
+    "marginBuckets": [
+      {
+        "predictedMarginBand": "0-3",
+        "n": 18,
+        "winnerAccuracy": 0.667,
+        "meanAbsMarginError": 8.44,
+        "meanWinnerProb": 0.541
+      },
+      {
+        "predictedMarginBand": "3-6",
+        "n": 27,
+        "winnerAccuracy": 0.615,
+        "meanAbsMarginError": 8.37,
+        "meanWinnerProb": 0.621
+      },
+      {
+        "predictedMarginBand": "6-9",
+        "n": 21,
+        "winnerAccuracy": 0.762,
+        "meanAbsMarginError": 10.67,
+        "meanWinnerProb": 0.708
+      },
+      {
+        "predictedMarginBand": "9-+",
+        "n": 38,
+        "winnerAccuracy": 0.763,
+        "meanAbsMarginError": 9.97,
+        "meanWinnerProb": 0.837
+      }
+    ],
+    "calibration": [
+      {
+        "probBand": "0.5-0.6",
+        "n": 30,
+        "meanPredicted": 0.558,
+        "actualWinRate": 0.633
+      },
+      {
+        "probBand": "0.6-0.7",
+        "n": 22,
+        "meanPredicted": 0.661,
+        "actualWinRate": 0.636
+      },
+      {
+        "probBand": "0.7-0.8",
+        "n": 26,
+        "meanPredicted": 0.751,
+        "actualWinRate": 0.808
+      },
+      {
+        "probBand": "0.8-1.0",
+        "n": 25,
+        "meanPredicted": 0.87,
+        "actualWinRate": 0.76
+      }
+    ],
+    "rollingResidualSdLatest": 8.18,
+    "rollingResidualSdByWeek": [
+      {
+        "week": 3,
+        "rollingSd": 13.21
+      },
+      {
+        "week": 4,
+        "rollingSd": 11.16
+      },
+      {
+        "week": 5,
+        "rollingSd": 14.07
+      },
+      {
+        "week": 6,
+        "rollingSd": 9.05
+      },
+      {
+        "week": 7,
+        "rollingSd": 13.6
+      },
+      {
+        "week": 8,
+        "rollingSd": 12.93
+      },
+      {
+        "week": 9,
+        "rollingSd": 8.18
+      }
+    ]
+  },
+  "varianceCurrentModel": {
+    "games": 43,
+    "weeksCovered": [
+      7,
+      8,
+      9
+    ],
+    "winnerAccuracy": 0.814,
+    "marketWinnerAccuracy": 0.786,
+    "meanAbsMarginError": 9.49,
+    "residualSd": 12.06,
+    "residualMean": -2.65,
+    "marketMeanAbsMarginError": 11.45,
+    "marketResidualSd": 14.16,
+    "meanAbsModelVsMarket": 5.52,
+    "correctWinnerMarginError": 7.2,
+    "incorrectWinnerMarginError": 19.5,
+    "correctWinnerBigErrorShare": 0.257,
+    "marginBuckets": [
+      {
+        "predictedMarginBand": "0-3",
+        "n": 4,
+        "winnerAccuracy": 0.75,
+        "meanAbsMarginError": 10.75,
+        "meanWinnerProb": 0.532
+      },
+      {
+        "predictedMarginBand": "3-6",
+        "n": 11,
+        "winnerAccuracy": 0.818,
+        "meanAbsMarginError": 8.27,
+        "meanWinnerProb": 0.641
+      },
+      {
+        "predictedMarginBand": "6-9",
+        "n": 10,
+        "winnerAccuracy": 0.8,
+        "meanAbsMarginError": 11.2,
+        "meanWinnerProb": 0.735
+      },
+      {
+        "predictedMarginBand": "9-+",
+        "n": 18,
+        "winnerAccuracy": 0.833,
+        "meanAbsMarginError": 9,
+        "meanWinnerProb": 0.845
+      }
+    ],
+    "calibration": [
+      {
+        "probBand": "0.5-0.6",
+        "n": 6,
+        "meanPredicted": 0.551,
+        "actualWinRate": 0.833
+      },
+      {
+        "probBand": "0.6-0.7",
+        "n": 9,
+        "meanPredicted": 0.653,
+        "actualWinRate": 0.778
+      },
+      {
+        "probBand": "0.7-0.8",
+        "n": 15,
+        "meanPredicted": 0.75,
+        "actualWinRate": 0.8
+      },
+      {
+        "probBand": "0.8-1.0",
+        "n": 13,
+        "meanPredicted": 0.87,
+        "actualWinRate": 0.846
+      }
+    ]
+  },
+  "varianceByVersion": [
+    {
+      "modelVersion": "2",
+      "modelKey": null,
+      "currentProduction": false,
+      "games": 3,
+      "weeksCovered": [
+        3
+      ],
+      "winnerAccuracy": 0.667,
+      "marketWinnerAccuracy": 0.333,
+      "meanAbsMarginError": 12.67,
+      "residualSd": 16.86,
+      "residualMean": -12.67,
+      "marketMeanAbsMarginError": 10.33,
+      "marketResidualSd": 15.31,
+      "meanAbsModelVsMarket": 9,
+      "correctWinnerMarginError": 3,
+      "incorrectWinnerMarginError": 32,
+      "correctWinnerBigErrorShare": 0,
+      "marginBuckets": [
+        {
+          "predictedMarginBand": "0-3",
+          "n": 0,
+          "winnerAccuracy": null,
+          "meanAbsMarginError": null,
+          "meanWinnerProb": null
+        },
+        {
+          "predictedMarginBand": "3-6",
+          "n": 1,
+          "winnerAccuracy": 1,
+          "meanAbsMarginError": 1,
+          "meanWinnerProb": 0.595
+        },
+        {
+          "predictedMarginBand": "6-9",
+          "n": 0,
+          "winnerAccuracy": null,
+          "meanAbsMarginError": null,
+          "meanWinnerProb": null
+        },
+        {
+          "predictedMarginBand": "9-+",
+          "n": 2,
+          "winnerAccuracy": 0.5,
+          "meanAbsMarginError": 18.5,
+          "meanWinnerProb": 0.812
+        }
+      ],
+      "calibration": [
+        {
+          "probBand": "0.5-0.6",
+          "n": 1,
+          "meanPredicted": 0.595,
+          "actualWinRate": 1
+        },
+        {
+          "probBand": "0.6-0.7",
+          "n": 0,
+          "meanPredicted": null,
+          "actualWinRate": null
+        },
+        {
+          "probBand": "0.7-0.8",
+          "n": 1,
+          "meanPredicted": 0.795,
+          "actualWinRate": 0
+        },
+        {
+          "probBand": "0.8-1.0",
+          "n": 1,
+          "meanPredicted": 0.829,
+          "actualWinRate": 1
+        }
+      ]
+    },
+    {
+      "modelVersion": "shared-full-model-v1",
+      "modelKey": null,
+      "currentProduction": false,
+      "games": 13,
+      "weeksCovered": [
+        3
+      ],
+      "winnerAccuracy": 0.538,
+      "marketWinnerAccuracy": 0.538,
+      "meanAbsMarginError": 7.85,
+      "residualSd": 10.87,
+      "residualMean": 3.38,
+      "marketMeanAbsMarginError": 7.87,
+      "marketResidualSd": 10.51,
+      "meanAbsModelVsMarket": 2.4,
+      "correctWinnerMarginError": 6.29,
+      "incorrectWinnerMarginError": 9.67,
+      "correctWinnerBigErrorShare": 0.143,
+      "marginBuckets": [
+        {
+          "predictedMarginBand": "0-3",
+          "n": 3,
+          "winnerAccuracy": 0.667,
+          "meanAbsMarginError": 3.33,
+          "meanWinnerProb": 0.533
+        },
+        {
+          "predictedMarginBand": "3-6",
+          "n": 6,
+          "winnerAccuracy": 0.333,
+          "meanAbsMarginError": 11.17,
+          "meanWinnerProb": 0.579
+        },
+        {
+          "predictedMarginBand": "6-9",
+          "n": 1,
+          "winnerAccuracy": 0,
+          "meanAbsMarginError": 14,
+          "meanWinnerProb": 0.645
+        },
+        {
+          "predictedMarginBand": "9-+",
+          "n": 3,
+          "winnerAccuracy": 1,
+          "meanAbsMarginError": 3.67,
+          "meanWinnerProb": 0.763
+        }
+      ],
+      "calibration": [
+        {
+          "probBand": "0.5-0.6",
+          "n": 9,
+          "meanPredicted": 0.564,
+          "actualWinRate": 0.444
+        },
+        {
+          "probBand": "0.6-0.7",
+          "n": 1,
+          "meanPredicted": 0.645,
+          "actualWinRate": 0
+        },
+        {
+          "probBand": "0.7-0.8",
+          "n": 3,
+          "meanPredicted": 0.763,
+          "actualWinRate": 1
+        },
+        {
+          "probBand": "0.8-1.0",
+          "n": 0,
+          "meanPredicted": null,
+          "actualWinRate": null
+        }
+      ]
+    },
+    {
+      "modelVersion": "3",
+      "modelKey": "full-v3-qbr",
+      "currentProduction": false,
+      "games": 16,
+      "weeksCovered": [
+        4
+      ],
+      "winnerAccuracy": 0.563,
+      "marketWinnerAccuracy": 0.563,
+      "meanAbsMarginError": 9.56,
+      "residualSd": 11.16,
+      "residualMean": -4.19,
+      "marketMeanAbsMarginError": 7.41,
+      "marketResidualSd": 9.55,
+      "meanAbsModelVsMarket": 3.56,
+      "correctWinnerMarginError": 7.22,
+      "incorrectWinnerMarginError": 12.57,
+      "correctWinnerBigErrorShare": 0.333,
+      "marginBuckets": [
+        {
+          "predictedMarginBand": "0-3",
+          "n": 4,
+          "winnerAccuracy": 0.5,
+          "meanAbsMarginError": 9.75,
+          "meanWinnerProb": 0.558
+        },
+        {
+          "predictedMarginBand": "3-6",
+          "n": 3,
+          "winnerAccuracy": 0,
+          "meanAbsMarginError": 13.33,
+          "meanWinnerProb": 0.629
+        },
+        {
+          "predictedMarginBand": "6-9",
+          "n": 4,
+          "winnerAccuracy": 0.75,
+          "meanAbsMarginError": 5.5,
+          "meanWinnerProb": 0.69
+        },
+        {
+          "predictedMarginBand": "9-+",
+          "n": 5,
+          "winnerAccuracy": 0.8,
+          "meanAbsMarginError": 10.4,
+          "meanWinnerProb": 0.847
+        }
+      ],
+      "calibration": [
+        {
+          "probBand": "0.5-0.6",
+          "n": 5,
+          "meanPredicted": 0.561,
+          "actualWinRate": 0.4
+        },
+        {
+          "probBand": "0.6-0.7",
+          "n": 5,
+          "meanPredicted": 0.672,
+          "actualWinRate": 0.4
+        },
+        {
+          "probBand": "0.7-0.8",
+          "n": 2,
+          "meanPredicted": 0.735,
+          "actualWinRate": 1
+        },
+        {
+          "probBand": "0.8-1.0",
+          "n": 4,
+          "meanPredicted": 0.868,
+          "actualWinRate": 0.75
+        }
+      ]
+    },
+    {
+      "modelVersion": "6",
+      "modelKey": "full-v6-best-bets-explanations",
+      "currentProduction": false,
+      "games": 15,
+      "weeksCovered": [
+        5
+      ],
+      "winnerAccuracy": 0.786,
+      "marketWinnerAccuracy": 0.769,
+      "meanAbsMarginError": 10.53,
+      "residualSd": 13.15,
+      "residualMean": -1.87,
+      "marketMeanAbsMarginError": 9.7,
+      "marketResidualSd": 13.2,
+      "meanAbsModelVsMarket": 3.03,
+      "correctWinnerMarginError": 10.73,
+      "incorrectWinnerMarginError": 11.67,
+      "correctWinnerBigErrorShare": 0.455,
+      "marginBuckets": [
+        {
+          "predictedMarginBand": "0-3",
+          "n": 4,
+          "winnerAccuracy": 0.75,
+          "meanAbsMarginError": 10.5,
+          "meanWinnerProb": 0.542
+        },
+        {
+          "predictedMarginBand": "3-6",
+          "n": 3,
+          "winnerAccuracy": 0.5,
+          "meanAbsMarginError": 4.67,
+          "meanWinnerProb": 0.607
+        },
+        {
+          "predictedMarginBand": "6-9",
+          "n": 5,
+          "winnerAccuracy": 1,
+          "meanAbsMarginError": 13.4,
+          "meanWinnerProb": 0.685
+        },
+        {
+          "predictedMarginBand": "9-+",
+          "n": 3,
+          "winnerAccuracy": 0.667,
+          "meanAbsMarginError": 11.67,
+          "meanWinnerProb": 0.823
+        }
+      ],
+      "calibration": [
+        {
+          "probBand": "0.5-0.6",
+          "n": 5,
+          "meanPredicted": 0.548,
+          "actualWinRate": 0.8
+        },
+        {
+          "probBand": "0.6-0.7",
+          "n": 4,
+          "meanPredicted": 0.653,
+          "actualWinRate": 0.75
+        },
+        {
+          "probBand": "0.7-0.8",
+          "n": 3,
+          "meanPredicted": 0.731,
+          "actualWinRate": 1
+        },
+        {
+          "probBand": "0.8-1.0",
+          "n": 2,
+          "meanPredicted": 0.846,
+          "actualWinRate": 0.5
+        }
+      ]
+    },
+    {
+      "modelVersion": "11",
+      "modelKey": "full-v11-week5-data-gap-audit",
+      "currentProduction": false,
+      "games": 14,
+      "weeksCovered": [
+        6
+      ],
+      "winnerAccuracy": 0.643,
+      "marketWinnerAccuracy": 0.571,
+      "meanAbsMarginError": 8.71,
+      "residualSd": 9.39,
+      "residualMean": -5.43,
+      "marketMeanAbsMarginError": 6.71,
+      "marketResidualSd": 7.82,
+      "meanAbsModelVsMarket": 4.71,
+      "correctWinnerMarginError": 6.22,
+      "incorrectWinnerMarginError": 13.2,
+      "correctWinnerBigErrorShare": 0.111,
+      "marginBuckets": [
+        {
+          "predictedMarginBand": "0-3",
+          "n": 3,
+          "winnerAccuracy": 0.667,
+          "meanAbsMarginError": 6,
+          "meanWinnerProb": 0.538
+        },
+        {
+          "predictedMarginBand": "3-6",
+          "n": 3,
+          "winnerAccuracy": 1,
+          "meanAbsMarginError": 4.33,
+          "meanWinnerProb": 0.644
+        },
+        {
+          "predictedMarginBand": "6-9",
+          "n": 1,
+          "winnerAccuracy": 0,
+          "meanAbsMarginError": 9,
+          "meanWinnerProb": 0.699
+        },
+        {
+          "predictedMarginBand": "9-+",
+          "n": 7,
+          "winnerAccuracy": 0.571,
+          "meanAbsMarginError": 11.71,
+          "meanWinnerProb": 0.855
+        }
+      ],
+      "calibration": [
+        {
+          "probBand": "0.5-0.6",
+          "n": 4,
+          "meanPredicted": 0.552,
+          "actualWinRate": 0.75
+        },
+        {
+          "probBand": "0.6-0.7",
+          "n": 3,
+          "meanPredicted": 0.679,
+          "actualWinRate": 0.667
+        },
+        {
+          "probBand": "0.7-0.8",
+          "n": 2,
+          "meanPredicted": 0.767,
+          "actualWinRate": 0.5
+        },
+        {
+          "probBand": "0.8-1.0",
+          "n": 5,
+          "meanPredicted": 0.89,
+          "actualWinRate": 0.6
+        }
+      ]
+    },
+    {
+      "modelVersion": "12",
+      "modelKey": "full-v12-special-teams-kicker-model",
+      "currentProduction": true,
+      "games": 43,
+      "weeksCovered": [
+        7,
+        8,
+        9
+      ],
+      "winnerAccuracy": 0.814,
+      "marketWinnerAccuracy": 0.786,
+      "meanAbsMarginError": 9.49,
+      "residualSd": 12.06,
+      "residualMean": -2.65,
+      "marketMeanAbsMarginError": 11.45,
+      "marketResidualSd": 14.16,
+      "meanAbsModelVsMarket": 5.52,
+      "correctWinnerMarginError": 7.2,
+      "incorrectWinnerMarginError": 19.5,
+      "correctWinnerBigErrorShare": 0.257,
+      "marginBuckets": [
+        {
+          "predictedMarginBand": "0-3",
+          "n": 4,
+          "winnerAccuracy": 0.75,
+          "meanAbsMarginError": 10.75,
+          "meanWinnerProb": 0.532
+        },
+        {
+          "predictedMarginBand": "3-6",
+          "n": 11,
+          "winnerAccuracy": 0.818,
+          "meanAbsMarginError": 8.27,
+          "meanWinnerProb": 0.641
+        },
+        {
+          "predictedMarginBand": "6-9",
+          "n": 10,
+          "winnerAccuracy": 0.8,
+          "meanAbsMarginError": 11.2,
+          "meanWinnerProb": 0.735
+        },
+        {
+          "predictedMarginBand": "9-+",
+          "n": 18,
+          "winnerAccuracy": 0.833,
+          "meanAbsMarginError": 9,
+          "meanWinnerProb": 0.845
+        }
+      ],
+      "calibration": [
+        {
+          "probBand": "0.5-0.6",
+          "n": 6,
+          "meanPredicted": 0.551,
+          "actualWinRate": 0.833
+        },
+        {
+          "probBand": "0.6-0.7",
+          "n": 9,
+          "meanPredicted": 0.653,
+          "actualWinRate": 0.778
+        },
+        {
+          "probBand": "0.7-0.8",
+          "n": 15,
+          "meanPredicted": 0.75,
+          "actualWinRate": 0.8
+        },
+        {
+          "probBand": "0.8-1.0",
+          "n": 13,
+          "meanPredicted": 0.87,
+          "actualWinRate": 0.846
+        }
+      ]
+    }
+  ],
+  "teamVenueEffects": {
+    "note": "Effect = actual margin minus pre-game expectation (market margin preferred, else valid pre-game Fourth Down margin); positive = beats expectation. Neutral-site games excluded. Venue effects are net of priced-in travel/rest/weather.",
+    "leagueHomeBaseline": -0.68,
+    "leagueAwayBaseline": 0.68,
+    "teams": [
+      {
+        "team": "PIT",
+        "homeGames": 4,
+        "homeWinPct": 1,
+        "meanHomeMargin": 10.75,
+        "awayGames": 3,
+        "awayWinPct": 0.333,
+        "meanAwayMargin": -4.33,
+        "homeN": 3,
+        "homeEffect": 11.33,
+        "homeVsMarket": 11.33,
+        "homeVsFourthDown": null,
+        "awayN": 3,
+        "awayEffect": -6,
+        "awayVsMarket": -6,
+        "awayVsFourthDown": null,
+        "confidence": "very-low/very-low",
+        "shrunkHomeEffect": 2.6,
+        "shrunkAwayEffect": -1.14
+      },
+      {
+        "team": "KC",
+        "homeGames": 4,
+        "homeWinPct": 1,
+        "meanHomeMargin": 15.75,
+        "awayGames": 4,
+        "awayWinPct": 0.5,
+        "meanAwayMargin": -1,
+        "homeN": 4,
+        "homeEffect": 13.88,
+        "homeVsMarket": 13.88,
+        "homeVsFourthDown": null,
+        "awayN": 4,
+        "awayEffect": -4.5,
+        "awayVsMarket": -4.5,
+        "awayVsFourthDown": null,
+        "confidence": "low/low",
+        "shrunkHomeEffect": 4.17,
+        "shrunkAwayEffect": -1.05
+      },
+      {
+        "team": "SEA",
+        "homeGames": 6,
+        "homeWinPct": 0.667,
+        "meanHomeMargin": 3.5,
+        "awayGames": 3,
+        "awayWinPct": 0.333,
+        "meanAwayMargin": 6.33,
+        "homeN": 6,
+        "homeEffect": 1.38,
+        "homeVsMarket": 1.38,
+        "homeVsFourthDown": null,
+        "awayN": 3,
+        "awayEffect": 5.5,
+        "awayVsMarket": 5.5,
+        "awayVsFourthDown": null,
+        "confidence": "moderate/very-low",
+        "shrunkHomeEffect": 0.2,
+        "shrunkAwayEffect": 2
+      },
+      {
+        "team": "BUF",
+        "homeGames": 4,
+        "homeWinPct": 0.75,
+        "meanHomeMargin": 10.25,
+        "awayGames": 4,
+        "awayWinPct": 1,
+        "meanAwayMargin": 7,
+        "homeN": 4,
+        "homeEffect": 7.69,
+        "homeVsMarket": 7.69,
+        "homeVsFourthDown": null,
+        "awayN": 3,
+        "awayEffect": 7,
+        "awayVsMarket": 7,
+        "awayVsFourthDown": null,
+        "confidence": "low/very-low",
+        "shrunkHomeEffect": 2.11,
+        "shrunkAwayEffect": 2.4
+      },
+      {
+        "team": "DET",
+        "homeGames": 4,
+        "homeWinPct": 1,
+        "meanHomeMargin": 3.75,
+        "awayGames": 4,
+        "awayWinPct": 0.5,
+        "meanAwayMargin": 4.5,
+        "homeN": 3,
+        "homeEffect": 0.17,
+        "homeVsMarket": 0.17,
+        "homeVsFourthDown": null,
+        "awayN": 4,
+        "awayEffect": 3.63,
+        "awayVsMarket": 3.63,
+        "awayVsFourthDown": null,
+        "confidence": "very-low/low",
+        "shrunkHomeEffect": -0.45,
+        "shrunkAwayEffect": 1.66
+      },
+      {
+        "team": "DEN",
+        "homeGames": 4,
+        "homeWinPct": 1,
+        "meanHomeMargin": 4.5,
+        "awayGames": 5,
+        "awayWinPct": 0.6,
+        "meanAwayMargin": -1.2,
+        "homeN": 4,
+        "homeEffect": 6.13,
+        "homeVsMarket": 6.13,
+        "homeVsFourthDown": null,
+        "awayN": 5,
+        "awayEffect": -1.95,
+        "awayVsMarket": -1.95,
+        "awayVsFourthDown": null,
+        "confidence": "low/low",
+        "shrunkHomeEffect": 1.59,
+        "shrunkAwayEffect": -0.33
+      },
+      {
+        "team": "MIA",
+        "homeGames": 4,
+        "homeWinPct": 0,
+        "meanHomeMargin": -9,
+        "awayGames": 4,
+        "awayWinPct": 0.25,
+        "meanAwayMargin": -9.5,
+        "homeN": 4,
+        "homeEffect": -2.37,
+        "homeVsMarket": -2.37,
+        "homeVsFourthDown": null,
+        "awayN": 3,
+        "awayEffect": -3,
+        "awayVsMarket": -3,
+        "awayVsFourthDown": null,
+        "confidence": "low/very-low",
+        "shrunkHomeEffect": -1.25,
+        "shrunkAwayEffect": -0.32
+      },
+      {
+        "team": "GB",
+        "homeGames": 4,
+        "homeWinPct": 0.75,
+        "meanHomeMargin": 5.25,
+        "awayGames": 5,
+        "awayWinPct": 0.6,
+        "meanAwayMargin": 0.8,
+        "homeN": 4,
+        "homeEffect": 3.38,
+        "homeVsMarket": 3.38,
+        "homeVsFourthDown": null,
+        "awayN": 4,
+        "awayEffect": 5.25,
+        "awayVsMarket": 5.25,
+        "awayVsFourthDown": null,
+        "confidence": "low/low",
+        "shrunkHomeEffect": 0.67,
+        "shrunkAwayEffect": 2.2
+      },
+      {
+        "team": "MIN",
+        "homeGames": 4,
+        "homeWinPct": 0.75,
+        "meanHomeMargin": 2.75,
+        "awayGames": 4,
+        "awayWinPct": 0.75,
+        "meanAwayMargin": 4.75,
+        "homeN": 3,
+        "homeEffect": -7.67,
+        "homeVsMarket": -7.67,
+        "homeVsFourthDown": null,
+        "awayN": 4,
+        "awayEffect": 4.75,
+        "awayVsMarket": 4.75,
+        "awayVsFourthDown": null,
+        "confidence": "very-low/low",
+        "shrunkHomeEffect": -2.59,
+        "shrunkAwayEffect": 2.04
+      },
+      {
+        "team": "NO",
+        "homeGames": 4,
+        "homeWinPct": 0.25,
+        "meanHomeMargin": -9.5,
+        "awayGames": 3,
+        "awayWinPct": 0.667,
+        "meanAwayMargin": 4.33,
+        "homeN": 4,
+        "homeEffect": -10.44,
+        "homeVsMarket": -10.44,
+        "homeVsFourthDown": null,
+        "awayN": 2,
+        "awayEffect": 6.25,
+        "awayVsMarket": 6.25,
+        "awayVsFourthDown": null,
+        "confidence": "low/very-low",
+        "shrunkHomeEffect": -3.93,
+        "shrunkAwayEffect": 1.8
+      },
+      {
+        "team": "BAL",
+        "homeGames": 4,
+        "homeWinPct": 0.25,
+        "meanHomeMargin": -11.5,
+        "awayGames": 5,
+        "awayWinPct": 0.6,
+        "meanAwayMargin": -0.2,
+        "homeN": 4,
+        "homeEffect": -15,
+        "homeVsMarket": -15,
+        "homeVsFourthDown": null,
+        "awayN": 5,
+        "awayEffect": -2.55,
+        "awayVsMarket": -2.55,
+        "awayVsFourthDown": null,
+        "confidence": "low/low",
+        "shrunkHomeEffect": -5.45,
+        "shrunkAwayEffect": -0.56
+      },
+      {
+        "team": "PHI",
+        "homeGames": 5,
+        "homeWinPct": 0.2,
+        "meanHomeMargin": -7.6,
+        "awayGames": 3,
+        "awayWinPct": 0.333,
+        "meanAwayMargin": -11,
+        "homeN": 4,
+        "homeEffect": -8.19,
+        "homeVsMarket": -8.19,
+        "homeVsFourthDown": null,
+        "awayN": 3,
+        "awayEffect": -11,
+        "awayVsMarket": -11,
+        "awayVsFourthDown": null,
+        "confidence": "low/very-low",
+        "shrunkHomeEffect": -3.18,
+        "shrunkAwayEffect": -2.5
+      },
+      {
+        "team": "CHI",
+        "homeGames": 5,
+        "homeWinPct": 0.8,
+        "meanHomeMargin": 6.8,
+        "awayGames": 4,
+        "awayWinPct": 0.75,
+        "meanAwayMargin": 5.75,
+        "homeN": 5,
+        "homeEffect": 6.5,
+        "homeVsMarket": 6.5,
+        "homeVsFourthDown": null,
+        "awayN": 3,
+        "awayEffect": 0.5,
+        "awayVsMarket": 0.5,
+        "awayVsFourthDown": null,
+        "confidence": "low/very-low",
+        "shrunkHomeEffect": 2.08,
+        "shrunkAwayEffect": 0.63
+      },
+      {
+        "team": "CLE",
+        "homeGames": 3,
+        "homeWinPct": 1,
+        "meanHomeMargin": 3,
+        "awayGames": 6,
+        "awayWinPct": 0.333,
+        "meanAwayMargin": -7.33,
+        "homeN": 3,
+        "homeEffect": 6.5,
+        "homeVsMarket": 6.5,
+        "homeVsFourthDown": null,
+        "awayN": 5,
+        "awayEffect": -3.1,
+        "awayVsMarket": -3.1,
+        "awayVsFourthDown": null,
+        "confidence": "very-low/low",
+        "shrunkHomeEffect": 1.28,
+        "shrunkAwayEffect": -0.77
+      },
+      {
+        "team": "NE",
+        "homeGames": 4,
+        "homeWinPct": 0.75,
+        "meanHomeMargin": 8.5,
+        "awayGames": 5,
+        "awayWinPct": 0.4,
+        "meanAwayMargin": -6,
+        "homeN": 4,
+        "homeEffect": 5.75,
+        "homeVsMarket": 5.75,
+        "homeVsFourthDown": null,
+        "awayN": 5,
+        "awayEffect": -5.1,
+        "awayVsMarket": -5.1,
+        "awayVsFourthDown": null,
+        "confidence": "low/low",
+        "shrunkHomeEffect": 1.46,
+        "shrunkAwayEffect": -1.54
+      },
+      {
+        "team": "CIN",
+        "homeGames": 3,
+        "homeWinPct": 0.667,
+        "meanHomeMargin": 2.67,
+        "awayGames": 5,
+        "awayWinPct": 0.8,
+        "meanAwayMargin": 11.4,
+        "homeN": 3,
+        "homeEffect": -1.67,
+        "homeVsMarket": -1.67,
+        "homeVsFourthDown": null,
+        "awayN": 5,
+        "awayEffect": 9.5,
+        "awayVsMarket": 9.5,
+        "awayVsFourthDown": null,
+        "confidence": "very-low/low",
+        "shrunkHomeEffect": -0.95,
+        "shrunkAwayEffect": 4.07
+      },
+      {
+        "team": "SF",
+        "homeGames": 5,
+        "homeWinPct": 1,
+        "meanHomeMargin": 13,
+        "awayGames": 3,
+        "awayWinPct": 0.667,
+        "meanAwayMargin": 4.67,
+        "homeN": 5,
+        "homeEffect": 10.95,
+        "homeVsMarket": 10.95,
+        "homeVsFourthDown": null,
+        "awayN": 2,
+        "awayEffect": -3.12,
+        "awayVsMarket": -3.12,
+        "awayVsFourthDown": null,
+        "confidence": "low/very-low",
+        "shrunkHomeEffect": 3.79,
+        "shrunkAwayEffect": -0.08
+      },
+      {
+        "team": "DAL",
+        "homeGames": 4,
+        "homeWinPct": 0.25,
+        "meanHomeMargin": 0.75,
+        "awayGames": 5,
+        "awayWinPct": 0.6,
+        "meanAwayMargin": 1.4,
+        "homeN": 4,
+        "homeEffect": -2.37,
+        "homeVsMarket": -2.37,
+        "homeVsFourthDown": null,
+        "awayN": 4,
+        "awayEffect": 3.63,
+        "awayVsMarket": 3.63,
+        "awayVsFourthDown": null,
+        "confidence": "low/low",
+        "shrunkHomeEffect": -1.25,
+        "shrunkAwayEffect": 1.66
+      },
+      {
+        "team": "HOU",
+        "homeGames": 4,
+        "homeWinPct": 0,
+        "meanHomeMargin": -7.25,
+        "awayGames": 3,
+        "awayWinPct": 0.667,
+        "meanAwayMargin": 14.33,
+        "homeN": 3,
+        "homeEffect": -12,
+        "homeVsMarket": -12,
+        "homeVsFourthDown": null,
+        "awayN": 3,
+        "awayEffect": 11.67,
+        "awayVsMarket": 11.67,
+        "awayVsFourthDown": null,
+        "confidence": "very-low/very-low",
+        "shrunkHomeEffect": -3.77,
+        "shrunkAwayEffect": 3.68
+      },
+      {
+        "team": "TEN",
+        "homeGames": 4,
+        "homeWinPct": 0,
+        "meanHomeMargin": -10.75,
+        "awayGames": 4,
+        "awayWinPct": 0.25,
+        "meanAwayMargin": -3,
+        "homeN": 3,
+        "homeEffect": -7.33,
+        "homeVsMarket": -7.33,
+        "homeVsFourthDown": null,
+        "awayN": 4,
+        "awayEffect": 4.75,
+        "awayVsMarket": 4.75,
+        "awayVsFourthDown": null,
+        "confidence": "very-low/low",
+        "shrunkHomeEffect": -2.5,
+        "shrunkAwayEffect": 2.04
+      },
+      {
+        "team": "ATL",
+        "homeGames": 5,
+        "homeWinPct": 0.2,
+        "meanHomeMargin": -10.8,
+        "awayGames": 4,
+        "awayWinPct": 0.5,
+        "meanAwayMargin": 4.75,
+        "homeN": 5,
+        "homeEffect": -8.45,
+        "homeVsMarket": -8.45,
+        "homeVsFourthDown": null,
+        "awayN": 3,
+        "awayEffect": 10.42,
+        "awayVsMarket": 10.42,
+        "awayVsFourthDown": null,
+        "confidence": "low/very-low",
+        "shrunkHomeEffect": -3.67,
+        "shrunkAwayEffect": 3.34
+      },
+      {
+        "team": "ARI",
+        "homeGames": 3,
+        "homeWinPct": 0,
+        "meanHomeMargin": -20.67,
+        "awayGames": 6,
+        "awayWinPct": 0.5,
+        "meanAwayMargin": -2.5,
+        "homeN": 3,
+        "homeEffect": -19.17,
+        "homeVsMarket": -19.17,
+        "homeVsFourthDown": null,
+        "awayN": 5,
+        "awayEffect": -1.9,
+        "awayVsMarket": -1.9,
+        "awayVsFourthDown": null,
+        "confidence": "very-low/low",
+        "shrunkHomeEffect": -5.72,
+        "shrunkAwayEffect": -0.31
+      },
+      {
+        "team": "IND",
+        "homeGames": 4,
+        "homeWinPct": 0.25,
+        "meanHomeMargin": -6.5,
+        "awayGames": 4,
+        "awayWinPct": 0,
+        "meanAwayMargin": -14,
+        "homeN": 4,
+        "homeEffect": -7.75,
+        "homeVsMarket": -7.75,
+        "homeVsFourthDown": null,
+        "awayN": 4,
+        "awayEffect": -10,
+        "awayVsMarket": -10,
+        "awayVsFourthDown": null,
+        "confidence": "low/low",
+        "shrunkHomeEffect": -3.04,
+        "shrunkAwayEffect": -2.88
+      },
+      {
+        "team": "JAX",
+        "homeGames": 3,
+        "homeWinPct": 1,
+        "meanHomeMargin": 29.33,
+        "awayGames": 3,
+        "awayWinPct": 0.667,
+        "meanAwayMargin": 7,
+        "homeN": 2,
+        "homeEffect": 26.88,
+        "homeVsMarket": 26.88,
+        "homeVsFourthDown": null,
+        "awayN": 3,
+        "awayEffect": 7.83,
+        "awayVsMarket": 7.83,
+        "awayVsFourthDown": null,
+        "confidence": "very-low/very-low",
+        "shrunkHomeEffect": 4.83,
+        "shrunkAwayEffect": 2.63
+      },
+      {
+        "team": "LAR",
+        "homeGames": 5,
+        "homeWinPct": 0.4,
+        "meanHomeMargin": 2.4,
+        "awayGames": 4,
+        "awayWinPct": 0.75,
+        "meanAwayMargin": 5.25,
+        "homeN": 4,
+        "homeEffect": 2.63,
+        "homeVsMarket": 2.63,
+        "homeVsFourthDown": null,
+        "awayN": 4,
+        "awayEffect": 2.81,
+        "awayVsMarket": 2.81,
+        "awayVsFourthDown": null,
+        "confidence": "low/low",
+        "shrunkHomeEffect": 0.42,
+        "shrunkAwayEffect": 1.39
+      },
+      {
+        "team": "NYG",
+        "homeGames": 4,
+        "homeWinPct": 0.75,
+        "meanHomeMargin": 4.5,
+        "awayGames": 4,
+        "awayWinPct": 0.5,
+        "meanAwayMargin": -2,
+        "homeN": 3,
+        "homeEffect": 3.5,
+        "homeVsMarket": 3.5,
+        "homeVsFourthDown": null,
+        "awayN": 4,
+        "awayEffect": 1,
+        "awayVsMarket": 1,
+        "awayVsFourthDown": null,
+        "confidence": "very-low/low",
+        "shrunkHomeEffect": 0.46,
+        "shrunkAwayEffect": 0.79
+      },
+      {
+        "team": "WSH",
+        "homeGames": 4,
+        "homeWinPct": 0.5,
+        "meanHomeMargin": 3,
+        "awayGames": 3,
+        "awayWinPct": 0,
+        "meanAwayMargin": -8.33,
+        "homeN": 4,
+        "homeEffect": 1.25,
+        "homeVsMarket": 1.25,
+        "homeVsFourthDown": null,
+        "awayN": 2,
+        "awayEffect": -7.75,
+        "awayVsMarket": -7.75,
+        "awayVsFourthDown": null,
+        "confidence": "low/very-low",
+        "shrunkHomeEffect": -0.04,
+        "shrunkAwayEffect": -1.01
+      },
+      {
+        "team": "TB",
+        "homeGames": 5,
+        "homeWinPct": 0.2,
+        "meanHomeMargin": -1,
+        "awayGames": 4,
+        "awayWinPct": 0.5,
+        "meanAwayMargin": 7.25,
+        "homeN": 5,
+        "homeEffect": 0,
+        "homeVsMarket": 0,
+        "homeVsFourthDown": null,
+        "awayN": 4,
+        "awayEffect": 10.5,
+        "awayVsMarket": 10.5,
+        "awayVsFourthDown": null,
+        "confidence": "low/low",
+        "shrunkHomeEffect": -0.42,
+        "shrunkAwayEffect": 3.95
+      },
+      {
+        "team": "LV",
+        "homeGames": 4,
+        "homeWinPct": 0.25,
+        "meanHomeMargin": -1.5,
+        "awayGames": 5,
+        "awayWinPct": 0.6,
+        "meanAwayMargin": -4.8,
+        "homeN": 3,
+        "homeEffect": -2.17,
+        "homeVsMarket": -2.17,
+        "homeVsFourthDown": null,
+        "awayN": 5,
+        "awayEffect": -3.2,
+        "awayVsMarket": -3.2,
+        "awayVsFourthDown": null,
+        "confidence": "very-low/low",
+        "shrunkHomeEffect": -1.09,
+        "shrunkAwayEffect": -0.81
+      },
+      {
+        "team": "CAR",
+        "homeGames": 4,
+        "homeWinPct": 0.25,
+        "meanHomeMargin": -12.75,
+        "awayGames": 4,
+        "awayWinPct": 0.5,
+        "meanAwayMargin": 7.75,
+        "homeN": 3,
+        "homeEffect": -9.67,
+        "homeVsMarket": -9.67,
+        "homeVsFourthDown": null,
+        "awayN": 4,
+        "awayEffect": 8,
+        "awayVsMarket": 8,
+        "awayVsFourthDown": null,
+        "confidence": "very-low/low",
+        "shrunkHomeEffect": -3.13,
+        "shrunkAwayEffect": 3.12
+      },
+      {
+        "team": "NYJ",
+        "homeGames": 4,
+        "homeWinPct": 0.25,
+        "meanHomeMargin": -1.5,
+        "awayGames": 5,
+        "awayWinPct": 0.2,
+        "meanAwayMargin": -7,
+        "homeN": 4,
+        "homeEffect": -3.62,
+        "homeVsMarket": -3.62,
+        "homeVsFourthDown": null,
+        "awayN": 4,
+        "awayEffect": -7.62,
+        "awayVsMarket": -7.62,
+        "awayVsFourthDown": null,
+        "confidence": "low/low",
+        "shrunkHomeEffect": -1.66,
+        "shrunkAwayEffect": -2.09
+      },
+      {
+        "team": "LAC",
+        "homeGames": 4,
+        "homeWinPct": 0,
+        "meanHomeMargin": -13,
+        "awayGames": 4,
+        "awayWinPct": 0,
+        "meanAwayMargin": -11.5,
+        "homeN": 3,
+        "homeEffect": -12.67,
+        "homeVsMarket": -12.67,
+        "homeVsFourthDown": null,
+        "awayN": 4,
+        "awayEffect": -6.25,
+        "awayVsMarket": -6.25,
+        "awayVsFourthDown": null,
+        "confidence": "very-low/low",
+        "shrunkHomeEffect": -3.95,
+        "shrunkAwayEffect": -1.63
+      }
+    ]
+  },
+  "factors": {
+    "homeFieldAdvantage": {
+      "n": 132,
+      "neutralSiteExcluded": 4,
+      "homeWinPct": 0.5,
+      "observedHomeMargin": 0.18,
+      "zWin": 0.12,
+      "currentAdjustment": "venue base 0.35-2.50 (league mean ~1.6) + travel penalty",
+      "leagueMeanCurrent": 1.64,
+      "derivedAdjustment2026": 0.2,
+      "byVenue": [
+        {
+          "venue": "PIT",
+          "n": 4,
+          "homeWinPct": 1,
+          "observedHomeMargin": 10.75,
+          "currentHfaBase": 2.5,
+          "reliability": "small-sample"
+        },
+        {
+          "venue": "KC",
+          "n": 4,
+          "homeWinPct": 1,
+          "observedHomeMargin": 15.75,
+          "currentHfaBase": 2.5,
+          "reliability": "small-sample"
+        },
+        {
+          "venue": "SEA",
+          "n": 6,
+          "homeWinPct": 0.667,
+          "observedHomeMargin": 3.5,
+          "currentHfaBase": 2.35,
+          "reliability": "small-sample"
+        },
+        {
+          "venue": "BUF",
+          "n": 4,
+          "homeWinPct": 0.75,
+          "observedHomeMargin": 10.25,
+          "currentHfaBase": 2.3,
+          "reliability": "small-sample"
+        },
+        {
+          "venue": "DET",
+          "n": 4,
+          "homeWinPct": 1,
+          "observedHomeMargin": 3.75,
+          "currentHfaBase": 2.25,
+          "reliability": "small-sample"
+        },
+        {
+          "venue": "DEN",
+          "n": 4,
+          "homeWinPct": 1,
+          "observedHomeMargin": 4.5,
+          "currentHfaBase": 2,
+          "reliability": "small-sample"
+        },
+        {
+          "venue": "MIA",
+          "n": 4,
+          "homeWinPct": 0,
+          "observedHomeMargin": -9,
+          "currentHfaBase": 2,
+          "reliability": "small-sample"
+        },
+        {
+          "venue": "GB",
+          "n": 4,
+          "homeWinPct": 0.75,
+          "observedHomeMargin": 5.25,
+          "currentHfaBase": 2,
+          "reliability": "small-sample"
+        },
+        {
+          "venue": "MIN",
+          "n": 4,
+          "homeWinPct": 0.75,
+          "observedHomeMargin": 2.75,
+          "currentHfaBase": 2,
+          "reliability": "small-sample"
+        },
+        {
+          "venue": "NO",
+          "n": 4,
+          "homeWinPct": 0.25,
+          "observedHomeMargin": -9.5,
+          "currentHfaBase": 2,
+          "reliability": "small-sample"
+        },
+        {
+          "venue": "BAL",
+          "n": 4,
+          "homeWinPct": 0.25,
+          "observedHomeMargin": -11.5,
+          "currentHfaBase": 1.9,
+          "reliability": "small-sample"
+        },
+        {
+          "venue": "PHI",
+          "n": 5,
+          "homeWinPct": 0.2,
+          "observedHomeMargin": -7.6,
+          "currentHfaBase": 1.9,
+          "reliability": "small-sample"
+        },
+        {
+          "venue": "CHI",
+          "n": 5,
+          "homeWinPct": 0.8,
+          "observedHomeMargin": 6.8,
+          "currentHfaBase": 1.75,
+          "reliability": "small-sample"
+        },
+        {
+          "venue": "CLE",
+          "n": 3,
+          "homeWinPct": 1,
+          "observedHomeMargin": 3,
+          "currentHfaBase": 1.75,
+          "reliability": "small-sample"
+        },
+        {
+          "venue": "NE",
+          "n": 4,
+          "homeWinPct": 0.75,
+          "observedHomeMargin": 8.5,
+          "currentHfaBase": 1.7,
+          "reliability": "small-sample"
+        },
+        {
+          "venue": "CIN",
+          "n": 3,
+          "homeWinPct": 0.667,
+          "observedHomeMargin": 2.67,
+          "currentHfaBase": 1.65,
+          "reliability": "small-sample"
+        },
+        {
+          "venue": "SF",
+          "n": 5,
+          "homeWinPct": 1,
+          "observedHomeMargin": 13,
+          "currentHfaBase": 1.65,
+          "reliability": "small-sample"
+        },
+        {
+          "venue": "DAL",
+          "n": 4,
+          "homeWinPct": 0.25,
+          "observedHomeMargin": 0.75,
+          "currentHfaBase": 1.6,
+          "reliability": "small-sample"
+        },
+        {
+          "venue": "HOU",
+          "n": 4,
+          "homeWinPct": 0,
+          "observedHomeMargin": -7.25,
+          "currentHfaBase": 1.6,
+          "reliability": "small-sample"
+        },
+        {
+          "venue": "TEN",
+          "n": 4,
+          "homeWinPct": 0,
+          "observedHomeMargin": -10.75,
+          "currentHfaBase": 1.55,
+          "reliability": "small-sample"
+        },
+        {
+          "venue": "ATL",
+          "n": 5,
+          "homeWinPct": 0.2,
+          "observedHomeMargin": -10.8,
+          "currentHfaBase": 1.5,
+          "reliability": "small-sample"
+        },
+        {
+          "venue": "ARI",
+          "n": 3,
+          "homeWinPct": 0,
+          "observedHomeMargin": -20.67,
+          "currentHfaBase": 1.5,
+          "reliability": "small-sample"
+        },
+        {
+          "venue": "IND",
+          "n": 4,
+          "homeWinPct": 0.25,
+          "observedHomeMargin": -6.5,
+          "currentHfaBase": 1.5,
+          "reliability": "small-sample"
+        },
+        {
+          "venue": "JAX",
+          "n": 3,
+          "homeWinPct": 1,
+          "observedHomeMargin": 29.33,
+          "currentHfaBase": 1.45,
+          "reliability": "small-sample"
+        },
+        {
+          "venue": "LAR",
+          "n": 5,
+          "homeWinPct": 0.4,
+          "observedHomeMargin": 2.4,
+          "currentHfaBase": 1.35,
+          "reliability": "small-sample"
+        },
+        {
+          "venue": "NYG",
+          "n": 4,
+          "homeWinPct": 0.75,
+          "observedHomeMargin": 4.5,
+          "currentHfaBase": 1.25,
+          "reliability": "small-sample"
+        },
+        {
+          "venue": "WSH",
+          "n": 4,
+          "homeWinPct": 0.5,
+          "observedHomeMargin": 3,
+          "currentHfaBase": 1.25,
+          "reliability": "small-sample"
+        },
+        {
+          "venue": "TB",
+          "n": 5,
+          "homeWinPct": 0.2,
+          "observedHomeMargin": -1,
+          "currentHfaBase": 1,
+          "reliability": "small-sample"
+        },
+        {
+          "venue": "LV",
+          "n": 4,
+          "homeWinPct": 0.25,
+          "observedHomeMargin": -1.5,
+          "currentHfaBase": 1,
+          "reliability": "small-sample"
+        },
+        {
+          "venue": "CAR",
+          "n": 4,
+          "homeWinPct": 0.25,
+          "observedHomeMargin": -12.75,
+          "currentHfaBase": 0.75,
+          "reliability": "small-sample"
+        },
+        {
+          "venue": "NYJ",
+          "n": 4,
+          "homeWinPct": 0.25,
+          "observedHomeMargin": -1.5,
+          "currentHfaBase": 0.75,
+          "reliability": "small-sample"
+        },
+        {
+          "venue": "LAC",
+          "n": 4,
+          "homeWinPct": 0,
+          "observedHomeMargin": -13,
+          "currentHfaBase": 0.35,
+          "reliability": "small-sample"
+        }
+      ]
+    },
+    "domeVsOutdoor": {
+      "domeN": 45,
+      "outdoorN": 91,
+      "domeMeanTotal": 48.18,
+      "outdoorMeanTotal": 44.81,
+      "domeHomeWinPct": 0.311,
+      "outdoorHomeWinPct": 0.582,
+      "observedTotalEffect": 3.36,
+      "zMean": 1.33,
+      "reliability": "not-significant",
+      "currentAdjustment": "dome = neutral (no weather adjustment)",
+      "derivedAdjustment2026": 0
+    },
+    "wind": [
+      {
+        "factor": "calm (<10 mph)",
+        "unit": "total-points",
+        "n": 74,
+        "winPct": 0.554,
+        "meanEffect": 45.23,
+        "baselineMean": 43,
+        "baselineN": 17,
+        "observedEffect": 2.23,
+        "zMean": 0.56,
+        "zWin": -1.14,
+        "reliability": "not-significant",
+        "currentAdjustment": "none below 10 mph",
+        "derivedAdjustment2026": 1.7
+      },
+      {
+        "factor": "breezy (10-15 mph)",
+        "unit": "total-points",
+        "n": 17,
+        "winPct": 0.706,
+        "meanEffect": 43,
+        "baselineMean": 45.23,
+        "baselineN": 74,
+        "observedEffect": -2.23,
+        "zMean": -0.56,
+        "zWin": 1.14,
+        "reliability": "small-sample",
+        "currentAdjustment": "windLoad ramps from 10 mph (small)",
+        "derivedAdjustment2026": -0.9
+      },
+      {
+        "factor": "windy (15-20 mph)",
+        "unit": "total-points",
+        "n": 0,
+        "winPct": null,
+        "meanEffect": null,
+        "baselineMean": 44.81,
+        "baselineN": 91,
+        "observedEffect": null,
+        "zMean": null,
+        "zWin": null,
+        "reliability": "small-sample",
+        "currentAdjustment": "moderate scoring reduction",
+        "derivedAdjustment2026": 0
+      },
+      {
+        "factor": "very windy (20+ mph)",
+        "unit": "total-points",
+        "n": 0,
+        "winPct": null,
+        "meanEffect": null,
+        "baselineMean": 44.81,
+        "baselineN": 91,
+        "observedEffect": null,
+        "zMean": null,
+        "zWin": null,
+        "reliability": "small-sample",
+        "currentAdjustment": "strong scoring reduction",
+        "derivedAdjustment2026": 0
+      }
+    ],
+    "temperature": [
+      {
+        "factor": "cold (<40F)",
+        "unit": "total-points",
+        "n": 0,
+        "winPct": null,
+        "meanEffect": null,
+        "baselineMean": 44.81,
+        "baselineN": 91,
+        "observedEffect": null,
+        "zMean": null,
+        "zWin": null,
+        "reliability": "small-sample",
+        "currentAdjustment": "extreme cold load only below -7C",
+        "derivedAdjustment2026": 0
+      },
+      {
+        "factor": "cool (40-60F)",
+        "unit": "total-points",
+        "n": 24,
+        "winPct": 0.583,
+        "meanEffect": 43.42,
+        "baselineMean": 45.31,
+        "baselineN": 67,
+        "observedEffect": -1.89,
+        "zMean": -0.53,
+        "zWin": 0.01,
+        "reliability": "small-sample",
+        "currentAdjustment": "none",
+        "derivedAdjustment2026": -0.9
+      },
+      {
+        "factor": "mild (60-75F)",
+        "unit": "total-points",
+        "n": 46,
+        "winPct": 0.63,
+        "meanEffect": 45.8,
+        "baselineMean": 43.8,
+        "baselineN": 45,
+        "observedEffect": 2,
+        "zMean": 0.65,
+        "zWin": 0.94,
+        "reliability": "not-significant",
+        "currentAdjustment": "none",
+        "derivedAdjustment2026": 1.3
+      },
+      {
+        "factor": "hot (75F+)",
+        "unit": "total-points",
+        "n": 21,
+        "winPct": 0.476,
+        "meanEffect": 44.24,
+        "baselineMean": 44.99,
+        "baselineN": 70,
+        "observedEffect": -0.75,
+        "zMean": -0.21,
+        "zWin": -1.13,
+        "reliability": "small-sample",
+        "currentAdjustment": "extreme heat load only above 32C",
+        "derivedAdjustment2026": -0.3
+      }
+    ],
+    "rain": {
+      "factor": "rain >= 1mm in game window",
+      "unit": "total-points",
+      "n": 18,
+      "winPct": 0.667,
+      "meanEffect": 42,
+      "baselineMean": 45.51,
+      "baselineN": 73,
+      "observedEffect": -3.51,
+      "zMean": -0.79,
+      "zWin": 0.81,
+      "reliability": "small-sample",
+      "currentAdjustment": "rainLoad reduces passingTD/FG/XP, raises turnovers",
+      "derivedAdjustment2026": -1.5
+    },
+    "snow": {
+      "factor": "any snowfall in game window",
+      "unit": "total-points",
+      "n": 0,
+      "winPct": null,
+      "meanEffect": null,
+      "baselineMean": 44.81,
+      "baselineN": 91,
+      "observedEffect": null,
+      "zMean": null,
+      "zWin": null,
+      "reliability": "small-sample",
+      "currentAdjustment": "snowLoad reduces passingTD/FG/XP, raises turnovers",
+      "derivedAdjustment2026": 0
+    },
+    "travelDistance": [
+      {
+        "factor": "short (<500 mi)",
+        "unit": "away-margin",
+        "n": 39,
+        "winPct": 0.41,
+        "meanEffect": -1.28,
+        "baselineMean": 0.52,
+        "baselineN": 97,
+        "observedEffect": -1.8,
+        "zMean": -0.7,
+        "zWin": -1.33,
+        "reliability": "not-significant",
+        "currentAdjustment": "none (distance itself not modeled)",
+        "derivedAdjustment2026": -1.1
+      },
+      {
+        "factor": "medium (500-1000 mi)",
+        "unit": "away-margin",
+        "n": 49,
+        "winPct": 0.51,
+        "meanEffect": 1.02,
+        "baselineMean": -0.57,
+        "baselineN": 87,
+        "observedEffect": 1.59,
+        "zMean": 0.66,
+        "zWin": 0.18,
+        "reliability": "not-significant",
+        "currentAdjustment": "none (distance itself not modeled)",
+        "derivedAdjustment2026": 1.1
+      },
+      {
+        "factor": "long (1000-2000 mi)",
+        "unit": "away-margin",
+        "n": 30,
+        "winPct": 0.667,
+        "meanEffect": 2.77,
+        "baselineMean": -0.78,
+        "baselineN": 106,
+        "observedEffect": 3.55,
+        "zMean": 1.36,
+        "zWin": 2.07,
+        "reliability": "significant",
+        "currentAdjustment": "none (distance itself not modeled)",
+        "derivedAdjustment2026": 1.9
+      },
+      {
+        "factor": "cross-country (2000+ mi)",
+        "unit": "away-margin",
+        "n": 18,
+        "winPct": 0.389,
+        "meanEffect": -4.61,
+        "baselineMean": 0.7,
+        "baselineN": 118,
+        "observedEffect": -5.31,
+        "zMean": -1.76,
+        "zWin": -1.01,
+        "reliability": "small-sample",
+        "currentAdjustment": "none (distance itself not modeled)",
+        "derivedAdjustment2026": -2
+      }
+    ],
+    "timezone": [
+      {
+        "factor": "away travels east 2+ zones",
+        "n": 11,
+        "awayWinPct": 0.455,
+        "baselineAwayWinPct": 0.504,
+        "meanAwayMargin": -4.18,
+        "observedAwayMarginEffect": -4.55,
+        "zMean": -1.24,
+        "zWin": -0.31,
+        "reliability": "small-sample",
+        "currentAdjustment": "travel penalty 0.25-1.0 pts to home",
+        "derivedAdjustment2026": -1.4
+      },
+      {
+        "factor": "away travels west 2+ zones",
+        "n": 13,
+        "awayWinPct": 0.462,
+        "baselineAwayWinPct": 0.504,
+        "meanAwayMargin": -1.46,
+        "observedAwayMarginEffect": -1.62,
+        "zMean": -0.36,
+        "zWin": -0.29,
+        "reliability": "small-sample",
+        "currentAdjustment": "none",
+        "derivedAdjustment2026": -0.6
+      }
+    ],
+    "rest": [
+      {
+        "factor": "very short week (<=4 days)",
+        "n": 16,
+        "winPct": 0.5,
+        "meanMargin": 0,
+        "observedMarginEffect": 0,
+        "zMean": 0,
+        "zWin": 0.03,
+        "reliability": "small-sample",
+        "currentAdjustment": "-0.7 pts",
+        "derivedAdjustment2026": 0
+      },
+      {
+        "factor": "short week (5 days)",
+        "n": 0,
+        "winPct": null,
+        "meanMargin": null,
+        "observedMarginEffect": null,
+        "zMean": null,
+        "zWin": null,
+        "reliability": "small-sample",
+        "currentAdjustment": "-0.4 pts",
+        "derivedAdjustment2026": 0
+      },
+      {
+        "factor": "extended rest (9-11 days)",
+        "n": 18,
+        "winPct": 0.778,
+        "meanMargin": 10,
+        "observedMarginEffect": 10.81,
+        "zMean": 3.95,
+        "zWin": 2.49,
+        "reliability": "small-sample",
+        "currentAdjustment": "+0.3 pts",
+        "derivedAdjustment2026": 2
+      },
+      {
+        "factor": "post-bye (12+ days)",
+        "n": 14,
+        "winPct": 0.929,
+        "meanMargin": 12.57,
+        "observedMarginEffect": 13.35,
+        "zMean": 3.81,
+        "zWin": 3.34,
+        "reliability": "small-sample",
+        "currentAdjustment": "+0.6 pts",
+        "derivedAdjustment2026": 2
+      }
+    ],
+    "restDifferential": [
+      {
+        "factor": "home rest edge 3-6 days",
+        "n": 9,
+        "homeWinPct": 0.778,
+        "meanHomeMargin": 10.33,
+        "observedHomeMarginEffect": 11.39,
+        "zMean": 3.01,
+        "reliability": "small-sample",
+        "currentAdjustment": "+0.4 pts home",
+        "derivedAdjustment2026": 2
+      },
+      {
+        "factor": "home rest edge 7+ days",
+        "n": 8,
+        "homeWinPct": 1,
+        "meanHomeMargin": 15.63,
+        "observedHomeMarginEffect": 16.68,
+        "zMean": 3.82,
+        "reliability": "small-sample",
+        "currentAdjustment": "+0.8 pts home",
+        "derivedAdjustment2026": 2
+      },
+      {
+        "factor": "away rest edge 3+ days",
+        "n": 15,
+        "homeWinPct": 0.2,
+        "meanHomeMargin": -9.2,
+        "observedHomeMarginEffect": -8.14,
+        "zMean": -2.39,
+        "reliability": "small-sample",
+        "currentAdjustment": "-0.4/-0.8 pts home",
+        "derivedAdjustment2026": -2
+      }
+    ],
+    "consecutiveRoadGames": [
+      {
+        "factor": "2nd consecutive road game",
+        "n": 37,
+        "awayWinPct": 0.514,
+        "meanAwayMargin": -1.78,
+        "observedAwayMarginEffect": -2.47,
+        "zMean": -0.96,
+        "zWin": 0.14,
+        "reliability": "not-significant",
+        "currentAdjustment": "-0.2 pts away",
+        "derivedAdjustment2026": -1.5
+      },
+      {
+        "factor": "3rd+ consecutive road game",
+        "n": 1,
+        "awayWinPct": 0,
+        "meanAwayMargin": -1,
+        "observedAwayMarginEffect": -1.68,
+        "zMean": null,
+        "zWin": -0.99,
+        "reliability": "small-sample",
+        "currentAdjustment": "-0.4 pts away",
+        "derivedAdjustment2026": -0.1
+      }
+    ]
+  },
+  "weeklyHistory": [
+    {
+      "week": 1,
+      "gamesCompleted": 16,
+      "gamesWithValidPredictions": 0,
+      "winnerAccuracy": null,
+      "marginMae": null,
+      "residualMean": null,
+      "residualSd": null,
+      "leagueHomeWinPct": 0.625,
+      "leagueHomeMargin": 0.81,
+      "domeMeanTotal": 52.43,
+      "outdoorMeanTotal": 47.11,
+      "rainMeanTotal": null,
+      "postByeN": 0,
+      "postByeMeanMargin": null,
+      "secondRoadGameN": 0,
+      "secondRoadGameAwayMargin": null,
+      "tzEastN": 0,
+      "tzEastAwayMargin": null
+    },
+    {
+      "week": 2,
+      "gamesCompleted": 32,
+      "gamesWithValidPredictions": 0,
+      "winnerAccuracy": null,
+      "marginMae": null,
+      "residualMean": null,
+      "residualSd": null,
+      "leagueHomeWinPct": 0.531,
+      "leagueHomeMargin": 0.19,
+      "domeMeanTotal": 46.08,
+      "outdoorMeanTotal": 44.16,
+      "rainMeanTotal": 36.5,
+      "postByeN": 0,
+      "postByeMeanMargin": null,
+      "secondRoadGameN": 5,
+      "secondRoadGameAwayMargin": -5,
+      "tzEastN": 0,
+      "tzEastAwayMargin": null
+    },
+    {
+      "week": 3,
+      "gamesCompleted": 48,
+      "gamesWithValidPredictions": 16,
+      "winnerAccuracy": 0.563,
+      "marginMae": 8.75,
+      "residualMean": 0.38,
+      "residualSd": 13.21,
+      "leagueHomeWinPct": 0.583,
+      "leagueHomeMargin": 0.88,
+      "domeMeanTotal": 48.06,
+      "outdoorMeanTotal": 44.42,
+      "rainMeanTotal": 37.75,
+      "postByeN": 0,
+      "postByeMeanMargin": null,
+      "secondRoadGameN": 11,
+      "secondRoadGameAwayMargin": -3.45,
+      "tzEastN": 3,
+      "tzEastAwayMargin": -0.67
+    },
+    {
+      "week": 4,
+      "gamesCompleted": 64,
+      "gamesWithValidPredictions": 32,
+      "winnerAccuracy": 0.563,
+      "marginMae": 9.16,
+      "residualMean": -1.91,
+      "residualSd": 12.25,
+      "leagueHomeWinPct": 0.571,
+      "leagueHomeMargin": 0.94,
+      "domeMeanTotal": 49.14,
+      "outdoorMeanTotal": 44.79,
+      "rainMeanTotal": 40.4,
+      "postByeN": 0,
+      "postByeMeanMargin": null,
+      "secondRoadGameN": 19,
+      "secondRoadGameAwayMargin": -2.26,
+      "tzEastN": 5,
+      "tzEastAwayMargin": -2
+    },
+    {
+      "week": 5,
+      "gamesCompleted": 79,
+      "gamesWithValidPredictions": 47,
+      "winnerAccuracy": 0.63,
+      "marginMae": 9.6,
+      "residualMean": -1.89,
+      "residualSd": 12.4,
+      "leagueHomeWinPct": 0.519,
+      "leagueHomeMargin": 0.48,
+      "domeMeanTotal": 49.56,
+      "outdoorMeanTotal": 45.12,
+      "rainMeanTotal": 43.21,
+      "postByeN": 0,
+      "postByeMeanMargin": null,
+      "secondRoadGameN": 22,
+      "secondRoadGameAwayMargin": -1.14,
+      "tzEastN": 6,
+      "tzEastAwayMargin": -6.33
+    },
+    {
+      "week": 6,
+      "gamesCompleted": 93,
+      "gamesWithValidPredictions": 61,
+      "winnerAccuracy": 0.633,
+      "marginMae": 9.39,
+      "residualMean": -2.7,
+      "residualSd": 11.8,
+      "leagueHomeWinPct": 0.511,
+      "leagueHomeMargin": 0.42,
+      "domeMeanTotal": 49.52,
+      "outdoorMeanTotal": 44.5,
+      "rainMeanTotal": 43.21,
+      "postByeN": 2,
+      "postByeMeanMargin": 13.5,
+      "secondRoadGameN": 26,
+      "secondRoadGameAwayMargin": -0.54,
+      "tzEastN": 7,
+      "tzEastAwayMargin": -7.71
+    },
+    {
+      "week": 7,
+      "gamesCompleted": 107,
+      "gamesWithValidPredictions": 75,
+      "winnerAccuracy": 0.635,
+      "marginMae": 9.89,
+      "residualMean": -3.57,
+      "residualSd": 12.3,
+      "leagueHomeWinPct": 0.495,
+      "leagueHomeMargin": -0.29,
+      "domeMeanTotal": 48.57,
+      "outdoorMeanTotal": 44.7,
+      "rainMeanTotal": 43.21,
+      "postByeN": 6,
+      "postByeMeanMargin": 10.17,
+      "secondRoadGameN": 29,
+      "secondRoadGameAwayMargin": 1.07,
+      "tzEastN": 8,
+      "tzEastAwayMargin": -7.87
+    },
+    {
+      "week": 8,
+      "gamesCompleted": 121,
+      "gamesWithValidPredictions": 89,
+      "winnerAccuracy": 0.67,
+      "marginMae": 9.99,
+      "residualMean": -2.75,
+      "residualSd": 12.46,
+      "leagueHomeWinPct": 0.521,
+      "leagueHomeMargin": 0.79,
+      "domeMeanTotal": 48.18,
+      "outdoorMeanTotal": 45.09,
+      "rainMeanTotal": 41.94,
+      "postByeN": 10,
+      "postByeMeanMargin": 12.4,
+      "secondRoadGameN": 34,
+      "secondRoadGameAwayMargin": -1.15,
+      "tzEastN": 9,
+      "tzEastAwayMargin": -6.44
+    },
+    {
+      "week": 9,
+      "gamesCompleted": 136,
+      "gamesWithValidPredictions": 104,
+      "winnerAccuracy": 0.709,
+      "marginMae": 9.43,
+      "residualMean": -2.68,
+      "residualSd": 11.85,
+      "leagueHomeWinPct": 0.5,
+      "leagueHomeMargin": 0.18,
+      "domeMeanTotal": 48.18,
+      "outdoorMeanTotal": 44.81,
+      "rainMeanTotal": 42,
+      "postByeN": 14,
+      "postByeMeanMargin": 12.57,
+      "secondRoadGameN": 37,
+      "secondRoadGameAwayMargin": -1.78,
+      "tzEastN": 11,
+      "tzEastAwayMargin": -4.18
+    }
+  ]
+}

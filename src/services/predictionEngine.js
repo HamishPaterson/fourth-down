@@ -2,6 +2,13 @@
 // Deterministic matchup projection with component-level weather effects.
 import { getTeamRatings, getTeamRatingsHealth } from "./teamRatings.js";
 import { getHomeFieldAdvantage } from "./homeFieldAdvantage.js";
+import {
+  computeExternalAdjustments2026,
+  computeVariance2026,
+  weatherPointsSplit,
+  capExternalMarginAdjustment,
+} from "./externalFactors2026.js";
+import EXTERNAL_FACTORS_2026 from "./externalFactors2026Data.js";
 import { buildExpectedPlayMix, buildMatchupIntelligence, pressureSignal, explainMatchupSignal } from "./matchupIntelligence.js";
 import { buildSituationalMatchups, explainSituationalSignal } from "./situationalMatchups.js";
 import { TEAM_NAMES } from "../data.js";
@@ -228,7 +235,7 @@ function buildSpecialTeamsDiagnostics(actual, leagueOnly, model) {
   };
 }
 
-function predictCore(awayCode, homeCode, options = {}) {
+function predictCore(awayCode, homeCode, options = {}, applyExternal = true) {
   const awayTeam = normalizeTeamCode(awayCode);
   const homeTeam = normalizeTeamCode(homeCode);
 
@@ -241,11 +248,19 @@ function predictCore(awayCode, homeCode, options = {}) {
   const weatherImpact = computeWeatherImpact(options.weather);
   const rivalry = computeDivisionalRivalryImpact(awayTeam, homeTeam, options.rivalry);
   const schedule = computeScheduleImpact(options.scheduleContext);
+  // 2026 season-to-date external factors. When active, the dynamic venue+travel
+  // edge replaces the static hfa.total and the dynamic rest points replace the
+  // static schedule points (full replacement, never additive).
+  const external = applyExternal ? computeExternalAdjustments2026(EXTERNAL_FACTORS_2026, {
+    away: awayTeam, home: homeTeam, kickoff: options.kickoff,
+    weather: options.weather, week: options.week,
+  }) : { active: false, reason: "Static baseline for combined external-factor cap" };
   const modelLayers = createModelLayers(options.modelLayers);
   const market = computeMarketProjection(options.market, options.week);
+  const homeEdge = external?.active ? external.homeEdge : hfa.total;
   const ratingAdjustments = {
     away: getRatingAdjustment(awayTeam, homeTeam, 0, options.espnSnapshot),
-    home: getRatingAdjustment(homeTeam, awayTeam, hfa.total, options.espnSnapshot),
+    home: getRatingAdjustment(homeTeam, awayTeam, homeEdge, options.espnSnapshot),
   };
   const formBlend = buildTeamSpecificProjection(
     ratingAdjustments,
@@ -256,11 +271,21 @@ function predictCore(awayCode, homeCode, options = {}) {
     homeTeam,
     options.espnSnapshot
   );
+  const scheduleAwayPoints = external?.active ? external.restAwayPoints : schedule.awayPoints;
+  const scheduleHomePoints = external?.active ? external.restHomePoints : schedule.homePoints;
+  const weatherSplit = weatherPointsSplit(
+    external,
+    weatherImpact.coefficient,
+    formBlend.away + scheduleAwayPoints,
+    formBlend.home + scheduleHomePoints
+  );
   const fourthDownAway = formBlend.away
-    + schedule.awayPoints
+    + scheduleAwayPoints
+    + weatherSplit.away
     + modelLayers.awayPoints;
   const fourthDownHome = formBlend.home
-    + schedule.homePoints
+    + scheduleHomePoints
+    + weatherSplit.home
     + modelLayers.homePoints;
   const rivalryAdjusted = applyRivalryToExpectedPoints(
     clamp(fourthDownAway, 6, 45),
@@ -288,14 +313,50 @@ function predictCore(awayCode, homeCode, options = {}) {
     seed: `${awayTeam}-${homeTeam}-${options.week || 1}-home`,
     kicker: specialTeams.home,
   }, options.espnSnapshot);
+  const uncappedMargin = Number(home.expectedPoints) - Number(away.expectedPoints);
+  const staticBaseline = external?.active ? predictCore(awayCode, homeCode, options, false) : null;
+  const externalMarginDelta = staticBaseline
+    ? capExternalMarginAdjustment(uncappedMargin - staticBaseline.continuousMargin) : 0;
+  const continuousMargin = staticBaseline
+    ? round3(staticBaseline.continuousMargin + externalMarginDelta)
+    : uncappedMargin;
+  if (staticBaseline) {
+    const excess = uncappedMargin - staticBaseline.continuousMargin - externalMarginDelta;
+    away.expectedPoints = round3(away.expectedPoints + excess / 2);
+    home.expectedPoints = round3(away.expectedPoints + continuousMargin);
+  }
   const projectedMargin = home.score - away.score;
-  const continuousMargin = Number(home.expectedPoints) - Number(away.expectedPoints);
   const probability = calculateWinProbability(continuousMargin, modelLayers, market);
   const projectedTie = home.score === away.score;
   let winner = null;
   if (!projectedTie) winner = home.score > away.score ? homeTeam : awayTeam;
   else if (probability.home > probability.away) winner = homeTeam;
   else if (probability.away > probability.home) winner = awayTeam;
+
+  const baseModelMargin = staticBaseline?.continuousMargin ?? round3(continuousMargin);
+  const baseWinner = baseModelMargin > 0 ? homeTeam : baseModelMargin < 0 ? awayTeam : null;
+  const externalFactors2026 = {
+    active: external?.active === true,
+    reason: external?.active ? null : external?.reason || null,
+    baseModelMargin,
+    staticExternal: {
+      homeFieldEdge: hfa.total,
+      scheduleDifferential: schedule.differential,
+      weatherCoefficient: weatherImpact.coefficient,
+    },
+    venue: external?.trace?.venue ?? null,
+    travel: external?.trace?.travel ?? null,
+    rest: external?.trace?.rest ?? null,
+    weather: external?.trace?.weather
+      ? { ...external.trace.weather, pointsIncrement: weatherSplit.increment }
+      : null,
+    totalExternalAdjustment: round3(externalMarginDelta),
+    uncappedExternalAdjustment: staticBaseline ? round3(uncappedMargin - baseModelMargin) : 0,
+    finalProjectedMargin: continuousMargin,
+    winnerFlippedByExternal: Boolean(baseWinner && winner && baseWinner !== winner),
+    baseWinner: baseWinner !== winner ? baseWinner : null,
+    variance: computeVariance2026(EXTERNAL_FACTORS_2026, continuousMargin),
+  };
 
   return {
     inputEvidence: options.inputEvidence,
@@ -316,6 +377,7 @@ function predictCore(awayCode, homeCode, options = {}) {
     weather: weatherImpact,
     rivalry,
     schedule,
+    externalFactors2026,
     modelLayers,
     specialTeams,
     formBlend,

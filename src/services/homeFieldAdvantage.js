@@ -80,7 +80,8 @@ function tierLabel(base) {
 }
 
 // Travel / body-clock penalty applied to the away team (adds to home edge).
-function travelPenalty(homeCode, awayCode, kickoff) {
+// Exported for the 2026 external-factor fallback path.
+export function travelPenalty(homeCode, awayCode, kickoff) {
   const homeTz = TEAM_TZ[homeCode];
   const awayTz = TEAM_TZ[awayCode];
   if (homeTz === undefined || awayTz === undefined) return 0;

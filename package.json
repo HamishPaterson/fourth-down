@@ -9,7 +9,9 @@
     "preview": "vite preview",
     "lint": "eslint .",
     "update:nflverse": "node scripts/update-nflverse.mjs",
-    "update:fpi": "node scripts/update-espn-fpi.mjs"
+    "update:fpi": "node scripts/update-espn-fpi.mjs",
+    "audit:external-factors": "node scripts/update-external-factors-audit.mjs",
+    "backtest:external-factors": "node scripts/backtest-external-factors-2026.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.117.1",
