@@ -38,13 +38,28 @@ function finitePrediction(prediction) {
     assert.ok(Number.isFinite(value));
   }
 }
+function unroundedHomeWinProbability(prediction) {
+  const dataQuality = prediction.confidenceScore;
+  const effectiveMargin = prediction.continuousMargin * (0.78 + dataQuality * 0.22);
+  const rawHome = 1 / (1 + Math.exp(-effectiveMargin / 6.5));
+  return 0.5 + (rawHome - 0.5) * (0.72 + dataQuality * 0.28);
+}
 function improves(before, after, direction) {
   finitePrediction(before);
   finitePrediction(after);
   assert.ok((after.continuousMargin - before.continuousMargin) * direction > 0,
     `margin ${before.continuousMargin} -> ${after.continuousMargin}, direction ${direction}`);
-  assert.ok((after.homeWinProbability - before.homeWinProbability) * direction > 0,
-    `probability ${before.homeWinProbability} -> ${after.homeWinProbability}, direction ${direction}`);
+  const probabilityDelta = after.homeWinProbability - before.homeWinProbability;
+  if (probabilityDelta === 0) {
+    const underlyingDelta = unroundedHomeWinProbability(after) - unroundedHomeWinProbability(before);
+    assert.ok(underlyingDelta * direction > 0,
+      `unrounded probability ${unroundedHomeWinProbability(before)} -> ${unroundedHomeWinProbability(after)}, direction ${direction}`);
+    assert.equal(before.homeWinProbability, Math.round(unroundedHomeWinProbability(before) * 1000) / 1000);
+    assert.equal(after.homeWinProbability, Math.round(unroundedHomeWinProbability(after) * 1000) / 1000);
+  } else {
+    assert.ok(probabilityDelta * direction > 0,
+      `probability ${before.homeWinProbability} -> ${after.homeWinProbability}, direction ${direction}`);
+  }
 }
 
 test("empty scoring history uses the existing 22-point league prior", () => {

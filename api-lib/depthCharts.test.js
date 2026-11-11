@@ -597,7 +597,7 @@ test("secondary MatchupPrediction passes week/dependency and uses the same timin
   assert.match(source, /loadedPersonnel\?\.week === Number\(week\)/);
   assert.match(source, /personnelAvailableAt\(loadedPlayerMatchup\?\.rosters\?\.away, personnel\?\.cutoff\)/);
   assert.match(source, /personnelAvailableAt\(loadedPlayerMatchup\?\.rosters\?\.home, personnel\?\.cutoff\)/);
-  assert.match(source, /personnelAvailableAt\(getTeamRatingsHealth\(\), cutoff\) \? getTeamQbr\(teamCode\) : null/);
+  assert.match(source, /personnelAvailableAt\(getTeamRatingsHealth\(\), cutoff\) \? getQuarterbackQbr\(decision\?\.resolved \? selected : null\) : null/);
   const original = global.fetch;
   const key = process.env.BALLDONTLIE_API_KEY;
   process.env.BALLDONTLIE_API_KEY = "test-only";

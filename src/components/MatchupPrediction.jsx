@@ -15,7 +15,7 @@ import {
   CURRENT_MODEL_VERSION,
 } from "../services/predictionLedger.js";
 import { getPlayerRating, getTeamPlayerRatings } from "../services/playerRatings.js";
-import { getTeamQbr, getTeamRatingsHealth } from "../services/teamRatings.js";
+import { getQuarterbackQbr, getTeamRatingsHealth } from "../services/teamRatings.js";
 import { classifyDataHealth, normaliseLayers, saveDataHealthSnapshot } from "../services/dataHealth.js";
 import { personnelAvailableAt } from "../../api-lib/depthCharts.js";
 import { TEAM_NAMES } from "../data.js";
@@ -89,10 +89,11 @@ function currentQbPerformanceWeight(week) {
 }
 
 function buildUnifiedQbAdjustment(roster, teamCode, personnelQb, personnelView, week = 1, cutoff = null) {
-  const qbr = personnelAvailableAt(getTeamRatingsHealth(), cutoff) ? getTeamQbr(teamCode) : null;
   const rosterPlayers = Object.values(roster?.groups || {}).flat();
   const decision = personnelView?.quarterback;
   const selected = decision?.player;
+  // QBR follows the personnel-selected starting quarterback, never the team.
+  const qbr = personnelAvailableAt(getTeamRatingsHealth(), cutoff) ? getQuarterbackQbr(decision?.resolved ? selected : null) : null;
   const currentPlayer = decision?.resolved && selected?.statusKnown && selected?.propEligible
     ? rosterPlayers.find((player) =>
       String(player.id) === String(selected.livePlayerId) ||

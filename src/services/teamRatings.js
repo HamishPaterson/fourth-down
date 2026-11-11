@@ -35,10 +35,28 @@ export function getTeamRatings(team, { snapshot = ESPN_FPI_RATINGS } = {}) {
 }
 
 
-export function getTeamQbr(team) {
-  const abbreviation = typeof team === "string" ? team : team?.abbreviation;
-  const code = normalizeTeamCode(abbreviation);
-  return TEAM_RATINGS[code]?.qbr || null;
+// QBR follows the personnel-selected starting quarterback's identity, never
+// the team. Exact canonicalId/GSIS match first; a uniquely matched normalised
+// name is the only secondary identity. No roster or team fallback exists, so
+// a starter without a QBR record (e.g. an unqualified rookie) resolves to null.
+export function getQuarterbackQbr(quarterback, { snapshot = ESPN_FPI_RATINGS } = {}) {
+  const players = snapshot?.quarterbacks?.players || {};
+  if (!quarterback) return null;
+  const id = String(
+    (typeof quarterback === "string" ? quarterback : quarterback.canonicalId || quarterback.gsisId) || ""
+  ).trim();
+  if (id && players[id]) return players[id];
+  if (typeof quarterback === "string") return null;
+  const nameKey = normalizePlayerName(quarterback.name || quarterback.playerName || quarterback.fullName);
+  if (!nameKey) return null;
+  const matches = Object.values(players).filter(
+    (player) => normalizePlayerName(player.playerName) === nameKey
+  );
+  return matches.length === 1 ? matches[0] : null;
+}
+
+function normalizePlayerName(value) {
+  return String(value || "").toLowerCase().replace(/[^a-z]/g, "");
 }
 
 export function getTeamRatingsHealth({ snapshot = ESPN_FPI_RATINGS } = {}) {

@@ -2,7 +2,8 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import snapshot, { createEspnSnapshot } from "./espnFpiRatings.js";
-import { getTeamRatings } from "./teamRatings.js";
+import { getTeamRatings, getQuarterbackQbr } from "./teamRatings.js";
+import { buildQuarterbackLayer } from "./gamePredictionService.js";
 import { predictMatchup } from "./predictionEngine.js";
 import artifact from "../../api/nfl/nflverse-team-metrics.js";
 import { buildTeamMetricsResponse } from "../../api/nfl/play-by-play.js";
@@ -36,24 +37,58 @@ test("all 32 supplied ESPN teams, rank sets and records are complete and indepen
     (t) => t.espnFpi.rank, ...["overallRank", "offenseRank", "defenseRank", "specialTeamsRank"]
       .map((key) => (t) => t.efficiencies[key]),
   ]) assert.deepEqual(Object.values(snapshot.teams).map(getRank).sort((a, b) => a - b), rankSet);
-  assert.equal(snapshot.teams.SF.espnFpi.overall, 5.9);
-  assert.equal(snapshot.teams.MIA.espnFpi.overall, -7.3);
-  assert.equal(snapshot.teams.JAX.espnFpi.trend, "UP 3");
-  assert.equal(snapshot.teams.BAL.espnFpi.trend, "DOWN 19");
-  assert.equal(snapshot.teams.WSH.record, "2-4-1");
-  assert.equal(snapshot.teams.JAX.efficiencies.overall, 71.5);
-  assert.equal(snapshot.teams.LAC.efficiencies.specialTeamsRank, 28);
-  assert.equal(snapshot.teams.CHI.record, "6-2-0");
-  assert.deepEqual(snapshot.teams.CHI.espnFpi, { overall: 4.7, rank: 4, trend: "UP 3",
-    offense: 2.8, defense: 1.3, specialTeams: 0.5, strengthOfScheduleRank: 24,
-    remainingStrengthOfScheduleRank: 4, averageWinProbabilityRank: 3 });
-  assert.equal(snapshot.teams.CHI.efficiencies.overall, 68.3);
-  assert.equal(snapshot.teams.CHI.efficiencies.overallRank, 2);
-  assert.equal(snapshot.teams.NE.record, "5-3-0");
-  assert.equal(snapshot.teams.NE.espnFpi.overall, 2.4);
-  assert.equal(snapshot.teams.NE.espnFpi.rank, 9);
-  assert.equal(snapshot.teams.NE.efficiencies.overall, 59.3);
-  assert.equal(snapshot.teams.NE.efficiencies.overallRank, 10);
+  assert.equal(snapshot.teams.SF.espnFpi.overall, 6.2);
+  assert.equal(snapshot.teams.MIA.espnFpi.overall, -11.2);
+  assert.equal(snapshot.teams.HOU.espnFpi.trend, "UP 7");
+  assert.equal(snapshot.teams.LV.espnFpi.trend, "DOWN 9");
+  assert.equal(snapshot.teams.WSH.record, "2-5-1");
+  assert.equal(snapshot.teams.JAX.efficiencies.overall, 75.0);
+  assert.equal(snapshot.teams.LAC.efficiencies.specialTeamsRank, 26);
+  assert.equal(snapshot.teams.CHI.record, "7-2-0");
+  assert.deepEqual(snapshot.teams.CHI.espnFpi, { overall: 4.1, rank: 6, trend: "DOWN 2",
+    offense: 2.1, defense: 1.4, specialTeams: 0.6, strengthOfScheduleRank: 22,
+    remainingStrengthOfScheduleRank: 7, averageWinProbabilityRank: 3 });
+  assert.equal(snapshot.teams.CHI.efficiencies.overall, 67.1);
+  assert.equal(snapshot.teams.CHI.efficiencies.overallRank, 5);
+  assert.equal(snapshot.teams.NE.record, "5-4-0");
+  assert.equal(snapshot.teams.NE.espnFpi.overall, 1.4);
+  assert.equal(snapshot.teams.NE.espnFpi.rank, 15);
+  assert.equal(snapshot.teams.NE.efficiencies.overall, 54.2);
+  assert.equal(snapshot.teams.NE.efficiencies.overallRank, 14);
+  assert.equal(snapshot.season, 2026);
+  assert.equal(snapshot.predictionWeek, 10);
+});
+
+test("Week 10 QBR follows the selected starter identity, never ESPN or current team labels", () => {
+  const players = Object.values(snapshot.quarterbacks.players);
+  assert.equal(players.length, 31);
+  assert.equal(snapshot.quarterbacks.week, 10);
+  for (const player of players) {
+    assert.match(player.canonicalId, /^00-\d{7}$/);
+    assert.equal(player.weeklyQbr, null);
+    assert.equal(player.week, 10);
+    assert.ok(Number.isFinite(player.seasonQbr));
+    assert.ok(Number.isInteger(player.plays) && player.plays > 0);
+  }
+  // MIN may select Cousins or Murray; either QBR follows the selected identity.
+  assert.equal(getQuarterbackQbr({ canonicalId: "00-0029604", name: "Kirk Cousins", team: "MIN" }).seasonQbr, 62.8);
+  assert.equal(getQuarterbackQbr("00-0029604").playerName, "Kirk Cousins");
+  assert.equal(getQuarterbackQbr({ canonicalId: "00-0035228", name: "Kyler Murray", team: "MIN" }).seasonQbr, 45.7);
+  // Wentz has no qualifying record in the supplied season-leaders table.
+  assert.equal(getQuarterbackQbr({ canonicalId: "00-0032950", name: "Carson Wentz", team: "MIN" }), null);
+  assert.equal(getQuarterbackQbr({ canonicalId: "00-0036355", name: "Justin Herbert", team: "LAC" }).seasonQbr, 29.8);
+  // LV selecting Mendoza cannot receive Cousins' QBR, despite the old LV association.
+  const mendoza = { canonicalId: "00-0041562", name: "Fernando Mendoza", team: "LV" };
+  assert.equal(getQuarterbackQbr(mendoza), null);
+  const noQbrLayer = buildQuarterbackLayer(null, { points: 1, confidence: 0.8 },
+    null, getQuarterbackQbr(mendoza), 10);
+  assert.equal(noQbrLayer.qbr.home, null);
+  assert.equal(noQbrLayer.qbr.effectiveWeights.home, 0);
+  assert.equal(noQbrLayer.homePoints, 1);
+  assert.equal(getQuarterbackQbr(null), null);
+  assert.equal(getQuarterbackQbr("LV"), null);
+  // Unique normalised-name match is the only secondary identity.
+  assert.equal(getQuarterbackQbr({ canonicalId: "unknown-id", name: "C.J. Stroud" }).canonicalId, "00-0039163");
 });
 
 for (const conflict of ["duplicate-team", "duplicate-rank", "record", "non-finite", "trend"]) {

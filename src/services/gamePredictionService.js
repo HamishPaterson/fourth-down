@@ -1,7 +1,7 @@
 import { predictMatchup } from "./predictionEngine.js";
 import { buildPlayerProjections } from "./playerProjectionService.js";
 import * as nflApi from "./nflApi.js";
-import { getTeamQbr, getTeamRatingsHealth } from "./teamRatings.js";
+import { getQuarterbackQbr, getTeamRatingsHealth } from "./teamRatings.js";
 import { getStadiumWeather } from "./weatherApi.js";
 import { resolveStadium } from "./stadiums.js";
 import { buildBestBets } from "./bestBetsService.js";
@@ -188,8 +188,8 @@ async function createPrediction({ game, oddsEvent, season, week, away, home, sig
     quarterback: buildQuarterbackLayer(
       personnel?.away?.quarterback,
       personnel?.home?.quarterback,
-      qbrAvailable ? getTeamQbr(away) : null,
-      qbrAvailable ? getTeamQbr(home) : null,
+      qbrAvailable ? getQuarterbackQbr(selectedStartingQuarterback(personnelViews.away)) : null,
+      qbrAvailable ? getQuarterbackQbr(selectedStartingQuarterback(personnelViews.home)) : null,
       week
     ),
     rosterHealth: buildPersonnelLayer(
@@ -395,6 +395,14 @@ function extractLayers(payload) {
   return payload?.modelLayers && typeof payload.modelLayers === "object"
     ? payload.modelLayers
     : {};
+}
+
+// QBR identity source: the quarterback already selected by the personnel view.
+// No team- or roster-based fallback: an unresolved decision or missing starter
+// yields null so the QBR layer receives zero weight for that side.
+function selectedStartingQuarterback(personnelView) {
+  const decision = personnelView?.quarterback;
+  return decision?.resolved ? decision.player || null : null;
 }
 
 export function buildQuarterbackLayer(awayPersonnel, homePersonnel, awayQbr, homeQbr, week) {
