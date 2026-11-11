@@ -9,18 +9,30 @@ export function predictionMissingOdds(snapshot) {
   return diagnostics?.bookmakerCount === 0 || diagnostics?.marketCount === 0;
 }
 
-export function completePrediction(snapshot) {
+export function predictionCompletenessStatus(snapshot) {
   const bets = snapshot?.bestBets || snapshot?.dataQuality?.bestBetsPayload;
-  return Boolean(snapshot && isCurrentModelIdentity(snapshot.modelVersion, snapshot.modelKey) && snapshot.predictionPayload &&
-    [snapshot.awayCode, snapshot.homeCode].includes(snapshot.fourthDownPick) &&
-    [snapshot.fourthDownAwayScore, snapshot.fourthDownHomeScore,
+  const checks = {
+    modelIdentity: Boolean(snapshot && isCurrentModelIdentity(snapshot.modelVersion, snapshot.modelKey)),
+    predictionPayload: Boolean(snapshot?.predictionPayload),
+    pick: Boolean(snapshot && [snapshot.awayCode, snapshot.homeCode].includes(snapshot.fourthDownPick)),
+    finiteValues: Boolean(snapshot && [snapshot.fourthDownAwayScore, snapshot.fourthDownHomeScore,
       snapshot.fourthDownAwayWinProbability, snapshot.fourthDownHomeWinProbability,
-      snapshot.confidenceScore].every(number) &&
-    [snapshot.fourthDownAwayWinProbability, snapshot.fourthDownHomeWinProbability].every((value) => value >= 0 && value <= 1) &&
-    snapshot.fourthDownAwayScore >= 0 && snapshot.fourthDownHomeScore >= 0 &&
-    snapshot.dataQuality?.sources?.odds?.available === true &&
-    bets && Array.isArray(bets.recommendations) && number(bets.assessed) && bets.assessed > 0 &&
-    snapshot.playerProjections?.available === true && predictionFeatureStatus(snapshot).personnel);
+      snapshot.confidenceScore].every(number)),
+    probabilities: Boolean(snapshot && [snapshot.fourthDownAwayWinProbability, snapshot.fourthDownHomeWinProbability]
+      .every((value) => value >= 0 && value <= 1)),
+    scores: Boolean(snapshot && snapshot.fourthDownAwayScore >= 0 && snapshot.fourthDownHomeScore >= 0),
+    odds: snapshot?.dataQuality?.sources?.odds?.available === true,
+    bestBets: Boolean(bets),
+    recommendations: Array.isArray(bets?.recommendations),
+    assessed: Boolean(bets && number(bets.assessed) && bets.assessed > 0),
+    playerProjections: snapshot?.playerProjections?.available === true,
+    personnel: Boolean(predictionFeatureStatus(snapshot).personnel),
+  };
+  return { ...checks, complete: Object.values(checks).every(Boolean) };
+}
+
+export function completePrediction(snapshot) {
+  return predictionCompletenessStatus(snapshot).complete;
 }
 
 export function retainPrediction(existing, incoming, now, authoritative = false) {

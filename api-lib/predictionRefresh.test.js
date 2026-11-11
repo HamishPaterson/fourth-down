@@ -9,7 +9,11 @@ import { applyPredictionSnapshot } from "../src/services/predictionSnapshot.js";
 import gameStats, { snapshotToDatabase, databaseToSnapshot } from "../api/nfl/game-stats.js";
 import { FULL_MODEL_VERSION, FULL_MODEL_KEY } from "../src/services/gamePredictionService.js";
 import { BEST_BETS_CANDIDATE_VERSION } from "../src/services/bestBetsService.js";
-import { createServerPredictionInputLoader, refreshSavedBestBets } from "./serverPredictions.js";
+import { createServerPredictionGenerator, createServerPredictionInputLoader, refreshSavedBestBets } from "./serverPredictions.js";
+import dataset from "../api/nfl/nflverse-team-metrics.js";
+import playerArtifact from "../data/nflverse-player-metrics.js";
+import { playerMetricsResponse } from "./playerMetrics.js";
+import { compareTeams } from "../api/nfl/play-by-play.js";
 import { PERSONNEL_VIEW_VERSION } from "./personnelView.js";
 import { findOddsForGame, resolveOddsForGame } from "../src/services/oddsApi.js";
 import { buildPredictionSnapshot } from "../src/services/predictionSnapshot.js";
@@ -198,6 +202,67 @@ const coreOddsEvent = (game) => ({
     { key: "totals", outcomes: [{ name: "Over", point: 44.5, price: 1.9 }] },
   ] })),
 });
+
+for (const missingPlayerWeek of [false, true]) {
+test(`NE-DET server generation with Week 10 player inputs ${missingPlayerWeek ? "missing" : "available"}`, async (t) => {
+  const now = new Date("2026-11-11T00:00:00Z");
+  t.mock.timers.enable({ apis: ["Date"], now: now.getTime() });
+  const away = dataset.metricsByWeek[10].NE, home = dataset.metricsByWeek[10].DET;
+  const game = { season: 2026, week: 10, away: "NE", home: "DET",
+    sourceDate: away.expectedLineup.cutoff, weather: { dome: true } };
+  const event = coreOddsEvent(game);
+  event.bookmakers.forEach((book) => {
+    book.last_update = now.toISOString();
+    book.markets.forEach((market) => market.outcomes.forEach((outcome) => { outcome.price = 100; }));
+  });
+  const roster = (team, metrics) => ({
+    team, sourceAsOf: now.toISOString(),
+    groups: { players: metrics.expectedLineup.roster.map((player) => ({
+      id: `live-${player.gsisId}`, gsisId: player.gsisId, fullName: player.name, team,
+      position: player.position, depthChartPosition: player.position, depthChartOrder: player.rank,
+      status: "Active", injuryStatus: "Active",
+    })) },
+  });
+  const source = missingPlayerWeek ? {
+    ...playerArtifact,
+    playerMetricsByWeek: { ...playerArtifact.playerMetricsByWeek, 10: undefined },
+  } : playerArtifact;
+  const playerMetrics = playerMetricsResponse(source, { season: 2026, week: 10, away: "NE", home: "DET" });
+  assert.equal(playerMetrics.available, !missingPlayerWeek);
+  if (missingPlayerWeek) assert.equal(playerMetrics.reason, "Exact prediction-week player data unavailable");
+  let generated;
+  const result = await run({
+    getNow: () => now,
+    resolveContext: () => ({ season: 2026, week: 10, cutoff: game.sourceDate, games: [game] }),
+    loadNetwork: async () => ({ ...network, week: 10 }),
+    readOdds: async () => ({ events: [event] }),
+    createGenerator: () => {
+      const generate = createServerPredictionGenerator({ loadInputs: () => ({
+      playByPlay: Promise.resolve({ season: 2026, week: 10, away, home, modelLayers: compareTeams(away, home, 10) }),
+      teamForm: Promise.resolve({}),
+      opponentNetwork: Promise.resolve({ available: true,
+        modelLayer: { available: true, awayPoints: .3, homePoints: -.3, confidence: .6 } }),
+      playerMetrics: Promise.resolve(playerMetrics),
+      awayRoster: Promise.resolve(roster("NE", away)), homeRoster: Promise.resolve(roster("DET", home)),
+      }) });
+      return async (...args) => { generated = await generate(...args); return generated; };
+    },
+  });
+  if (missingPlayerWeek) {
+    assert.equal(result.res.statusCode, 502);
+    assert.equal(result.res.body.reason, "NE at DET: Incomplete current-model prediction: playerProjections");
+  } else {
+    assert.equal(result.res.statusCode, 200, result.res.body.reason);
+    assert.equal(generated.playerProjections.available, true);
+    assert.equal(completePrediction(generated), true);
+    assert.equal(generated.bestBets.marketDiagnostics.bookmakerCount, 2);
+    assert.ok(generated.bestBets.marketDiagnostics.marketCount > 0);
+    assert.ok(generated.bestBets.assessed > 0);
+  }
+  assert.deepEqual(result.db.writes, []);
+});
+}
+
 const noOddsSnapshot = (game) => ({
   ...fixture(game), authoritative: true,
   bestBets: { candidateVersion: BEST_BETS_CANDIDATE_VERSION, available: false,

@@ -9,7 +9,7 @@ import { handleOddsRequest, getCurrentWeekWindow, readStoredOddsForWeek } from "
 import { getFullGamePrediction } from "../src/services/gamePredictionService.js";
 import { buildPredictionSnapshot } from "../src/services/predictionSnapshot.js";
 import { findOddsForGame } from "../src/services/oddsApi.js";
-import { completePrediction, retainPrediction } from "./predictionEligibility.js";
+import { completePrediction, predictionCompletenessStatus, retainPrediction } from "./predictionEligibility.js";
 import { mergeStoredOdds, getLockCycle } from "./weeklyMulti.js";
 import { randomUUID } from "node:crypto";
 import { PRESERVED_LOCK_THROUGH, LOCK_PROVENANCE_VERSION, lockPredictionRejections } from "./weeklyLockProvenance.js";
@@ -121,8 +121,12 @@ export function createServerPredictionGenerator(options = {}) {
       loadInputs,
     });
     const snapshot = buildPredictionSnapshot(game, result, oddsEvent, now);
-    if (!completePrediction(snapshot) || !result.dataQuality.playByPlay) {
-      throw new Error(`Incomplete current-model prediction for ${game.away} at ${game.home}`);
+    const completeness = predictionCompletenessStatus(snapshot);
+    if (!completeness.complete || !result.dataQuality.playByPlay) {
+      const failed = Object.entries(completeness).filter(([name, passed]) => name !== "complete" && !passed)
+        .map(([name]) => name);
+      if (!result.dataQuality.playByPlay) failed.push("playByPlay");
+      throw new Error(`Incomplete current-model prediction: ${failed.join(", ")}`);
     }
     const dependencies = result.prediction.market?.active ? (oddsEvent.bookmakers || []).flatMap((book) =>
       (book.markets || []).filter((market) => ["spreads", "totals"].includes(market.key))
