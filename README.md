@@ -277,7 +277,8 @@ fails closed with an explicit error or candidate diagnostic.
 
 The refresh loads the complete current-week schedule and stored core/player odds,
 loads completed season games once, and computes one validated 32-team weekly
-Opponent-Network for every game. There is no persistent network cache. Provider
+Opponent-Network shared by newly generated games (none when all games are reused).
+There is no persistent network cache. Provider
 pagination is sequential, paced at 12.5 seconds, with up to three same-page 429
 retries honoring Retry-After seconds/dates; fallback backoff is bounded at eight
 seconds with small jitter. HTTP failures and non-JSON/malformed responses fail
@@ -289,11 +290,31 @@ remaining budget fails explicitly rather than retrying early or using partial da
 Prediction feature version 1 and Matchup Intelligence schema version 2 are stored
 in existing snapshot JSON (no database migration). Required Phase 1/2A, successful
 network state, player projections, current qualified-candidate pool and score/
-probability consistency are checked for the entire batch before any writes.
+probability consistency are checked for the selected batch before any writes,
+then verified again after persistence.
 Complete current-feature authoritative records are reused regardless of age;
 pre-feature records can upgrade before kickoff, but browser partial records
 cannot replace authoritative records and frozen/graded records cannot upgrade.
 All predictions remain model-v11; scoring formulas are unchanged.
+
+Each invocation generates at most two snapshots, ordered by kickoff then canonical
+away/home identity. Reinvoke the same authenticated POST until `complete` is true.
+The response reports `processed`, `regenerated`, `reused`, `remaining`, and `complete`;
+dry runs do not persist progress. Already repaired snapshots are reused. Saved
+zero-bookmaker/zero-market snapshots are regenerated only when exact-match current
+odds have markets and priced outcomes; otherwise their missing-odds evidence is
+left untouched. Zero qualified bets after genuine assessment does not trigger a
+refresh. Frozen, graded, started and preserved historical predictions remain
+protected. Explicit weekly-lock preparation saves its plan only after all games
+have passed full-slate validation.
+
+`bestBets.anytimeTdModelPick` persists the highest eligible player touchdown
+probability from existing player projections, including team, canonical personnel
+identity, rushing/receiving touchdown evidence, explanation and risk. Existing
+matchup-derived team passing/rushing opportunities and red-zone/goal-line role
+allocation determine those probabilities; no extra scoring weights are added.
+Bookmaker prices never select or withhold this model pick. Optional price display
+is separate from selection; priced bets retain their existing qualification gates.
 
 By default this path writes only prediction snapshots, apart from reading stored odds
 and other model inputs. It never selects/locks a Weekly Multi or calls

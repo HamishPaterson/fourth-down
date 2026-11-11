@@ -14,7 +14,7 @@ import { CURRENT_MODEL_KEY, CURRENT_MODEL_VERSION } from "../src/services/modelI
 import { useFixedTestClock as installFixedTestClock } from "./testClock.js";
 import { createPredictionRefreshHandler } from "./predictionRefresh.js";
 import { NFL_TEAMS } from "../api/nfl/opponent-network.js";
-import { BEST_BETS_CANDIDATE_VERSION } from "../src/services/bestBetsService.js";
+import { BEST_BETS_CANDIDATE_VERSION, selectTdModelPick } from "../src/services/bestBetsService.js";
 
 installFixedTestClock();
 
@@ -119,6 +119,68 @@ test("real saved odds readers retain market-specific stale diagnostics and never
   } finally { globalThis.fetch = original; }
 });
 
+  test("all 14 Week 10 games persist one highest-probability eligible model TD pick without TD prices", async (t) => {
+    const began = performance.now(), now = new Date("2026-11-11T00:00:00Z");
+    t.mock.timers.setTime(now.getTime());
+    const db = database();
+    const matchups = ["WSH-NYG", "NE-DET", "CAR-NO", "BUF-NYJ", "HOU-CLE", "JAX-TEN", "KC-ATL",
+      "MIN-GB", "MIA-IND", "SEA-LV", "LAR-ARI", "SF-DAL", "PIT-CIN", "LAC-BAL"];
+    const roster = (team, metrics) => ({ team, sourceAsOf: now.toISOString(),
+      groups: { players: metrics.expectedLineup.roster.map((player) => ({
+        id: `live-${player.gsisId}`, gsisId: player.gsisId, fullName: player.name, team,
+        position: player.position, depthChartPosition: player.position, depthChartOrder: player.rank,
+        status: "Active", injuryStatus: "Active",
+      })) },
+    });
+    const generate = createServerPredictionGenerator({ loadInputs: ({ away: awayCode, home: homeCode }) => {
+      const away = dataset.metricsByWeek[10][awayCode], home = dataset.metricsByWeek[10][homeCode];
+      return {
+        playByPlay: Promise.resolve({ season: 2026, week: 10, away, home, modelLayers: compareTeams(away, home, 10) }),
+        opponentNetwork: Promise.resolve({ available: true,
+          modelLayer: { available: true, awayPoints: .3, homePoints: -.3, confidence: .6 } }),
+        playerMetrics: Promise.resolve(playerMetricsResponse(players, { season: 2026, week: 10, away: awayCode, home: homeCode })),
+        awayRoster: Promise.resolve(roster(awayCode, away)), homeRoster: Promise.resolve(roster(homeCode, home)),
+      };
+    } });
+    for (const [index, matchup] of matchups.entries()) {
+      const [away, home] = matchup.split("-");
+      const game = { id: String(1000 + index), season: 2026, week: 10, away, home,
+        sourceDate: dataset.metricsByWeek[10][away].expectedLineup.cutoff, weather: { dome: true } };
+      const event = { away_team: away, home_team: home, commence_time: game.sourceDate,
+        bookmakers: ["one", "two"].map((key) => ({ key, last_update: now.toISOString(), markets: [
+          { key: "h2h", outcomes: [{ name: away, price: 100 }, { name: home, price: 100 }] },
+          { key: "spreads", outcomes: [{ name: away, point: -1.5, price: 100 }, { name: home, point: 1.5, price: 100 }] },
+          { key: "totals", outcomes: [{ name: "Over", point: 44.5, price: 100 }, { name: "Under", point: 44.5, price: 100 }] },
+        ] })) };
+      const snapshot = await generate(game, { events: [event] }, now);
+      const pick = snapshot.bestBets.anytimeTdModelPick;
+      assert.ok(completePrediction(snapshot), matchup);
+      assert.equal(snapshot.playerProjections.available, true, matchup);
+      assert.equal(snapshot.bestBets.marketDiagnostics.bookmakerCount, 2, matchup);
+      assert.ok(snapshot.bestBets.assessed > 0, matchup);
+      assert.equal(pick.modelPickEligible, true, `${matchup}: ${pick.primaryReason}`);
+      assert.ok(pick.playerName && pick.personnelId && pick.team && pick.statisticalProjection && pick.explanation && pick.risk);
+      assert.equal(pick.price, null);
+      const ranked = [...snapshot.playerProjections.away.players, ...snapshot.playerProjections.home.players]
+        .sort((a, b) => b.anytimeTouchdownProbability - a.anytimeTouchdownProbability);
+      assert.equal(pick.modelProbability, ranked[0].anytimeTouchdownProbability, matchup);
+      for (const oddsEvent of [null, { ...event, bookmakers: [] },
+        { ...event, bookmakers: event.bookmakers.map((book) => ({ ...book, markets: book.markets.map((market) =>
+          ({ ...market, outcomes: market.outcomes.map((outcome) => ({ ...outcome, price: -900 })) })) })) }]) {
+        const independent = selectTdModelPick({ game, playerProjections: snapshot.playerProjections,
+          personnelViews: snapshot.personnelViews, oddsEvent, quoteAsOf: now });
+        assert.equal(independent.personnelId, pick.personnelId, matchup);
+        assert.equal(independent.modelProbability, pick.modelProbability, matchup);
+      }
+      await saveAuthoritativePrediction(db, snapshot, now);
+      const saved = databaseToSnapshot(db.tables.prediction_snapshots.find((row) =>
+        row.away_code === away && row.home_code === home));
+      assert.deepEqual(saved.bestBets.anytimeTdModelPick, pick, matchup);
+    }
+    assert.equal(db.tables.prediction_snapshots.length, 14);
+    t.diagnostic(`14 complete generated and persisted Week 10 fixtures: ${(performance.now() - began).toFixed(1)}ms`);
+  });
+
 test("actual shared model handoff remains complete using fixtures only and preserves named model-only TD", async () => {
   const now = new Date("2026-10-15T00:00Z");
   const game = { season: 2026, week: 6, away: "SEA", home: "DEN", sourceDate: "2026-10-16T00:15Z", weather: { dome: true } };
@@ -131,7 +193,6 @@ test("actual shared model handoff remains complete using fixtures only and prese
       status: "Active", injuryStatus: "Active",
     })) },
   });
-
   const odds = { events: [{ away_team: "SEA", home_team: "DEN", bookmakers: [{ title: "Book", last_update: now.toISOString(),
     markets: [{ key: "h2h", outcomes: [{ name: "SEA", price: 100 }, { name: "DEN", price: 100 }] }],
   }] }] };
@@ -170,6 +231,7 @@ test("explicit pre-lock administrative preparation saves verified provenance and
       const context = { season: 2026, week: 8, cutoff: fixture.plan.games[0].kickoff,
         games: fixture.plan.games.map((game) => ({ ...game, season: 2026, week: 8, sourceDate: game.kickoff })) };
       await createPredictionRefreshHandler({
+        batchLimit: 5,
         getNow: () => now, createClient: () => db, readSchedule: async () => [],
         resolveContext: () => context, readOdds: async () => fixture.odds,
         loadNetwork: async () => {

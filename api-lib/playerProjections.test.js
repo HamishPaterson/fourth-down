@@ -7,7 +7,7 @@ import { parseGenericCsv } from "../scripts/update-nflverse.mjs";
 import { buildWeeklyPlayerMetrics, parsePlay } from "../scripts/update-nflverse-players.mjs";
 import { playerMetricsResponse, validatePlayerMetrics, completedPlayerGames } from "./playerMetrics.js";
 import { buildPlayerProjections } from "../src/services/playerProjectionService.js";
-import { buildBestBets } from "../src/services/bestBetsService.js";
+import { buildBestBets, selectTdModelPick } from "../src/services/bestBetsService.js";
 import { buildWeeklyMultiSelection } from "./weeklyMulti.js";
 import { CURRENT_MODEL_VERSION, CURRENT_MODEL_KEY } from "../src/services/modelIdentity.js";
 import handler from "../api/nfl/game-stats.js";
@@ -944,6 +944,59 @@ test("Anytime TD remains 1-exp(-expected TDs) and Best Bets consumes only eligib
   assert.equal(bets.anytimeTdScorer.source, "unavailable");
   assert.ok(bets.anytimeTdScorer.statisticalProjection);
 });
+
+for (const [position, id] of [["RB", "NYG-rb"], ["WR", ids.wr], ["TE", "NYG-te"], ["QB", ids.dart]]) {
+  test(`supported ${position} red-zone role and matchup scoring opportunity can lead model-only TD ranking`, () => {
+    const sample = [...playsFor(1), ...Array.from({ length: 12 }, (_, index) =>
+      parsePlay(raw(1, "NYG", `qb-rush-${index}`, { play_type: "run", pass_attempt: "0", rush_attempt: "1",
+        complete_pass: "0", receiver_player_id: "", receiver_player_name: "",
+        rusher_player_id: ids.dart, rusher_player_name: "J.Dart", rushing_yards: "6", yardline_100: "4" }))),
+      ...Array.from({ length: 30 }, (_, index) => parsePlay(raw(1, "NYG", `te-target-${index}`, {
+        receiver_player_id: "NYG-te", receiver_player_name: "Tight End",
+      })))];
+    const input = fixture(2, sample);
+    input.prediction = structuredClone(prediction);
+    input.personnelViews = confirmedPersonnelViews(input);
+    const names = { "NYG-rb": "Away Runner", "NYG-te": "Away Tightend", [ids.wr]: "Away Receiver",
+      "KC-rb": "Home Runner", "KC-te": "Home Tightend", "home-wr": "Home Receiver", "home-qb": "Home Quarterback" };
+    for (const side of ["away", "home"]) {
+      for (const profile of Object.values(input.playerMetrics[side].players)) {
+        if (names[profile.gsisId]) profile.playerName = names[profile.gsisId];
+      }
+      for (const record of input.personnelViews[side].players) {
+        if (names[record.canonicalId]) record.name = names[record.canonicalId];
+      }
+    }
+    const receiving = ["WR", "TE"].includes(position);
+    for (const profile of Object.values(input.playerMetrics.away.players)) {
+      if (profile.rushing) Object.assign(profile.rushing, {
+        redZoneCarryShare: profile.gsisId === id ? .9 : .01,
+        goalLineCarryShare: profile.gsisId === id ? .9 : .01,
+      });
+      if (profile.receiving) Object.assign(profile.receiving, {
+        redZoneTargetShare: profile.gsisId === id ? .9 : .01,
+        endZoneTargetShare: profile.gsisId === id ? .9 : .01,
+      });
+    }
+    // Controlled outputs of the existing matchup model, not bookmaker inputs.
+    Object.assign(input.prediction.away, { passingTD: receiving ? 3 : .1, rushingTD: receiving ? .1 : 3 });
+    Object.assign(input.prediction.home, { passingTD: .1, rushingTD: .1 });
+    const projections = run(input);
+    const value = { game: input, playerProjections: projections, personnelViews: input.personnelViews };
+    const pick = selectTdModelPick(value);
+    assert.equal(pick.personnelId, id, JSON.stringify({ pick, players: projections.away.players.map((player) => ({
+      id: player.personnelId, roleConfidence: player.roleConfidence, probability: player.anytimeTouchdownProbability,
+    })) }));
+    const supported = [...projections.away.players, ...projections.home.players];
+    assert.equal(pick.modelProbability, Math.max(...supported.map((player) => player.anytimeTouchdownProbability)));
+    assert.equal(pick.statisticalProjection.anytimeTouchdownProbability, pick.modelProbability);
+    assert.equal(pick.team, "NYG");
+    const changed = structuredClone(input);
+    Object.assign(changed.prediction.away, { passingTD: receiving ? .1 : 3, rushingTD: receiving ? 3 : .1 });
+    assert.notEqual(selectTdModelPick({ ...value, playerProjections: run(changed) }).personnelId, id,
+      "changing supported passing/rushing matchup opportunity must be capable of changing the selected player");
+  });
+}
 for (const change of ["legacy", "season", "week", "cutoff", "futureLog", "duplicateLog", "nonfinite", "missingVolume"]) {
   test(`rejects ${change} input instead of silently fabricating certainty`, () => {
     const input = fixture();

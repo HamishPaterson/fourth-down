@@ -301,6 +301,12 @@ export function selectTdModelPick({ game, playerProjections, personnelViews, odd
     source: "model-only", modelPickEligible: true, bettingEligible: false, identityState: "MATCHED", title: "Anytime TD scorer",
     playerId: top.player.playerId, personnelId: top.player.personnelId || top.player.gsisId,
     playerTeam: top.player.team, playerName: top.playerName, selection: top.playerName,
+    team: top.player.team,
+    statisticalProjection: {
+      rushingTouchdowns: nullable(top.player.rushingTouchdowns),
+      receivingTouchdowns: nullable(top.player.receivingTouchdowns),
+      anytimeTouchdownProbability: top.probability,
+    },
     modelProbability: top.probability, roleConfidence: top.roleConfidence, dataQuality: top.dataQuality,
     confidenceScore: round4(confidenceScore), confidenceLevel: confidenceLabel(confidenceScore),
     personnelState: top.availability, availabilityKnown: !unknown,

@@ -8,7 +8,7 @@ import { createServerPredictionGenerator, readPredictionOdds, saveAuthoritativeP
 import { databaseToSnapshot } from "../api/nfl/game-stats.js";
 import { getCurrentWeekWindow } from "../api/nfl/odds.js";
 import { loadWeeklyOpponentNetwork, validateWeeklyOpponentNetwork, NFL_TEAMS } from "../api/nfl/opponent-network.js";
-import { completePrediction, predictionMissingOdds } from "./predictionEligibility.js";
+import { completePrediction, predictionCompletenessStatus, predictionMissingOdds } from "./predictionEligibility.js";
 import { predictionFeatureStatus, PREDICTION_FEATURE_VERSION } from "../src/services/predictionFeatures.js";
 import { playerTeam } from "./playerMetrics.js";
 import { findOddsForGame } from "../src/services/oddsApi.js";
@@ -104,6 +104,7 @@ export function createPredictionRefreshHandler(overrides = {}) {
   const createGenerator = overrides.createGenerator || createServerPredictionGenerator;
   const save = overrides.savePrediction || saveAuthoritativePrediction;
   const savePlan = overrides.saveLockPlan || saveWeeklyLockPlan;
+  const batchLimit = overrides.batchLimit || 2;
   return async (req, res) => {
     res.setHeader("Cache-Control", "no-store");
     if (!["GET", "POST"].includes(req.method)) return res.status(405).json({ error: "Method not allowed" });
@@ -113,6 +114,8 @@ export function createPredictionRefreshHandler(overrides = {}) {
       const dryRun = req.method !== "POST" || req.body?.dryRun !== false;
       const sourceGames = await readSchedule(dataset.season, { deadline: Date.now() + 55000 });
       const context = await resolveContext(sourceGames, now);
+      context.games = [...context.games].sort((a, b) =>
+        Date.parse(a.sourceDate) - Date.parse(b.sourceDate) || identity(a).localeCompare(identity(b)));
       if (context.season === 2026 && context.week === 7) throw new Error("HISTORICAL_WEEK_7_PRESERVED");
       const prepareWeeklyLock = req.body?.prepareWeeklyLock === true;
       const lockContext = { ...context, lockAt: new Date(getLockCycle(new Date(context.cutoff)).lockAt).toISOString() };
@@ -128,42 +131,66 @@ export function createPredictionRefreshHandler(overrides = {}) {
         prior.set(key, s);
       }
       const odds = await readOdds(client, now, context);
-      const network = validateWeeklyOpponentNetwork(await loadNetwork(context.season, context.week, {
-        sourceGames, cutoff: context.cutoff, now,
-      }), context.season, context.week);
-      const generate = createGenerator({ weeklyNetwork: network, sourceGames, weeklyCutoff: context.cutoff });
+      let generator;
+      const generate = async (game) => {
+        generator ||= loadNetwork(context.season, context.week, { sourceGames, cutoff: context.cutoff, now })
+          .then((network) => createGenerator({
+            weeklyNetwork: validateWeeklyOpponentNetwork(network, context.season, context.week),
+            sourceGames, weeklyCutoff: context.cutoff,
+          }));
+        return (await generator)(game, odds, now);
+      };
       const generated = [];
       let reused = 0;
+      let selected = 0, remaining = 0;
+      const processedGames = [];
       for (let index = 0; index < context.games.length; index += 3) {
         generated.push(...await Promise.all(context.games.slice(index, index + 3).map(async (game) => {
           const existing = prior.get(identity(game));
           const currentEvent = findOddsForGame(odds?.events, game);
+          const currentOddsAvailable = currentEvent?.bookmakers?.some((book) => book.markets?.some((market) =>
+            market.key && market.outcomes?.some((outcome) => Number(outcome.price) > 1)));
           const missingOddsNowAvailable = !existing?.frozenAt && !existing?.actualWinner &&
             Date.parse(existing?.kickoff) > now.getTime() &&
-            predictionMissingOdds(existing) &&
-            currentEvent?.bookmakers?.some((book) => book.markets?.some((market) =>
-              market.key && market.outcomes?.some((outcome) => Number(outcome.price) > 1)));
+            predictionMissingOdds(existing) && currentOddsAvailable;
+          // Keep the original evidence untouched while there are still no odds to recover.
+          const waitingForOdds = !prepareWeeklyLock && predictionMissingOdds(existing) && !currentOddsAvailable &&
+            !existing?.frozenAt && !existing?.actualWinner && Date.parse(existing?.kickoff) > now.getTime() &&
+            Object.entries(predictionCompletenessStatus(existing)).every(([name, passed]) =>
+              ["complete", "odds", "assessed"].includes(name) || passed);
+          if (existing?.authoritative && waitingForOdds && predictionFeatureStatus(existing).complete &&
+              existing.season === context.season && existing.week === context.week &&
+              Date.parse(existing.kickoff) === Date.parse(game.sourceDate)) {
+            reused++;
+            return null;
+          }
           if (existing?.authoritative && completePrediction(existing) && predictionFeatureStatus(existing).complete &&
               Date.parse(existing.kickoff) === Date.parse(game.sourceDate) &&
               !missingOddsNowAvailable &&
               (!prepareWeeklyLock || !lockPredictionRejections(existing, lockContext, now).length)) {
+            validatePredictionRefreshBatch([existing], { ...context, games: [game] }, getNow());
             reused++;
-            return existing;
+            return null;
           }
+          if (selected >= batchLimit) { remaining++; return null; }
+          selected++;
+          processedGames.push(game);
           try {
             if (existing?.frozenAt || existing?.actualWinner || Date.parse(existing?.kickoff) <= now.getTime()) {
               throw new Error("Frozen, graded or started prediction cannot be refreshed");
             }
-            const snapshot = await generate(game, odds, now);
+            const snapshot = await generate(game);
             return snapshot;
           } catch (error) {
             throw new Error(`${game.away} at ${game.home}: ${error instanceof Error ? error.message : "Prediction generation failed"}`, { cause: error });
           }
         })));
       }
-      validatePredictionRefreshBatch(generated, context, getNow());
+      const snapshots = generated.filter(Boolean);
+      const batchContext = { ...context, games: processedGames };
+      validatePredictionRefreshBatch(snapshots, batchContext, getNow());
       if (!dryRun) {
-        for (const snapshot of generated) {
+        for (const snapshot of snapshots) {
           if (prior.get(`${snapshot.awayCode}:${snapshot.homeCode}`) !== snapshot) {
             await save(client, snapshot, getNow(), { requireLockProvenance: prepareWeeklyLock });
           }
@@ -175,9 +202,11 @@ export function createPredictionRefreshHandler(overrides = {}) {
           const s = databaseToSnapshot(row);
           return [`${s.awayCode}:${s.homeCode}`, s];
         }));
-        const saved = context.games.map((game) => byGame.get(identity(game)));
-        validatePredictionRefreshBatch(saved, context, getNow());
-        if (prepareWeeklyLock) {
+        const saved = processedGames.map((game) => byGame.get(identity(game)));
+        validatePredictionRefreshBatch(saved, batchContext, getNow());
+        if (prepareWeeklyLock && remaining === 0) {
+          const saved = context.games.map((game) => byGame.get(identity(game)));
+          validatePredictionRefreshBatch(saved, context, getNow());
           if (saved.some((snapshot) => lockPredictionRejections(snapshot, lockContext, getNow()).length)) {
             throw new Error("AUTHORITATIVE_LOCK_PROVENANCE_REQUIRED");
           }
@@ -186,9 +215,10 @@ export function createPredictionRefreshHandler(overrides = {}) {
       }
       return res.status(200).json({
         status: dryRun ? "dry run" : "refreshed", dryRun, prepareWeeklyLock, season: context.season, week: context.week,
-        predictionFeatureVersion: PREDICTION_FEATURE_VERSION, networkComputations: 1,
-        generated: generated.length - reused, reused, writes: dryRun ? 0 : generated.length - reused,
-        predictions: generated.map((s) => ({
+        predictionFeatureVersion: PREDICTION_FEATURE_VERSION, networkComputations: generator ? 1 : 0,
+        processed: snapshots.length, regenerated: snapshots.length, remaining, complete: remaining === 0,
+        generated: snapshots.length, reused, writes: dryRun ? 0 : snapshots.length,
+        predictions: snapshots.map((s) => ({
           game: `${s.awayCode} at ${s.homeCode}`, ...predictionFeatureStatus(s),
           playerProjections: s.playerProjections.available,
           score: [s.fourthDownAwayScore, s.fourthDownHomeScore],

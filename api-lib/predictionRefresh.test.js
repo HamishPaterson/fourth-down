@@ -113,6 +113,7 @@ async function run({ db = database(), dryRun = true, method = "POST", authorizat
   build = fixture, ...overrides } = {}) {
   let loads = 0, generators = 0, generated = 0;
   const dependencies = {
+    batchLimit: 14,
     getNow: () => NOW, createClient: () => db, readSchedule: async () => [],
     resolveContext: () => context, readOdds: async () => ({ stored: true }),
     loadNetwork: async () => { loads++; return structuredClone(network); },
@@ -270,6 +271,54 @@ const noOddsSnapshot = (game) => ({
     marketDiagnostics: { bookmakerCount: 0, marketCount: 0 } },
 });
 
+test("14-game refresh resumes deterministic two-game batches without rebuilding repaired authority", async (t) => {
+  const started = performance.now();
+  const slate = games.map((game, index) => ({ ...game, sourceDate: `2026-10-18T${17 + index % 3}:00:00Z` }));
+  const ordered = [...slate].sort((a, b) => a.sourceDate.localeCompare(b.sourceDate) ||
+    `${a.away}:${a.home}`.localeCompare(`${b.away}:${b.home}`));
+  const repaired = ordered.slice(0, 7).map((game) => ({
+    ...fixture(game), authoritative: true,
+    bestBets: { ...fixture(game).bestBets, qualified: 0, recommendations: [],
+      marketDiagnostics: { bookmakerCount: 2, marketCount: 6 } },
+  }));
+  const stale = ordered.slice(7).map((game) => {
+    const snapshot = noOddsSnapshot(game);
+    snapshot.bestBets.assessed = 0;
+    return snapshot;
+  });
+  const db = database([...stale, ...repaired].reverse());
+  const generated = [];
+  let rounds = 0, result;
+  do {
+    result = await run({
+      db, dryRun: false, batchLimit: undefined,
+      resolveContext: () => ({ ...context, games: [...slate].reverse() }),
+      readOdds: async () => ({ events: slate.map(coreOddsEvent).reverse() }),
+      build(game) {
+        generated.push(`${game.away}:${game.home}`);
+        const snapshot = fixture(game);
+        snapshot.bestBets.marketDiagnostics = { bookmakerCount: 2, marketCount: 6 };
+        return snapshot;
+      },
+    });
+    assert.equal(result.res.statusCode, 200, result.res.body.reason);
+    assert.ok(result.res.body.processed <= 2);
+    assert.equal(result.res.body.regenerated, Math.min(2, 7 - rounds * 2));
+    assert.equal(result.res.body.reused, 7 + rounds * 2);
+    assert.equal(result.res.body.remaining, Math.max(0, 7 - (rounds + 1) * 2));
+    rounds++;
+  } while (!result.res.body.complete && rounds < 5);
+  assert.equal(rounds, 4);
+  assert.deepEqual(generated, ordered.slice(7).map((game) => `${game.away}:${game.home}`));
+  assert.equal(db.writes.length, 7);
+  for (const snapshot of repaired) {
+    assert.deepEqual(databaseToSnapshot(db.rows.find((row) =>
+      row.away_code === snapshot.awayCode && row.home_code === snapshot.homeCode)).bestBets, snapshot.bestBets);
+  }
+  assert.ok(performance.now() - started < 5000, "bounded fixture must remain well below 60 seconds");
+  t.diagnostic(`14-game resume fixture completed four bounded calls in ${(performance.now() - started).toFixed(1)}ms`);
+});
+
 for (const diagnostics of [
   { bookmakerCount: 0, marketCount: 0 },
   { bookmakerCount: 0, marketCount: 3 },
@@ -347,8 +396,11 @@ for (const kind of ["unavailable", "different-matchup", "different-kickoff", "em
     if (kind === "empty-markets") event.bookmakers.forEach((book) => { book.markets = []; });
     if (kind === "empty-outcomes") event.bookmakers.forEach((book) =>
       book.markets.forEach((market) => { market.outcomes = []; }));
+    const saved = noOddsSnapshot(games[0]);
+    saved.bestBets.assessed = 0;
+    saved.dataQuality.sources.odds.available = false;
     const result = await run({
-      db: database([noOddsSnapshot(games[0])]), dryRun: false,
+      db: database([saved]), dryRun: false,
       resolveContext: () => ({ ...context, games: [games[0]] }),
       readOdds: async () => ({ events: kind === "unavailable" ? [] : [event] }),
       build: () => assert.fail("no usable exact-match odds must not trigger regeneration"),
