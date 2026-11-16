@@ -305,12 +305,15 @@ test("unsupported methods cannot start automatic grading", async (t) => {
   assert.equal(res.statusCode, 405);
 });
 
-test("automatic grading uses a single centralized three-hour cron without changing other jobs", () => {
+test("automatic grading uses one Hobby-compatible daily cron before the Tuesday-noon week rollover", () => {
   const config = JSON.parse(readFileSync(new URL("../vercel.json", import.meta.url), "utf8"));
   const jobs = config.crons.filter(({ path }) => path.includes("grade-current"));
   assert.deepEqual(jobs, [{
-    path: "/api/nfl/game-stats?action=predictions&mode=grade-current", schedule: "0 */3 * * *",
+    path: "/api/nfl/game-stats?action=predictions&mode=grade-current", schedule: "0 9 * * *",
   }]);
+  for (const { schedule } of config.crons) {
+    assert.match(schedule, /^\d+ \d+ \* \* \*$/, "Every configured job must run only once daily");
+  }
 });
 
 test("grading re-verifies finals, uses saved picks and writes only six result columns, idempotently", async () => {

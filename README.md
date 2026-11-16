@@ -262,11 +262,19 @@ remain unchanged.
 
 The trusted server endpoint
 `/api/nfl/game-stats?action=predictions&mode=grade-current` runs via one Vercel
-cron, `0 */3 * * *` (00:00, 03:00, 06:00, 09:00, 12:00, 15:00, 18:00 and
-21:00 UTC daily). It requires the exact configured `CRON_SECRET` bearer and
+cron, `0 9 * * *` (daily at 09:00 UTC / 19:00 Brisbane time), compatible
+with Vercel Hobby's once-daily cron limit. It requires the exact configured `CRON_SECRET` bearer and
 accepts GET for cron or POST for an explicit current-week invocation. Deploy the
 updated `vercel.json` with the existing server secret and Supabase/provider
 configuration; no database migration is needed. No browser receives this secret.
+The daily fallback is intentional: existing odds jobs refresh markets, not verified
+results, and Weekly Multi preparation reads saved pregame inputs. Attaching grading
+would add results-provider calls to those workflows. Their frequencies and handlers
+remain unchanged. The 09:00 UTC run leaves time to verify Monday night finals before
+Tuesday's noon week rollover. Expect up to approximately a day after local eligibility
+and verified final availability, plus scheduler/provider delays; this is not live
+grading. Hobby execution may occur within the scheduled hour rather than exactly
+at 09:00.
 
 The existing Tuesday-noon UTC schedule window determines the single current
 prediction week, keeping Monday night games in their week through Tuesday morning.
@@ -283,7 +291,7 @@ requests/fallback). The existing grader independently requires matching season,
 week, canonical ordered matchup, verified final status and finite scores. One
 finished game can be persisted while other games remain pending. Only the six
 grading columns listed below change; repeated invocations skip completed grades.
-An unfinished eligible game is retried at the next three-hour invocation. Unresolved
+An unfinished eligible game is retried at the next daily invocation. Unresolved
 older weeks are not polled after rollover and require an explicit operator review.
 
 Results now reads the persisted ledger on its existing refresh/focus interval;
@@ -291,7 +299,7 @@ it makes no schedule/provider or grading requests. The selector and weekly
 breakdown derive from persisted completed rows, so any newly graded week appears
 automatically. No UI must be open for grading. The independent job avoids changes
 to the pregame prediction refresh, Weekly Multi and market-specific odds jobs.
-It bounds automatic result checks to eight per day, with none when local
+It bounds automatic result checks to one per day, with none when local
 eligibility checks fail, rather than adding provider requests per user.
 
 For an immediate current-week run after deployment (not a historical backfill):
