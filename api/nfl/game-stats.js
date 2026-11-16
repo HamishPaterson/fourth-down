@@ -1587,6 +1587,7 @@ const handlePredictionLedger = createPredictionLedgerHandler();
 export function createPredictionLedgerHandler({
   createClient = createServerClient,
   loadResults = loadGradingResults,
+  now = () => new Date(),
 } = {}) {
   return async function predictionLedgerHandler(request, response) {
     setLedgerHeaders(response);
@@ -1594,9 +1595,14 @@ export function createPredictionLedgerHandler({
     if (request.method === "OPTIONS") {
       return response.status(204).end();
     }
-    const backfill = String(request.query?.mode || "").toLowerCase() === "backfill-grades";
-    if (backfill && !isTrustedJob(request.headers?.authorization)) {
+    const mode = String(request.query?.mode || "").toLowerCase();
+    const backfill = mode === "backfill-grades";
+    const currentGrades = mode === "grade-current";
+    if ((backfill || currentGrades) && !isTrustedJob(request.headers?.authorization)) {
       return response.status(401).json({ error: "Server authorization required" });
+    }
+    if (currentGrades && !["GET", "POST"].includes(request.method)) {
+      return response.status(405).json({ error: "Current grading requires GET or POST" });
     }
     if (backfill && request.method !== "POST") {
       return response.status(405).json({ error: "Backfill requires POST" });
@@ -1619,6 +1625,9 @@ export function createPredictionLedgerHandler({
     }
 
     try {
+      if (currentGrades) {
+        return await gradeCurrentSnapshots(supabase, response, { loadResults, now: now() });
+      }
       if (request.method === "GET") {
         return await readSnapshots(supabase, request, response);
       }
@@ -1827,7 +1836,40 @@ async function loadGradingResults(season, week) {
   return body.games;
 }
 
-async function gradeSnapshots(supabase, request, response, { loadResults, dryRun = false, savedRows }) {
+async function gradeCurrentSnapshots(supabase, response, { loadResults, now }) {
+  const { getCurrentWeekWindow } = await import("./odds.js");
+  // Use the existing Tuesday-noon schedule window, including Monday night finals.
+  const window = getCurrentWeekWindow(now.getTime() - 12 * 60 * 60 * 1000);
+  const start = new Date(window.start);
+  const season = start.getUTCFullYear() - (start.getUTCMonth() < 2 ? 1 : 0);
+  const context = { season, week: window.week, examined: 0, eligible: 0, deferred: [] };
+  let eligible = [];
+  if (now.getTime() >= window.start && now.getTime() < window.end) {
+    const { data, error } = await supabase.from("prediction_snapshots").select("*")
+      .eq("season", season).eq("week", window.week).is("graded_at", null);
+    if (error) throw new Error("Current grading prediction read failed");
+    context.examined = data?.length || 0;
+    eligible = (data || []).filter((row) => {
+      const snapshot = databaseToSnapshot(row);
+      if (hasFinalResult(snapshot)) return false;
+      const kickoff = Date.parse(snapshot.kickoff);
+      const reason = snapshot.authoritative !== true ? "Non-authoritative prediction"
+        : !Number.isFinite(kickoff) ? "Missing valid kickoff"
+        : now.getTime() < kickoff + 3 * 60 * 60 * 1000 ? "Before plausible completion" : null;
+      if (reason) {
+        context.deferred.push({ id: row.id, reason });
+        return false;
+      }
+      return true;
+    });
+    context.eligible = eligible.length;
+  }
+  return gradeSnapshots(supabase, {
+    body: { results: eligible.map(databaseToSnapshot) },
+  }, response, { loadResults, savedRows: eligible, context });
+}
+
+async function gradeSnapshots(supabase, request, response, { loadResults, dryRun = false, savedRows, context = {} }) {
   const body = parseBody(request.body);
   const rows = Array.isArray(body?.results) ? body.results : [];
   const graded = [];
@@ -1836,7 +1878,7 @@ async function gradeSnapshots(supabase, request, response, { loadResults, dryRun
   const unchanged = [];
   const gamesByWeek = new Map();
   if (!rows.length) {
-    return response.status(200).json({ graded, rejected, pending, unchanged, count: 0, dryRun });
+    return response.status(200).json({ ...context, graded, rejected, pending, unchanged, count: 0, dryRun });
   }
 
   for (const result of rows) {
@@ -1961,6 +2003,7 @@ async function gradeSnapshots(supabase, request, response, { loadResults, dryRun
   return response
     .status(rejected.length && !graded.length ? 500 : 200)
     .json({
+      ...context,
       graded,
       rejected,
       pending,

@@ -23,7 +23,7 @@ before(async () => {
       if (id.replace(/\\/g, "/").endsWith("/src/pages/Predictions.jsx"))
         return `${code}\nexport { mapScheduleGame, findLedgerRow, sortPredictions, filterPredictions, enrichSavedPredictionWithCurrentMarket };`;
       if (id.replace(/\\/g, "/").endsWith("/src/pages/Results.jsx"))
-        return `${code}\nexport { hydrateFinalScores, isValidCompletedResult, ResultGameCard };`;
+        return `${code}\nexport { isValidCompletedResult, ResultGameCard };`;
     } }] });
   ui = await server.ssrLoadModule("/src/pages/Predictions.jsx");
   results = await server.ssrLoadModule("/src/pages/Results.jsx");
@@ -130,23 +130,22 @@ for (const score of [null, "", undefined, "not a score"])
     assert.equal(withGameResult(row, game), row);
   });
 
-test("L: Results hydrates and renders the same existing final source without changing grading behaviour", async () => {
+test("L: Results renders saved finals without provider calls or prediction changes", () => {
   const originalFetch = globalThis.fetch, calls = [];
-  globalThis.fetch = async (url) => {
+  globalThis.fetch = (url) => {
     calls.push(url);
-    return { ok: true, json: async () => ({ games: [finalGame()] }) };
+    assert.fail("Rendering persisted results must not request providers");
   };
   try {
     const row = saved(), before = structuredClone(row);
-    const [graded] = await results.hydrateFinalScores([row]);
-    assert.equal(calls.length, 1);
-    assert.match(calls[0], /results=1/);
+    const graded = { ...withGameResult(row, finalGame()), fourthDownCorrect: true };
     assert.equal(results.isValidCompletedResult(graded), true);
     assert.deepEqual([graded.actualAwayScore, graded.actualHomeScore, graded.actualWinner], [24, 30, "CHI"]);
     assert.equal(graded.fourthDownCorrect, true);
     assert.equal(graded.fourthDownAwayScore, 24);
     assert.equal(graded.fourthDownHomeScore, 28);
     assert.match(renderToStaticMarkup(createElement(results.ResultGameCard, { result: graded })), /24 - 30/);
+    assert.equal(calls.length, 0);
     assert.deepEqual(row, before);
   } finally { globalThis.fetch = originalFetch; }
 });

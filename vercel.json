@@ -35,6 +35,10 @@
   ],
   "crons": [
     {
+      "path": "/api/nfl/game-stats?action=predictions&mode=grade-current",
+      "schedule": "0 */3 * * *"
+    },
+    {
       "path": "/api/weekly-multi/lock",
       "schedule": "0 0 * * *"
     },

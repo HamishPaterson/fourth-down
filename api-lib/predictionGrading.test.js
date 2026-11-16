@@ -1,7 +1,10 @@
 import test, { before, after } from "node:test";
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { createElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
 import { createServer } from "vite";
-import { createPredictionLedgerHandler, normaliseSnapshot, snapshotToDatabase } from "../api/nfl/game-stats.js";
+import { createPredictionLedgerHandler, databaseToSnapshot, normaliseSnapshot, snapshotToDatabase } from "../api/nfl/game-stats.js";
 import { withApprovedUser } from "./authorization.js";
 
 const gradeColumns = new Set(["actual_away_score", "actual_home_score", "actual_winner",
@@ -88,6 +91,227 @@ const request = (results = [snapshot()]) => ({
   body: { results },
 });
 const withoutGrades = (row) => Object.fromEntries(Object.entries(row).filter(([key]) => !gradeColumns.has(key)));
+
+function cronSecret(t) {
+  const prior = process.env.CRON_SECRET;
+  process.env.CRON_SECRET = "grading-job-test";
+  t.after(() => {
+    if (prior === undefined) delete process.env.CRON_SECRET; else process.env.CRON_SECRET = prior;
+  });
+}
+const currentRequest = () => ({
+  method: "GET", headers: { authorization: "Bearer grading-job-test" },
+  query: { action: "predictions", mode: "grade-current" },
+});
+
+for (const week of [10, 11]) {
+  test(`current Week ${week}: one final persists while 13 games stay pending, without browser grading`, async (t) => {
+    cronSecret(t);
+    const now = new Date(Date.UTC(2026, 10, 16 + (week - 10) * 7, 6));
+    const rows = Array.from({ length: 14 }, (_, i) => ({
+      ...dbRow(week, i), kickoff: new Date(now.getTime() - 6 * 60 * 60 * 1000).toISOString(),
+    }));
+    const historical = dbRow(week - 1), future = dbRow(week + 1);
+    const db = database([historical, ...rows, future]), before = structuredClone(db.rows);
+    let reads = 0, laterFinals = false;
+    const route = createPredictionLedgerHandler({ createClient: () => db, now: () => now,
+      loadResults: async (season, requestedWeek) => {
+        reads++;
+        assert.deepEqual([season, requestedWeek], [2026, week]);
+        return rows.map((row, i) => ({ ...finalGame(week, i), date: row.kickoff,
+          completed: i === 0 || laterFinals, status: i === 0 || laterFinals ? "Final" : "In Progress" }));
+      } });
+    const res = response();
+    await route({ ...currentRequest(), method: week === 10 ? "GET" : "POST",
+      query: { ...currentRequest().query, season: "2025", week: "4" },
+      body: { results: [snapshot(4)] } }, res);
+    assert.equal(res.statusCode, 200);
+    assert.equal(res.body.week, week);
+    assert.equal(res.body.count, 1);
+    assert.equal(res.body.pending.length, 13);
+    assert.equal(res.body.eligible, 14);
+    assert.equal(reads, 1, "all candidates share a single verified week retrieval");
+    assert.equal(db.writes.length, 1);
+    assert.deepEqual(db.rows.map(withoutGrades), before.map(withoutGrades));
+    assert.deepEqual(db.rows.filter((row) => row.week !== week),
+      before.filter((row) => row.week !== week));
+    const firstGrade = structuredClone(db.rows[1]);
+    const again = response();
+    await route(currentRequest(), again);
+    assert.equal(again.body.count, 0);
+    assert.equal(again.body.eligible, 13);
+    assert.equal(db.writes.length, 1);
+    assert.deepEqual(db.rows[1], firstGrade);
+    laterFinals = true;
+    const later = response();
+    await route(currentRequest(), later);
+    assert.equal(later.body.count, 13);
+    assert.deepEqual(db.rows[1], firstGrade);
+    const readCount = reads, done = response();
+    await route(currentRequest(), done);
+    assert.equal(done.body.count, 0);
+    assert.equal(done.body.examined, 0);
+    assert.equal(reads, readCount, "a fully graded week makes no provider request");
+    assert.equal(db.writes.length, 14);
+    assert.deepEqual(db.rows.map(withoutGrades), before.map(withoutGrades));
+    assert.ok(db.reads.every((filters) => filters.some(([key, value]) => key === "week" && value === week) ||
+      filters.some(([key]) => key === "id")), "no historical prediction reads");
+  });
+}
+
+test("current grading checks persisted authority and plausible kickoff completion before requesting results", async (t) => {
+  cronSecret(t);
+  const now = new Date("2026-11-16T06:00:00Z");
+  for (const rows of [
+    [],
+    [{ ...dbRow(10), kickoff: "2026-11-17T01:15:00Z" }],
+    [{ ...dbRow(10), kickoff: "2026-11-16T03:00:00.001Z" }],
+    [{ ...dbRow(10), kickoff: null }],
+    [{ ...dbRow(10), kickoff: "invalid" }],
+    [{ ...dbRow(10), graded_at: "2026-11-16T05:00:00Z" }],
+    [{ ...dbRow(10), actual_away_score: 27, actual_home_score: 20, actual_winner: "NE" }],
+    [{ ...dbRow(10), data_quality: { snapshot: { ...snapshot(10), authoritative: false } } }],
+    [dbRow(9), dbRow(11)],
+  ]) {
+    const db = database(rows), before = structuredClone(db.rows), res = response();
+    await createPredictionLedgerHandler({ createClient: () => db, now: () => now,
+      loadResults: () => assert.fail("Nothing eligible: no results-provider work") })(currentRequest(), res);
+    assert.equal(res.statusCode, 200);
+    assert.equal(res.body.eligible, 0);
+    assert.equal(res.body.count, 0);
+    assert.deepEqual(db.rows, before);
+    assert.equal(db.writes.length, 0);
+  }
+});
+
+test("three-hour eligibility boundary defers future games even when another game's verified results are fetched", async (t) => {
+  cronSecret(t);
+  const now = new Date("2026-11-16T06:00:00Z");
+  const db = database([{ ...dbRow(10), kickoff: "2026-11-16T03:00:00Z" },
+    { ...dbRow(10, 1), kickoff: "2026-11-17T01:15:00Z" }]);
+  const before = structuredClone(db.rows[1]), res = response();
+  await createPredictionLedgerHandler({ createClient: () => db, now: () => now,
+    loadResults: async () => [finalGame(10), finalGame(10, 1)] })(currentRequest(), res);
+  assert.equal(res.body.count, 1);
+  assert.equal(res.body.deferred.length, 1);
+  assert.deepEqual(db.rows[1], before);
+});
+
+test("the automatic endpoint uses the real verified schedule path for a partial current week", async (t) => {
+  cronSecret(t);
+  const prior = process.env.BALLDONTLIE_API_KEY;
+  process.env.BALLDONTLIE_API_KEY = "grading-schedule-test-key";
+  t.after(() => {
+    if (prior === undefined) delete process.env.BALLDONTLIE_API_KEY; else process.env.BALLDONTLIE_API_KEY = prior;
+  });
+  const db = database([dbRow(10), dbRow(10, 1)]), before = structuredClone(db.rows);
+  let providerCalls = 0;
+  t.mock.method(globalThis, "fetch", async (input, options) => {
+    const url = new URL(input);
+    providerCalls++;
+    assert.equal(options.cache, "no-store");
+    if (url.hostname === "api.balldontlie.io") {
+      assert.equal(url.searchParams.get("weeks[]"), "10");
+      return Response.json({ data: [finalGame(10),
+        { ...finalGame(10, 1), completed: false, status: "In Progress" }], meta: {} });
+    }
+    assert.equal(url.hostname, "site.api.espn.com");
+    assert.equal(url.searchParams.get("week"), "10");
+    return Response.json({ events: [] });
+  });
+  const res = response();
+  await createPredictionLedgerHandler({ createClient: () => db,
+    now: () => new Date("2026-11-16T06:00:00Z") })(currentRequest(), res);
+  assert.equal(res.statusCode, 200);
+  assert.equal(res.body.count, 1);
+  assert.equal(res.body.pending.length, 1);
+  assert.equal(providerCalls, 2, "one week retrieval reuses the existing two-source verification path");
+  assert.deepEqual(db.rows[1], before[1]);
+  assert.deepEqual(db.rows.map(withoutGrades), before.map(withoutGrades));
+});
+
+test("Monday night finals stay in the current schedule week until Tuesday noon UTC; offseason is skipped", async (t) => {
+  cronSecret(t);
+  for (const [timestamp, expectedWeek, eligible] of [
+    ["2026-11-17T06:00:00Z", 10, true],
+    ["2026-11-17T12:00:00Z", 11, true],
+    ["2026-08-01T06:00:00Z", 1, false],
+    ["2027-03-01T06:00:00Z", 18, false],
+  ]) {
+    const db = database([dbRow(expectedWeek)]), res = response();
+    let reads = 0;
+    await createPredictionLedgerHandler({ createClient: () => db, now: () => new Date(timestamp),
+      loadResults: async (_season, week) => { reads++; return [finalGame(week)]; } })(currentRequest(), res);
+    assert.equal(res.body.week, expectedWeek);
+    assert.equal(reads, Number(eligible));
+    if (!eligible) assert.equal(db.reads.length, 0);
+  }
+});
+
+test("current grading rejects provider/storage failures without modifying predictions", async (t) => {
+  cronSecret(t);
+  for (const failure of ["provider", "read", "write"]) {
+    const db = database([dbRow(10)]), before = structuredClone(db.rows), res = response();
+    if (failure === "write") db.failWrites();
+    if (failure === "read") t.mock.method(db, "from", () => { throw new Error("Read unavailable"); });
+    await createPredictionLedgerHandler({ createClient: () => db,
+      now: () => new Date("2026-11-16T06:00:00Z"),
+      loadResults: async () => {
+        if (failure === "provider") throw new Error("Provider unavailable");
+        return [finalGame(10)];
+      } })(currentRequest(), res);
+    assert.equal(res.statusCode, 500);
+    assert.deepEqual(db.rows, before);
+  }
+});
+
+test("current grading requires the configured exact CRON_SECRET even for approved users", async (t) => {
+  cronSecret(t);
+  let approved = false, clientCalls = 0;
+  const route = withApprovedUser(createPredictionLedgerHandler({
+    createClient: () => { clientCalls++; return database([]); },
+    now: () => new Date("2026-11-16T06:00:00Z"),
+    loadResults: () => assert.fail("No eligible predictions"),
+  }), { createUserClient: (token) => ({
+    auth: { getUser: async () => ({ data: { user: token === "user-jwt" ? { id: "own" } : null } }) },
+    from: () => ({ select() { return this; }, eq() { return this; },
+      maybeSingle: async () => ({ data: { user_id: "own", approved } }) }),
+  }) });
+  for (const [authorization, approval, status] of [
+    [undefined, false, 401], ["Bearer wrong-secret", false, 401],
+    ["Bearer user-jwt", false, 403], ["Bearer user-jwt", true, 401],
+    ["Bearer grading-job-test", false, 200],
+  ]) {
+    approved = approval;
+    const res = response();
+    await route({ ...currentRequest(), headers: { Authorization: authorization } }, res);
+    assert.equal(res.statusCode, status);
+    assert.equal(clientCalls, status === 200 ? 1 : 0);
+    assert.equal(res.headers["Cache-Control"], "private, no-store");
+  }
+  delete process.env.CRON_SECRET;
+  const denied = response();
+  await route(currentRequest(), denied);
+  assert.equal(denied.statusCode, 401);
+  assert.equal(clientCalls, 1);
+});
+
+test("unsupported methods cannot start automatic grading", async (t) => {
+  cronSecret(t);
+  const res = response();
+  await createPredictionLedgerHandler({
+    createClient: () => assert.fail("Invalid method must not read storage"),
+  })({ ...currentRequest(), method: "DELETE" }, res);
+  assert.equal(res.statusCode, 405);
+});
+
+test("automatic grading uses a single centralized three-hour cron without changing other jobs", () => {
+  const config = JSON.parse(readFileSync(new URL("../vercel.json", import.meta.url), "utf8"));
+  const jobs = config.crons.filter(({ path }) => path.includes("grade-current"));
+  assert.deepEqual(jobs, [{
+    path: "/api/nfl/game-stats?action=predictions&mode=grade-current", schedule: "0 */3 * * *",
+  }]);
+});
 
 test("grading re-verifies finals, uses saved picks and writes only six result columns, idempotently", async () => {
   const db = database([dbRow()]), before = structuredClone(db.rows[0]);
@@ -305,12 +529,12 @@ before(async () => {
       name: "grading-test-boundaries",
       transform(code, id) {
         const file = id.replace(/\\/g, "/");
-        if (file.endsWith("/src/services/sharedPredictionLedger.js") || file.endsWith("/src/pages/Results.jsx")) {
+        if (file.endsWith("/src/services/sharedPredictionLedger.js")) {
           code = code.replace(/import \{ apiFetch as fetch \} from "[^"]+supabaseAuth.js";/,
             "const fetch = (...args) => globalThis.gradingFetch(...args);");
         }
         if (file.endsWith("/src/pages/Results.jsx"))
-          code += "\nexport { hydrateFinalScores, calculateWeeklyBreakdown };";
+          code += "\nexport { calculateWeeklyBreakdown };";
         return code;
       },
     }] });
@@ -319,7 +543,7 @@ before(async () => {
 });
 after(async () => { await server?.close(); });
 
-test("verified Results hydration grades locally immediately and remotely through only the existing grade endpoint", async (t) => {
+test("supplementary verified grades persist locally immediately and remotely through only the existing grade endpoint", async (t) => {
   const priorWindow = globalThis.window;
   const storage = new Map(), calls = [], db = database([dbRow()]);
   const original = structuredClone(db.rows[0]);
@@ -331,13 +555,12 @@ test("verified Results hydration grades locally immediately and remotely through
   const route = createPredictionLedgerHandler({ createClient: () => db, loadResults: async () => [finalGame()] });
   globalThis.gradingFetch = async (url, options) => {
     calls.push({ url, options });
-    if (url.startsWith("/api/nfl/schedule")) return { ok: true, json: async () => ({ games: [finalGame()] }) };
     await waiting;
     const res = response();
     await route({ ...request(), body: JSON.parse(options.body) }, res);
     return { ok: res.statusCode === 200, text: async () => JSON.stringify(res.body) };
   };
-  const [graded] = await results.hydrateFinalScores([snapshot()]);
+  const graded = { ...snapshot(), actualAwayScore: 27, actualHomeScore: 20, actualWinner: "NE" };
   const done = ledger.saveGradedPredictions([graded]);
   const local = JSON.parse(storage.get("fourth-down:prediction-ledger:v1"));
   assert.equal(local[0].actualWinner, "NE");
@@ -350,9 +573,8 @@ test("verified Results hydration grades locally immediately and remotely through
   finishRemote();
   await done;
   assert.equal(db.rows[0].actual_winner, "NE");
-  assert.equal(calls.length, 2);
-  assert.match(calls[0].url, /schedule.*results=1/);
-  assert.match(calls[1].url, /action=predictions&mode=grade/);
+  assert.equal(calls.length, 1);
+  assert.match(calls[0].url, /action=predictions&mode=grade/);
   assert.equal(db.writes.length, 1);
   assert.deepEqual(withoutGrades(db.rows[0]), withoutGrades(original));
   await ledger.saveGradedPredictions([graded]);
@@ -388,57 +610,66 @@ test("remote grading rejection retains immediate local finals and reports failur
   assert.ok(warnings.every(([message]) => /local results retained/.test(message)));
 });
 
-test("Results hydrates only verified finals and weekly breakdown dynamically includes future graded weeks", async (t) => {
-  t.after(() => { delete globalThis.gradingFetch; });
+test("Results weekly breakdown dynamically includes every persisted graded week", async () => {
+  const db = database(Array.from({ length: 12 }, (_, i) => dbRow(i + 1)));
   let week10Final = false;
-  globalThis.gradingFetch = async (url) => {
-    const week = Number(new URL(url, "https://fourth-down.test").searchParams.get("week"));
+  const route = createPredictionLedgerHandler({ createClient: () => db, loadResults: async (_season, week) => {
     const game = finalGame(week);
     if (week === 10 && !week10Final) Object.assign(game, { status: "In Progress", completed: false });
-    return { ok: true, json: async () => ({ games: [game] }) };
-  };
-  const rows = await results.hydrateFinalScores(Array.from({ length: 12 }, (_, i) => snapshot(i + 1)));
-  assert.equal(rows.find((row) => row.week === 10).actualWinner, null);
-  const graded = rows.filter((row) => row.actualWinner);
+    return [game];
+  } });
+  const req = request(db.rows.map(databaseToSnapshot));
+  await route(req, response());
+  const graded = db.rows.map(databaseToSnapshot).filter((row) => row.actualWinner);
   assert.deepEqual(results.calculateWeeklyBreakdown(graded).map((row) => row.week), [1, 2, 3, 4, 5, 6, 7, 8, 9, 11, 12]);
   assert.ok(results.calculateWeeklyBreakdown(graded).every((row) => row.record.correct === 1));
   week10Final = true;
-  const later = await results.hydrateFinalScores(rows);
+  await route(req, response());
+  const later = db.rows.map(databaseToSnapshot);
   assert.deepEqual(results.calculateWeeklyBreakdown(later).map((row) => row.week),
     Array.from({ length: 12 }, (_, i) => i + 1));
 });
 
-test("future Week 10 and 11 finals persist through the unchanged Results-to-ledger workflow", async (t) => {
-  const priorWindow = globalThis.window, storage = new Map(), db = database([dbRow(10), dbRow(11)]);
+test("server-graded Week 10, 11 and 12 appear dynamically in Results through read-only ledger refresh", async (t) => {
+  cronSecret(t);
+  const priorWindow = globalThis.window, storage = new Map(), db = database([dbRow(10), dbRow(11), dbRow(12)]);
   const before = structuredClone(db.rows);
   globalThis.window = { localStorage: { getItem: (key) => storage.get(key) || null,
     setItem: (key, value) => storage.set(key, value) }, dispatchEvent() {} };
   t.after(() => { globalThis.window = priorWindow; delete globalThis.gradingFetch; });
   let finalsAvailable = false;
+  let now = new Date("2026-11-16T06:00:00Z");
   const gameFor = (week) => ({ ...finalGame(week),
     completed: finalsAvailable, status: finalsAvailable ? "Final" : "In Progress" });
-  const route = createPredictionLedgerHandler({ createClient: () => db,
+  const route = createPredictionLedgerHandler({ createClient: () => db, now: () => now,
     loadResults: async (_season, week) => [gameFor(week)] });
   globalThis.gradingFetch = async (url, options) => {
-    if (url.startsWith("/api/nfl/schedule")) {
-      const week = Number(new URL(url, "https://fourth-down.test").searchParams.get("week"));
-      return { ok: true, json: async () => ({ games: [gameFor(week)] }) };
-    }
+    assert.match(url, /action=predictions/);
+    assert.equal(options?.method, undefined, "Results only reads the persisted ledger");
     const res = response();
-    await route({ ...request(), body: JSON.parse(options.body) }, res);
+    await route({ method: "GET", query: {}, headers: {} }, res);
     return { ok: res.statusCode === 200, text: async () => JSON.stringify(res.body) };
   };
-  const pending = await results.hydrateFinalScores([snapshot(10), snapshot(11)]);
-  await ledger.saveGradedPredictions(pending.filter((row) => row.actualWinner));
+  await route(currentRequest(), response());
   assert.equal(db.writes.length, 0);
   finalsAvailable = true;
-  const graded = await results.hydrateFinalScores(pending);
-  await ledger.saveGradedPredictions(graded.filter((row) => row.actualWinner));
-  assert.equal(db.writes.length, 2);
+  for (const week of [10, 11, 12]) {
+    now = new Date(Date.UTC(2026, 10, 16 + (week - 10) * 7, 6));
+    const res = response();
+    await route(currentRequest(), res);
+    assert.equal(res.body.count, 1);
+    const rows = await ledger.refreshPredictionLedger();
+    assert.ok(rows.some((row) => row.week === week && row.actualWinner === "NE"));
+    const html = renderToStaticMarkup(createElement(results.default));
+    assert.ok(html.includes(`<option value="${week}">Week ${week}</option>`));
+    assert.deepEqual(results.calculateWeeklyBreakdown(rows.filter((row) => row.actualWinner)).map((row) => row.week),
+      Array.from({ length: week - 9 }, (_, i) => i + 10));
+  }
+  assert.equal(db.writes.length, 3);
   assert.ok(db.rows.every((row) => row.actual_winner === "NE" && row.graded_at));
   assert.deepEqual(db.rows.map(withoutGrades), before.map(withoutGrades));
-  assert.deepEqual(results.calculateWeeklyBreakdown(ledger.readPredictionLedger())
-    .map((row) => row.week).filter((week) => week >= 10), [10, 11]);
+  const source = readFileSync(new URL("../src/pages/Results.jsx", import.meta.url), "utf8");
+  assert.doesNotMatch(source, /hydrateFinalScores|\/api\/nfl\/schedule|saveGradedPredictions/);
 });
 
 test("grading remains behind JWT approval and CRON server authorization without shared caching", async (t) => {

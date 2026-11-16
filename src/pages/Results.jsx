@@ -1,16 +1,14 @@
 import { useEffect, useMemo, useState } from "react";
-import { apiFetch as fetch } from "../services/supabaseAuth.js";
 import { CheckCircle2, MinusCircle, XCircle } from "lucide-react";
 import TeamLogo from "../components/TeamLogo.jsx";
 import { TEAM_NAMES } from "../data.js";
 import { getTeamTheme } from "../services/teamThemes.js";
-import { isFinalGame, getGameTeamCode, getGameScore, isValidCompletedResult, normalizeResultTeam as normalizeTeamCode } from "../services/gameResults.js";
+import { isValidCompletedResult, normalizeResultTeam as normalizeTeamCode } from "../services/gameResults.js";
 import {
   hasMigratedSharedLedger,
   migrateLocalPredictionLedger,
   readPredictionLedger,
   refreshPredictionLedger,
-  saveGradedPredictions,
 } from "../services/predictionLedger.js";
 import FourthDownLoader from "../components/FourthDownLoader.jsx";
 import { shouldShowBlockingLoader } from "../components/fourthDownLoader.js";
@@ -20,7 +18,7 @@ const CURRENT_SCORING_MODEL_START_WEEK = 2;
 export default function Results() {
   const [rows, setRows] = useState(() => readPredictionLedger());
   const [week, setWeek] = useState("all");
-  const [syncStatus, setSyncStatus] = useState("Checking final scores...");
+  const [syncStatus, setSyncStatus] = useState("Loading saved results...");
   const [initialLoading, setInitialLoading] = useState(true);
 
   useEffect(() => {
@@ -65,18 +63,7 @@ export default function Results() {
       }
 
       try {
-        setSyncStatus("Checking final scores...");
-        const updatedRows = await hydrateFinalScores(
-          authoritativeRows,
-          controller.signal
-        );
-
-        if (cancelled) return;
-
-        const canonicalRows = mergeResultRows([], updatedRows);
-        saveGradedPredictions(
-          canonicalRows.filter((row) => row.actualWinner)
-        );
+        const canonicalRows = mergeResultRows([], authoritativeRows);
         setRows(canonicalRows);
 
         const count = canonicalRows.filter(isValidCompletedResult).length;
@@ -294,116 +281,6 @@ function mergeNonEmpty(base, preferred) {
     }
   }
   return merged;
-}
-
-async function hydrateFinalScores(rows, signal) {
-  const keys = new Map();
-
-  for (const row of rows) {
-    const week = Number(row.week);
-    const season = getResultSeason(row);
-
-    if (Number.isInteger(week) && Number.isInteger(season)) {
-      keys.set(`${season}:${week}`, { season, week });
-    }
-  }
-
-  const requests = await Promise.allSettled(
-    [...keys.values()].map(async ({ season, week }) => {
-      const params = new URLSearchParams({
-        season: String(season),
-        week: String(week),
-        results: "1",
-        refresh: String(Date.now()),
-      });
-
-      const response = await fetch(
-        `/api/nfl/schedule?${params.toString()}`,
-        {
-          signal,
-          cache: "no-store",
-        }
-      );
-
-      const body = await response.json();
-      if (!response.ok) {
-        throw new Error(
-          body.error ||
-            `Week ${week} schedule request failed (${response.status})`
-        );
-      }
-
-      return {
-        season,
-        week,
-        games: (Array.isArray(body.games) ? body.games : []).map(
-          (game) => ({
-            ...game,
-            season: game.season ?? season,
-            requestedWeek: week,
-          })
-        ),
-      };
-    })
-  );
-
-  const gamesByWeek = new Map();
-  for (const request of requests) {
-    if (request.status === "fulfilled") {
-      gamesByWeek.set(
-        `${request.value.season}:${request.value.week}`,
-        request.value.games
-      );
-    } else if (request.reason?.name !== "AbortError") {
-      console.error("Results week refresh failed", request.reason);
-    }
-  }
-
-  return rows.map((row) => {
-    // Never remove a result that was already graded.
-    if (row.actualWinner) return row;
-
-    const season = getResultSeason(row);
-    const week = Number(row.week);
-    const games = gamesByWeek.get(`${season}:${week}`) || [];
-    const game = games.find((candidate) => resultMatchesGame(row, candidate));
-
-    if (!game || !isFinalGame(game)) return row;
-
-    const actualAwayScore = getGameScore(game, "away");
-    const actualHomeScore = getGameScore(game, "home");
-    if (actualAwayScore == null || actualHomeScore == null) return row;
-
-    const actualWinner =
-      actualAwayScore === actualHomeScore
-        ? "TIE"
-        : actualAwayScore > actualHomeScore
-          ? normalizeTeamCode(row.awayCode)
-          : normalizeTeamCode(row.homeCode);
-
-    return {
-      ...row,
-      actualAwayScore,
-      actualHomeScore,
-      actualWinner,
-      fourthDownCorrect:
-        row.fourthDownPick == null
-          ? null
-          : normalizeTeamCode(row.fourthDownPick) === actualWinner,
-      oddsCorrect:
-        row.oddsPick == null
-          ? null
-          : normalizeTeamCode(row.oddsPick) === actualWinner,
-      resultUpdatedAt: new Date().toISOString(),
-    };
-  });
-}
-
-function resultMatchesGame(row, game) {
-  return getResultSeason(row) === Number(game.season?.year ?? game.season) &&
-    Number(row.week) === Number(game.week ?? game.requestedWeek) &&
-    normalizeTeamCode(row.awayCode) === getGameTeamCode(game, "away") &&
-    normalizeTeamCode(row.homeCode) === getGameTeamCode(game, "home");
 }
 
 function getResultSeason(row) {
