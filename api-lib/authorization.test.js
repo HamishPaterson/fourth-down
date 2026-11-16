@@ -86,22 +86,95 @@ test("exact existing CRON_SECRET bypasses interactive auth; other values do not"
   assert.equal(calls, 1);
 });
 
+test("capitalized Authorization reaches backfill's own server check without interactive auth", async (t) => {
+  env(t, { CRON_SECRET: "test-job-secret" });
+  const { default: gameStats } = await import("../api/nfl/game-stats.js");
+  t.mock.method(globalThis, "fetch", () => assert.fail("Validation must not reach network"));
+  for (const headerName of ["authorization", "Authorization", "AUTHORIZATION"]) {
+    const res = response();
+    await gameStats({
+      method: "POST",
+      headers: { [headerName]: "Bearer test-job-secret" },
+      query: { action: "predictions", mode: "backfill-grades" },
+      body: {},
+    }, res);
+    assert.equal(res.statusCode, 400);
+    assert.equal(res.body.error, "Explicit dryRun boolean required");
+  }
+});
+
+test("trusted-job normalization preserves the exact bearer for route-level authorization", async (t) => {
+  env(t, { CRON_SECRET: "test-job-secret" });
+  const { isTrustedJob } = await import("./authorization.js");
+  let calls = 0;
+  const route = withApprovedUser((req, res) => {
+    calls++;
+    assert.equal(req.headers.authorization, "Bearer test-job-secret");
+    assert.equal(isTrustedJob(req.headers.authorization), true);
+    return res.status(200).json({ ok: true });
+  }, { createUserClient: () => assert.fail("Trusted jobs must not require user sessions") });
+  const res = response();
+  await route({ headers: { Authorization: "Bearer test-job-secret" } }, res);
+  assert.equal(res.statusCode, 200);
+  assert.equal(calls, 1);
+});
+
+test("user JWT approval rules remain enforced for every Authorization header casing", async () => {
+  const { state, route } = fixture();
+  for (const headerName of ["authorization", "Authorization", "AUTHORIZATION"]) {
+    for (const [approved, expected] of [[false, 403], [true, 200]]) {
+      state.approved = approved;
+      const res = response();
+      await route({ headers: { [headerName]: "Bearer user-jwt" } }, res);
+      assert.equal(res.statusCode, expected);
+    }
+  }
+  assert.equal(state.calls, 3);
+  assert.equal(state.lookups, 6);
+});
+
+test("missing, malformed and incorrect job credentials never qualify as trusted", async (t) => {
+  env(t, { CRON_SECRET: "test-job-secret" });
+  const { isTrustedJob } = await import("./authorization.js");
+  const route = withApprovedUser(() => assert.fail("Invalid credentials must not reach routes"), {
+    createUserClient: () => ({
+      auth: { getUser: async () => ({ data: { user: null }, error: new Error("Invalid JWT") }) },
+    }),
+  });
+  for (const value of [undefined, "", "Bearer", "Basic test-job-secret", "Bearer arbitrary",
+    "Bearer test-job-secreu", "Bearer test-job-secret-extra", "Bearer test-job-secret "]) {
+    assert.equal(isTrustedJob(value), false);
+    for (const headerName of ["authorization", "Authorization"]) {
+      const res = response();
+      await route({ headers: { [headerName]: value } }, res);
+      assert.equal(res.statusCode, 401);
+    }
+  }
+  delete process.env.CRON_SECRET;
+  assert.equal(isTrustedJob("Bearer test-job-secret"), false);
+  assert.equal(isTrustedJob("Bearer undefined"), false);
+  process.env.CRON_SECRET = "";
+  assert.equal(isTrustedJob("Bearer "), false);
+});
+
 test("deployed refresh and Weekly Multi dispatch preserve their existing cron-only handlers", async (t) => {
   env(t, { CRON_SECRET: "test-job-secret" });
   t.mock.method(globalThis, "fetch", () => assert.fail("Dispatch checks must not reach network"));
   const { default: gameStats } = await import("../api/nfl/game-stats.js");
   const { default: odds } = await import("../api/nfl/odds.js");
   const { default: schedule } = await import("../api/nfl/schedule.js");
-  const headers = { authorization: "Bearer test-job-secret" };
-  const res = response();
-  await gameStats({ method: "PUT", headers, query: { action: "refresh-predictions" } }, res);
-  assert.equal(res.statusCode, 405);
-  const oddsRes = response();
-  await odds({ method: "GET", headers, query: {}, url: "/api/nfl/odds?refreshMarket=unknown" }, oddsRes);
-  assert.equal(oddsRes.statusCode, 400);
-  const scheduleRes = response();
-  await schedule({ method: "GET", headers, query: { weeklyMultiMode: "unknown" } }, scheduleRes);
-  assert.equal(scheduleRes.statusCode, 404);
+  for (const headerName of ["authorization", "Authorization", "AUTHORIZATION"]) {
+    const headers = { [headerName]: "Bearer test-job-secret" };
+    const res = response();
+    await gameStats({ method: "PUT", headers, query: { action: "refresh-predictions" } }, res);
+    assert.equal(res.statusCode, 405);
+    const oddsRes = response();
+    await odds({ method: "GET", headers, query: {}, url: "/api/nfl/odds?refreshMarket=unknown" }, oddsRes);
+    assert.equal(oddsRes.statusCode, 400);
+    const scheduleRes = response();
+    await schedule({ method: "GET", headers, query: { weeklyMultiMode: "unknown" } }, scheduleRes);
+    assert.equal(scheduleRes.statusCode, 404);
+  }
 });
 
 for (const name of ["teams", "standings", "schedule", "game", "game-stats", "odds",

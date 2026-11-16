@@ -36,7 +36,12 @@ export function withApprovedUser(handler, { createUserClient = userClient } = {}
     res.setHeader("CDN-Cache-Control", "private, no-store");
     res.setHeader("Vercel-CDN-Cache-Control", "private, no-store");
     res.setHeader("Vary", "Authorization");
-    const authorization = req.headers?.authorization;
+    const headerName = Object.keys(req.headers || {}).find((name) => name.toLowerCase() === "authorization");
+    const authorization = req.headers?.authorization ?? req.headers?.[headerName];
+    // Keep route-level job checks on the same unmodified bearer value.
+    if (headerName && headerName !== "authorization" && req.headers.authorization === undefined) {
+      req.headers.authorization = authorization;
+    }
     if (isTrustedJob(authorization)) return handler(req, res, ...args);
     const token = typeof authorization === "string" && /^Bearer \S+$/i.test(authorization)
       ? authorization.slice(7) : null;

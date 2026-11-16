@@ -31,7 +31,10 @@ a shared CDN cannot bypass authorization. Browser API calls send the current
 session bearer token; 401/403 responses remove the application from the auth gate.
 Static app assets remain public. Existing exact `CRON_SECRET` bearer authentication
 bypasses interactive approval, while each job's existing authorization remains
-in force. Internal server prediction loaders call named in-process handlers.
+in force. The shared guard accepts case-insensitive Authorization header names
+and preserves the exact bearer value for route-level job checks; the configured
+non-empty secret must still match exactly.
+Internal server prediction loaders call named in-process handlers.
 External tools reading the ledger now also need an authorized bearer token.
 
 ## Favourite team preference
