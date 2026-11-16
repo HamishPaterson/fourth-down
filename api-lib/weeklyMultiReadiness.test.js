@@ -95,7 +95,7 @@ for (const [name, mutate, code] of [
 
 for (const [name, mutate] of [
   ["missing plan", (fixture) => { fixture.plan = null; }],
-  ["late plan", (fixture) => { fixture.plan.prepared_at = FUTURE_LOCK; }],
+  ["future plan", (fixture) => { fixture.plan.prepared_at = "2026-10-29T00:01:00Z"; }],
   ["duplicate matchup/team", (fixture) => { fixture.plan.games[1] = fixture.plan.games[0]; }],
   ["missing game", (fixture) => { fixture.plan.games.pop(); }],
   ["historical Week 7", (fixture) => { fixture.plan.lock_at = "2026-10-22T00:00:00Z"; fixture.plan.week = 7; }],
@@ -143,13 +143,11 @@ test("readiness counts saved, authoritative, model, completeness, projections an
   assert.deepEqual(result.playerAvailabilityCoverage, { total: 2, eligible: 1 });
 });
 
-test("late evaluation never promotes current-model post-lock predictions to lock-time authority", () => {
+test("an unlocked week's current authoritative predictions may arrive after the former deadline", () => {
   const fixture = lockFixture();
   fixture.now = new Date("2026-10-29T00:10:00Z");
   for (const row of fixture.predictions) row.generatedAt = "2026-10-29T00:05:00Z";
-  assert.equal(evaluateWeeklyMultiReadiness(fixture).selection.legs.length, 0);
-  assert.ok(lockPredictionRejections(fixture.predictions[0], { season: 2026, week: 8, lockAt: FUTURE_LOCK },
-    fixture.now).includes("POST_LOCK_PREDICTION"));
+  assert.equal(evaluateWeeklyMultiReadiness(fixture).selection.legs.length, 5);
 });
 
 test("freshness coverage never labels quotes current without pre-lock persisted snapshot evidence", () => {
@@ -170,7 +168,7 @@ const WEEK8_PAIRS = [["ARI", "DAL"], ["ATL", "TB"], ["BAL", "BUF"], ["CAR", "GB"
   ["CLE", "PIT"], ["IND", "JAX"], ["KC", "DEN"], ["LAC", "LAR"], ["LV", "NYJ"], ["MIN", "DET"],
   ["NE", "MIA"], ["PHI", "WSH"], ["TEN", "CIN"]];
 
-function week8Fixture({ candidateCount = 2, matchups = WEEK8_PAIRS } = {}) {
+function week8Fixture({ candidateCount = 2, matchups = WEEK8_PAIRS, quoteAt = WEEK8_QUOTE } = {}) {
   const games = matchups.map(([away, home], index) => ({
     away, home, kickoff: index === 3 ? "2026-10-30T00:15:00Z" : "2026-11-01T18:00:00Z",
   }));
@@ -182,7 +180,7 @@ function week8Fixture({ candidateCount = 2, matchups = WEEK8_PAIRS } = {}) {
     const bets = Array.from({ length: candidateCount }, (_, betIndex) => ({
       market: "Moneyline", category: "Game", selection: game.away, sportsbook: "Book",
       price: 100, decimalOdds: 2, modelProbability: .7 - betIndex * .05,
-      updatedAt: WEEK8_QUOTE, quoteId: `q${index}-${betIndex}` }));
+      updatedAt: quoteAt, quoteId: `q${index}-${betIndex}` }));
     return {
       id: `8:${game.away}:${game.home}`, season: 2026, week: 8, awayCode: game.away, homeCode: game.home,
       kickoff: game.kickoff, generatedAt: WEEK8_GENERATED, authoritative: true,
@@ -198,14 +196,14 @@ function week8Fixture({ candidateCount = 2, matchups = WEEK8_PAIRS } = {}) {
       bestBets: { assessed: candidateCount, recommendations: bets.slice(0, 1), candidates: bets },
     };
   });
-  const odds = { cacheStatus: "fresh", refreshedAt: WEEK8_QUOTE,
+  const odds = { cacheStatus: "fresh", refreshedAt: quoteAt,
     events: games.map((game, index) => ({
       id: `game${index}`, away_team: game.away, home_team: game.home, commence_time: game.kickoff,
-      bookmakers: [{ key: "book", title: "Book", last_update: WEEK8_QUOTE, markets: [
+      bookmakers: [{ key: "book", title: "Book", last_update: quoteAt, markets: [
         { key: "h2h", outcomes: Array.from({ length: candidateCount }, (_, betIndex) => ({
-          name: game.away, price: 100, updatedAt: WEEK8_QUOTE,
+          name: game.away, price: 100, updatedAt: quoteAt,
           quoteValidation: { status: "validated" },
-          quoteSource: { id: `q${index}-${betIndex}`, provider: "SharpAPI", timestamp: WEEK8_QUOTE, fetchedAt: WEEK8_QUOTE } })) },
+          quoteSource: { id: `q${index}-${betIndex}`, provider: "SharpAPI", timestamp: quoteAt, fetchedAt: quoteAt } })) },
       ] }],
     })) };
   return { plan, predictions, odds, now: new Date(WEEK8_LOCK) };
@@ -224,42 +222,38 @@ test("Week 8 atomic batchProvenance snapshots are recognized as authoritative wi
   assert.equal(result.blockingReasons.includes("AUTHORITATIVE_PREDICTIONS_NOT_READY"), false);
 });
 
-test("Week 8 catch-up after the lock consumes saved Best Bets without reassessment or fresh quotes", () => {
+test("availability polling rejects stale atomic predictions and quotes instead of catch-up exemptions", () => {
   const fixture = week8Fixture();
   fixture.now = new Date("2026-11-02T06:00:00Z"); // after the lock and after the 30h quote window
   const result = evaluateWeeklyMultiReadiness(fixture);
-  assert.equal(result.canSatisfyLegCount, true);
-  assert.equal(result.selection.legs.length, 5);
-  assert.equal(result.selection.complete, true);
-  assert.equal(new Set(result.selection.legs.map((leg) => leg.matchupKey)).size, 5);
-  assert.ok(result.selection.legs.every((leg) => leg.updatedAt === WEEK8_QUOTE));
-  assert.equal(result.selection.reasonCounts.staleOdds, 0);
+  assert.equal(result.canSatisfyLegCount, false);
+  assert.equal(result.selection.legs.length, 0);
+  assert.ok(result.predictionRejections.every((row) => row.reasons.includes("STALE_PREDICTION")));
 });
 
-test("Week 8 catch-up still rejects post-lock and future quotes", () => {
+test("availability polling rejects future quotes from an atomic batch", () => {
   const fixture = week8Fixture();
-  fixture.now = new Date("2026-11-02T06:00:00Z");
   fixture.predictions[0].bestBets.candidates[0].updatedAt = "2026-10-29T00:01:00Z";
   const result = evaluateWeeklyMultiReadiness(fixture);
   const rejected = result.selection.candidateDiagnostics.find((row) => row.predictionId === fixture.predictions[0].id);
   assert.ok(rejected.reasons.includes("POST_LOCK_QUOTE"));
 });
 
-test("Week 8 catch-up keeps the 30h dependency freshness bound off but still rejects post-lock dependencies", () => {
+test("availability polling retains the 30h dependency freshness bound for atomic batches", () => {
   const fixture = week8Fixture();
   fixture.now = new Date("2026-11-02T06:00:00Z");
+  const context = { season: 2026, week: 8, provenanceLockAt: WEEK8_LOCK, lockAt: fixture.now.toISOString() };
   fixture.predictions[0].generationMarketDependencies = [{ market: "totals", timestamp: "2026-10-27T10:00:00Z" }];
-  assert.equal(lockPredictionRejections(fixture.predictions[0], { season: 2026, week: 8, lockAt: WEEK8_LOCK },
-    fixture.now).includes("MODEL_MARKET_DEPENDENCY_STALE"), false);
+  assert.equal(lockPredictionRejections(fixture.predictions[0], context,
+    fixture.now).includes("MODEL_MARKET_DEPENDENCY_STALE"), true);
   fixture.predictions[0].generationMarketDependencies = [{ market: "totals", timestamp: "2026-10-29T00:01:00Z" }];
-  assert.ok(lockPredictionRejections(fixture.predictions[0], { season: 2026, week: 8, lockAt: WEEK8_LOCK },
+  assert.ok(lockPredictionRejections(fixture.predictions[0], context,
     fixture.now).includes("MODEL_MARKET_DEPENDENCY_STALE"));
 });
 
-test("Week 8 catch-up enforces distinct matchups and never pads to five", () => {
-  const fixture = week8Fixture({ matchups: WEEK8_PAIRS.slice(0, 4) });
+test("atomic batch selection enforces distinct matchups and never pads to five", () => {
+  const fixture = week8Fixture({ matchups: WEEK8_PAIRS.slice(0, 4), quoteAt: PREPARED_AT });
   fixture.plan.expected_game_count = 4;
-  fixture.now = new Date("2026-11-02T06:00:00Z");
   const result = evaluateWeeklyMultiReadiness(fixture);
   assert.equal(result.selection.legs.length, 4);
   assert.equal(result.selection.complete, false);
@@ -267,17 +261,16 @@ test("Week 8 catch-up enforces distinct matchups and never pads to five", () => 
   assert.ok(result.blockingReasons.includes("INSUFFICIENT_ELIGIBLE_MATCHUPS"));
 });
 
-test("Week 8 catch-up rejects contradictory same-matchup candidates and duplicate markets", () => {
-  const fixture = week8Fixture({ matchups: WEEK8_PAIRS.slice(0, 5) });
+test("atomic batch selection rejects contradictory same-matchup candidates and duplicate markets", () => {
+  const fixture = week8Fixture({ matchups: WEEK8_PAIRS.slice(0, 5), quoteAt: PREPARED_AT });
   fixture.plan.expected_game_count = 5;
-  fixture.now = new Date("2026-11-02T06:00:00Z");
   // Add a contradictory home moneyline to game 0; only one leg per matchup survives.
   fixture.predictions[0].bestBets.candidates.push({ market: "Moneyline", category: "Game",
     selection: fixture.predictions[0].homeCode, sportsbook: "Book", price: 100, decimalOdds: 2,
-    modelProbability: .9, updatedAt: WEEK8_QUOTE, quoteId: "q0-home" });
+    modelProbability: .9, updatedAt: PREPARED_AT, quoteId: "q0-home" });
   fixture.odds.events[0].bookmakers[0].markets[0].outcomes.push({ name: fixture.predictions[0].homeCode,
-    price: 100, updatedAt: WEEK8_QUOTE, quoteValidation: { status: "validated" },
-    quoteSource: { id: "q0-home", provider: "SharpAPI", timestamp: WEEK8_QUOTE, fetchedAt: WEEK8_QUOTE } });
+    price: 100, updatedAt: PREPARED_AT, quoteValidation: { status: "validated" },
+    quoteSource: { id: "q0-home", provider: "SharpAPI", timestamp: PREPARED_AT, fetchedAt: PREPARED_AT } });
   const result = evaluateWeeklyMultiReadiness(fixture);
   const game0Legs = result.selection.legs.filter((leg) => leg.matchupKey.includes("ARI") && leg.matchupKey.includes("DAL"));
   assert.equal(game0Legs.length, 1);

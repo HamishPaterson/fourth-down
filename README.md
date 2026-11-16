@@ -13,8 +13,12 @@ Retain the existing unprefixed server credentials for trusted jobs.
 Email/password authentication uses Supabase's persistent, auto-refreshed session.
 The normal application is lazy-mounted only after reading the signed-in user's
 own `app_users` row and finding `approved === true`. New accounts are not approved
-by signup. Pending users can check approval or sign out; approval errors fail
-closed. No browser approval controls, database migrations, or profile writes are
+by signup. Pending users can check approval or sign out; initial approval errors fail
+closed. Once approved, same-user session/token/approval rechecks keep the application
+mounted, preserving its URL, selected matchup/team, page and React navigation state.
+Background verification errors are displayed with a retry without resetting navigation.
+Absent sessions, sign-out, explicit API denial or revoked approval still block access.
+No browser approval controls, auth database migrations, or profile writes are
 added. The existing trigger and own-row SELECT-only RLS must remain in place.
 Configure Supabase Auth's Site URL and permitted confirmation redirect URLs for
 the deployed app, and enable the email/password provider as appropriate.
@@ -441,47 +445,49 @@ stronger Phase 1 reasons. Unsupported old saved predictions are never retrofitte
 
 ## Weekly Best Multi locking
 
-The intended lock is Thursday 10:00 **AEST**, fixed UTC+10
-(`Australia/Brisbane`, not daylight-saving Sydney time). The lock calculation
-uses Thursday 00:00 UTC. Hobby cron times are **hour windows, not exact invocation
-times**. The authenticated `/api/weekly-multi/prepare` job runs Wednesday within
-23:00-23:59 UTC (Thursday 09:00-09:59 AEST); daily invocations on other days are
-no-ops. Required market jobs run earlier; the last is player completions in the
-22:00 UTC hour. Rush attempts moved from 23:00 to 10:00 UTC. Preparation always
-checks stored snapshot freshness, rather than assuming the jobs ran in order.
-
-`/api/weekly-multi/lock` runs Thursday within 00:00-00:59 UTC, with a second
-01:00-01:59 UTC invocation for retry/finalization. Other days are no-ops.
-Both invocations now execute the same **saved-state-only** audited pipeline:
+The current week's Multi locks on the first normal authenticated prepare/lock
+invocation that can construct a complete valid five-leg selection from persisted
+authoritative predictions and eligible Best Bets with validated current quotes.
+There is no scheduled lock time or weekday gate. Incomplete inputs remain not ready;
+the next invocation revalidates current inputs and locks immediately if ready.
+Both `/api/weekly-multi/prepare` and `/api/weekly-multi/lock` execute the same
+**saved-state-only** audited pipeline (`dryRun=1` remains non-locking):
 1. Record the invocation and authorization outcome; return any existing immutable lock.
-2. Read the pre-lock immutable expected-game plan and saved predictions.
+2. Read the immutable expected-game plan and saved predictions.
 3. Read normalized persisted core/prop quotes, without calling any odds provider,
    fetching a schedule, generating predictions or repairing candidates.
 4. Append a sanitized immutable input manifest before selection; evaluate readiness.
 5. Append the result manifest, then insert a lock only with five eligible unique
    matchups. Insufficient candidates leave no fabricated partial/empty lock.
 
-If the scheduled Thursday run was blocked only because the authoritative
-prediction batch was unavailable, a post-lock invocation of the same endpoint
-performs an idempotent catch-up: it derives the expected-game plan from the
-persisted atomic batch (snapshots marked `batchProvenance.source =
-"server-week-replacement"`), re-reads the persisted pre-lock quotes without the
-rolling staleness bound, and locks only when the existing readiness rules are
-satisfied. It never runs before the lock moment, never re-locks an existing
-record, and never fabricates a lock without the persisted atomic batch.
+When no saved plan exists, the pipeline can derive it from the persisted authoritative
+batch using the existing authority contract. Atomic batches (`batchProvenance.source =
+"server-week-replacement"`) retain the exact offers assessed by their saved Best Bets.
+All prediction, quote, market-dependency and personnel freshness/identity requirements
+apply at invocation; obsolete scheduled catch-up freshness exemptions are retired.
+Existing locks are returned unchanged before reading any candidate inputs, and
+concurrent inserts return the first winner. No regeneration or replacement is allowed.
+The existing Wednesday UTC week rollover and legacy `lock_at` week keys are retained
+for storage/provenance compatibility only, not as availability deadlines.
+`locked_at` records the actual successful invocation; new locks are not labelled late.
 
-Before the scheduled lock, a separately authorized administrator must prepare the
+The existing daily cron entries at 23:00, 00:00 and 01:00 UTC remain availability
+polls, not lock deadlines; any authorized invocation on any day can lock ready inputs.
+All jobs retain exact `CRON_SECRET` bearer authentication. Snapshot freshness is
+validated regardless of cron ordering. Page reads never generate or lock a Multi.
+
+A separately authorized administrator can prepare the
 complete current-model prediction batch. Use the existing protected prediction-only
 refresh with JSON `{"dryRun":true,"prepareWeeklyLock":true}` first. Only an
 explicitly approved POST with `{"dryRun":false,"prepareWeeklyLock":true}` writes:
-it verifies pre-lock authoritative provenance, saves predictions, re-reads the
+it verifies authoritative provenance, saves predictions, re-reads the
 complete batch, and saves the immutable expected-game plan. This is **not** a cron
 or page action. It may acquire the existing model's inputs; never invoke it as
 part of a read-only readiness check. Keep exact-week team/player artifacts and
 persisted Sharp quotes current through separately approved upstream operations.
 No source-data regeneration is performed here. Conflicting plans fail rather
 than being overwritten. An interrupted batch has no ready plan until verification
-succeeds. Explicit pre-lock refreshes may replace stale/unproven server snapshots;
+succeeds. Explicit preparation refreshes may replace stale/unproven server snapshots;
 ordinary refresh reuse rules remain unchanged.
 
 `evaluateWeeklyMultiReadiness` in `api-lib/weeklyMultiReadiness.js` is pure and
@@ -525,19 +531,23 @@ PLAYER_PROJECTION_UNAVAILABLE and ROLE_CONFIDENCE_INSUFFICIENT codes.
 
 Server provenance requires prediction ID, current model identity, complete inputs,
 generation cutoff and server authority. Predictions must have been generated
-strictly before the scheduled cutoff and within 24 hours. Browser saves cannot
+strictly before the lock invocation and within 24 hours. Browser saves cannot
 claim or replace server provenance, including while adding final results.
-Later predictions/quotes cannot fill missing lock-time evidence. Historical
+Before locking, later valid saved predictions/quotes can make an unlocked week ready.
+After locking, no prediction, quote, Best Bets or model update changes its legs. Historical
 Week 7 and all earlier missing locks remain prohibited; existing records and
-displays are not rewritten. Late successful retries report actual execution time
-and generated-late state, never backdate generation.
+displays are not rewritten. Successful invocations report actual execution time,
+never backdate generation.
 
 **Deployment prerequisite (not applied by this change):** after the existing
 `supabase/weekly_best_multis.sql`, separately review/apply
 `supabase/weekly_multi_lock_audit.sql`. It creates append-only service-role-only
 plans, manifests and execution events, adds the immutable manifest reference to
 future locks, and rejects historical or incomplete new locks. Missing audit
-storage fails closed. This is unrelated to the dormant Parlay provider-cache
+storage fails closed. Reapply the updated audit SQL on existing deployments to
+remove only the obsolete plan `prepared_at < lock_at` constraint; existing plans,
+locks, manifests and immutability protections remain unchanged.
+This is unrelated to the dormant Parlay provider-cache
 migration; do not apply that migration or activate Parlay for this repair.
 
 `dryRun=1` on prepare/lock evaluates saved inputs and appends audit evidence but
@@ -554,8 +564,7 @@ incomplete execution, readiness failure, no eligible candidates, existing lock,
 and success. Missing records mean UNKNOWN/NO_INVOCATION_RECORDED, **not proof**
 that the scheduler never invoked; correlate with platform scheduler logs.
 Safe structured console events remain useful if audit storage itself fails.
-The Thursday 10:00 Brisbane schedule and Sharp-backed production provider are
-unchanged. Hobby invocation windows still cannot guarantee exact-second execution.
+The Sharp-backed production provider is unchanged.
 Reading the page only polls shared storage; it does not generate or lock a Multi.
 All devices read the immutable `weekly_best_multis` record. The unique
 season/week constraint and duplicate-insert recovery keep concurrent invocations

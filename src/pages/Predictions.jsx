@@ -1222,7 +1222,7 @@ export function WeeklyParlay({ parlay, week }) {
           </h2>
           {parlay?.placeholder ? (
             <p style={{ margin: "8px 0", color: "rgba(255,255,255,.72)", fontSize: "12px" }}>
-              Weekly Best Multi locks Thursday 10:00 AEST
+              Weekly Best Multi locks as soon as complete valid inputs are available.
             </p>
           ) : statusLabels.length > 0 && (
             <div style={{ display: "flex", flexWrap: "wrap", gap: "6px", marginBottom: "8px" }}>
@@ -1357,7 +1357,7 @@ export function WeeklyParlay({ parlay, week }) {
           {parlay?.locked && parlay?.partial
             ? "No legs available"
             : parlay?.placeholder
-              ? "Weekly Best Multi locks Thursday 10:00 AEST"
+              ? "Weekly Best Multi locks as soon as complete valid inputs are available."
               : parlay?.locked
                 ? "Locked multi has no legs"
                 : parlay?.status === "loading"
@@ -1368,7 +1368,7 @@ export function WeeklyParlay({ parlay, week }) {
                       ? "Weekly Best Multi is not ready yet. Please check back later."
                     : parlay?.status === "missed"
                       ? "No Weekly Best Multi was locked for this week."
-                      : "Weekly Best Multi locks Thursday 10:00 AEST"}
+                      : "Weekly Best Multi locks as soon as complete valid inputs are available."}
         </div>
       )}
 

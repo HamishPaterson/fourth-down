@@ -134,10 +134,10 @@ test("the new-week placeholder cannot hide an unresolved previous-week multi", a
   assert.equal(body.locked, true);
 });
 
-test("once every leg is settled the Wednesday display moves to the new week's placeholder", async () => {
+test("once every leg is settled the Wednesday display moves to the new week's readiness state", async () => {
   const { handler } = currentHandler(savedRecord(), { now: THURSDAY - DAY, status: "Final" });
   const body = await read(handler);
-  assert.equal(body.status, "before lock");
+  assert.equal(body.status, "not ready");
   assert.equal(body.week, 6);
 });
 

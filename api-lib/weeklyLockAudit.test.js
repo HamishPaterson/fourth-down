@@ -16,7 +16,13 @@ test("immutable audit migration applies/reapplies locally and preserves existing
       values (2026,6,'2026-10-15T00:00Z','2026-10-15T00:00Z','[]',.55,'partial',true,'unavailable')`);
     const before = (await db.query("select * from public.weekly_best_multis")).rows;
     const sql = readFileSync(new URL("../supabase/weekly_multi_lock_audit.sql", import.meta.url), "utf8");
-    await db.exec(sql); await db.exec(sql);
+    await db.exec(sql);
+    await db.exec("alter table public.weekly_multi_lock_plans add constraint old_preparation_deadline check (prepared_at < lock_at)");
+    await db.exec(sql);
+    await db.exec(`insert into public.weekly_multi_lock_plans
+      (id,season,week,lock_at,prepared_at,source,expected_game_count,games) values
+      ('00000000-0000-4000-8000-000000000003',2026,8,'2026-10-29T00:00Z','2026-10-29T01:00Z',
+       'server-prepared',1,'[{"away":"NE","home":"CHI","kickoff":"2026-10-30T00:15Z"}]')`);
     const after = (await db.query("select * from public.weekly_best_multis")).rows;
     assert.equal(after.length, 1);
     assert.equal(after[0].week, before[0].week);
@@ -49,6 +55,12 @@ test("immutable audit migration applies/reapplies locally and preserves existing
       (season,week,lock_at,locked_at,legs,model_probability_threshold,status,partial,odds_cache_status,manifest_id)
       values (2026,8,'2026-10-29T00:00Z',now(),$2,.55,'locked',false,'fresh',$1)`,
     [manifest.id, JSON.stringify(evaluateWeeklyMultiReadiness(fixture).selection.legs)]);
+    const locked = (await db.query("select * from public.weekly_best_multis where week=8")).rows;
+    await assert.rejects(db.exec("update public.weekly_best_multis set legs='[]' where week=8"),
+      /cannot be updated or deleted/);
+    await assert.rejects(db.exec("delete from public.weekly_best_multis where week=8"),
+      /cannot be updated or deleted/);
+    assert.deepEqual((await db.query("select * from public.weekly_best_multis where week=8")).rows, locked);
     const permissions = (await db.query(`select has_table_privilege('anon','public.weekly_multi_lock_manifests','select') as anon_read,
       has_table_privilege('service_role','public.weekly_multi_lock_manifests','insert') as service_insert,
       has_table_privilege('service_role','public.weekly_multi_lock_manifests','update') as service_update`)).rows[0];
@@ -56,7 +68,7 @@ test("immutable audit migration applies/reapplies locally and preserves existing
   } finally { await db.close(); }
 });
 
-test("explicit administrative plan writer only accepts complete future pre-lock schedule context", async () => {
+test("explicit administrative plan writer accepts complete schedule context without the old preparation deadline", async () => {
   const fixture = lockFixture(), db = lockDatabase({ ...fixture, plan: null });
   const context = { season: 2026, week: 8, lockAt: FUTURE_LOCK,
     games: fixture.plan.games.map((game) => ({ visitor_team: { abbreviation: game.away },
@@ -68,7 +80,9 @@ test("explicit administrative plan writer only accepts complete future pre-lock 
   assert.equal(reused.id, saved.id);
   await assert.rejects(saveWeeklyLockPlan(db, { ...context, games: context.games.slice(1) },
     new Date("2026-10-28T23:30:00Z")), /IMMUTABLE_LOCK_PLAN_CONFLICT/);
-  await assert.rejects(saveWeeklyLockPlan(db, context, new Date(FUTURE_LOCK)), /INVALID_PRE_LOCK_PLAN/);
+  assert.equal((await saveWeeklyLockPlan(db, context, new Date(FUTURE_LOCK))).id, saved.id);
+  const lateDb = lockDatabase({ ...fixture, plan: null });
+  assert.equal((await saveWeeklyLockPlan(lateDb, context, new Date("2026-10-29T01:00:00Z"))).expected_game_count, 5);
 });
 
 for (const [records, expected] of [

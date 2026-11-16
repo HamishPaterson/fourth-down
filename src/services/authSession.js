@@ -1,10 +1,13 @@
 export function createAuthSession(client, onChange) {
   let version = 0, stopped = false, session = null;
+  let approvedUserId = null;
   const emit = (state) => { if (!stopped) onChange(state); };
   async function resolve(nextSession) {
     const request = ++version;
+    const alreadyApproved = Boolean(nextSession && approvedUserId === nextSession.user.id);
     session = nextSession;
-    emit({ status: nextSession ? "loading" : "signedOut", session: nextSession });
+    if (!alreadyApproved) approvedUserId = null;
+    emit({ status: alreadyApproved ? "approved" : nextSession ? "loading" : "signedOut", session: nextSession });
     if (!nextSession) return;
     try {
       const { data, error } = await client.from("app_users")
@@ -14,17 +17,20 @@ export function createAuthSession(client, onChange) {
       if (!data || data.user_id !== nextSession.user.id) {
         throw new Error("Your account approval record is not available yet. Please retry.");
       }
+      approvedUserId = data.approved === true ? nextSession.user.id : null;
       emit({ status: data.approved === true ? "approved" : "pending", session: nextSession });
     } catch (error) {
-      if (!stopped && request === version) emit({ status: "error", session: nextSession, error: error.message });
+      if (!stopped && request === version) {
+        emit({ status: alreadyApproved ? "approved" : "error", session: nextSession, error: error.message });
+      }
     }
   }
   return {
     start() {
       emit({ status: "loading", session: null });
-      const { data: { subscription } } = client.auth.onAuthStateChange((_event, next) => {
+      const { data: { subscription } } = client.auth.onAuthStateChange((event, next) => {
         // Do not await Supabase calls inside its auth callback.
-        void resolve(next);
+        void resolve(event === "SIGNED_OUT" ? null : next);
       });
       const initialVersion = version;
       void client.auth.getSession().then(({ data, error }) => {
@@ -41,6 +47,8 @@ export function createAuthSession(client, onChange) {
     retry() { return resolve(session); },
     deny(status) {
       version++;
+      approvedUserId = null;
+      if (status === 401) session = null;
       emit({ status: status === 401 ? "signedOut" : "pending", session });
     },
     async signIn(email, password) {

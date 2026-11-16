@@ -38,7 +38,7 @@ function fixture(initial = null) {
     },
   };
   return { client, profiles, states, writes, authCalls, session,
-    emit(next) { current = next; callback?.("SIGNED_IN", next); } };
+    emit(next, event = "SIGNED_IN") { current = next; callback?.(event, next); } };
 }
 
 test("no session resolves to sign in; signup calls Supabase and never grants approval", async () => {
@@ -142,4 +142,58 @@ test("missing own-row evidence fails closed and stopped controllers cannot emit 
   f.emit(f.session("other"));
   await flush();
   assert.equal(f.states.length, count);
+});
+
+for (const event of ["SIGNED_IN", "TOKEN_REFRESHED", "USER_UPDATED"]) {
+  test(`approved same-user ${event} revalidation never emits an unmounting gate state`, async () => {
+    const f = fixture();
+    f.profiles.set("user", true);
+    const controller = createAuthSession(f.client, (state) => f.states.push(state));
+    const stop = controller.start();
+    await controller.signIn("user@example.test", "password");
+    await flush();
+    f.states.length = 0;
+    let finish;
+    f.client.from = () => ({
+      select() { return this; }, eq() { return this; },
+      maybeSingle: () => new Promise((resolve) => { finish = resolve; }),
+    });
+    const refreshed = { ...f.session("user"), access_token: "refreshed-jwt" };
+    f.emit(refreshed, event);
+    await flush();
+    assert.deepEqual(f.states.map((state) => state.status), ["approved"]);
+    assert.equal(f.states[0].session.access_token, "refreshed-jwt");
+    finish({ data: { user_id: "user", approved: true }, error: null });
+    await flush();
+    assert.deepEqual(f.states.map((state) => state.status), ["approved", "approved"]);
+    stop();
+  });
+}
+
+test("background approval errors are visible without replacing the approved app; retry and revocation still work", async () => {
+  const f = fixture();
+  f.profiles.set("user", true);
+  const controller = createAuthSession(f.client, (state) => f.states.push(state));
+  const stop = controller.start();
+  await controller.signIn("user@example.test", "password");
+  await flush();
+  const from = f.client.from;
+  f.client.from = () => ({
+    select() { return this; }, eq() { return this; },
+    async maybeSingle() { return { data: null, error: { message: "offline" } }; },
+  });
+  await controller.retry();
+  assert.equal(f.states.at(-1).status, "approved");
+  assert.match(f.states.at(-1).error, /Unable to verify/);
+  f.client.from = from;
+  await controller.retry();
+  assert.equal(f.states.at(-1).status, "approved");
+  assert.equal(f.states.at(-1).error, undefined);
+  f.profiles.set("user", false);
+  await controller.retry();
+  assert.equal(f.states.at(-1).status, "pending");
+  f.emit(f.session("user"), "SIGNED_OUT");
+  await flush();
+  assert.equal(f.states.at(-1).status, "signedOut");
+  stop();
 });

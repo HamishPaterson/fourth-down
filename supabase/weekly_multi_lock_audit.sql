@@ -5,11 +5,25 @@ create table if not exists public.weekly_multi_lock_plans (
   season integer not null,
   week integer not null check (week between 1 and 18),
   lock_at timestamptz not null unique check (lock_at > '2026-10-22T00:00:00Z'),
-  prepared_at timestamptz not null check (prepared_at < lock_at),
+  prepared_at timestamptz not null,
   source text not null check (source = 'server-prepared'),
   expected_game_count integer not null check (expected_game_count between 1 and 16),
   games jsonb not null check (jsonb_typeof(games) = 'array' and jsonb_array_length(games) = expected_game_count)
 );
+
+-- lock_at is the legacy week key, not a deadline for preparing valid inputs.
+do $$
+declare item record;
+begin
+  for item in
+    select conname from pg_constraint
+    where conrelid = 'public.weekly_multi_lock_plans'::regclass and contype = 'c'
+      and pg_get_expr(conbin, conrelid) = '(prepared_at < lock_at)'
+  loop
+    execute format('alter table public.weekly_multi_lock_plans drop constraint %I', item.conname);
+  end loop;
+end;
+$$;
 
 create table if not exists public.weekly_multi_lock_manifests (
   id uuid primary key,

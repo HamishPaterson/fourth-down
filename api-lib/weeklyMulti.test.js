@@ -153,7 +153,7 @@ test("read route returns the current lock record at Tue 23:59 without provider l
   assert.equal(providerCalls, 0);
 });
 
-test("read route resolves the placeholder week at Wed 00:00 when the previous multi has no unsettled legs", async () => {
+test("read route resolves the available week at Wed 00:00 when the previous multi has no unsettled legs", async () => {
   const previousRecord = { season: 2026, week: 4, lock_at: new Date(THURSDAY - DAY).toISOString() };
   let providerCalls = 0;
   const handler = createCurrentEntry({
@@ -167,7 +167,7 @@ test("read route resolves the placeholder week at Wed 00:00 when the previous mu
         select() { return this; },
         eq(column, value) {
           assert.equal(column, "lock_at");
-          assert.equal(value, new Date(THURSDAY - 7 * DAY).toISOString());
+          assert.ok([THURSDAY, THURSDAY - 7 * DAY].map((at) => new Date(at).toISOString()).includes(value));
           return this;
         },
         async maybeSingle() { return { data: null, error: null }; },
@@ -177,7 +177,7 @@ test("read route resolves the placeholder week at Wed 00:00 when the previous mu
   const res = response();
   await handler({ method: "GET", query: { weeklyMultiMode: "current" } }, res);
   assert.equal(res.statusCode, 200);
-  assert.equal(res.body.status, "before lock");
+  assert.equal(res.body.status, "not ready");
   assert.equal(res.body.week, 5);
   assert.notEqual(res.body.record, previousRecord);
   assert.equal(providerCalls, 1);
@@ -239,7 +239,7 @@ test("Vercel rewrites preserve Weekly Multi URLs with on-time locking and deadli
   ]);
 });
 
-test("configured AEST lock is 10:00 on Thursday, including daylight-saving season", () => {
+test("legacy week keys remain readable but never gate availability, including daylight-saving season", () => {
   for (const day of ["2026-10-15", "2027-01-07", "2026-06-04"]) {
     const lock = new Date(`${day}T00:00:00Z`);
     const parts = Object.fromEntries(new Intl.DateTimeFormat("en-AU", {
@@ -248,14 +248,14 @@ test("configured AEST lock is 10:00 on Thursday, including daylight-saving seaso
     assert.equal(parts.weekday, "Thursday");
     assert.equal(parts.hour, "10");
     assert.equal(parts.minute, "00");
-    assert.equal(getLockCycle(new Date(lock.getTime() - 60000)).eligible, false);
+    assert.equal(getLockCycle(new Date(lock.getTime() - 60000)).eligible, true);
     assert.equal(getLockCycle(lock).eligible, true);
     assert.equal(getLockCycle(new Date(lock.getTime() + 60000)).eligible, true);
     assert.equal(getDisplayLockCycle(new Date(lock.getTime() - 60000)).lockAt, lock.getTime());
   }
 });
 
-test("lock and display cycles follow UTC Thursday and Wednesday boundaries", () => {
+test("lock and display cycles share Wednesday rollover without a Thursday availability boundary", () => {
   const cases = [
     { label: "Tue 23:59 UTC", at: date(-2, 23, 59), lockOffset: -7, displayOffset: -7, eligible: true, placeholder: false, notYetLocked: false },
     { label: "Wed 00:00 UTC", at: date(-1), lockOffset: -7, displayOffset: 0, eligible: true, placeholder: true, notYetLocked: true },
@@ -271,11 +271,12 @@ test("lock and display cycles follow UTC Thursday and Wednesday boundaries", () 
   for (const item of cases) {
     const lockCycle = getLockCycle(item.at);
     assert.equal(lockCycle.lockAt, THURSDAY + item.lockOffset * DAY, item.label);
-    assert.equal(lockCycle.eligible, item.eligible && !item.notYetLocked, `${item.label}: lock eligibility`);
+    assert.equal(lockCycle.targetLockAt, THURSDAY + item.displayOffset * DAY, `${item.label}: current-week key`);
+    assert.equal(lockCycle.eligible, true, `${item.label}: lock eligibility`);
     const displayCycle = getDisplayLockCycle(item.at);
     assert.equal(displayCycle.lockAt, THURSDAY + item.displayOffset * DAY, `${item.label}: display cycle`);
-    assert.equal(displayCycle.placeholder, item.placeholder, `${item.label}: display placeholder`);
-    assert.equal(!lockCycle.eligible, item.notYetLocked, `${item.label}: endpoint status`);
+    assert.equal(displayCycle.placeholder, false, `${item.label}: display placeholder`);
+    assert.equal(displayCycle.eligible, true, `${item.label}: endpoint status`);
   }
 });
 
@@ -300,19 +301,20 @@ test("boundary inputs map to schedule-backed season/week keys", async () => {
   ];
   for (const item of cases) {
     const lockCycle = getLockCycle(item.at);
-    assert.equal(lockCycle.lockAt, item.lockAt.getTime(), `${item.label}: lock cycle timestamp`);
+    assert.equal(lockCycle.lockAt, item.lockAt.getTime(), `${item.label}: legacy timestamp`);
+    assert.equal(lockCycle.targetLockAt, item.displayAt.getTime(), `${item.label}: current-week timestamp`);
     const lockCycleContext = await resolveLockWeekContext(new Date(lockCycle.lockAt), { fetchGames });
-    assert.equal(`${lockCycleContext.season}/${lockCycleContext.week}`, item.lockKey, `${item.label}: lock cycle key`);
+    assert.equal(`${lockCycleContext.season}/${lockCycleContext.week}`, item.lockKey, `${item.label}: legacy cycle key`);
 
     const display = await resolveDisplayWeekContext(item.at, { fetchGames });
     assert.deepEqual(
       { placeholder: display.placeholder, key: `${display.season}/${display.week}` },
-      { placeholder: item.placeholder, key: item.displayKey },
+      { placeholder: false, key: item.displayKey },
       `${item.label}: display state and week`,
     );
 
     const dryRun = await resolveLockWeekContext(item.at, { allowBeforeLock: true, fetchGames });
-    assert.equal(`${dryRun.season}/${dryRun.week}`, item.dryRunKey, `${item.label}: dry-run key`);
+    assert.equal(`${dryRun.season}/${dryRun.week}`, item.displayKey, `${item.label}: dry-run key`);
   }
 });
 
@@ -323,7 +325,7 @@ test("dry run before Thursday resolves the upcoming lock week's season/week", as
     fetchGames: async () => upcomingWeek,
   });
   assert.equal(context.available, true);
-  assert.equal(context.eligible, false);
+  assert.equal(context.eligible, true);
   assert.equal(context.season, 2026);
   assert.equal(context.week, 5);
   assert.equal(context.lockAt, new Date(THURSDAY).toISOString());
@@ -410,15 +412,15 @@ test("resolved lock season/week comes from games in the Thursday-to-Thursday sch
   assert.equal(lockContext.week, 5);
 });
 
-test("lock resolver returns not yet locked before Thursday without fetching schedule", async () => {
+test("lock resolver checks current-week availability before Thursday instead of waiting", async () => {
   let fetchCount = 0;
   const context = await resolveLockWeekContext(date(-1, 23, 59), {
     fetchGames: async () => { fetchCount += 1; return []; },
   });
   assert.equal(context.available, false);
-  assert.equal(context.notYetLocked, true);
-  assert.equal(context.eligible, false);
-  assert.equal(fetchCount, 0);
+  assert.equal(context.notYetLocked, false);
+  assert.equal(context.eligible, true);
+  assert.equal(fetchCount, 1);
 });
 
 test("lock route denies missing/incorrect secret without resolving inputs and attempts safe audit storage", async () => {
@@ -534,7 +536,7 @@ test("schedule retry honors Retry-After before the second request", async () => 
   }
 });
 
-test("read route shows the placeholder only when the upcoming display week has regular-season games", async () => {
+test("read route shows readiness, never a scheduled placeholder, for the current week", async () => {
   const schedule = [{ season: 2026, week: 5, date: date(0, 1).toISOString(), postseason: false }];
   const handler = createCurrentEntry({
     getNow: () => date(-1),
@@ -550,8 +552,8 @@ test("read route shows the placeholder only when the upcoming display week has r
   const res = response();
   await handler({ method: "GET", query: { weeklyMultiMode: "current" } }, res);
   assert.equal(res.statusCode, 200);
-  assert.equal(res.body.status, "before lock");
-  assert.equal(res.body.placeholder, true);
+  assert.equal(res.body.status, "not ready");
+  assert.notEqual(res.body.placeholder, true);
   assert.equal(res.body.week, 5);
 });
 

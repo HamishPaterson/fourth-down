@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { createWeeklyMultiPreparationHandler } from "./weeklyMultiPreparation.js";
 import { createWeeklyMultiLockHandler, createWeeklyMultiCurrentHandler, getLockCycle,
-  isGeneratedLate, lockIsPastDeadline, WEEKLY_MULTI_TIME_ZONE } from "./weeklyMulti.js";
+  isGeneratedLate, lockIsPastDeadline } from "./weeklyMulti.js";
 import { lockFixture, lockDatabase, lockResponse, FUTURE_LOCK } from "./weeklyLockTestHelpers.js";
 import { buildLockManifest } from "./weeklyLockAudit.js";
 
@@ -66,26 +66,29 @@ test("a post-insert audit failure reports that the lock actually succeeded inste
 });
 
 for (const offset of [-60000, 0, 60000]) {
-  test(`Brisbane lock boundary ${offset / 60000} minutes preserves 10:00 UTC conversion in any process timezone`, async () => {
+  test(`valid inputs lock immediately ${offset / 60000} minutes from the former scheduled time`, async () => {
     const fixture = lockFixture();
     fixture.now = new Date(Date.parse(FUTURE_LOCK) + offset);
     const result = await run({ fixture });
-    assert.equal(WEEKLY_MULTI_TIME_ZONE, "Australia/Brisbane");
-    const local = new Intl.DateTimeFormat("en-AU", { timeZone: WEEKLY_MULTI_TIME_ZONE,
-      weekday: "long", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).format(new Date(FUTURE_LOCK));
-    assert.match(local, /Thursday/); assert.match(local, /10:00/);
-    assert.equal(result.res.body.status, offset < 0 ? "not ready" : "locked");
-    assert.equal(result.db.tables.weekly_best_multis.length, offset < 0 ? 0 : 1);
+    assert.equal(result.res.body.status, "locked");
+    assert.equal(result.db.tables.weekly_best_multis.length, 1);
   });
 }
 
-test("pre-lock prepare evaluates retained inputs but never writes predictions or a Multi", async () => {
+test("prepare also locks valid retained inputs immediately without prediction writes", async () => {
   const fixture = lockFixture(); fixture.now = new Date("2026-10-28T23:30:00Z");
   const { res, db } = await run({ fixture, prepare: true });
-  assert.equal(res.body.status, "prepared");
-  assert.equal(db.tables.weekly_best_multis.length, 0);
-  assert.ok(db.writes.every((row) => ["weekly_multi_lock_executions", "weekly_multi_lock_manifests"].includes(row.table)));
-  assert.equal(db.tables.weekly_multi_lock_executions.at(-1).result, "PREPARED");
+  assert.equal(res.body.status, "locked");
+  assert.equal(db.tables.weekly_best_multis.length, 1);
+  assert.ok(db.writes.every((row) => row.table !== "prediction_snapshots"));
+  assert.equal(db.tables.weekly_multi_lock_executions.at(-1).result, "LOCK_SUCCEEDED");
+  const current = lockResponse();
+  await createWeeklyMultiCurrentHandler({
+    createClient: () => db, getNow: () => fixture.now,
+    fetchGames: () => assert.fail("An early current-week lock must be returned without a schedule lookup"),
+  })({ method: "GET" }, current);
+  assert.equal(current.body.status, "locked");
+  assert.deepEqual(current.body.record, res.body.record);
 });
 
 test("dry-run evaluation persists audit evidence, never predictions or a Multi", async () => {
@@ -108,6 +111,29 @@ test("insufficient candidates retain structured failed-preparation manifest with
   assert.equal(db.tables.weekly_multi_lock_executions.at(-1).result, "READINESS_FAILED");
 });
 
+test("incomplete inputs become lockable on the next normal invocation, on any polling day", async () => {
+  const fixture = lockFixture();
+  fixture.now = new Date("2026-10-30T00:01:00Z");
+  for (const row of fixture.predictions) row.generatedAt = "2026-10-29T23:50:00Z";
+  const db = lockDatabase(fixture);
+  const missing = db.tables.prediction_snapshots.pop();
+  const first = await run({ fixture, db, prepare: true });
+  assert.equal(first.res.body.status, "not ready");
+  assert.equal(db.tables.weekly_best_multis.length, 0);
+  db.tables.prediction_snapshots.push(missing);
+  const second = await run({ fixture, db, prepare: true });
+  assert.equal(second.res.body.status, "locked");
+  const saved = structuredClone(second.res.body.record);
+  db.tables.prediction_snapshots = [];
+  fixture.odds = null;
+  for (const prepare of [false, true]) {
+    const again = await run({ fixture, db, prepare,
+      readOdds: () => assert.fail("Cannot regenerate an existing lock") });
+    assert.deepEqual(again.res.body.record, saved);
+  }
+  assert.equal(db.tables.weekly_best_multis.length, 1);
+});
+
 test("all expected authoritative predictions are required, not merely five arbitrary saved rows", async () => {
   const fixture = lockFixture();
   fixture.predictions[0].authoritative = false;
@@ -121,20 +147,29 @@ test("all expected authoritative predictions are required, not merely five arbit
   assert.ok(rejection.rejectionCodes.includes("MISSING_AUTHORITY"));
 });
 
-test("late invocation reuses only exact pre-lock predictions and quotes, with generated-late flag", async () => {
+test("availability polling after the former deadline locks without a generated-late flag", async () => {
   const fixture = lockFixture(); fixture.now = new Date("2026-10-29T01:00:00Z");
   const { res } = await run({ fixture });
   assert.equal(res.body.status, "locked");
-  assert.equal(res.body.record.generated_late, true);
+  assert.equal(res.body.record.generated_late, false);
   assert.ok(res.body.record.legs.every((leg) => leg.updatedAt < FUTURE_LOCK));
 });
 
-test("late invocation cannot replace missing lock-time inputs with new predictions or prices", async () => {
+test("new valid saved predictions after the former deadline can lock an unlocked week", async () => {
   const fixture = lockFixture(); fixture.now = new Date("2026-10-29T01:00:00Z");
   for (const row of fixture.predictions) row.generatedAt = "2026-10-29T00:10:00Z";
+  for (const [index, row] of fixture.predictions.entries()) {
+    const updatedAt = "2026-10-29T00:05:00Z";
+    row.bestBets.candidates[0].updatedAt = updatedAt;
+    const quote = fixture.odds.events[index].bookmakers[0].markets[0].outcomes[0];
+    quote.updatedAt = updatedAt;
+    quote.quoteSource.timestamp = updatedAt;
+    quote.quoteSource.fetchedAt = updatedAt;
+  }
   const { res, db } = await run({ fixture });
-  assert.equal(res.body.status, "not ready");
-  assert.equal(db.tables.weekly_best_multis.length, 0);
+  assert.equal(res.body.status, "locked");
+  assert.equal(db.tables.weekly_best_multis.length, 1);
+  assert.ok(res.body.record.legs.every((leg) => leg.updatedAt > FUTURE_LOCK));
   assert.equal(db.writes.some((row) => row.table === "prediction_snapshots"), false);
 });
 
@@ -224,7 +259,7 @@ test("manifest contains safe exact inputs, ranking values and selected quote pro
   assert.doesNotMatch(JSON.stringify(manifest), /never-store-this|authorization|rawProviderBody/);
 });
 
-test("scheduler time and strict late/deadline boundaries remain unchanged", () => {
+test("legacy timestamp interpretation and existing availability polls remain compatible", () => {
   const context = { lockAt: FUTURE_LOCK, retryDeadline: Date.parse(FUTURE_LOCK) + 30 * 60000 };
   assert.equal(isGeneratedLate(context, new Date(Date.parse(FUTURE_LOCK) + 15 * 60000)), false);
   assert.equal(isGeneratedLate(context, new Date(Date.parse(FUTURE_LOCK) + 15 * 60000 + 1)), true);
@@ -235,11 +270,7 @@ test("scheduler time and strict late/deadline boundaries remain unchanged", () =
     .map((job) => job.schedule), ["0 0 * * *", "0 1 * * *"]);
 });
 
-// Week 8 catch-up: the atomic batch carries batchProvenance (not lockProvenance)
-// and no pre-lock plan was ever saved. A post-lock invocation derives the plan
-// from the persisted batch, locks exactly once, and a second invocation returns
-// the same record without duplication.
-function week8CatchUpFixture() {
+function atomicBatchFixture() {
   const fixture = lockFixture();
   for (const [index, row] of fixture.predictions.entries()) {
     delete row.lockProvenance;
@@ -260,10 +291,18 @@ function week8CatchUpFixture() {
   return fixture;
 }
 
-test("Week 8 catch-up derives the plan from the atomic batch, locks once, and is idempotent", async () => {
-  const fixture = week8CatchUpFixture();
+test("fresh atomic batch derives its plan before the former deadline, locks once, and is idempotent", async () => {
+  const fixture = atomicBatchFixture();
   fixture.plan = null; // no pre-lock plan was ever saved
-  fixture.now = new Date("2026-11-02T06:00:00Z"); // after the lock and the 30h quote window
+  fixture.now = new Date("2026-10-28T23:30:00Z");
+  for (const [index, row] of fixture.predictions.entries()) {
+    row.generatedAt = "2026-10-28T23:00:00Z";
+    row.bestBets.candidates[0].updatedAt = "2026-10-28T22:00:00Z";
+    const outcome = row.game.oddsEvent.bookmakers[0].markets[0].outcomes[0];
+    outcome.updatedAt = "2026-10-28T22:00:00Z";
+    outcome.quoteSource = { id: `q${index}`, provider: "SharpAPI",
+      timestamp: outcome.updatedAt, fetchedAt: outcome.updatedAt };
+  }
   const db = lockDatabase(fixture);
   const first = await run({ fixture, db });
   assert.equal(first.res.body.status, "locked", JSON.stringify(first.res.body));
@@ -278,8 +317,8 @@ test("Week 8 catch-up derives the plan from the atomic batch, locks once, and is
   assert.equal(db.tables.weekly_best_multis.length, 1);
 });
 
-test("Week 8 catch-up never fabricates a lock without the persisted atomic batch", async () => {
-  const fixture = week8CatchUpFixture();
+test("availability polling never fabricates a lock without a persisted authoritative batch", async () => {
+  const fixture = atomicBatchFixture();
   fixture.plan = null;
   fixture.now = new Date("2026-11-02T06:00:00Z");
   for (const row of fixture.predictions) delete row.batchProvenance; // not the atomic batch

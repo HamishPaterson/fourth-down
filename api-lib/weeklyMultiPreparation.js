@@ -21,7 +21,7 @@ export function createWeeklyMultiPreparationHandler(overrides = {}) {
     const base = {
       operation_id: operationId, season: null, week: null, scheduled_at: lockAt,
       invoked_at: now.toISOString(), authorization_result: authorized ? "AUTHORIZED" : "DENIED",
-      handler_reached: true, generated_late: now.getTime() > Date.parse(lockAt) + 15 * 60000,
+      handler_reached: true, generated_late: false,
       readiness_result: "UNKNOWN", preparation_result: "NOT_STARTED",
       lock_result: "NOT_ATTEMPTED", existing_lock_result: false,
     };
@@ -40,26 +40,16 @@ export function createWeeklyMultiPreparationHandler(overrides = {}) {
         await recordExecution(client, { ...base, stage: "FINISHED", result: "LOCK_ALREADY_EXISTED" });
         return res.status(200).json({ status: "already locked", record: existing, operationId });
       }
-      const prepare = req.query?.weeklyMultiMode === "prepare";
       const dryRun = ["1", "true"].includes(String(req.query?.dryRun ?? req.body?.dryRun ?? "").toLowerCase());
       if (lockAt <= PRESERVED_LOCK_THROUGH) {
         await recordExecution(client, { ...base, stage: "FINISHED", result: "HISTORICAL_LOCK_PROHIBITED" });
         return res.status(200).json({ status: "not ready", reason: "HISTORICAL_LOCK_PROHIBITED", operationId });
       }
-      // A post-lock catch-up re-locks the current unlocked week from the persisted
-      // authoritative batch when the scheduled run was blocked only because that
-      // batch was unavailable. It never runs before the lock and never re-locks.
-      const catchUp = !prepare && now.getTime() > Date.parse(lockAt);
-      if ((!prepare && now.getTime() < Date.parse(lockAt)) ||
-          (!catchUp && now.getUTCDay() !== 4 && !(prepare && now.getUTCDay() === 3))) {
-        await recordExecution(client, { ...base, stage: "FINISHED", result: "OUTSIDE_LOCK_WINDOW" });
-        return res.status(200).json({ status: "not ready", reason: "OUTSIDE_LOCK_WINDOW", operationId });
-      }
       const { data, error } = await client.from("weekly_multi_lock_plans").select("*")
         .eq("lock_at", lockAt).maybeSingle();
       if (error) throw new Error("LOCK_PLAN_READ_FAILED");
       plan = data;
-      if (!plan && catchUp) plan = await deriveCatchUpPlan(client, lockAt, now);
+      if (!plan) plan = await deriveSavedPlan(client, lockAt, now);
       if (plan && validLockPlan(plan, now)) {
         base.season = plan.season;
         base.week = plan.week;
@@ -67,10 +57,7 @@ export function createWeeklyMultiPreparationHandler(overrides = {}) {
           .eq("season", plan.season).eq("week", plan.week);
         if (predictionError) throw new Error("PREDICTION_READ_FAILED");
         predictions = savedPredictionRows(rows);
-        // A catch-up over the atomic batch re-reads the exact pre-lock quotes
-        // embedded in each persisted snapshot; the current-week snapshot table
-        // has since been refreshed and no longer holds them.
-        odds = catchUp && predictions.every((row) => row.batchProvenance?.source === "server-week-replacement")
+        odds = predictions.length && predictions.every((row) => row.batchProvenance?.source === "server-week-replacement")
           ? embeddedOddsPayload(predictions)
           : await readOdds(client, now, { season: plan.season, week: plan.week });
       }
@@ -91,14 +78,14 @@ export function createWeeklyMultiPreparationHandler(overrides = {}) {
       }));
       await recordExecution(client, { ...base, stage, result: ready ? "READY" : readinessResult,
         manifest_id: manifestId, readiness_result: readiness.status });
-      if (!ready || prepare || dryRun) {
+      if (!ready || dryRun) {
         await recordExecution(client, { ...base, stage: "FINISHED",
-          result: !ready ? readinessResult : prepare ? "PREPARED" : "DRY_RUN",
+          result: !ready ? readinessResult : "DRY_RUN",
           manifest_id: manifestId, readiness_result: readiness.status });
         return res.status(200).json({ status: ready ? "prepared" : "not ready", operationId,
           manifestId, readiness, dryRun });
       }
-      // No awaits that acquire new inputs after capture: retries consume only retained pre-lock evidence.
+      // Capture and validate once; a concurrent winner is returned, never replaced.
       const record = { ...makeWeeklyMultiRecord(readiness.selection, {
         season: plan.season, week: plan.week, lockAt,
       }, now), manifest_id: manifestId };
@@ -137,9 +124,7 @@ export function createWeeklyMultiPreparationHandler(overrides = {}) {
   };
 }
 
-// Builds the odds payload from the exact pre-lock quotes embedded in each
-// persisted atomic-batch snapshot (game.oddsEvent). These are the quotes the
-// saved Best Bets were assessed against; the snapshot table has since moved on.
+// Atomic batches retain the exact offers assessed by their saved Best Bets.
 function embeddedOddsPayload(predictions) {
   const events = (predictions || []).map((row) => row.game?.oddsEvent).filter((event) =>
     event && Array.isArray(event.bookmakers) && event.bookmakers.length);
@@ -154,15 +139,10 @@ function embeddedOddsPayload(predictions) {
   };
 }
 
-// Derives the expected-game plan for a post-lock catch-up directly from the
-// persisted authoritative batch when no pre-lock plan was ever saved. The batch
-// is the authoritative source: every snapshot must be authoritative, complete,
-// pre-kickoff at the lock moment and belong to a single week whose kickoffs all
-// fall inside the lock window. Returns null when no such batch exists.
-async function deriveCatchUpPlan(client, lockAt, now) {
+async function deriveSavedPlan(client, lockAt, now) {
   const lock = Date.parse(lockAt);
   const { data: rows, error } = await client.from("prediction_snapshots").select("*")
-    .eq("season", 2026).gte("kickoff", new Date(lock).toISOString())
+    .gte("kickoff", new Date(lock).toISOString())
     .lt("kickoff", new Date(lock + 7 * 86400000).toISOString());
   if (error) throw new Error("PREDICTION_READ_FAILED");
   const snapshots = savedPredictionRows(rows);
@@ -179,7 +159,7 @@ async function deriveCatchUpPlan(client, lockAt, now) {
     games.push({ away: snapshot.awayCode, home: snapshot.homeCode, kickoff: snapshot.kickoff });
   }
   const plan = {
-    id: randomUUID(), season, week, lock_at: lockAt, prepared_at: new Date(lock - 1).toISOString(),
+    id: randomUUID(), season, week, lock_at: lockAt, prepared_at: now.toISOString(),
     source: "server-prepared", expected_game_count: games.length, games,
   };
   return validLockPlan(plan, now) ? plan : null;

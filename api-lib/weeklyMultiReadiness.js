@@ -17,13 +17,14 @@ export function savedPredictionRows(rows) {
 }
 
 export function validLockPlan(plan, now) {
+  // The legacy timestamp identifies the week; it no longer limits preparation time.
   const lock = Date.parse(plan?.lock_at);
   const created = Date.parse(plan?.prepared_at);
   const games = plan?.games;
   return Number.isFinite(lock) && lock > Date.parse(PRESERVED_LOCK_THROUGH) &&
     new Date(lock).getUTCDay() === 4 && new Date(lock).getUTCHours() === 0 &&
     new Date(lock).getUTCMinutes() === 0 && new Date(lock).getUTCSeconds() === 0 &&
-    Number.isFinite(created) && created < lock && created <= now.getTime() &&
+    Number.isFinite(created) && created <= now.getTime() &&
     plan.source === "server-prepared" && Number.isInteger(plan.season) && plan.season >= 2026 &&
     Number.isInteger(plan.week) && plan.week >= 1 && plan.week <= 18 &&
     !(plan.season === 2026 && plan.week <= 7) &&
@@ -36,19 +37,15 @@ export function validLockPlan(plan, now) {
 }
 
 export function evaluateWeeklyMultiReadiness({ plan, predictions = [], odds, now = new Date() }) {
-  const context = { season: plan?.season, week: plan?.week, lockAt: plan?.lock_at };
+  const context = { season: plan?.season, week: plan?.week, lockAt: now.toISOString(),
+    provenanceLockAt: plan?.lock_at };
   const planValid = validLockPlan(plan, now);
   const expected = planValid ? plan.games : [];
   const considered = expected.map((game) => predictions.find((prediction) =>
     prediction.awayCode === game.away && prediction.homeCode === game.home &&
     Date.parse(prediction.kickoff) === Date.parse(game.kickoff))).filter(Boolean);
   const accepted = considered.filter((prediction) => !lockPredictionRejections(prediction, context, now).length);
-  // A post-lock catch-up over the persisted atomic batch re-reads pre-lock quotes
-  // without the rolling staleness bound.
-  const catchUp = now.getTime() > Date.parse(plan?.lock_at) && considered.length > 0 &&
-    considered.every((row) => row.batchProvenance?.source === "server-week-replacement");
-  const quoteAsOf = catchUp ? plan.lock_at : undefined;
-  const validation = validateOddsEvents(odds?.events || [], { now, quoteAsOf });
+  const validation = validateOddsEvents(odds?.events || [], { now });
   const coverage = Object.fromEntries(READINESS_MARKETS.map((market) => {
     let present = 0, fresh = 0, rejected = 0;
     for (const game of expected) {
@@ -61,9 +58,9 @@ export function evaluateWeeklyMultiReadiness({ plan, predictions = [], odds, now
         const time = Date.parse(outcome.quoteSource?.timestamp || outcome.updatedAt || row.last_update || book.last_update);
         const fetched = Date.parse(outcome.quoteSource?.fetchedAt);
         return outcome.quoteValidation?.status === "validated" && outcome.quoteSource?.rolloverFallback !== true && Number.isFinite(time) &&
-          time <= Math.min(now.getTime(), Date.parse(plan.lock_at)) &&
+          time <= now.getTime() &&
           Boolean(outcome.quoteSource?.id) && Number.isFinite(fetched) &&
-          fetched <= Math.min(now.getTime(), Date.parse(plan.lock_at));
+          fetched <= now.getTime();
       });
       if (current) fresh++;
       if (outcomes.length && !current) rejected++;
@@ -72,7 +69,7 @@ export function evaluateWeeklyMultiReadiness({ plan, predictions = [], odds, now
       missingGames: expected.length - present,
       status: !planValid ? "UNKNOWN" : fresh === expected.length ? "READY" : "DEGRADED_NON_BLOCKING" }];
   }));
-  const selection = buildWeeklyMultiSelection(accepted, odds, { ...context, requireSnapshotEvidence: true, catchUp }, now);
+  const selection = buildWeeklyMultiSelection(accepted, odds, { ...context, requireSnapshotEvidence: true }, now);
   for (const prediction of considered.filter((row) => !accepted.includes(row))) {
     const reasons = lockPredictionRejections(prediction, context, now);
     const bets = [...(prediction.bestBets?.candidates || prediction.bestBets?.recommendations || []),

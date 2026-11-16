@@ -22,7 +22,7 @@ const LEG_COUNT = 5;
 const START_PROBABILITY = 0.65;
 const FLOOR_PROBABILITY = 0.55;
 const PROBABILITY_STEP = 0.025;
-// Thursday 10:00 AEST (Australia/Brisbane, no daylight saving) is 00:00 UTC.
+// Retained for interpreting historical records, not an availability deadline.
 export const WEEKLY_MULTI_TIME_ZONE = "Australia/Brisbane";
 const TEAM_ALIASES = { WAS: "WSH", LA: "LAR", OAK: "LV", SD: "LAC", STL: "LAR" };
 
@@ -37,38 +37,25 @@ export function getLockCycle(now = new Date()) {
   const mostRecentThursday = getMostRecentThursday(now);
   const nextThursday = mostRecentThursday + 7 * 24 * 60 * 60 * 1000;
   const wednesdayStart = mostRecentThursday + 6 * 24 * 60 * 60 * 1000;
-  const beforeUpcomingWeeklyLock = now.getTime() >= wednesdayStart && now.getTime() < nextThursday;
+  // Keep the existing Wednesday week rollover and legacy storage key.
+  // The key is not a lock deadline: this week is eligible immediately.
+  const lockAt = now.getTime() >= wednesdayStart ? nextThursday : mostRecentThursday;
   return {
     lockAt: mostRecentThursday,
-    targetLockAt: beforeUpcomingWeeklyLock ? nextThursday : mostRecentThursday,
-    eligible: !beforeUpcomingWeeklyLock && now.getTime() >= mostRecentThursday,
-    placeholder: beforeUpcomingWeeklyLock,
+    targetLockAt: lockAt,
+    eligible: true,
+    placeholder: false,
   };
 }
 
 export function getDisplayLockCycle(now = new Date()) {
-  const current = now.getTime();
-  const mostRecentThursday = getMostRecentThursday(now);
-  const wednesdayStart = mostRecentThursday + 6 * 24 * 60 * 60 * 1000;
-  const nextThursday = mostRecentThursday + 7 * 24 * 60 * 60 * 1000;
-  const placeholder = current >= wednesdayStart && current < nextThursday;
-  const lockAt = placeholder ? nextThursday : mostRecentThursday;
-  return { lockAt, eligible: !placeholder && current >= lockAt, placeholder };
+  const cycle = getLockCycle(now);
+  return { ...cycle, lockAt: cycle.targetLockAt };
 }
 
 export async function resolveLockWeekContext(now = new Date(), { allowBeforeLock = false, fetchGames = fetchScheduleGamesForWindow } = {}) {
   const cycle = getLockCycle(now);
-  if (!cycle.eligible && !allowBeforeLock) {
-    return {
-      available: false,
-      notYetLocked: true,
-      eligible: false,
-      lockAt: new Date(cycle.targetLockAt).toISOString(),
-      deadlineAt: new Date(cycle.targetLockAt + RETRY_WINDOW_MS).toISOString(),
-      reason: "The current lock moment has not arrived",
-    };
-  }
-  const lockAt = allowBeforeLock ? getDryRunLockTime(now) : cycle.lockAt;
+  const lockAt = cycle.targetLockAt;
   let context;
   try {
     context = await resolveScheduleWeek(lockAt, fetchGames);
@@ -113,15 +100,6 @@ function getScheduleFailureReason(error) {
   return message === "schedule provider rate limited"
     ? message
     : `Schedule data is unavailable: ${message}`;
-}
-
-function getNextThursday(now) {
-  const latest = getMostRecentThursday(now);
-  return now.getTime() === latest ? latest : latest + 7 * 24 * 60 * 60 * 1000;
-}
-
-function getDryRunLockTime(now) {
-  return now.getUTCDay() === 4 ? getMostRecentThursday(now) : getNextThursday(now);
 }
 
 function getMostRecentThursday(now) {
@@ -313,11 +291,7 @@ export function buildWeeklyMultiSelection(snapshots, oddsPayload, context, now =
     ...candidatePersonnelAssessment(snapshot, bet, now), reasons, eligible: false,
   });
   const candidates = [];
-  // A post-lock catch-up over the persisted atomic batch validates persisted
-  // pre-lock quotes without the rolling staleness bound.
-  const catchUp = context.catchUp === true;
-  const quoteAsOf = catchUp ? context.lockAt : undefined;
-  const quoteAudit = validateOddsEvents(Array.isArray(oddsPayload?.events) ? oddsPayload.events : [], { now, quoteAsOf });
+  const quoteAudit = validateOddsEvents(Array.isArray(oddsPayload?.events) ? oddsPayload.events : [], { now });
   const oddsEvents = quoteAudit.events;
   for (const snapshot of snapshots || []) {
     const predictionReasons = isCurrentModelIdentity(snapshot?.modelVersion, snapshot?.modelKey) ? [] : ["WRONG_MODEL"];
@@ -364,11 +338,7 @@ export function buildWeeklyMultiSelection(snapshots, oddsPayload, context, now =
       const decimalOdds = getDecimalOddsValue(bet);
       const modelProbability = Number(bet.modelProbability);
       const quoteTime = new Date(bet.updatedAt || 0).getTime();
-      // Saved Best Bet quotes are pre-lock evidence. The rolling freshness bound
-      // applies only while the scheduled pre-lock pipeline runs; a post-lock
-      // catch-up re-reads the already-persisted pre-lock quotes, which stay valid.
-      const catchUp = context.catchUp === true;
-      if (!Number.isFinite(quoteTime) || quoteTime <= 0 || (!catchUp && now.getTime() - quoteTime > ODDS_MAX_AGE_MS) ||
+      if (!Number.isFinite(quoteTime) || quoteTime <= 0 || now.getTime() - quoteTime > ODDS_MAX_AGE_MS ||
           quoteTime > Math.min(now.getTime(), Date.parse(context.lockAt))) {
         reasonCounts.staleOdds += 1;
         reject(snapshot, bet, [quoteTime > Date.parse(context.lockAt) ? "POST_LOCK_QUOTE" :
@@ -487,7 +457,7 @@ export function makeWeeklyMultiRecord(selection, context, now = new Date(), reas
     model_probability_threshold: selection.threshold,
     status: selection.complete ? "locked" : "partial",
     partial: !selection.complete,
-    generated_late: isGeneratedLate(context, now),
+    generated_late: false,
     odds_late: selection.oddsLate,
     odds_updated_at: selection.oddsUpdatedAt,
     odds_refreshed_at: selection.oddsRefreshedAt,
@@ -583,22 +553,19 @@ function currentBookQuote(event, bet, now, context) {
   const selection = normalizeText(bet.selection);
   const suppliedLine = bet.line ?? bet.point ?? bet.handicap;
   const line = suppliedLine === null || suppliedLine === undefined ? null : Number(suppliedLine);
-  // A post-lock catch-up re-reads persisted pre-lock quotes; the rolling freshness
-  // bound and exact live-quote identity apply only to the scheduled pre-lock run.
-  const catchUp = context.catchUp === true;
   for (const market of matches) for (const outcome of market.outcomes || []) {
     const matchesOutcome = () => {
     if (outcome.quoteValidation?.status !== "validated" || outcome.quoteSource?.rolloverFallback === true) return false;
     const timestamp = outcome.quoteSource?.timestamp || outcome.updatedAt || market.last_update || bookmaker.last_update;
     const time = Date.parse(timestamp);
     if (!Number.isFinite(time) || time > Date.parse(context.lockAt) || time > now.getTime() + 60000 ||
-        (!catchUp && now.getTime() - time > ODDS_MAX_AGE_MS) ||
-        (!catchUp && time !== Date.parse(bet.updatedAt))) return false;
+        now.getTime() - time > ODDS_MAX_AGE_MS ||
+        time !== Date.parse(bet.updatedAt)) return false;
     const fetchedAt = Date.parse(outcome.quoteSource?.fetchedAt);
     if (context.requireSnapshotEvidence && (!outcome.quoteSource?.id ||
         !Number.isFinite(fetchedAt) || fetchedAt > now.getTime() || !bet.quoteId)) return false;
     if (Number.isFinite(fetchedAt) && fetchedAt > Date.parse(context.lockAt)) return false;
-    if (!catchUp && bet.quoteId && outcome.quoteSource?.id !== bet.quoteId) return false;
+    if (bet.quoteId && outcome.quoteSource?.id !== bet.quoteId) return false;
     if (bet.price !== null && bet.price !== undefined && bet.price !== "" &&
         (!Number.isFinite(Number(bet.price)) || Number(bet.price) !== Number(outcome.price))) return false;
     const name = normalizeText(outcome.name || outcome.selection || "");
@@ -715,17 +682,15 @@ export function createWeeklyMultiCurrentHandler(overrides = {}) {
         if (error) throw error;
         return data;
       };
-      if (!cycle.placeholder) {
-        const savedRecord = await readRecord(cycle.lockAt);
-        if (savedRecord) {
-          const hasPlayerLegs = (savedRecord.legs || []).some(isPlayerLeg);
-          const started = (savedRecord.legs || []).some((leg) => new Date(leg.kickoff || 0).getTime() <= now.getTime());
-          const settlement = hasPlayerLegs && started ? await settle(savedRecord) : null;
-          return savedBody(savedRecord, settlement?.legResults, settlement?.unresolved);
-        }
-      } else {
-        // From Wednesday the display moves to the next week, but a previous-week
-        // multi with unsettled legs stays visible until it is fully resolved.
+      const savedRecord = await readRecord(cycle.lockAt);
+      if (savedRecord) {
+        const hasPlayerLegs = (savedRecord.legs || []).some(isPlayerLeg);
+        const started = (savedRecord.legs || []).some((leg) => new Date(leg.kickoff || 0).getTime() <= now.getTime());
+        const settlement = hasPlayerLegs && started ? await settle(savedRecord) : null;
+        return savedBody(savedRecord, settlement?.legResults, settlement?.unresolved);
+      }
+      if (now.getUTCDay() === 3) {
+        // An unresolved prior week remains visible only until a current lock exists.
         const previous = await readRecord(cycle.lockAt - 7 * 24 * 60 * 60 * 1000);
         if (previous?.legs?.length) {
           const settlement = await settle(previous);
@@ -746,21 +711,9 @@ export function createWeeklyMultiCurrentHandler(overrides = {}) {
           message: "Weekly Best Multi is not ready yet. Please check back later.",
         });
       }
-      if (context.placeholder) {
-        setWeeklyMultiReadCache(res, 180);
-        return res.status(200).json({
-          status: "before lock",
-          locked: false,
-          placeholder: true,
-          season: context.season,
-          week: context.week,
-          lockAt: context.lockAt,
-        });
-      }
       const firstKickoff = new Date(context.firstKickoffAt || "").getTime();
       if (Number.isFinite(firstKickoff) && now.getTime() >= firstKickoff) {
-        // A persisted authoritative batch may still be lockable through the
-        // catch-up path; only report a missed week when no such batch exists.
+        // Keep the existing saved-authority diagnostic without generating inputs.
         const { data: rows, error: predictionError } = await createClient()
           .from("prediction_snapshots").select("data_quality")
           .eq("season", context.season).eq("week", context.week);
@@ -774,7 +727,7 @@ export function createWeeklyMultiCurrentHandler(overrides = {}) {
           season: context.season,
           week: context.week,
           lockAt: context.lockAt,
-          message: `No shared Weekly Best Multi has been locked for Week ${context.week}. Scheduled locking requires fresh, complete saved predictions and eligible Best Bets with current odds.`,
+          message: `No shared Weekly Best Multi has been locked for Week ${context.week}. Locking requires fresh, complete saved predictions and eligible Best Bets with current odds.`,
         } : {
           status: "missed",
           locked: false,
@@ -791,7 +744,7 @@ export function createWeeklyMultiCurrentHandler(overrides = {}) {
         season: context.season,
         week: context.week,
         lockAt: context.lockAt,
-        message: `No shared Weekly Best Multi has been locked for Week ${context.week}. Scheduled locking requires fresh, complete saved predictions and eligible Best Bets with current odds.`,
+        message: `No shared Weekly Best Multi has been locked for Week ${context.week}. Locking requires fresh, complete saved predictions and eligible Best Bets with current odds.`,
       });
     } catch (error) {
       console.error("Weekly Best Multi read failed", error);

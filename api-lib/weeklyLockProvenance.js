@@ -15,7 +15,7 @@ export function snapshotAuthority(snapshot, context) {
   const provenance = snapshot?.lockProvenance;
   if (snapshot?.authoritative && provenance?.source === "server-prepared" &&
       provenance?.version === LOCK_PROVENANCE_VERSION && provenance?.predictionId === snapshot?.id &&
-      snapshot?.id && provenance?.generationCutoff === context.lockAt &&
+      snapshot?.id && provenance?.generationCutoff === (context.provenanceLockAt || context.lockAt) &&
       Array.isArray(provenance?.inputs) && provenance.inputs.length &&
       Array.isArray(provenance?.marketDependencies)) {
     return { authoritative: true, marketDependencies: provenance.marketDependencies };
@@ -36,10 +36,8 @@ export function lockPredictionRejections(snapshot, context, now) {
   if (snapshot?.season !== context.season || snapshot?.week !== context.week) reasons.push("WRONG_WEEK");
   if (!isCurrentModelIdentity(snapshot?.modelVersion, snapshot?.modelKey)) reasons.push("WRONG_MODEL");
   if (!authority.authoritative) reasons.push("MISSING_AUTHORITY");
-  // Market dependencies are generation-time evidence. They must predate the lock
-  // and the generation moment; the 30-hour freshness bound applies only while the
-  // scheduled pre-lock pipeline runs. The post-lock relaxations below apply only
-  // to the persisted atomic batch (batchProvenance), never to arbitrary rows.
+  // Availability-based locking supplies the invocation as lockAt, so these
+  // legacy atomic-batch catch-up exceptions are never used by current locks.
   const atomicBatch = snapshot?.batchProvenance?.source === ATOMIC_BATCH_SOURCE;
   const catchUp = atomicBatch && now.getTime() > lock;
   if (Array.isArray(authority.marketDependencies) && authority.marketDependencies.some((input) => {
@@ -52,9 +50,6 @@ export function lockPredictionRejections(snapshot, context, now) {
     return Number.isFinite(time) && time > Math.min(generated, lock);
   }))) reasons.push("FUTURE_PERSONNEL_EVIDENCE");
   if (!Number.isFinite(generated) || generated >= lock) reasons.push("POST_LOCK_PREDICTION");
-  // The 24-hour prediction-age and future-kickoff bounds apply only while the
-  // scheduled pre-lock pipeline runs. A post-lock catch-up re-reads the persisted
-  // pre-lock batch, whose games legitimately kicked off after the lock moment.
   if (!Number.isFinite(generated) || (!catchUp &&
       (now.getTime() - generated > 24 * 3600000 || generated > now.getTime()))) reasons.push("STALE_PREDICTION");
   if (!completePrediction(snapshot)) reasons.push("INCOMPLETE_PREDICTION");

@@ -535,27 +535,26 @@ test("a locked multi cannot be changed by later odds, prediction or Best Bets ch
   }
 });
 
-test("the lock only runs at the scheduled lock moment", async () => {
+test("the lock accepts complete valid inputs before the former scheduled moment", async () => {
   const database = lockClient();
   const { res } = await runLock({
     database,
     now: new Date(THURSDAY - 60000),
-    fetchOdds: async () => { throw new Error("must not read odds before the lock"); },
+    fetchOdds: storedOddsFetch(),
   });
-  assert.equal(res.body.status, "not ready");
-  assert.equal(res.body.reason, "OUTSIDE_LOCK_WINDOW");
-  assert.equal(inserts(database).length, 0);
+  assert.equal(res.body.status, "locked");
+  assert.equal(inserts(database).length, 1);
 });
 
-test("mocked AEST clock locks at exactly 10:00, never 09:59, and remains eligible at 10:01", async () => {
+test("mocked clock locks valid inputs on either side of the retired 10:00 deadline", async () => {
   for (const minutes of [-1, 0, 1]) {
     const now = new Date(THURSDAY + minutes * 60000);
     const context = await resolveLockWeekContext(now, { fetchGames: async () => [
       { season: 2026, week: 8, date: CONTEXT.firstKickoffAt },
     ] });
     const { res, database } = await runLock({ now, context, fetchOdds: storedOddsFetch() });
-    assert.equal(res.body.status, minutes < 0 ? "not ready" : "locked");
-    assert.equal(inserts(database).length, minutes < 0 ? 0 : 1);
+    assert.equal(res.body.status, "locked");
+    assert.equal(inserts(database).length, 1);
   }
 });
 

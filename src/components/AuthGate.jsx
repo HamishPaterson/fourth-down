@@ -57,6 +57,9 @@ export default function AuthGate() {
         <span>{state.session.user.email}</span>
         <button type="button" disabled={busy} onClick={() => act(() => controller.current.signOut())}>Sign out</button>
         {actionError && <p role="alert">{actionError}</p>}
+        {state.error && <p role="alert">{state.error}
+          <button type="button" disabled={busy} onClick={() => act(() => controller.current.retry())}>Check approval</button>
+        </p>}
       </div>
       <Suspense fallback={<p role="status">Loading Fourth Down...</p>}><ApprovedApp /></Suspense>
     </>;
