@@ -1,4 +1,4 @@
-import { createClient } from "@supabase/supabase-js";
+﻿import { createClient } from "@supabase/supabase-js";
 import NFLVERSE_PLAYER_METRICS from "../../data/nflverse-player-metrics.js";
 import { playerMetricsResponse } from "../../api-lib/playerMetrics.js";
 import { completePrediction, retainPrediction } from "../../api-lib/predictionEligibility.js";
@@ -1688,6 +1688,41 @@ async function readSnapshots(supabase, request, response) {
   }
 
   let snapshots = (data || []).map(databaseToSnapshot);
+
+  if (String(request.query?.view || "").toLowerCase() === "results") {
+    snapshots = snapshots.map((snapshot) => ({
+      id: snapshot.id,
+      season: snapshot.season,
+      week: snapshot.week,
+      kickoff: snapshot.kickoff,
+      awayCode: snapshot.awayCode,
+      homeCode: snapshot.homeCode,
+      fourthDownPick: snapshot.fourthDownPick,
+      fourthDownAwayScore: snapshot.fourthDownAwayScore,
+      fourthDownHomeScore: snapshot.fourthDownHomeScore,
+      fourthDownAwayWinProbability: snapshot.fourthDownAwayWinProbability,
+      fourthDownHomeWinProbability: snapshot.fourthDownHomeWinProbability,
+      fourthDownWinnerProbability: snapshot.fourthDownWinnerProbability,
+      oddsPick: snapshot.oddsPick,
+      marketAwayScore: snapshot.marketAwayScore,
+      marketHomeScore: snapshot.marketHomeScore,
+      marketGameTotal: snapshot.marketGameTotal,
+      marketSpread: snapshot.marketSpread,
+      actualAwayScore: snapshot.actualAwayScore,
+      actualHomeScore: snapshot.actualHomeScore,
+      actualWinner: snapshot.actualWinner,
+      fourthDownCorrect: snapshot.fourthDownCorrect,
+      oddsCorrect: snapshot.oddsCorrect,
+      gradedAt: snapshot.gradedAt,
+      resultUpdatedAt: snapshot.resultUpdatedAt,
+      resultSource: snapshot.resultSource,
+      savedBeforeKickoff: snapshot.savedBeforeKickoff,
+      snapshotAt: snapshot.snapshotAt,
+      generatedAt: snapshot.generatedAt,
+      authoritative: snapshot.authoritative,
+      shared: true,
+    }));
+  }
   if (request.query?.bets === "display") {
     const { resultGameKey, isValidCompletedResult } = await import("../../src/services/gameResults.js");
     const historicalGames = new Set(String(request.query?.historicalGames || "").split(","));
@@ -2251,3 +2286,4 @@ function setLedgerHeaders(response) {
   response.setHeader("Cache-Control", "no-store, max-age=0");
   response.setHeader("Content-Type", "application/json; charset=utf-8");
 }
+

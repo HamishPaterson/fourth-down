@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+﻿import { useEffect, useMemo, useState } from "react";
 import { CheckCircle2, MinusCircle, XCircle } from "lucide-react";
 import TeamLogo from "../components/TeamLogo.jsx";
 import { TEAM_NAMES } from "../data.js";
@@ -18,7 +18,7 @@ const CURRENT_SCORING_MODEL_START_WEEK = 2;
 export default function Results() {
   const [rows, setRows] = useState(() => readPredictionLedger());
   const [week, setWeek] = useState("all");
-  const [syncStatus, setSyncStatus] = useState("Loading saved results...");
+  const [syncStatus, setSyncStatus] = useState("Loading results...");
   const [initialLoading, setInitialLoading] = useState(true);
 
   useEffect(() => {
@@ -30,6 +30,8 @@ export default function Results() {
       controller = new AbortController();
 
       let authoritativeRows = readPredictionLedger();
+      let authoritativeLoaded = false;
+      setSyncStatus("Loading results...");
 
       try {
         if (!hasMigratedSharedLedger()) {
@@ -38,10 +40,12 @@ export default function Results() {
 
         const sharedRows = await refreshPredictionLedger({
           signal: controller.signal,
+          resultsView: true,
         });
 
         if (sharedRows.length) {
           authoritativeRows = sharedRows;
+          authoritativeLoaded = true;
         }
       } catch (sharedError) {
         if (sharedError?.name === "AbortError" || cancelled) return;
@@ -68,7 +72,7 @@ export default function Results() {
 
         const count = canonicalRows.filter(isValidCompletedResult).length;
         setSyncStatus(
-          `Results updated · ${count} graded game${count === 1 ? "" : "s"}`
+          `Results updated Â· ${count} graded game${count === 1 ? "" : "s"}`
         );
         setInitialLoading(false);
       } catch (error) {
@@ -106,6 +110,8 @@ export default function Results() {
   const filtered = week === "all"
     ? completed
     : completed.filter((row) => Number(row.week) === Number(week));
+
+  const weekOneHistorical = Number(week) === 1;
 
   const fourthDown = calculateRecord(filtered, "fourthDownCorrect", "fourthDownPick");
   const odds = calculateRecord(filtered, "oddsCorrect", "oddsPick");
@@ -159,36 +165,36 @@ export default function Results() {
       <div className="results-summary-grid">
         <CalibrationCard
           label="Brier score"
-          value={calibration.graded ? calibration.brier.toFixed(3) : "Not graded"}
-          detail={`${calibration.graded} of ${filtered.length} games eligible`}
+          value={weekOneHistorical ? "Unavailable" : calibration.graded ? calibration.brier.toFixed(3) : "Not graded"}
+          detail={weekOneHistorical ? "Pre-game win probabilities were not recorded for Week 1." : `${calibration.graded} of ${filtered.length} games eligible`}
         />
         <CalibrationCard
           label="Average margin error"
-          value={scoring.graded ? `${scoring.marginError.toFixed(1)} pts` : "Not graded"}
-          detail={`Weeks 2+ · ${scoring.graded} score-graded games`}
+          value={weekOneHistorical ? "Unavailable" : scoring.graded ? `${scoring.marginError.toFixed(1)} pts` : "Not graded"}
+          detail={`Weeks 2+ Â· ${scoring.graded} score-graded games`}
         />
         <CalibrationCard
           label="Average total error"
-          value={scoring.graded ? `${scoring.totalError.toFixed(1)} pts` : "Not graded"}
-          detail={`Weeks 2+ · ${scoring.graded} score-graded games`}
+          value={weekOneHistorical ? "Unavailable" : scoring.graded ? `${scoring.totalError.toFixed(1)} pts` : "Not graded"}
+          detail={`Weeks 2+ Â· ${scoring.graded} score-graded games`}
         />
       </div>
 
       <div className="results-summary-grid">
         <CalibrationCard
           label="Fourth Down total bias"
-          value={scoring.graded ? formatSignedMetric(scoring.totalBias) : "Not graded"}
-          detail={`Weeks 2+ · ${scoring.graded} score-graded games`}
+          value={weekOneHistorical ? "Unavailable" : scoring.graded ? formatSignedMetric(scoring.totalBias) : "Not graded"}
+          detail={`Weeks 2+ Â· ${scoring.graded} score-graded games`}
         />
         <CalibrationCard
           label="Fourth Down margin bias"
-          value={scoring.graded ? formatSignedMetric(scoring.marginBias) : "Not graded"}
-          detail={`Weeks 2+ · ${scoring.graded} score-graded games`}
+          value={weekOneHistorical ? "Unavailable" : scoring.graded ? formatSignedMetric(scoring.marginBias) : "Not graded"}
+          detail={`Weeks 2+ Â· ${scoring.graded} score-graded games`}
         />
         <CalibrationCard
           label="Market total error"
           value={marketScoring.totalGraded ? `${marketScoring.totalError.toFixed(1)} pts` : "Unavailable"}
-          detail={`Weeks 2+ · ${marketScoring.totalGraded} market-total games`}
+          detail={`Weeks 2+ Â· ${marketScoring.totalGraded} market-total games`}
         />
       </div>
 
@@ -309,7 +315,7 @@ function ResultGameCard({ result }) {
       <span className="results-centre-line" aria-hidden="true" />
 
       <div className="game-meta results-game-meta">
-        <span>Regular season · Week {result.week}</span>
+        <span>Regular season Â· Week {result.week}</span>
         <strong>FINAL</strong>
       </div>
 
@@ -555,3 +561,7 @@ function formatDate(value) {
 function sortResults(first, second) {
   return Number(second.week) - Number(first.week) || new Date(second.kickoff) - new Date(first.kickoff);
 }
+
+
+
+

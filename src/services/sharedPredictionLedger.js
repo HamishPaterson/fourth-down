@@ -1,4 +1,4 @@
-import { apiFetch as fetch } from "./supabaseAuth.js";
+﻿import { apiFetch as fetch } from "./supabaseAuth.js";
 
 const ENDPOINT = "/api/nfl/game-stats?action=predictions";
 const GRADE_ENDPOINT = "/api/nfl/game-stats?action=predictions&mode=grade";
@@ -8,6 +8,7 @@ export async function fetchSharedPredictionLedger(options = {}) {
   if (options.season) params.set("season", String(options.season));
   if (options.week) params.set("week", String(options.week));
   if (options.displayBets) params.set("bets", "display");
+  if (options.resultsView) params.set("view", "results");
   if (options.historicalGames?.length) params.set("historicalGames", options.historicalGames.join(","));
 
   const response = await fetch(
@@ -84,3 +85,4 @@ async function readJson(response) {
     throw new Error("Shared ledger returned invalid JSON");
   }
 }
+
