@@ -5,7 +5,7 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { createServer } from "vite";
 import { applyPredictionSnapshot } from "../src/services/predictionSnapshot.js";
-import { choosePredictionSnapshot, readPredictionLedger, savePredictionSnapshot, refreshPredictionLedger, migrateLocalPredictionLedger } from "../src/services/predictionLedger.js";
+import { choosePredictionSnapshot, readPredictionLedger, savePredictionSnapshot } from "../src/services/predictionLedger.js";
 import { fetchSharedPredictionLedger } from "../src/services/sharedPredictionLedger.js";
 import { combinedDecimalOdds, formatAustralianOdds, usableDecimalOdds } from "../src/services/oddsDisplay.js";
 import { createPredictionLedgerHandler, snapshotToDatabase } from "../api/nfl/game-stats.js";
@@ -135,8 +135,9 @@ test("real ledger refresh repairs corrupted local scores at the same saved times
     return { ok: true, text: async () => JSON.stringify({ snapshots: [saved()] }) };
   };
   try {
-    await refreshPredictionLedger({ season: 2030, week: 6 });
-    await migrateLocalPredictionLedger();
+    const ledger = await server.ssrLoadModule("/src/services/predictionLedger.js");
+    await ledger.refreshPredictionLedger({ season: 2030, week: 6 });
+    await ledger.migrateLocalPredictionLedger();
     const row = readPredictionLedger().find((r) => r.id === saved().id);
     assert.equal(row.fourthDownAwayScore, 21);
     assert.equal(row.snapshotAt, saved().snapshotAt);
@@ -285,7 +286,13 @@ test("Weekly Multi dispatcher never mutates headers after successful/not-found/e
 
 let server, Matchup, PredictionCard, WeeklyParlay;
 before(async () => {
-  server = await createServer({ server: { middlewareMode: true, hmr: false, watch: null }, appType: "custom" });
+  server = await createServer({ server: { middlewareMode: true, hmr: false, watch: null }, appType: "custom",
+    plugins: [{ name: "ledger-network-test-boundary", transform(code, id) {
+      if (id.replace(/\\/g, "/").endsWith("/src/services/sharedPredictionLedger.js")) {
+        return code.replace('import { apiFetch as fetch } from "./supabaseAuth.js";',
+          "const fetch = (...args) => globalThis.fetch(...args);");
+      }
+    } }] });
   Matchup = (await server.ssrLoadModule("/src/components/MatchupPrediction.jsx")).default;
   const predictions = await server.ssrLoadModule("/src/pages/Predictions.jsx");
   PredictionCard = predictions.PredictionCard;

@@ -252,7 +252,63 @@ week, ordered team codes and kickoff, never display names or elapsed time.
 Completed cards retain the saved projection alongside a separate final score and
 pick outcome (ties remain neutral). Their saved Best Bets are historical only:
 current-market display reassessment is skipped and no forecast is regenerated.
-The Results page's grading and persistence behaviour is unchanged.
+Results grading persists separately as described below; saved pregame inputs
+remain unchanged.
+
+### Results grading persistence and 2026 Weeks 4-9 backfill
+
+Results continues to hydrate finals from `/api/nfl/schedule?results=1`. Saving
+verified grades updates the browser cache immediately, then calls the existing
+shared grading endpoint, not the snapshot-save endpoint. Remote failures are
+reported in the console and retain local grades for a later retry. The server
+re-reads saved predictions and the same schedule/results source, matches season,
+week and canonical ordered matchup, and requires final status plus finite scores.
+Winner correctness is calculated from the saved picks, never caller-supplied picks.
+
+Grading updates only `actual_away_score`, `actual_home_score`, `actual_winner`,
+`fourth_down_correct`, `market_correct` and `graded_at`. It does not update
+`data_quality`, prediction/model/odds evidence, timestamps of prediction generation
+or any pregame fields. Already graded rows are returned unchanged; conditional
+writes reject concurrent prediction changes. Responses contain grading summaries,
+not copies of historical model evidence. Authenticated approval and same-origin
+rules remain required for ordinary browser grading.
+
+The explicit POST mode
+`/api/nfl/game-stats?action=predictions&mode=backfill-grades` requires the exact
+server `CRON_SECRET` bearer and an explicit boolean `dryRun`. It reads only existing
+2026 Weeks 4-9 rows and reuses the same verified grading implementation. An optional
+integer `week` can narrow that range but cannot extend it. No prediction generation,
+historical input repair, new cron, migration or hard-coded final scores are involved.
+Weeks 1-3 and 10 are never selected by this backfill. Missing/non-final results are
+reported as rejected/pending rather than invented.
+
+After deployment, set `FOURTH_DOWN_URL` to the production origin and securely load
+the existing `CRON_SECRET` into the shell environment. Preview each week first:
+
+```powershell
+$uri = "$($env:FOURTH_DOWN_URL.TrimEnd('/'))/api/nfl/game-stats?action=predictions&mode=backfill-grades"
+$headers = @{ Authorization = "Bearer $env:CRON_SECRET" }
+4..9 | ForEach-Object {
+  Invoke-RestMethod -Method Post -Uri $uri -Headers $headers -ContentType "application/json" `
+    -Body (@{ week = $_; dryRun = $true } | ConvertTo-Json)
+}
+```
+
+Inspect every response: no rejected/pending games should remain for these completed
+weeks. Based on the supplied production counts, 87 newly graded rows are expected,
+with the existing Week 5 grade unchanged. Then explicitly apply:
+
+```powershell
+4..9 | ForEach-Object {
+  Invoke-RestMethod -Method Post -Uri $uri -Headers $headers -ContentType "application/json" `
+    -Body (@{ week = $_; dryRun = $false } | ConvertTo-Json)
+}
+```
+
+The commands are safe to retry; each response separates newly graded, unchanged,
+pending and rejected rows. Week 10 stays pending until verified finals exist and
+ordinary Results grading persists them. The weekly breakdown remains derived from
+all graded rows, so later weeks appear without UI changes.
 
 The Predictions page consumes the returned shared ledger directly, even when
 browser storage is full or unavailable. Saved Best Bets remain display-only:

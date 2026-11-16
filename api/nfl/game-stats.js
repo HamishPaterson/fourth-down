@@ -22,7 +22,8 @@ const TEAM_ALIASES = {
   STL: "LAR",
 };
 
-import { withApprovedUser } from "../../api-lib/authorization.js";
+import { isTrustedJob, withApprovedUser } from "../../api-lib/authorization.js";
+import { isFinalGame, getGameTeamCode as getResultTeamCode, getGameScore as getResultScore } from "../../src/services/gameResults.js";
 
 export default withApprovedUser(handler);
 export async function handler(req, res) {
@@ -1583,12 +1584,30 @@ function roundThree(value) {
 // Shared Supabase prediction ledger actions.
 const handlePredictionLedger = createPredictionLedgerHandler();
 
-export function createPredictionLedgerHandler({ createClient = createServerClient } = {}) {
+export function createPredictionLedgerHandler({
+  createClient = createServerClient,
+  loadResults = loadGradingResults,
+} = {}) {
   return async function predictionLedgerHandler(request, response) {
     setLedgerHeaders(response);
 
     if (request.method === "OPTIONS") {
       return response.status(204).end();
+    }
+    const backfill = String(request.query?.mode || "").toLowerCase() === "backfill-grades";
+    if (backfill && !isTrustedJob(request.headers?.authorization)) {
+      return response.status(401).json({ error: "Server authorization required" });
+    }
+    if (backfill && request.method !== "POST") {
+      return response.status(405).json({ error: "Backfill requires POST" });
+    }
+    if (backfill && typeof parseBody(request.body)?.dryRun !== "boolean") {
+      return response.status(400).json({ error: "Explicit dryRun boolean required" });
+    }
+    const backfillWeek = parseBody(request.body)?.week;
+    if (backfill && backfillWeek !== undefined &&
+        (!Number.isInteger(backfillWeek) || backfillWeek < 4 || backfillWeek > 9)) {
+      return response.status(400).json({ error: "Backfill week must be within 2026 Weeks 4-9" });
     }
 
     let supabase;
@@ -1605,12 +1624,22 @@ export function createPredictionLedgerHandler({ createClient = createServerClien
       }
 
       if (request.method === "POST") {
+        if (backfill) {
+          let query = supabase.from("prediction_snapshots").select("*")
+            .eq("season", 2026).gte("week", 4).lte("week", 9);
+          if (backfillWeek !== undefined) query = query.eq("week", backfillWeek);
+          const { data, error } = await query;
+          if (error) throw new Error("Backfill prediction read failed");
+          return await gradeSnapshots(supabase, {
+            body: { results: (data || []).map(databaseToSnapshot) },
+          }, response, { loadResults, dryRun: parseBody(request.body).dryRun, savedRows: data || [] });
+        }
         if (!isSameOriginRequest(request)) {
           return response.status(403).json({ error: "Cross-origin writes are not allowed" });
         }
 
         if (String(request.query?.mode || "").toLowerCase() === "grade") {
-          return await gradeSnapshots(supabase, request, response);
+          return await gradeSnapshots(supabase, request, response, { loadResults });
         }
 
         return await saveSnapshots(supabase, request, response);
@@ -1781,33 +1810,58 @@ async function saveSnapshots(supabase, request, response) {
   });
 }
 
-async function gradeSnapshots(supabase, request, response) {
+async function loadGradingResults(season, week) {
+  const { createScheduleHandler } = await import("./schedule.js");
+  let status = 200, body;
+  await createScheduleHandler()({
+    method: "GET", query: { season: String(season), week: String(week), results: "1" },
+  }, {
+    setHeader() {},
+    status(code) { status = code; return this; },
+    json(value) { body = value; return this; },
+  });
+  if (status !== 200 || !Array.isArray(body?.games) ||
+      Number(body.season) !== season || Number(body.week) !== week) {
+    throw new Error("Verified final results unavailable");
+  }
+  return body.games;
+}
+
+async function gradeSnapshots(supabase, request, response, { loadResults, dryRun = false, savedRows }) {
   const body = parseBody(request.body);
   const rows = Array.isArray(body?.results) ? body.results : [];
   const graded = [];
   const rejected = [];
+  const pending = [];
+  const unchanged = [];
+  const gamesByWeek = new Map();
+  if (!rows.length) {
+    return response.status(200).json({ graded, rejected, pending, unchanged, count: 0, dryRun });
+  }
 
   for (const result of rows) {
     const season = ledgerIntegerOrNull(result?.season);
     const week = ledgerIntegerOrNull(result?.week);
     const awayCode = ledgerNormaliseTeam(result?.awayCode);
     const homeCode = ledgerNormaliseTeam(result?.homeCode);
-    const awayScore = ledgerNullableNumber(result?.actualAwayScore);
-    const homeScore = ledgerNullableNumber(result?.actualHomeScore);
-
+    const identity = { season, week, awayCode, homeCode };
     if (
       season === null ||
+      season < 2000 ||
       week === null ||
+      week < 1 || week > 18 ||
       !awayCode ||
       !homeCode ||
-      awayScore === null ||
-      homeScore === null
+      awayCode === homeCode
     ) {
-      rejected.push({ result, reason: "Invalid result" });
+      rejected.push({ result: identity, reason: "Invalid result" });
       continue;
     }
 
-    const { data: existing, error: readError } = await supabase
+    const read = savedRows ? {
+      data: savedRows.find((row) => row.season === season && row.week === week &&
+        row.away_code === awayCode && row.home_code === homeCode), error: null,
+    } : await supabase
       .from("prediction_snapshots")
       .select("*")
       .eq("season", season)
@@ -1815,12 +1869,44 @@ async function gradeSnapshots(supabase, request, response) {
       .eq("away_code", awayCode)
       .eq("home_code", homeCode)
       .maybeSingle();
+    const { data: existing, error: readError } = read;
 
     if (readError || !existing) {
       rejected.push({
-        result,
+        result: identity,
         reason: readError?.message || "Prediction not found",
       });
+      continue;
+    }
+    const existingSnapshot = databaseToSnapshot(existing);
+    if (hasFinalResult(existingSnapshot)) {
+      unchanged.push(gradingSummary(existingSnapshot));
+      continue;
+    }
+    const weekKey = `${season}:${week}`;
+    if (!gamesByWeek.has(weekKey)) {
+      // Cache the promise too: one failed week is reported, not repeatedly fetched.
+      gamesByWeek.set(weekKey, Promise.resolve().then(() => loadResults(season, week)));
+    }
+    let games;
+    try { games = await gamesByWeek.get(weekKey); }
+    catch {
+      rejected.push({ result: identity, reason: "Verified final results unavailable" });
+      continue;
+    }
+    const matches = games.filter((game) =>
+      Number(game.season?.year ?? game.season ?? season) === season &&
+      Number(game.week?.number ?? game.week) === week &&
+      getResultTeamCode(game, "away") === awayCode && getResultTeamCode(game, "home") === homeCode);
+    if (matches.length !== 1) {
+      rejected.push({ result: identity, reason: "Verified result identity missing or ambiguous" });
+      continue;
+    }
+    const game = matches[0];
+    const awayScore = getResultScore(game, "away");
+    const homeScore = getResultScore(game, "home");
+    if (!isFinalGame(game) || awayScore === null || homeScore === null) {
+      pending.push(gradingSummary(existingSnapshot));
       continue;
     }
 
@@ -1839,41 +1925,37 @@ async function gradeSnapshots(supabase, request, response) {
       ? ledgerNormaliseTeam(existing.market_pick) === actualWinner
       : null;
 
-    const snapshot = existing?.data_quality?.snapshot || {};
     const gradedAt = new Date().toISOString();
-
-    const { data, error } = await supabase
-      .from("prediction_snapshots")
-      .update({
-        actual_away_score: awayScore,
-        actual_home_score: homeScore,
-        actual_winner: actualWinner,
-        fourth_down_correct: fourthDownCorrect,
-        market_correct: marketCorrect,
-        graded_at: gradedAt,
-        updated_at: gradedAt,
-        data_quality: {
-          ...(existing.data_quality || {}),
-          snapshot: {
-            ...snapshot,
-            actualAwayScore: awayScore,
-            actualHomeScore: homeScore,
-            actualWinner,
-            fourthDownCorrect,
-            oddsCorrect: marketCorrect,
-            gradedAt,
-          },
-        },
-      })
-      .eq("id", existing.id)
-      .select("*")
-      .single();
-
-    if (error) {
-      rejected.push({ result, reason: error.message });
-    } else {
-      graded.push(databaseToSnapshot(data));
+    const patch = {
+      actual_away_score: awayScore,
+      actual_home_score: homeScore,
+      actual_winner: actualWinner,
+      fourth_down_correct: fourthDownCorrect,
+      market_correct: marketCorrect,
+      graded_at: gradedAt,
+    };
+    if (dryRun) {
+      graded.push(gradingSummary(databaseToSnapshot({ ...existing, ...patch })));
+      continue;
     }
+    let update = supabase
+      .from("prediction_snapshots")
+      .update(patch).eq("id", existing.id);
+    update = existing.updated_at ? update.eq("updated_at", existing.updated_at) : update.is("updated_at", null);
+    update = existing.graded_at ? update.eq("graded_at", existing.graded_at) : update.is("graded_at", null);
+    const { data, error } = await update.select("*").maybeSingle();
+
+    if (error || !data) {
+      rejected.push({ result: identity, reason: error?.message || "Prediction changed concurrently; retry grading" });
+    } else {
+      graded.push(gradingSummary(databaseToSnapshot(data)));
+    }
+  }
+
+  function gradingSummary(snapshot) {
+    return Object.fromEntries(["id", "season", "week", "awayCode", "homeCode", "actualAwayScore",
+      "actualHomeScore", "actualWinner", "fourthDownCorrect", "oddsCorrect", "gradedAt"]
+      .map((key) => [key, snapshot[key]]));
   }
 
   return response
@@ -1881,7 +1963,10 @@ async function gradeSnapshots(supabase, request, response) {
     .json({
       graded,
       rejected,
+      pending,
+      unchanged,
       count: graded.length,
+      dryRun,
     });
 }
 
@@ -2053,6 +2138,8 @@ function hasPrediction(snapshot) {
 function hasFinalResult(snapshot) {
   return Boolean(
     snapshot?.actualWinner &&
+    snapshot.actualAwayScore !== null && snapshot.actualAwayScore !== undefined && snapshot.actualAwayScore !== "" &&
+    snapshot.actualHomeScore !== null && snapshot.actualHomeScore !== undefined && snapshot.actualHomeScore !== "" &&
     Number.isFinite(Number(snapshot.actualAwayScore)) &&
     Number.isFinite(Number(snapshot.actualHomeScore))
   );

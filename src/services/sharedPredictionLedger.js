@@ -58,12 +58,18 @@ export async function gradeSharedPredictions(results, options = {}) {
       Accept: "application/json",
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({ results: rows }),
+    body: JSON.stringify({ results: rows.map((row) => ({
+      season: row.season, week: row.week, awayCode: row.awayCode, homeCode: row.homeCode,
+      actualAwayScore: row.actualAwayScore, actualHomeScore: row.actualHomeScore,
+    })) }),
   });
   const body = await readJson(response);
 
   if (!response.ok) {
     throw new Error(body?.error || `Shared grading failed (${response.status})`);
+  }
+  if (body?.rejected?.length || body?.pending?.length) {
+    throw new Error(`Shared grading incomplete: ${body.rejected?.length || 0} rejected, ${body.pending?.length || 0} pending`);
   }
 
   return body;

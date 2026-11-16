@@ -1,7 +1,7 @@
 import { timingSafeEqual } from "node:crypto";
 import { createClient } from "@supabase/supabase-js";
 
-function isTrustedJob(authorization) {
+export function isTrustedJob(authorization) {
   const secret = process.env.CRON_SECRET;
   if (!secret || typeof authorization !== "string") return false;
   const actual = Buffer.from(authorization);

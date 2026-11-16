@@ -199,6 +199,7 @@ export function saveGradedPredictions(rows) {
   for (const row of rows) mergeRow(merged, row);
 
   writeStoredRows([...merged.values()]);
+  return persistGradedRows(rows);
 }
 
 function mergeLedgerCollections(firstRows, secondRows) {
@@ -227,14 +228,8 @@ function persistGradedRows(rows) {
   const graded = rows.filter((row) => hasFinalResult(row));
   if (!graded.length) return;
 
-  Promise.allSettled([
-    saveSharedPredictionSnapshots(graded),
-    gradeSharedPredictions(graded),
-  ]).then((results) => {
-    const failed = results.find((result) => result.status === "rejected");
-    if (failed) {
-      console.warn("Shared grading partially failed; local results retained", failed.reason);
-    }
+  return gradeSharedPredictions(graded).catch((error) => {
+    console.warn("Shared grading failed; local results retained", error);
   });
 }
 
@@ -326,6 +321,8 @@ function ledgerMatchupKey(row) {
 function hasFinalResult(row) {
   return Boolean(
     row?.actualWinner &&
+      hasNumber(row.actualAwayScore) &&
+      hasNumber(row.actualHomeScore) &&
       Number.isFinite(Number(row.actualAwayScore)) &&
       Number.isFinite(Number(row.actualHomeScore))
   );

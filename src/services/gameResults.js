@@ -1,13 +1,12 @@
 export function normalizeResultTeam(code) {
   const normalized = String(code || "").trim().toUpperCase();
-  return { WAS: "WSH", LA: "LAR", OAK: "LV", SD: "LAC", STL: "LAR" }[normalized] || normalized;
+  return { WAS: "WSH", LA: "LAR", JAC: "JAX", OAK: "LV", SD: "LAC", STL: "LAR" }[normalized] || normalized;
 }
 
 export function isFinalGame(game) {
   if (game.completed === true) return true;
   const status = String(game.status || game.status_state || game.state || "").toLowerCase();
-  return status.includes("final") || status.includes("complete") ||
-    status.includes("closed") || status === "post";
+  return /^(final(?:\b|_)|completed?$|closed$|post$|status_final$)/.test(status);
 }
 
 export function getGameTeamCode(game, side) {
@@ -31,6 +30,8 @@ export function getGameScore(game, side) {
 
 export function isValidCompletedResult(row) {
   if (!row?.actualWinner) return false;
+  if ([row.actualAwayScore, row.actualHomeScore].some((score) =>
+    score === null || score === undefined || score === "")) return false;
   const away = Number(row.actualAwayScore);
   const home = Number(row.actualHomeScore);
   return Number.isFinite(away) && Number.isFinite(home) && !(away === 0 && home === 0);

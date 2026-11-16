@@ -1,5 +1,6 @@
 import { createWeeklyMultiCurrentHandler } from "../../api-lib/weeklyMulti.js";
 import { withApprovedUser } from "../../api-lib/authorization.js";
+import { isFinalGame } from "../../src/services/gameResults.js";
 
 const API_URL =
   "https://api.balldontlie.io/nfl/v1/games";
@@ -386,16 +387,7 @@ function getVenue(game) {
 }
 
 function isCompletedGame(game) {
-  if (game?.completed === true) return true;
-  const status = String(
-    game?.status || game?.status_state || game?.state || ""
-  ).toLowerCase();
-  return (
-    status.includes("final") ||
-    status.includes("complete") ||
-    status.includes("closed") ||
-    status === "post"
-  );
+  return isFinalGame(game);
 }
 
 function getGameScore(game, side) {

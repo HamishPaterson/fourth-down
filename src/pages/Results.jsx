@@ -4,7 +4,7 @@ import { CheckCircle2, MinusCircle, XCircle } from "lucide-react";
 import TeamLogo from "../components/TeamLogo.jsx";
 import { TEAM_NAMES } from "../data.js";
 import { getTeamTheme } from "../services/teamThemes.js";
-import { isFinalGame, getGameTeamCode, getGameScore, isValidCompletedResult } from "../services/gameResults.js";
+import { isFinalGame, getGameTeamCode, getGameScore, isValidCompletedResult, normalizeResultTeam as normalizeTeamCode } from "../services/gameResults.js";
 import {
   hasMigratedSharedLedger,
   migrateLocalPredictionLedger,
@@ -339,6 +339,7 @@ async function hydrateFinalScores(rows, signal) {
         games: (Array.isArray(body.games) ? body.games : []).map(
           (game) => ({
             ...game,
+            season: game.season ?? season,
             requestedWeek: week,
           })
         ),
@@ -399,7 +400,8 @@ async function hydrateFinalScores(rows, signal) {
 }
 
 function resultMatchesGame(row, game) {
-  return Number(row.week) === Number(game.week ?? game.requestedWeek) &&
+  return getResultSeason(row) === Number(game.season?.year ?? game.season) &&
+    Number(row.week) === Number(game.week ?? game.requestedWeek) &&
     normalizeTeamCode(row.awayCode) === getGameTeamCode(game, "away") &&
     normalizeTeamCode(row.homeCode) === getGameTeamCode(game, "home");
 }
@@ -409,11 +411,6 @@ function getResultSeason(row) {
   if (Number.isInteger(explicit)) return explicit;
   const kickoff = new Date(row.kickoff);
   return Number.isNaN(kickoff.getTime()) ? new Date().getUTCFullYear() : kickoff.getUTCFullYear();
-}
-
-function normalizeTeamCode(code) {
-  const normalized = String(code || "").trim().toUpperCase();
-  return { WAS: "WSH", LA: "LAR", OAK: "LV", SD: "LAC", STL: "LAR" }[normalized] || normalized;
 }
 
 function ResultGameCard({ result }) {
