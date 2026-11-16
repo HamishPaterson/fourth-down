@@ -16,6 +16,7 @@ import { predictionFeatureFixture } from "./personnelTestHelpers.js";
 import { CURRENT_MODEL_VERSION, CURRENT_MODEL_KEY } from "../src/services/modelIdentity.js";
 import { resultGameKey } from "../src/services/gameResults.js";
 import { getCurrentWeekWindow } from "../api/nfl/odds.js";
+import { withApprovedUser } from "./authorization.js";
 
 const saved = () => {
   const cutoff = "2030-10-16T00:15:00Z";
@@ -147,6 +148,108 @@ test("real ledger refresh repairs corrupted local scores at the same saved times
   } finally { global.window = originalWindow; global.fetch = originalFetch; }
 });
 
+const resultFields = new Set(["actualAwayScore", "actualHomeScore", "actualWinner",
+  "fourthDownCorrect", "oddsCorrect", "gradedAt", "resultUpdatedAt", "resultSource"]);
+const predictionEvidence = (row) => Object.fromEntries(Object.entries(row)
+  .filter(([key]) => !resultFields.has(key)));
+const finalSnapshot = () => ({
+  ...saved(), actualAwayScore: 27, actualHomeScore: 20, actualWinner: "SEA",
+  fourthDownCorrect: true, oddsCorrect: false, gradedAt: "2030-10-17T01:00:00Z",
+  resultUpdatedAt: "2030-10-17T01:00:00Z", resultSource: "verified-server",
+});
+function browserLedger(t, initial, remoteRows) {
+  const priorWindow = global.window, calls = [];
+  const storage = new Map([["fourth-down:prediction-ledger:v1", JSON.stringify(initial)]]);
+  global.window = { localStorage: { getItem: (key) => storage.get(key) || null,
+    setItem: (key, value) => storage.set(key, value) }, dispatchEvent() {} };
+  t.after(() => { global.window = priorWindow; });
+  t.mock.method(global, "fetch", async (url, options) => {
+    calls.push({ url, options });
+    assert.equal(options.method, undefined, "Reconciliation must never grade or save predictions");
+    assert.equal(options.cache, "no-store");
+    return { ok: true, text: async () => JSON.stringify({ snapshots: remoteRows() }) };
+  });
+  return { calls, cached: () => JSON.parse(storage.get("fourth-down:prediction-ledger:v1")) };
+}
+
+for (const state of ["stale final", "ungraded"]) {
+  test(`refresh replaces ${state} local grading and prediction evidence with the shared snapshot`, async (t) => {
+    const shared = finalSnapshot();
+    const local = { ...shared, fourthDownAwayScore: 99, fourthDownHomeScore: 0,
+      fourthDownAwayWinProbability: .99, fourthDownHomeWinProbability: .01,
+      modelKey: "local-corruption", predictionPayload: { corrupted: true },
+      bestBets: { corrupted: true }, anytimeTdScorer: { corrupted: true },
+      personnelViews: { corrupted: true }, externalFactors2026: { corrupted: true },
+      generatedAt: "2099-01-01", updatedAt: "2099-01-01", localOnlyEvidence: "must not leak",
+      actualAwayScore: state === "stale final" ? 7 : null,
+      actualHomeScore: state === "stale final" ? 35 : null,
+      actualWinner: state === "stale final" ? "DEN" : null,
+      fourthDownCorrect: false, oddsCorrect: true, gradedAt: "2099-01-01",
+    };
+    const { cached, calls } = browserLedger(t, [local], () => [shared]);
+    const ledger = await server.ssrLoadModule("/src/services/predictionLedger.js");
+    const rows = await ledger.refreshPredictionLedger();
+    assert.deepEqual(rows, [shared], "the network response wins even over cached shared flags and newer timestamps");
+    assert.deepEqual(cached(), [shared], "existing storage self-heals without being cleared");
+    assert.deepEqual(await ledger.refreshPredictionLedger(), rows);
+    assert.deepEqual(cached(), rows);
+    assert.equal(calls.length, 2);
+  });
+}
+
+test("pending local final overlays only result fields until the shared persisted grade arrives", async (t) => {
+  const shared = { ...saved(), oddsPick: "DEN", actualAwayScore: null, actualHomeScore: null,
+    actualWinner: null, fourthDownCorrect: null, oddsCorrect: null, gradedAt: null };
+  const local = { ...finalSnapshot(), shared: false, authoritative: false,
+    awayCode: "DEN", homeCode: "SEA", actualAwayScore: 20, actualHomeScore: 27,
+    fourthDownPick: "DEN", oddsPick: "SEA", fourthDownCorrect: false, oddsCorrect: true,
+    predictionPayload: { corrupted: true }, bestBets: { corrupted: true },
+    personnelViews: { corrupted: true }, generatedAt: "2099-01-01", localOnlyEvidence: true };
+  let remote = shared;
+  const { cached } = browserLedger(t, [local], () => [remote]);
+  const ledger = await server.ssrLoadModule("/src/services/predictionLedger.js");
+  const [pending] = await ledger.refreshPredictionLedger();
+  assert.deepEqual(predictionEvidence(pending), predictionEvidence(shared));
+  assert.deepEqual([pending.actualAwayScore, pending.actualHomeScore, pending.actualWinner], [27, 20, "SEA"]);
+  assert.equal(pending.fourthDownCorrect, true, "correctness uses the authoritative saved pick");
+  assert.equal(pending.oddsCorrect, false);
+  assert.equal(pending.resultSource, local.resultSource);
+  assert.deepEqual(await ledger.refreshPredictionLedger(), [pending]);
+  remote = { ...shared, actualAwayScore: 24, actualHomeScore: 30, actualWinner: "DEN",
+    fourthDownCorrect: false, oddsCorrect: true, gradedAt: "2030-10-17T02:00:00Z" };
+  assert.deepEqual(await ledger.refreshPredictionLedger(), [remote]);
+  assert.deepEqual(cached(), [remote]);
+  assert.deepEqual(await ledger.refreshPredictionLedger(), [remote]);
+});
+
+test("shared authority takes precedence over local finality when selecting snapshots", () => {
+  const shared = saved(), local = { ...finalSnapshot(), shared: false, authoritative: false };
+  assert.equal(choosePredictionSnapshot(local, shared), shared);
+  assert.equal(choosePredictionSnapshot(shared, local), shared);
+  const newer = { ...finalSnapshot(), updatedAt: "2030-10-17T02:00:00Z" };
+  const stale = { ...finalSnapshot(), actualWinner: "DEN" };
+  assert.equal(choosePredictionSnapshot(stale, newer), newer);
+});
+
+test("legacy browser finals cannot replace persisted shared results when the healed cache is read", async (t) => {
+  const shared = { ...finalSnapshot(), id: "shared-week-two", season: 2026, week: 2,
+    awayCode: "NO", homeCode: "BAL", actualAwayScore: 31, actualHomeScore: 28,
+    actualWinner: "NO", fourthDownPick: "NO", oddsPick: "BAL",
+    savedBeforeKickoff: false, resultSource: "persisted-correction" };
+  browserLedger(t, [], () => [shared]);
+  const ledger = await server.ssrLoadModule("/src/services/predictionLedger.js");
+  await ledger.refreshPredictionLedger();
+  assert.deepEqual(ledger.readPredictionLedger().find((row) => row.id === shared.id), shared);
+});
+
+test("incomplete local scores do not become a temporary final on the authoritative shared row", async (t) => {
+  const shared = { ...saved(), actualAwayScore: null, actualHomeScore: null, actualWinner: null };
+  const local = { ...finalSnapshot(), actualAwayScore: null, shared: false };
+  browserLedger(t, [local], () => [shared]);
+  const ledger = await server.ssrLoadModule("/src/services/predictionLedger.js");
+  assert.deepEqual(await ledger.refreshPredictionLedger(), [shared]);
+});
+
 function response() {
   return {
     statusCode: 200, body: null, headers: {}, headersSent: false, responses: 0, lateHeaders: 0,
@@ -206,6 +309,77 @@ test("ledger successful and not-found reads return HTTP 200 exactly once", async
     assert.equal(res.statusCode, 200);
     assert.equal(res.body.snapshots.length, initial.length);
   }
+});
+
+test("authenticated ledger GET and normal refresh expose all graded weeks and repair a stale browser cache", async (t) => {
+  const counts = [19, 16, 16, 16, 15, 14, 14, 14, 15, 14];
+  const matchups = [["SEA", "NE"], ["LAR", "SF"], ["DET", "NO"], ["CIN", "TB"],
+    ["IND", "BAL"], ["JAX", "CLE"], ["TEN", "NYJ"], ["HOU", "BUF"],
+    ["PIT", "ATL"], ["CAR", "CHI"], ["MIN", "GB"], ["LV", "MIA"],
+    ["LAC", "ARI"], ["PHI", "WSH"], ["NYG", "DAL"], ["DEN", "KC"],
+    ["NE", "CHI"], ["SEA", "DEN"], ["GB", "DET"]];
+  const snapshots = counts.flatMap((count, i) => Array.from({ length: count }, (_, index) => {
+    const week = i + 1;
+    const [awayCode, homeCode] = week === 2 && index < 2
+      ? [["NO", "BAL"], ["NYG", "LAR"]][index] : matchups[index];
+    const graded = week !== 10 || index < 12;
+    return { ...saved(), id: `2026:${week}:${awayCode}:${homeCode}`, season: 2026, week,
+      awayCode, homeCode, fourthDownPick: awayCode, oddsPick: homeCode,
+      kickoff: `2026-09-${String(week + 10).padStart(2, "0")}T17:00:00Z`,
+      actualAwayScore: graded ? 27 : null, actualHomeScore: graded ? 20 : null,
+      actualWinner: graded ? awayCode : null, fourthDownCorrect: graded ? true : null,
+      oddsCorrect: graded ? false : null, gradedAt: graded ? "2026-11-16T03:00:00Z" : null };
+  }));
+  const db = database({ initial: snapshots.map((row) => snapshotToDatabase(row)) });
+  let approved = true, lookups = 0;
+  const route = withApprovedUser(createPredictionLedgerHandler({ createClient: () => db }), {
+    createUserClient: (token) => {
+      assert.equal(token, "approved-user-jwt");
+      return {
+        auth: { getUser: async () => ({ data: { user: { id: "own-user" } } }) },
+        from: () => ({ select() { return this; }, eq() { return this; },
+          maybeSingle: async () => {
+            lookups++;
+            return { data: { user_id: "own-user", approved } };
+          } }),
+      };
+    },
+  });
+  const get = async () => {
+    const res = response();
+    await route({ method: "GET", headers: { authorization: "Bearer approved-user-jwt" }, query: {} }, res);
+    return res;
+  };
+  const endpoint = await get();
+  assert.equal(endpoint.statusCode, 200);
+  assert.deepEqual(counts.map((_, i) => endpoint.body.snapshots
+    .filter((row) => row.week === i + 1 && row.actualWinner).length),
+  [19, 16, 16, 16, 15, 14, 14, 14, 15, 12]);
+  assert.equal(endpoint.body.snapshots.filter((row) => row.week === 10 && !row.actualWinner).length, 2);
+  for (const name of ["Cache-Control", "CDN-Cache-Control", "Vercel-CDN-Cache-Control"]) {
+    assert.equal(endpoint.headers[name], "private, no-store");
+  }
+  assert.match(endpoint.headers.Vary, /Authorization/);
+  const local = snapshots.filter((row) => [1, 2, 3, 5].includes(row.week)).slice(0, 49)
+    .map((row) => ({ ...row, actualWinner: row.homeCode, actualAwayScore: 0, actualHomeScore: 99,
+      fourthDownCorrect: false, oddsCorrect: true, predictionPayload: { stale: true } }));
+  const { cached } = browserLedger(t, local, () => endpoint.body.snapshots);
+  const ledger = await server.ssrLoadModule("/src/services/predictionLedger.js");
+  const refreshed = await ledger.refreshPredictionLedger();
+  assert.equal(refreshed.length, 153);
+  assert.equal(refreshed.filter((row) => row.actualWinner).length, 151);
+  assert.deepEqual(cached(), refreshed);
+  const html = renderToStaticMarkup(createElement(Results));
+  for (let week = 1; week <= 10; week++) {
+    assert.ok(html.includes(`<option value="${week}">Week ${week}</option>`), `Missing week ${week}`);
+  }
+  assert.match(html, /Week 10/);
+  assert.deepEqual(await ledger.refreshPredictionLedger(), refreshed);
+  assert.deepEqual(cached(), refreshed);
+  assert.deepEqual(db.writes, [], "GET and browser reconciliation must not write Supabase");
+  approved = false;
+  assert.equal((await get()).statusCode, 403);
+  assert.equal(lookups, 2, "approval remains checked for each authenticated request");
 });
 
 test("completed display exclusions preserve saved Best Bets and skip all current-quote reads when only finals remain", async () => {
@@ -284,7 +458,7 @@ test("Weekly Multi dispatcher never mutates headers after successful/not-found/e
   }
 });
 
-let server, Matchup, PredictionCard, WeeklyParlay;
+let server, Matchup, PredictionCard, WeeklyParlay, Results;
 before(async () => {
   server = await createServer({ server: { middlewareMode: true, hmr: false, watch: null }, appType: "custom",
     plugins: [{ name: "ledger-network-test-boundary", transform(code, id) {
@@ -297,6 +471,7 @@ before(async () => {
   const predictions = await server.ssrLoadModule("/src/pages/Predictions.jsx");
   PredictionCard = predictions.PredictionCard;
   WeeklyParlay = predictions.WeeklyParlay;
+  Results = (await server.ssrLoadModule("/src/pages/Results.jsx")).default;
 });
 after(async () => { await server?.close(); });
 test("actual Predictions and Matchup renders use the same saved score sum rather than the stale payload", () => {

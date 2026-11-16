@@ -302,6 +302,16 @@ to the pregame prediction refresh, Weekly Multi and market-specific odds jobs.
 It bounds automatic result checks to one per day, with none when local
 eligibility checks fail, rather than adding provider requests per user.
 
+On ledger refresh, matching season/week/canonical-matchup rows use the returned
+Supabase snapshot as the entire prediction-evidence base, regardless of cached
+finals, shared flags or timestamps. A valid shared final wins outright. Only when
+the shared row is ungraded may a local final temporarily supply result fields
+(with scores aligned to the shared matchup orientation and correctness evaluated
+against its saved picks). The next persisted shared grade replaces that temporary
+result. Local payloads, forecasts, model/market/personnel evidence and generation
+timestamps never overlay the shared row. The reconciled rows rewrite browser
+storage automatically; no manual cache clearing is required.
+
 For an immediate current-week run after deployment (not a historical backfill):
 
 ```powershell

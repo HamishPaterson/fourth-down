@@ -205,8 +205,31 @@ export function saveGradedPredictions(rows) {
 function mergeLedgerCollections(firstRows, secondRows) {
   const merged = new Map();
   for (const row of firstRows || []) mergeRow(merged, row);
-  for (const row of secondRows || []) mergeRow(merged, row);
+  for (const row of secondRows || []) {
+    const shared = normaliseSnapshot(row);
+    const key = ledgerMatchupKey(shared);
+    merged.set(key, reconcileSharedSnapshot(merged.get(key), shared));
+  }
   return [...merged.values()];
+}
+
+function reconcileSharedSnapshot(local, shared) {
+  const reconciled = Object.assign({}, shared);
+  if (hasFinalResult(shared) || !hasFinalResult(local)) return reconciled;
+
+  // Only an unpersisted final may overlay shared evidence, never a local forecast.
+  const sameOrientation = normaliseTeam(local.awayCode) === normaliseTeam(shared.awayCode);
+  reconciled.actualAwayScore = sameOrientation ? local.actualAwayScore : local.actualHomeScore;
+  reconciled.actualHomeScore = sameOrientation ? local.actualHomeScore : local.actualAwayScore;
+  reconciled.actualWinner = normaliseTeam(local.actualWinner);
+  reconciled.fourthDownCorrect = shared.fourthDownPick
+    ? normaliseTeam(shared.fourthDownPick) === reconciled.actualWinner : null;
+  reconciled.oddsCorrect = shared.oddsPick
+    ? normaliseTeam(shared.oddsPick) === reconciled.actualWinner : null;
+  for (const field of ["gradedAt", "resultUpdatedAt", "resultSource"]) {
+    if (Object.hasOwn(local, field)) reconciled[field] = local[field];
+  }
+  return reconciled;
 }
 
 function persistSnapshots(rows) {
@@ -238,6 +261,10 @@ function mergeVerifiedFinal(map, finalResult) {
   const found = [...map.entries()].find(([, row]) => Number(row.week) === 2 && teams.has(normaliseTeam(row.awayCode)) && teams.has(normaliseTeam(row.homeCode)));
   const existing = found?.[1] || null;
   const oldKey = found?.[0];
+  if (existing?.shared === true) {
+    map.set(oldKey, reconcileSharedSnapshot(finalResult, existing));
+    return;
+  }
   const awayCode = normaliseTeam(existing?.awayCode || finalResult.awayCode);
   const homeCode = normaliseTeam(existing?.homeCode || finalResult.homeCode);
   const winner = normaliseTeam(finalResult.actualWinner);
@@ -259,19 +286,23 @@ function mergeRow(map, incoming) {
   }
 
   const preferred = choosePredictionSnapshot(existing, row);
-  map.set(key, preferred === row ? { ...existing, ...row } : { ...row, ...existing });
+  const other = preferred === row ? existing : row;
+  map.set(key, preferred.shared === true
+    ? reconcileSharedSnapshot(other, preferred) : preferred);
 }
 
 export function choosePredictionSnapshot(existing, incoming) {
   if (!existing) return incoming;
   if (!incoming) return existing;
-  if (hasFinalResult(existing)) return existing;
-  if (hasFinalResult(incoming)) return incoming;
+  const sharedRank = (row) => row.shared === true ? row.authoritative === true ? 2 : 1 : 0;
+  if (sharedRank(existing) !== sharedRank(incoming)) return sharedRank(incoming) > sharedRank(existing) ? incoming : existing;
+  if (!sharedRank(existing)) {
+    if (hasFinalResult(existing)) return existing;
+    if (hasFinalResult(incoming)) return incoming;
+  }
   const existingComplete = isCurrentCompletePrediction(existing);
   const incomingComplete = isCurrentCompletePrediction(incoming);
   if (existingComplete !== incomingComplete) return incomingComplete ? incoming : existing;
-  const sharedRank = (row) => row.shared === true ? row.authoritative === true ? 2 : 1 : 0;
-  if (sharedRank(existing) !== sharedRank(incoming)) return sharedRank(incoming) > sharedRank(existing) ? incoming : existing;
   const time = (row) => Date.parse(row.updatedAt || row.generatedAt || row.snapshotAt || "") || 0;
   return time(incoming) >= time(existing) ? incoming : existing;
 }
@@ -334,6 +365,7 @@ function normaliseTeam(value) {
     {
       WAS: "WSH",
       LA: "LAR",
+      JAC: "JAX",
       OAK: "LV",
       SD: "LAC",
       STL: "LAR",
