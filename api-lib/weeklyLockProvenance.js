@@ -15,7 +15,10 @@ export function snapshotAuthority(snapshot, context) {
   const provenance = snapshot?.lockProvenance;
   if (snapshot?.authoritative && provenance?.source === "server-prepared" &&
       provenance?.version === LOCK_PROVENANCE_VERSION && provenance?.predictionId === snapshot?.id &&
-      snapshot?.id && provenance?.generationCutoff === (context.provenanceLockAt || context.lockAt) &&
+      snapshot?.id &&
+      Number.isFinite(Date.parse(provenance?.generationCutoff)) &&
+      Date.parse(provenance.generationCutoff) ===
+        Date.parse(context.provenanceLockAt || context.lockAt) &&
       Array.isArray(provenance?.inputs) && provenance.inputs.length &&
       Array.isArray(provenance?.marketDependencies)) {
     return { authoritative: true, marketDependencies: provenance.marketDependencies };

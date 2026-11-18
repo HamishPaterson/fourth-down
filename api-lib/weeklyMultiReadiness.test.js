@@ -312,3 +312,24 @@ test("future personnel observations cannot authorize an earlier prediction", () 
   assert.ok(result.predictionRejections[0].reasons.includes("FUTURE_PERSONNEL_EVIDENCE"));
   assert.equal(result.canSatisfyLegCount, false);
 });
+test("equivalent UTC lock timestamp formats preserve saved prediction authority", () => {
+  const snapshot = {
+    id: "11:IND:HOU:2026-11-20T01:15Z",
+    authoritative: true,
+    lockProvenance: {
+      version: 1,
+      source: "server-prepared",
+      predictionId: "11:IND:HOU:2026-11-20T01:15Z",
+      generationCutoff: "2026-11-19T00:00:00.000Z",
+      inputs: [{ source: "odds", observedAt: "2026-11-18T10:00:00Z" }],
+      marketDependencies: [],
+    },
+  };
+
+  const authority = snapshotAuthority(snapshot, {
+    provenanceLockAt: "2026-11-19T00:00:00+00:00",
+    lockAt: "2026-11-18T04:45:00.000Z",
+  });
+
+  assert.equal(authority.authoritative, true);
+});
