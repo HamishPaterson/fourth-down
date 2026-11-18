@@ -1719,6 +1719,9 @@ async function readSnapshots(supabase, request, response) {
       savedBeforeKickoff: snapshot.savedBeforeKickoff,
       snapshotAt: snapshot.snapshotAt,
       generatedAt: snapshot.generatedAt,
+      updatedAt: snapshot.updatedAt,
+      modelVersion: snapshot.modelVersion,
+      modelKey: snapshot.modelKey,
       authoritative: snapshot.authoritative,
       shared: true,
     }));
@@ -2286,4 +2289,5 @@ function setLedgerHeaders(response) {
   response.setHeader("Cache-Control", "no-store, max-age=0");
   response.setHeader("Content-Type", "application/json; charset=utf-8");
 }
+
 

@@ -1,4 +1,4 @@
-import { gunzipSync } from "node:zlib";
+﻿import { gunzipSync } from "node:zlib";
 import {
   readFile,
   rename,
@@ -220,10 +220,15 @@ export async function writePlayerArtifactAtomically(destination, serialized, {
 }
 
 export function parsePlayerArtifact(source) {
-  if (!source.startsWith(artifactPrefix) || !source.endsWith(artifactSuffix)) {
+  const normalized = String(source || "")
+    .replace(/^\uFEFF/, "")
+    .replace(/\r\n/g, "\n");
+
+  if (!normalized.startsWith(artifactPrefix) || !normalized.endsWith(artifactSuffix)) {
     throw new Error("Player artifact has an invalid JavaScript wrapper");
   }
-  return JSON.parse(source.slice(artifactPrefix.length, -artifactSuffix.length));
+
+  return JSON.parse(normalized.slice(artifactPrefix.length, -artifactSuffix.length));
 }
 
 export function serializePlayerArtifact(artifact) {
@@ -231,10 +236,15 @@ export function serializePlayerArtifact(artifact) {
 }
 
 function parseTeamArtifact(source) {
-  if (!source.startsWith(teamArtifactPrefix) || !source.endsWith(teamArtifactSuffix)) {
+  const normalized = String(source || "")
+    .replace(/^\uFEFF/, "")
+    .replace(/\r\n/g, "\n");
+
+  if (!normalized.startsWith(teamArtifactPrefix) || !normalized.endsWith(teamArtifactSuffix)) {
     throw new Error("Local team artifact has an invalid JavaScript wrapper");
   }
-  return JSON.parse(source.slice(teamArtifactPrefix.length, -teamArtifactSuffix.length));
+
+  return JSON.parse(normalized.slice(teamArtifactPrefix.length, -teamArtifactSuffix.length));
 }
 
 function validateTeamArtifactTarget(artifact, { season, predictionWeek }) {
@@ -499,7 +509,7 @@ function isCanonicalFullName(value) {
   const nameParts = parts.filter((part) => !/^(?:Jr\.?|Sr\.?|II|III|IV|V)$/i.test(part));
   const substantive = (part) => part.replace(/[^A-Za-z]/g, "").length >= 2;
   return nameParts.filter(substantive).length >= 2 &&
-    nameParts.every((part) => /^[A-Za-z][A-Za-z.'’-]*$/.test(part) &&
+    nameParts.every((part) => /^[A-Za-z][A-Za-z.'â€™-]*$/.test(part) &&
       (substantive(part) || /^[A-Za-z]\.?$/.test(part)));
 }
 
@@ -2177,3 +2187,5 @@ function round(value) {
     ) / 10000
   );
 }
+
+

@@ -1,4 +1,4 @@
-import { gunzipSync } from "node:zlib";
+﻿import { gunzipSync } from "node:zlib";
 import { readFile, writeFile, rename, unlink } from "node:fs/promises";
 import { randomUUID } from "node:crypto";
 import path from "node:path";
@@ -174,8 +174,17 @@ export async function regenerateTeamMetrics({
 if (process.argv[1] && import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href) await main();
 
 export function parseTeamArtifact(text) {
-  if (!text.startsWith(artifactPrefix) || !text.endsWith(artifactSuffix)) throw new Error("Invalid team artifact wrapper");
-  return JSON.parse(text.slice(artifactPrefix.length, -artifactSuffix.length));
+  const normalized = String(text || "")
+    .replace(/^\uFEFF/, "")
+    .replace(/\r\n/g, "\n");
+
+  if (!normalized.startsWith(artifactPrefix) || !normalized.endsWith(artifactSuffix)) {
+    throw new Error("Invalid team artifact wrapper");
+  }
+
+  return JSON.parse(
+    normalized.slice(artifactPrefix.length, -artifactSuffix.length)
+  );
 }
 
 export function serializeTeamArtifact(artifact) {
@@ -857,3 +866,4 @@ function team(value) { const code = String(value || "").trim().toUpperCase(); re
 function average(values) { const valid = values.filter(Number.isFinite); return valid.length ? round(valid.reduce((total, value) => total + value, 0) / valid.length) : 0; }
 function rate(numerator, denominator) { return denominator ? round(numerator / denominator) : 0; }
 function round(value) { return Math.round((Number(value) || 0) * 10000) / 10000; }
+

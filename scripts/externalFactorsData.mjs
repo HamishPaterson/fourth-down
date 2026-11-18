@@ -1,4 +1,4 @@
-// Script-side data loading for the 2026 external-factors audit and backtest.
+﻿// Script-side data loading for the 2026 external-factors audit and backtest.
 // Node-only: reads env, fetches the production prediction ledger and BALLDONTLIE
 // schedule, enriches games with schedule/venue/weather context. Production code
 // never imports this; it consumes the generated data module instead.
@@ -30,23 +30,73 @@ export async function loadEnv() {
 
 export async function fetchPredictionSnapshots() {
   const rows = [];
-  // The supported week filter keeps the large season ledger below its read timeout.
+
   for (let week = 1; week <= 18; week++) {
-    const response = await fetch(
-      `https://fourth-down-coral.vercel.app/api/nfl/game-stats?action=predictions&season=${SEASON}&week=${week}`,
-      { headers: { Accept: "application/json" } },
-    );
-    if (!response.ok) throw new Error(`Prediction ledger week ${week} fetch failed (${response.status})`);
-    const body = await response.json();
-    if (!Array.isArray(body.snapshots) || body.count !== body.snapshots.length ||
-        body.snapshots.some((s) => Number(s.season) !== SEASON || Number(s.week) !== week)) {
+    const url =
+      `https://fourth-down-coral.vercel.app/api/nfl/game-stats?action=predictions&view=results&season=${SEASON}&week=${week}`;
+
+    let body = null;
+    let lastError = null;
+
+    for (let attempt = 1; attempt <= 2; attempt++) {
+      try {
+        const response = await fetch(url, {
+          headers: {
+            Accept: "application/json",
+            Authorization: `Bearer ${process.env.CRON_SECRET || ""}`,
+          },
+        });
+
+        const text = await response.text();
+
+        if (!response.ok) {
+          throw new Error(
+            `Prediction ledger week ${week} fetch failed (${response.status}): ${text.slice(0, 160)}`
+          );
+        }
+
+        try {
+          body = JSON.parse(text);
+        } catch {
+          throw new Error(
+            `Prediction ledger week ${week} returned invalid JSON: ${text.slice(0, 160)}`
+          );
+        }
+
+        break;
+      } catch (error) {
+        lastError = error;
+
+        if (attempt < 2) {
+          console.warn(
+            `Prediction ledger week ${week} attempt ${attempt} failed; retrying once`
+          );
+          await new Promise((resolve) => setTimeout(resolve, 750));
+        }
+      }
+    }
+
+    if (!body) {
+      throw lastError || new Error(`Prediction ledger week ${week} unavailable`);
+    }
+
+    if (
+      !Array.isArray(body.snapshots) ||
+      body.count !== body.snapshots.length ||
+      body.snapshots.some(
+        (snapshot) =>
+          Number(snapshot.season) !== SEASON ||
+          Number(snapshot.week) !== week
+      )
+    ) {
       throw new Error(`Invalid prediction ledger response for week ${week}`);
     }
+
     rows.push(...body.snapshots.map(predictionSnapshotRow));
   }
+
   return rows;
 }
-
 export function predictionSnapshotRow(snapshot) {
   // API snapshots omit created_at. Only explicit persisted pre-game evidence plus
   // a pre-kickoff snapshot timestamp can substitute; generatedAt alone cannot.
@@ -167,10 +217,10 @@ export function groupSnapshotRows(snapshotsRaw) {
 // Full input load: ledger + schedule + enrichment (schedule context, venue,
 // travel, timezone, archive weather for outdoor completed games).
 export async function loadExternalFactorInputs({ weather = true } = {}) {
-  const [snapshotsRaw, schedule] = await Promise.all([
-    fetchPredictionSnapshots(),
-    fetchSchedule(SEASON),
-  ]);
+  // Load sequentially to avoid intermittent Node/undici streaming failures
+  // when the authenticated ledger and schedule are fetched concurrently.
+  const snapshotsRaw = await fetchPredictionSnapshots();
+  const schedule = await fetchSchedule(SEASON);
   const { rowsByKey, snapshots } = groupSnapshotRows(snapshotsRaw);
 
   const games = [];
@@ -263,3 +313,8 @@ export function predictionRows(completedGames) {
     })
     .filter(Boolean);
 }
+
+
+
+
+
