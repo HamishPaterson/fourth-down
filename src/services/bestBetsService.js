@@ -718,8 +718,12 @@ function findPersonnelRecord(personnelViews, player) {
   const view = player.team && personnelViews
     ? Object.values(personnelViews).find((candidate) => canonicalTeam(candidate?.team) === canonicalTeam(player.team))
     : null;
-  const id = player.personnelId || player.gsisId;
-  return id ? view?.players?.find((record) => record.canonicalId === id) : null;
+  const id = player.personnelId || player.gsisId || player.playerId;
+  return id ? view?.players?.find((record) =>
+    record.canonicalId === id ||
+    record.gsisId === id ||
+    record.playerId === id
+  ) : null;
 }
 
 function isPlausiblePlayerPropLine(marketKey, point) {

@@ -457,3 +457,50 @@ test("historical candidate-repair dry run cannot recreate past lock-time inputs"
   assert.equal(refreshed.length, 0);
   assert.equal(body.reason, "HISTORICAL_LOCK_PROHIBITED");
 });
+test("priced player prop resolves personnel through projection playerId when personnelId is absent", () => {
+  const input = fixture(["BUF", "LV"]);
+
+  const qb = {
+    playerName: "Josh Allen",
+    position: "QB",
+    team: "BUF",
+    passingYards: 280,
+    playerId: "buf-josh-allen",
+    personnel: { eligible: true },
+    roleConfidence: .9,
+    dataQuality: .9,
+  };
+
+  input.playerProjections.push(qb);
+  input.personnelViews.away.players.push(
+    activePersonnelRecord(qb.playerId, "BUF")
+  );
+
+  input.oddsEvent.bookmakers[0].markets.push({
+    key: "player_pass_yds",
+    last_update: QUOTE,
+    outcomes: [{
+      playerName: "Josh Allen",
+      name: "Over",
+      point: 220.5,
+      price: -110,
+    }],
+  });
+
+  const result = buildBestBets(input);
+
+  assert.ok(
+    result.candidates.some(
+      (bet) =>
+        bet.category === "Passing props" &&
+        bet.selection.includes("Josh Allen")
+    )
+  );
+
+  assert.equal(
+    result.marketDiagnostics.playerFailureCounts.PLAYER_AVAILABILITY_UNKNOWN || 0,
+    0
+  );
+
+  assert.ok(result.marketDiagnostics.matchedPlayerMarkets >= 1);
+});
