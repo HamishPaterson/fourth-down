@@ -36,7 +36,23 @@ const TEAM_DIVISION = Object.fromEntries(
 );
 
 export function createScheduleHandler({
-  currentHandler = createWeeklyMultiCurrentHandler(),
+  currentHandler = createWeeklyMultiCurrentHandler({
+    ensureCurrent: async (req, res) => {
+      const { createWeeklyMultiPreparationHandler } = await import("../../api-lib/weeklyMultiPreparation.js");
+      const prepare = createWeeklyMultiPreparationHandler();
+      return prepare({
+        ...req,
+        headers: {
+          ...(req.headers || {}),
+          authorization: `Bearer ${process.env.CRON_SECRET || ""}`,
+        },
+        query: {
+          ...(req.query || {}),
+          weeklyMultiMode: "prepare",
+        },
+      }, res);
+    },
+  }),
   lockHandler = async (req, res) => {
     const { createWeeklyMultiPreparationHandler } = await import("../../api-lib/weeklyMultiPreparation.js");
     return createWeeklyMultiPreparationHandler()(req, res);
