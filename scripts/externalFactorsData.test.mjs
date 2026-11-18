@@ -45,12 +45,12 @@ for (const change of [
   assert.equal(isPreGameRow([...snapshots.values()][0]), false);
 });
 
-test("weekly production ledger GET reads require no authorization and cover the complete season", async (t) => {
+test("weekly production ledger GET reads authenticate and cover the complete season", async (t) => {
   const requests = [];
   t.mock.method(globalThis, "fetch", async (url, options) => {
     requests.push({ url, options });
     const week = Number(new URL(url).searchParams.get("week"));
-    return { ok: true, json: async () => ({ count: week === 9 ? 1 : 0,
+    return { ok: true, status: 200, text: async () => JSON.stringify({ count: week === 9 ? 1 : 0,
       snapshots: week === 9 ? [snapshot] : [] }) };
   });
   assert.equal((await fetchPredictionSnapshots()).length, 1);
@@ -59,11 +59,13 @@ test("weekly production ledger GET reads require no authorization and cover the 
     const url = new URL(request.url);
     assert.equal(url.origin, "https://fourth-down-coral.vercel.app");
     assert.equal(url.searchParams.get("week"), String(index + 1));
-    assert.deepEqual(request.options, { headers: { Accept: "application/json" } });
+    assert.equal(request.options.headers.Accept, "application/json");
+    assert.match(request.options.headers.Authorization, /^Bearer /);
+    assert.equal(url.searchParams.get("view"), "results");
   }
 });
 
 test("ledger transport failure is explicit rather than an empty success", async (t) => {
-  t.mock.method(globalThis, "fetch", async () => ({ ok: false, status: 500 }));
+  t.mock.method(globalThis, "fetch", async () => ({ ok: false, status: 500, text: async () => "server error" }));
   await assert.rejects(fetchPredictionSnapshots(), /week 1 fetch failed \(500\)/);
 });

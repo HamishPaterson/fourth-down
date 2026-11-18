@@ -1,4 +1,4 @@
-﻿// Script-side data loading for the 2026 external-factors audit and backtest.
+// Script-side data loading for the 2026 external-factors audit and backtest.
 // Node-only: reads env, fetches the production prediction ledger and BALLDONTLIE
 // schedule, enriches games with schedule/venue/weather context. Production code
 // never imports this; it consumes the generated data module instead.
@@ -134,19 +134,56 @@ async function fetchArchiveWeather(stadium, endDate) {
     longitude: String(stadium.lon),
     start_date: SEASON_START,
     end_date: endDate,
-    hourly: ["temperature_2m", "precipitation", "rain", "snowfall", "weather_code",
-      "wind_speed_10m", "wind_gusts_10m"].join(","),
+    hourly: [
+      "temperature_2m",
+      "precipitation",
+      "rain",
+      "snowfall",
+      "weather_code",
+      "wind_speed_10m",
+      "wind_gusts_10m",
+    ].join(","),
     wind_speed_unit: "kmh",
     precipitation_unit: "mm",
     timeformat: "unixtime",
     timezone: "GMT",
   });
-  const response = await fetch(`${ARCHIVE_URL}?${params.toString()}`);
-  if (!response.ok) return null;
-  const hourly = (await response.json())?.hourly;
-  return Array.isArray(hourly?.time) && hourly.time.length ? hourly : null;
-}
 
+  const url = `${ARCHIVE_URL}?${params.toString()}`;
+
+  for (let attempt = 1; attempt <= 2; attempt++) {
+    try {
+      const response = await fetch(url);
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
+      }
+
+      const text = await response.text();
+      const body = JSON.parse(text);
+      const hourly = body?.hourly;
+
+      if (Array.isArray(hourly?.time) && hourly.time.length) {
+        return hourly;
+      }
+
+      throw new Error("Archive weather response has no hourly data");
+    } catch (error) {
+      if (attempt < 2) {
+        console.warn(
+          `Archive weather failed for ${stadium.name}; retrying once: ${error.message}`
+        );
+        await new Promise((resolve) => setTimeout(resolve, 750));
+      } else {
+        console.warn(
+          `Archive weather unavailable for ${stadium.name}: ${error.message}`
+        );
+      }
+    }
+  }
+
+  return null;
+}
 // Aggregate one game's weather window exactly like weatherApi.js does.
 function gameWindowWeather(hourly, kickoff) {
   const times = hourly.time.map(Number);
@@ -313,8 +350,3 @@ export function predictionRows(completedGames) {
     })
     .filter(Boolean);
 }
-
-
-
-
-
