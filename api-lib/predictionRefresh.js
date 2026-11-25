@@ -108,10 +108,13 @@ export function createCachedSchedule({ load = fetchSchedule, now = Date.now, max
   };
 }
 
+// One per server instance: a new handler is built for every request.
+const sharedSchedule = createCachedSchedule();
+
 export function createPredictionRefreshHandler(overrides = {}) {
   const getNow = overrides.getNow || (() => new Date());
   const createClient = overrides.createClient || createSnapshotClient;
-  const readSchedule = overrides.readSchedule || createCachedSchedule();
+  const readSchedule = overrides.readSchedule || sharedSchedule;
   const resolveContext = overrides.resolveContext || predictionRefreshContext;
   const readOdds = overrides.readOdds || readPredictionOdds;
   const loadNetwork = overrides.loadNetwork || loadWeeklyOpponentNetwork;

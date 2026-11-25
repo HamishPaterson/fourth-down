@@ -896,3 +896,22 @@ test("batched calls share one recent schedule, refetch when stale, and never cac
   await read(2027);
   assert.equal(loads, 4);
 });
+
+test("separate production requests share one schedule instead of refetching it", async (t) => {
+  const original = globalThis.fetch;
+  t.after(() => { globalThis.fetch = original; });
+  let providerCalls = 0;
+  globalThis.fetch = async (url) => {
+    assert.match(String(url), /api.balldontlie.io/);
+    providerCalls++;
+    return new Response(JSON.stringify({ data: [], meta: { next_cursor: null } }), { headers: { "Content-Type": "application/json" } });
+  };
+  const seen = [];
+  for (let request = 0; request < 3; request++) {
+    // Exactly what the route does: a fresh handler each time, with the real schedule reader.
+    await createPredictionRefreshHandler({ resolveContext: (games) => { seen.push(games); throw new Error("stop"); } })(
+      { method: "POST", headers: { authorization: "Bearer mock-refresh-secret" }, body: { dryRun: true } }, response());
+  }
+  assert.equal(seen.length, 3);
+  assert.equal(providerCalls, 1);
+});
