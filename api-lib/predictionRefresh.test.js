@@ -770,3 +770,89 @@ test("anonymous GET/POST cannot save via public refresh or removed administrativ
     }
   }
 });
+
+// Week 8 lock-preparation scenario: predictions saved, then the daily odds refresh lands.
+async function runReprice({ fetchedAt = "2026-10-28T12:34:00Z", locked = null, now = "2026-10-28T21:00:00Z",
+  frozen = false, prepareWeeklyLock = true, rolloverFallback = false, batchLimit = 2, db: reuseDb, sideEffect } = {}) {
+  const kickoff = "2026-10-30T00:15:00.000Z", lockAt = "2026-10-29T00:00:00.000Z";
+  const at = new Date(now);
+  const weekGames = games.slice(0, 3).map((game) => ({ ...game, week: 8, sourceDate: kickoff }));
+  const build = (game, generated, odds) => {
+    const snapshot = JSON.parse(JSON.stringify(fixture(game, new Date(generated))).replaceAll(KICKOFF, kickoff)
+      .replaceAll("2026-10-14T00:00:00Z", "2026-10-27T00:00:00Z"));
+    const id = `8:${game.away}:${game.home}`;
+    return { ...snapshot, id, builtFrom: odds, generationMarketDependencies: [],
+      dataQuality: { ...snapshot.dataQuality, sources: { ...snapshot.dataQuality.sources } } };
+  };
+  const saved = weekGames.map((game) => {
+    const snapshot = build(game, "2026-10-28T03:00:00.000Z");
+    return { ...snapshot, authoritative: true, ...(frozen ? { frozenAt: "2026-10-28T04:00:00Z" } : {}),
+      lockProvenance: { version: 1, source: "server-prepared", predictionId: snapshot.id,
+        generationCutoff: lockAt, inputs: [{ source: "odds" }], marketDependencies: [] } };
+  });
+  const db = reuseDb || database(saved);
+  if (!reuseDb) {
+    const base = db.from.bind(db);
+    db.from = (table) => table === "weekly_best_multis" ? {
+      select() { return this; }, eq(column, value) { assert.equal(column, "lock_at"); assert.equal(value, lockAt); return this; },
+      maybeSingle: async () => ({ data: db.multi, error: null }),
+    } : base(table);
+  }
+  db.multi = locked;
+  const events = weekGames.map((game) => ({ ...coreOddsEvent(game), bookmakers: [{ key: "book", title: "Book", markets: [
+    { key: "h2h", outcomes: [{ name: game.away, price: 100, quoteSource: { id: "q", fetchedAt, rolloverFallback } }] },
+  ] }] }));
+  let generated = 0, plans = 0;
+  const previous = process.env.CRON_SECRET;
+  const handler = createPredictionRefreshHandler({
+    batchLimit, getNow: () => at, createClient: () => db, readSchedule: async () => [],
+    resolveContext: () => ({ season: 2026, week: 8, cutoff: kickoff, games: weekGames }),
+    readOdds: async () => ({ events }), loadNetwork: async () => structuredClone({ ...network, week: 8 }),
+    createGenerator: () => async (game) => { generated++; sideEffect?.(db); return build(game, now); },
+    saveLockPlan: async () => { plans++; },
+  });
+  const res = response();
+  await handler({ method: "POST", headers: { authorization: `Bearer ${previous}` }, body: { dryRun: false, prepareWeeklyLock } }, res);
+  return { res, db, generated, plans, times: db.rows.map((row) => databaseToSnapshot(row).generatedAt) };
+}
+
+test("odds fetched after an authoritative prediction reprice it in batches, then settle as reused", async () => {
+  const first = await runReprice();
+  assert.equal(first.res.statusCode, 200, first.res.body.reason);
+  assert.equal(first.generated, 2); assert.equal(first.res.body.remaining, 1); assert.equal(first.plans, 0);
+  const second = await runReprice({ db: first.db });
+  assert.equal(second.res.statusCode, 200, second.res.body.reason);
+  assert.equal(second.generated, 1); assert.equal(second.res.body.complete, true); assert.equal(second.plans, 1);
+  assert.deepEqual(new Set(second.times.map((time) => Date.parse(time))), new Set([Date.parse("2026-10-28T21:00:00Z")]));
+  assert.ok(second.db.rows.map(databaseToSnapshot).every((row) => row.authoritative && row.lockProvenance?.source === "server-prepared"));
+  const third = await runReprice({ db: first.db, now: "2026-10-28T21:10:00Z" });
+  assert.equal(third.generated, 0); assert.equal(third.res.body.reused, 3); assert.equal(third.res.body.writes, 0);
+});
+
+for (const [label, options] of [
+  ["odds older than the prediction", { fetchedAt: "2026-10-28T02:00:00Z" }],
+  ["rollover fallback odds", { rolloverFallback: true }],
+  ["an already locked Multi", { locked: { id: "locked" } }],
+  ["a run after the lock time", { now: "2026-10-29T00:05:00Z" }],
+  ["a refresh that is not preparing the lock", { prepareWeeklyLock: false }],
+]) {
+  test(`authoritative predictions are not repriced for ${label}`, async () => {
+    const result = await runReprice(options);
+    assert.equal(result.res.statusCode, 200, result.res.body.reason);
+    assert.equal(result.generated, 0); assert.equal(result.res.body.reused, 3);
+    assert.deepEqual(result.db.writes, []);
+  });
+}
+
+test("frozen predictions are never repriced and a newer concurrent save wins", async () => {
+  const frozen = await runReprice({ frozen: true });
+  assert.equal(frozen.generated, 0); assert.deepEqual(frozen.db.writes, []);
+  let bumped = false;
+  const concurrent = await runReprice({ batchLimit: 1, sideEffect(db) {
+    if (bumped) return; bumped = true;
+    db.rows[0].data_quality.snapshot.generatedAt = "2026-10-28T20:59:00.000Z";
+    if (db.rows[0].generated_at) db.rows[0].generated_at = "2026-10-28T20:59:00.000Z";
+  } });
+  assert.ok(concurrent.times.some((time) => Date.parse(time) === Date.parse("2026-10-28T20:59:00Z")));
+  assert.deepEqual(concurrent.db.writes, []);
+});

@@ -230,7 +230,7 @@ test("explicit pre-lock administrative preparation saves verified provenance and
   process.env.CRON_SECRET = "fixture-prelock-secret";
   try {
     for (const [dryRun, atLock] of [[true, false], [false, false], [false, true]]) {
-      const db = database({ weekly_multi_lock_plans: [] }), res = lockResponse();
+      const db = database({ weekly_multi_lock_plans: [], weekly_best_multis: [] }), res = lockResponse();
       const now = new Date(atLock ? FUTURE_LOCK : PREPARED_AT);
       const context = { season: 2026, week: 8, cutoff: fixture.plan.games[0].kickoff,
         games: fixture.plan.games.map((game) => ({ ...game, season: 2026, week: 8, sourceDate: game.kickoff })) };

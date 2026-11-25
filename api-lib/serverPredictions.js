@@ -138,7 +138,7 @@ export function createServerPredictionGenerator(options = {}) {
   };
 }
 
-export async function saveAuthoritativePrediction(client, snapshot, now, { requireLockProvenance = false } = {}) {
+export async function saveAuthoritativePrediction(client, snapshot, now, { requireLockProvenance = false, repriceGeneratedAt } = {}) {
   const cutoff = new Date(getLockCycle(new Date(snapshot.kickoff)).lockAt).toISOString();
   if (snapshot.season === 2026 && snapshot.week === 7) throw new Error("Historical Week 7 prediction writes prohibited");
   const lockEligible = cutoff > PRESERVED_LOCK_THROUGH && now.getTime() < Date.parse(cutoff) &&
@@ -152,7 +152,11 @@ export async function saveAuthoritativePrediction(client, snapshot, now, { requi
       .eq("away_code", snapshot.awayCode).eq("home_code", snapshot.homeCode).maybeSingle();
     if (error) throw new Error("Reading shared prediction failed");
     const saved = existing ? databaseToSnapshot(existing) : null;
-    if (retainPrediction(saved, snapshot, now, true) &&
+    // Replace only the exact prediction found outdated; a newer concurrent save wins.
+    const reprice = Boolean(repriceGeneratedAt) && saved?.authoritative === true &&
+      saved.generatedAt === repriceGeneratedAt && !saved.frozenAt && !saved.actualWinner && !saved.gradedAt &&
+      Date.parse(snapshot.generatedAt) > Date.parse(repriceGeneratedAt);
+    if (!reprice && retainPrediction(saved, snapshot, now, true) &&
         (!requireLockProvenance || !lockEligible || saved.frozenAt || saved.actualWinner ||
           !lockPredictionRejections(saved, { season: snapshot.season, week: snapshot.week, lockAt: cutoff }, now).length)) return existing;
     const predictionId = existing?.data_quality?.snapshot?.id || snapshot.id || randomUUID();

@@ -17,6 +17,19 @@ export function predictionMissingOdds(snapshot) {
   return diagnostics?.bookmakerCount === 0 || diagnostics?.marketCount === 0;
 }
 
+// Weekly Multi legs must match the exact current quote, so a saved prediction whose
+// game has odds fetched after it was generated can no longer be locked.
+export function predictionOddsOutdated(snapshot, event, now) {
+  const generated = Date.parse(snapshot?.generatedAt);
+  if (!snapshot?.authoritative || snapshot.frozenAt || snapshot.actualWinner || snapshot.gradedAt ||
+      !Number.isFinite(generated) || !(Date.parse(snapshot.kickoff) > now.getTime())) return false;
+  return (event?.bookmakers || []).some((book) => (book.markets || []).some((market) =>
+    (market.outcomes || []).some((outcome) => {
+      const fetched = Date.parse(outcome.quoteSource?.fetchedAt);
+      return outcome.quoteSource?.rolloverFallback !== true && fetched > generated && fetched <= now.getTime();
+    })));
+}
+
 export function predictionCompletenessStatus(snapshot) {
   const bets = snapshot?.bestBets || snapshot?.dataQuality?.bestBetsPayload;
   const checks = {

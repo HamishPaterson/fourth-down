@@ -8,7 +8,7 @@ import { createServerPredictionGenerator, readPredictionOdds, saveAuthoritativeP
 import { databaseToSnapshot } from "../api/nfl/game-stats.js";
 import { getCurrentWeekWindow } from "../api/nfl/odds.js";
 import { loadWeeklyOpponentNetwork, validateWeeklyOpponentNetwork, NFL_TEAMS } from "../api/nfl/opponent-network.js";
-import { completePrediction, predictionCompletenessStatus, predictionMissingOdds, predictionMissingExternalFactors } from "./predictionEligibility.js";
+import { completePrediction, predictionCompletenessStatus, predictionMissingOdds, predictionMissingExternalFactors, predictionOddsOutdated } from "./predictionEligibility.js";
 import { predictionFeatureStatus, PREDICTION_FEATURE_VERSION } from "../src/services/predictionFeatures.js";
 import { playerTeam } from "./playerMetrics.js";
 import { findOddsForGame } from "../src/services/oddsApi.js";
@@ -131,6 +131,15 @@ export function createPredictionRefreshHandler(overrides = {}) {
         prior.set(key, s);
       }
       const odds = await readOdds(client, now, context);
+      // Reprice only while this week's immutable Multi can still be locked.
+      let canReprice = false;
+      if (prepareWeeklyLock && now.getTime() < Date.parse(lockContext.lockAt)) {
+        const { data: lockedMulti, error: lockedError } = await client.from("weekly_best_multis").select("*")
+          .eq("lock_at", lockContext.lockAt).maybeSingle();
+        if (lockedError) throw new Error("Reading locked Multi state failed");
+        canReprice = !lockedMulti;
+      }
+      const repriced = new Map();
       let generator;
       const generate = async (game) => {
         generator ||= loadNetwork(context.season, context.week, { sourceGames, cutoff: context.cutoff, now })
@@ -155,12 +164,13 @@ export function createPredictionRefreshHandler(overrides = {}) {
             predictionMissingOdds(existing) && currentOddsAvailable;
           const missingExternalFactors = existing?.authoritative && !existing.frozenAt && !existing.actualWinner && !existing.gradedAt &&
             Date.parse(existing.kickoff) > now.getTime() && predictionMissingExternalFactors(existing);
+          const oddsOutdated = canReprice && predictionOddsOutdated(existing, currentEvent, now);
           // Keep the original evidence untouched while there are still no odds to recover.
           const waitingForOdds = !prepareWeeklyLock && predictionMissingOdds(existing) && !currentOddsAvailable &&
             !existing?.frozenAt && !existing?.actualWinner && Date.parse(existing?.kickoff) > now.getTime() &&
             Object.entries(predictionCompletenessStatus(existing)).every(([name, passed]) =>
               ["complete", "odds", "assessed"].includes(name) || passed);
-          if (existing?.authoritative && waitingForOdds && predictionFeatureStatus(existing).complete &&
+          if (existing?.authoritative && !oddsOutdated && waitingForOdds && predictionFeatureStatus(existing).complete &&
               existing.season === context.season && existing.week === context.week &&
               Date.parse(existing.kickoff) === Date.parse(game.sourceDate)) {
             reused++;
@@ -168,7 +178,7 @@ export function createPredictionRefreshHandler(overrides = {}) {
           }
           if (existing?.authoritative && completePrediction(existing) && predictionFeatureStatus(existing).complete &&
               Date.parse(existing.kickoff) === Date.parse(game.sourceDate) &&
-              !missingOddsNowAvailable && !missingExternalFactors &&
+              !missingOddsNowAvailable && !missingExternalFactors && !oddsOutdated &&
               (!prepareWeeklyLock || !lockPredictionRejections(existing, lockContext, now).length)) {
             validatePredictionRefreshBatch([existing], { ...context, games: [game] }, getNow());
             reused++;
@@ -177,6 +187,7 @@ export function createPredictionRefreshHandler(overrides = {}) {
           if (selected >= batchLimit) { remaining++; return null; }
           selected++;
           processedGames.push(game);
+          if (oddsOutdated) repriced.set(identity(game), existing.generatedAt);
           try {
             if (existing?.frozenAt || existing?.actualWinner || Date.parse(existing?.kickoff) <= now.getTime()) {
               throw new Error("Frozen, graded or started prediction cannot be refreshed");
@@ -195,7 +206,10 @@ export function createPredictionRefreshHandler(overrides = {}) {
       if (!dryRun) {
         for (const snapshot of snapshots) {
           if (prior.get(`${snapshot.awayCode}:${snapshot.homeCode}`) !== snapshot) {
-            await save(client, snapshot, getNow(), { requireLockProvenance: prepareWeeklyLock });
+            await save(client, snapshot, getNow(), {
+              requireLockProvenance: prepareWeeklyLock,
+              repriceGeneratedAt: repriced.get(`${snapshot.awayCode}:${snapshot.homeCode}`),
+            });
           }
         }
         const { data: stored, error: readError } = await client.from("prediction_snapshots").select("*")
