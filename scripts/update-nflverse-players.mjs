@@ -143,9 +143,10 @@ export async function regeneratePlayerMetrics({
   const targetMetrics = generateWeek(identifiedPlays, observedSchedule, {
     season, predictionWeek, cutoff, identityContext,
   });
+  const departedPassers = findDepartedPassers(targetMetrics, eligiblePlays, targetContext.teams);
   validateTargetWeek(targetMetrics, {
     season, predictionWeek, cutoff, sourceAsOf, referenceWeek: targetContext.referenceWeek,
-    sourceColumns: PLAYER_SOURCE_REQUIRED_FIELDS,
+    sourceColumns: PLAYER_SOURCE_REQUIRED_FIELDS, departedPassers,
   });
 
   const cutoffs = { ...existing.cutoffs, [predictionWeek]: cutoff };
@@ -162,6 +163,7 @@ export async function regeneratePlayerMetrics({
       referenceWeek: targetContext.referenceWeek,
       sourceAsOf,
       sourceColumns: [...PLAYER_SOURCE_REQUIRED_FIELDS],
+      ...(Object.keys(departedPassers).length ? { departedPassers } : {}),
     },
   };
   const payload = {
@@ -518,6 +520,26 @@ function canonicalNameKey(value) {
     .toLowerCase().replace(/[^a-z]/g, "");
 }
 
+// A team whose every recorded passer has left its roster (for example a waived
+// starter) has no current passing profile. Record that evidence so validation can
+// tell it apart from a broken QB identity join, which must still fail closed.
+export function findDepartedPassers(targetMetrics, eligiblePlays, teams) {
+  const departed = {};
+  for (const [code, metrics] of Object.entries(targetMetrics || {})) {
+    if (Object.values(metrics?.players || {}).some((player) => player.passing?.attempts > 0)) continue;
+    const lineup = teams[code]?.expectedLineup;
+    const rostered = [...(lineup?.roster || []), ...(lineup?.players || [])];
+    const rosterIds = new Set(rostered.map((player) => player.gsisId));
+    const currentQb = rostered.some((player) =>
+      player.position === "QB" && /^00-\d{7}$/.test(player.gsisId || ""));
+    const passes = eligiblePlays.filter((play) => play.team === code && (play.passAttempt || play.sack));
+    const passers = [...new Set(passes.map((play) => play.passerId))].sort();
+    if (currentQb && passers.length && passers.every((id) =>
+      /^00-\d{7}$/.test(id || "") && !rosterIds.has(id))) departed[code] = passers;
+  }
+  return departed;
+}
+
 export function validatePlayerArtifact(artifact, { season, targetWeek } = {}) {
   if (artifact?.schemaVersion !== PLAYER_METRICS_SCHEMA) throw new Error("Player artifact schema mismatch");
   if (artifact.season !== season) throw new Error("Player artifact season mismatch");
@@ -588,13 +610,14 @@ export function validatePlayerArtifact(artifact, { season, targetWeek } = {}) {
     }
     validateStrictTargetTeams(targetTeams, {
       season, targetWeek, cutoff: metadata.cutoff, sourceAsOf: metadata.sourceAsOf,
+      departedPassers: metadata.departedPassers,
     });
   }
   return true;
 }
 
 function validateTargetWeek(teams, {
-  season, predictionWeek, cutoff, sourceAsOf, referenceWeek, sourceColumns,
+  season, predictionWeek, cutoff, sourceAsOf, referenceWeek, sourceColumns, departedPassers,
 }) {
   if (!teams || typeof teams !== "object" || Array.isArray(teams)) {
     throw new Error(`Generated player week ${predictionWeek} is invalid`);
@@ -613,14 +636,14 @@ function validateTargetWeek(teams, {
     requiredFields: sourceColumns,
     targetMetadataByWeek: {
       [predictionWeek]: {
-        season, predictionWeek, cutoff, referenceWeek, sourceAsOf, sourceColumns,
+        season, predictionWeek, cutoff, referenceWeek, sourceAsOf, sourceColumns, departedPassers,
       },
     },
     playerMetricsByWeek: { [predictionWeek]: teams },
   }, { season, targetWeek: predictionWeek });
 }
 
-function validateStrictTargetTeams(teams, { season, targetWeek, cutoff, sourceAsOf }) {
+function validateStrictTargetTeams(teams, { season, targetWeek, cutoff, sourceAsOf, departedPassers = {} }) {
   if (instant(sourceAsOf) === null || Date.parse(sourceAsOf) > Date.parse(cutoff)) {
     throw new Error(`Target Week ${targetWeek} sourceAsOf is later than the cutoff`);
   }
@@ -643,7 +666,10 @@ function validateStrictTargetTeams(teams, { season, targetWeek, cutoff, sourceAs
         : category === "rushing"
           ? metrics.teamTotals.rushingAttempts
           : metrics.teamTotals.targets;
-      if (teamTotal > 0 && !covered) {
+      const departed = category === "qb" ? departedPassers[team] : null;
+      const allPassersDeparted = Array.isArray(departed) && departed.length > 0 &&
+        departed.every((id) => /^00-\d{7}$/.test(id) && !metrics.players[id]);
+      if (teamTotal > 0 && !covered && !allPassersDeparted) {
         throw new Error(`Target Week ${targetWeek} ${team} has missing ${category} player coverage`);
       }
     }

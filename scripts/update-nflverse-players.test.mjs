@@ -15,6 +15,7 @@ import artifact from "../data/nflverse-player-metrics.js";
 import {
   buildTeamPlayerMetrics,
   buildWeeklyPlayerMetrics,
+  findDepartedPassers,
   main,
   PLAYER_SOURCE_REQUIRED_FIELDS,
   parsePlay,
@@ -970,4 +971,37 @@ test("post-fetch clock is sourceAsOf and cannot cross the target cutoff", async 
     }), /later than the target cutoff/);
     assert.deepEqual(await readFile(outputPath), bytes);
   });
+});
+
+test("a waived sole passer is recorded as departed; a broken QB join still fails closed", () => {
+  const metrics = { IND: { players: { "00-0039164": { passing: { attempts: 0 } } } } };
+  const teamsWith = (roster) => ({ IND: { expectedLineup: { roster, players: [] } } });
+  const richardson = { gsisId: "00-0039164", position: "QB" };
+  const jones = { gsisId: "00-0035710", position: "QB" };
+  const pass = (passerId) => ({ team: "IND", passAttempt: 1, passerId });
+  assert.deepEqual(findDepartedPassers(metrics, [pass(jones.gsisId)], teamsWith([richardson])),
+    { IND: [jones.gsisId] });
+  // Passer still rostered, unidentified passer, no current QB, or no passes: no exception.
+  assert.deepEqual(findDepartedPassers(metrics, [pass(jones.gsisId)], teamsWith([richardson, jones])), {});
+  assert.deepEqual(findDepartedPassers(metrics, [pass(jones.gsisId), pass(null)], teamsWith([richardson])), {});
+  assert.deepEqual(findDepartedPassers(metrics, [pass(jones.gsisId)], teamsWith([])), {});
+  assert.deepEqual(findDepartedPassers(metrics, [], teamsWith([richardson])), {});
+});
+
+test("strict validation accepts missing QB coverage only with departed-passer evidence", () => {
+  const targetWeek = artifact.latestCompletedWeek + 1;
+  const team = "SF";
+  const candidate = structuredClone(artifact);
+  const players = candidate.playerMetricsByWeek[targetWeek][team].players;
+  const passers = Object.keys(players).filter((id) => players[id].passing?.attempts > 0);
+  for (const id of passers) delete players[id];
+  const validate = () => validatePlayerArtifact(candidate, { season, targetWeek });
+  assert.throws(validate, /SF has missing qb player coverage/);
+  const metadata = candidate.targetMetadataByWeek[targetWeek];
+  metadata.departedPassers = { ...metadata.departedPassers, [team]: [] };
+  assert.throws(validate, /SF has missing qb player coverage/);
+  metadata.departedPassers[team] = [Object.keys(players)[0]];
+  assert.throws(validate, /SF has missing qb player coverage/);
+  metadata.departedPassers[team] = passers;
+  assert.equal(validate(), true);
 });
