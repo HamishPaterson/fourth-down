@@ -1,7 +1,7 @@
 import process from "node:process";
 import test, { beforeEach, afterEach } from "node:test";
 import assert from "node:assert/strict";
-import { createPredictionRefreshHandler, predictionRefreshContext, validatePredictionRefreshBatch } from "./predictionRefresh.js";
+import { createCachedSchedule, createPredictionRefreshHandler, predictionRefreshContext, validatePredictionRefreshBatch } from "./predictionRefresh.js";
 import { validateWeeklyOpponentNetwork, loadWeeklyOpponentNetwork, NFL_TEAMS, createOpponentNetworkHandler } from "../api/nfl/opponent-network.js";
 import { completePrediction, personnelSignature, retainPrediction } from "./predictionEligibility.js";
 import { predictionFeatureStatus, PREDICTION_FEATURE_VERSION, MATCHUP_INTELLIGENCE_SCHEMA_VERSION } from "../src/services/predictionFeatures.js";
@@ -875,4 +875,24 @@ test("predictions saved under older availability rules regenerate before the loc
     const result = await runReprice({ ...stale, ...guard });
     assert.equal(result.generated, 0, JSON.stringify(guard)); assert.deepEqual(result.db.writes, []);
   }
+});
+
+test("batched calls share one recent schedule, refetch when stale, and never cache a failure", async () => {
+  let loads = 0, at = 0, fail = true;
+  const read = createCachedSchedule({ now: () => at, maxAgeMs: 1000, load: async (season) => {
+    loads++;
+    if (fail) throw new Error("schedule unavailable");
+    return [{ id: loads, season }];
+  } });
+  await assert.rejects(read(2026), /schedule unavailable/);
+  fail = false;
+  const first = await read(2026);
+  first[0].id = "mutated";
+  assert.equal((await read(2026))[0].id, 2, "callers cannot corrupt the cache");
+  assert.equal(loads, 2);
+  at = 1001;
+  await read(2026);
+  assert.equal(loads, 3);
+  await read(2027);
+  assert.equal(loads, 4);
 });

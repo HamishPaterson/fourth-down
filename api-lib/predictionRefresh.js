@@ -94,10 +94,24 @@ export function validatePredictionRefreshBatch(snapshots, context, now) {
   }
 }
 
+// The provider allows one page every 12.5 seconds, which took about half of each refresh
+// call. A refresh is many calls in a row, so they share one recent complete schedule.
+export const SCHEDULE_CACHE_MS = 10 * 60 * 1000;
+export function createCachedSchedule({ load = fetchSchedule, now = Date.now, maxAgeMs = SCHEDULE_CACHE_MS } = {}) {
+  let cached = null;
+  return async (season, options) => {
+    if (!cached || cached.season !== season || now() - cached.at > maxAgeMs) {
+      const games = await load(season, options);
+      cached = { season, games, at: now() };
+    }
+    return structuredClone(cached.games);
+  };
+}
+
 export function createPredictionRefreshHandler(overrides = {}) {
   const getNow = overrides.getNow || (() => new Date());
   const createClient = overrides.createClient || createSnapshotClient;
-  const readSchedule = overrides.readSchedule || fetchSchedule;
+  const readSchedule = overrides.readSchedule || createCachedSchedule();
   const resolveContext = overrides.resolveContext || predictionRefreshContext;
   const readOdds = overrides.readOdds || readPredictionOdds;
   const loadNetwork = overrides.loadNetwork || loadWeeklyOpponentNetwork;

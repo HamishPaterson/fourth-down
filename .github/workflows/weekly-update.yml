@@ -1,0 +1,93 @@
+name: Weekly update
+
+# Brisbane time (UTC+10, no daylight saving):
+#   Tuesday 5:30 pm   new week's data, odds and predictions
+#   Tuesday 9:30 pm   second attempt if NFLverse or ESPN was not ready
+#   Wednesday 8:00 am refreshed odds, injuries and depth charts before approval
+# The Weekly Multi is never locked here; locking needs approval of the exact legs.
+on:
+  schedule:
+    - cron: "30 7 * * 2"
+    - cron: "30 11 * * 2"
+    - cron: "0 22 * * 2"
+  workflow_dispatch:
+    inputs:
+      publish:
+        description: "Publish and refresh production (off = update and test only)"
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+  statuses: read
+
+concurrency:
+  group: weekly-update
+  cancel-in-progress: false
+
+jobs:
+  weekly:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    env:
+      PUBLISH: ${{ github.event_name == 'schedule' || inputs.publish }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+
+      - name: Find the week
+        id: week
+        run: |
+          node --input-type=module -e "
+            import { getCalendarWeek } from './src/services/weekLifecycle.js';
+            import { inSeason } from './scripts/weekly-production.mjs';
+            console.log('week=' + getCalendarWeek()); console.log('active=' + inSeason(new Date()));" >> "$GITHUB_OUTPUT"
+
+      - name: Update NFLverse, ESPN and external factors
+        if: steps.week.outputs.active == 'true'
+        env:
+          BALLDONTLIE_API_KEY: ${{ secrets.BALLDONTLIE_API_KEY }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+          WEEK: ${{ steps.week.outputs.week }}
+        run: |
+          node scripts/update-nflverse.mjs 2026 > /tmp/nflverse.log || { tail -5 /tmp/nflverse.log; exit 1; }
+          node scripts/update-nflverse-players.mjs 2026 "$WEEK"
+          node scripts/update-espn.mjs "$WEEK"
+          npm run -s audit:external-factors > /tmp/external.log || { tail -5 /tmp/external.log; exit 1; }
+          node scripts/verify-weekly-data.mjs
+
+      - name: Test and build
+        if: steps.week.outputs.active == 'true'
+        run: |
+          git diff --check
+          node --test src/services/espnModelInputs.test.mjs src/services/weekLifecycle.test.js scripts/weekly-job.test.mjs \
+            scripts/externalFactorsData.test.mjs scripts/update-nflverse-players.test.mjs scripts/team-artifact-update.test.mjs \
+            api-lib/candidateCoverage.test.js api-lib/playerBetDiagnostics.test.js api-lib/modelCorrectness.test.js \
+            api-lib/weeklyMulti.test.js api-lib/weeklyMultiPreparation.test.js api-lib/weeklyMultiReadiness.test.js \
+            api-lib/weeklyMultiValuePolicy.test.js api-lib/oddsSnapshots.test.js api-lib/personnelView.test.js
+          npm run build
+
+      - name: Publish the week's data
+        if: steps.week.outputs.active == 'true' && env.PUBLISH == 'true'
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          WEEK: ${{ steps.week.outputs.week }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add api/nfl/nflverse-team-metrics.js data/nflverse-player-metrics.js data/external-factors-2026.json \
+            src/services/espnSnapshotData.js src/services/externalFactors2026Data.js
+          if git diff --cached --quiet; then echo "No data changes."; exit 0; fi
+          git commit -m "Update Week $WEEK model inputs"
+          git push origin HEAD:main
+          node scripts/wait-for-deployment.mjs "$GITHUB_REPOSITORY" "$(git rev-parse HEAD)"
+
+      - name: Refresh odds and predictions
+        if: steps.week.outputs.active == 'true' && env.PUBLISH == 'true'
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: node scripts/weekly-production.mjs
