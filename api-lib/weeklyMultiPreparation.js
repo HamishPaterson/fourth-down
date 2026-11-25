@@ -12,6 +12,7 @@ export function createWeeklyMultiPreparationHandler(overrides = {}) {
   const createClient = overrides.createClient || createWeeklyMultiClient;
   const readOdds = overrides.readOdds || readPredictionOdds;
   const recordExecution = overrides.recordExecution || recordLockExecution;
+  const requireApproval = overrides.requireApproval === true;
   const valuePolicy = overrides.valuePolicy === undefined ? MULTI_VALUE_POLICY : overrides.valuePolicy;
   const holdPlayerProps = overrides.holdPlayerProps ?? PLAYER_PROPS_HELD;
   const persistManifest = overrides.persistManifest || persistLockManifest;
@@ -82,12 +83,16 @@ export function createWeeklyMultiPreparationHandler(overrides = {}) {
       }));
       await recordExecution(client, { ...base, stage, result: ready ? "READY" : readinessResult,
         manifest_id: manifestId, readiness_result: readiness.status });
-      if (!ready || dryRun) {
+      // A lock is permanent, so production needs an explicit request naming the exact legs.
+      const legKeys = (readiness.selection?.legs || []).map(approvalKey).sort();
+      const approved = !requireApproval || (req.method === "POST" && req.body?.approved === true &&
+        Array.isArray(req.body.legs) && JSON.stringify([...req.body.legs].sort()) === JSON.stringify(legKeys));
+      if (!ready || dryRun || !approved) {
         await recordExecution(client, { ...base, stage: "FINISHED",
-          result: !ready ? readinessResult : "DRY_RUN",
+          result: !ready ? readinessResult : dryRun ? "DRY_RUN" : "AWAITING_APPROVAL",
           manifest_id: manifestId, readiness_result: readiness.status });
         return res.status(200).json({ status: ready ? "prepared" : "not ready", operationId,
-          manifestId, readiness, dryRun });
+          manifestId, readiness, dryRun, ...(ready && !approved ? { awaitingApproval: true, legs: legKeys } : {}) });
       }
       // Capture and validate once; a concurrent winner is returned, never replaced.
       const record = { ...makeWeeklyMultiRecord(readiness.selection, {
@@ -126,6 +131,10 @@ export function createWeeklyMultiPreparationHandler(overrides = {}) {
         operationId, lockResult: base.lock_result });
     }
   };
+}
+
+export function approvalKey(leg) {
+  return [leg.awayCode, leg.homeCode, leg.market, leg.selection, leg.decimalOdds].join("|");
 }
 
 // Atomic batches retain the exact offers assessed by their saved Best Bets.

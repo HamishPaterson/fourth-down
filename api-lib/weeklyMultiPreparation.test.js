@@ -369,3 +369,32 @@ test("availability polling never fabricates a lock without a persisted authorita
   assert.equal(res.body.status, "not ready");
   assert.equal(db.tables.weekly_best_multis.length, 0);
 });
+
+test("production locks only the exact legs a person approved; schedulers never lock", async () => {
+  const attempt = async (method, body, mutate) => {
+    const fixture = lockFixture(), db = lockDatabase(fixture), res = lockResponse(), previous = process.env.CRON_SECRET;
+    process.env.CRON_SECRET = "fixture-only-secret";
+    try {
+      await createWeeklyMultiPreparationHandler({ requireApproval: true, createClient: () => db, getNow: () => fixture.now,
+        readOdds: async () => fixture.odds })({ method, headers: { authorization: "Bearer fixture-only-secret" }, query: {}, body: mutate ? mutate(body) : body }, res);
+    } finally { if (previous === undefined) delete process.env.CRON_SECRET; else process.env.CRON_SECRET = previous; }
+    return { res, db };
+  };
+  const cron = await attempt("GET");
+  assert.equal(cron.res.body.status, "prepared");
+  assert.equal(cron.res.body.awaitingApproval, true);
+  assert.equal(cron.res.body.legs.length, 5);
+  assert.equal(cron.db.tables.weekly_best_multis.length, 0);
+  assert.equal(cron.db.tables.weekly_multi_lock_executions.at(-1).result, "AWAITING_APPROVAL");
+  const legs = cron.res.body.legs;
+  for (const [method, body] of [["POST", {}], ["POST", { approved: true }], ["POST", { approved: "true", legs }],
+    ["POST", { approved: true, legs: legs.slice(1) }], ["POST", { approved: true, legs: [...legs.slice(1), "A|B|Moneyline|A|9"] }],
+    ["GET", { approved: true, legs }]]) {
+    const refused = await attempt(method, body);
+    assert.equal(refused.res.body.status, "prepared", JSON.stringify(body));
+    assert.equal(refused.db.tables.weekly_best_multis.length, 0);
+  }
+  const locked = await attempt("POST", { approved: true, legs: [...legs].reverse() });
+  assert.equal(locked.res.body.status, "locked");
+  assert.equal(locked.db.tables.weekly_best_multis.length, 1);
+});

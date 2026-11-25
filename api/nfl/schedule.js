@@ -39,7 +39,7 @@ export function createScheduleHandler({
   currentHandler = createWeeklyMultiCurrentHandler({
     ensureCurrent: async (req, res) => {
       const { createWeeklyMultiPreparationHandler } = await import("../../api-lib/weeklyMultiPreparation.js");
-      const prepare = createWeeklyMultiPreparationHandler();
+      const prepare = createWeeklyMultiPreparationHandler({ requireApproval: true });
       return prepare({
         ...req,
         headers: {
@@ -55,7 +55,7 @@ export function createScheduleHandler({
   }),
   lockHandler = async (req, res) => {
     const { createWeeklyMultiPreparationHandler } = await import("../../api-lib/weeklyMultiPreparation.js");
-    return createWeeklyMultiPreparationHandler()(req, res);
+    return createWeeklyMultiPreparationHandler({ requireApproval: true })(req, res);
   },
   scheduleHandler = handleScheduleRequest,
 } = {}) {
