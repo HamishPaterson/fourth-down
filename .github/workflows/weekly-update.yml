@@ -52,6 +52,7 @@ jobs:
         env:
           BALLDONTLIE_API_KEY: ${{ secrets.BALLDONTLIE_API_KEY }}
           CRON_SECRET: ${{ secrets.CRON_SECRET }}
+          GITHUB_TOKEN: ${{ github.token }}
           WEEK: ${{ steps.week.outputs.week }}
         run: |
           node scripts/update-nflverse.mjs 2026 > /tmp/nflverse.log || { tail -5 /tmp/nflverse.log; exit 1; }

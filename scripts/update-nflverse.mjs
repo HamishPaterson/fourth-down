@@ -295,8 +295,11 @@ function validateSchedule(games, season) {
 }
 
 async function resolveDepthSource(season, fetchImpl) {
+  // Anonymous GitHub API calls are limited per address, which hosted runners share.
+  // The token goes to this GitHub endpoint only, never to dataset downloads.
+  const token = process.env.GITHUB_TOKEN;
   const response = await fetchImpl(depthReleaseMetadata, {
-    headers: { Accept: "application/vnd.github+json" }, signal: AbortSignal.timeout(60000),
+    headers: { Accept: "application/vnd.github+json", ...(token ? { Authorization: `Bearer ${token}` } : {}) }, signal: AbortSignal.timeout(60000),
   });
   if (!response.ok) throw new Error(`Required depth release metadata unavailable (${response.status})`);
   const metadata = await response.json();

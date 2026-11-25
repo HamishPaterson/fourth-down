@@ -330,3 +330,21 @@ for (const stage of ["missing-asset", "metadata-request", "malformed-metadata", 
     assert.deepEqual(await readdir(f.directory), ["team.js"]);
   });
 }
+
+test("the GitHub token authenticates only the release lookup and stays optional", async (t) => {
+  const previous = process.env.GITHUB_TOKEN;
+  t.after(() => { if (previous === undefined) delete process.env.GITHUB_TOKEN; else process.env.GITHUB_TOKEN = previous; });
+  for (const token of ["fixture-token", undefined]) {
+    if (token) process.env.GITHUB_TOKEN = token; else delete process.env.GITHUB_TOKEN;
+    const f = await fixture(t), seen = [];
+    await regenerateTeamMetrics({ ...f.options, fetchImpl: (url, options) => {
+      seen.push([url, options?.headers?.Authorization]);
+      return mockFetch(url);
+    } });
+    const lookups = seen.filter(([url]) => url.startsWith("https://api.github.com/"));
+    assert.deepEqual(lookups.map(([, header]) => header), [token ? `Bearer ${token}` : undefined]);
+    const downloads = seen.filter(([url]) => !url.startsWith("https://api.github.com/"));
+    assert.ok(downloads.length >= 3);
+    assert.ok(downloads.every(([, header]) => header === undefined));
+  }
+});
