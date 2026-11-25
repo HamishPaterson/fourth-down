@@ -65,7 +65,8 @@ export async function refreshPredictions(call, week, { sleep = pause, log = () =
       failures += 1;
       log(`refresh failed (${failures}/${maxFailures}): ${status} ${body?.reason || body?.error}`);
       if (failures >= maxFailures) throw new Error(`Prediction refresh did not complete: ${body?.reason || body?.error}`);
-      await sleep(20000);
+      // The schedule provider allows 5 calls a minute across every server; wait out a full window.
+      await sleep(/BALLDONTLIE/.test(String(body?.reason || body?.error)) ? MINUTE : 20000);
       continue;
     }
     failures = 0;

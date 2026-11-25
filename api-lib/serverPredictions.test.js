@@ -14,6 +14,7 @@ import { CURRENT_MODEL_KEY, CURRENT_MODEL_VERSION } from "../src/services/modelI
 import { useFixedTestClock as installFixedTestClock } from "./testClock.js";
 import { createPredictionRefreshHandler } from "./predictionRefresh.js";
 import { NFL_TEAMS } from "../api/nfl/opponent-network.js";
+import externalFactors from "../src/services/externalFactors2026Data.js";
 import { BEST_BETS_CANDIDATE_VERSION, selectTdModelPick } from "../src/services/bestBetsService.js";
 
 installFixedTestClock();
@@ -122,6 +123,10 @@ test("real saved odds readers retain market-specific stale diagnostics and never
   test("all 14 Week 10 games persist one highest-probability eligible model TD pick without TD prices", async (t) => {
     const began = performance.now(), now = new Date("2026-11-11T00:00:00Z");
     t.mock.timers.setTime(now.getTime());
+    // External factors only apply to the week after the newest completed one; simulate Week 10.
+    const completed = externalFactors.maxCompletedWeek;
+    externalFactors.maxCompletedWeek = 9;
+    t.after(() => { externalFactors.maxCompletedWeek = completed; });
     const db = database();
     const matchups = ["WSH-NYG", "NE-DET", "CAR-NO", "BUF-NYJ", "HOU-CLE", "JAX-TEN", "KC-ATL",
       "MIN-GB", "MIA-IND", "SEA-LV", "LAR-ARI", "SF-DAL", "PIT-CIN", "LAC-BAL"];

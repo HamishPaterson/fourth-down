@@ -13,12 +13,13 @@ import { predictionFeatureStatus, PREDICTION_FEATURE_VERSION } from "../src/serv
 import { playerTeam } from "./playerMetrics.js";
 import { findOddsForGame } from "../src/services/oddsApi.js";
 import dataset from "../api/nfl/nflverse-team-metrics.js";
+import externalFactors from "../src/services/externalFactors2026Data.js";
 
 const finiteTree = (value) => typeof value === "number" ? Number.isFinite(value)
   : !value || typeof value !== "object" || Object.values(value).every(finiteTree);
 const identity = (game) => `${game.away}:${game.home}`;
 
-export function predictionRefreshContext(sourceGames, now) {
+export function predictionRefreshContext(sourceGames, now, external = externalFactors) {
   const season = dataset.season;
   const { week } = getCurrentWeekWindow(now.getTime());
   const selected = new Map(), teams = new Set(), scheduleIds = new Map();
@@ -64,6 +65,10 @@ export function predictionRefreshContext(sourceGames, now) {
   if (!metrics || games.some((g) => [g.away, g.home].some((code) =>
     Date.parse(metrics[code]?.situational?.cutoff) !== Date.parse(cutoff)))) {
     throw new Error("Schedule first kickoff differs from current situational artifact cutoff");
+  }
+  // External factors must include the week just finished; older data would pass as current.
+  if (external?.season !== season || Number(external.maxCompletedWeek) !== week - 1) {
+    throw new Error(`External factors cover Week ${external?.maxCompletedWeek}, expected Week ${week - 1}`);
   }
   return { season, week, cutoff, games };
 }

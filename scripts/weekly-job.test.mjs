@@ -38,6 +38,9 @@ test("prediction refresh survives timeouts, stops at complete, and refuses the w
   assert.equal((await refreshPredictions(run.call, 13, waits())).complete, true);
   assert.equal(run.calls.length, 4);
   assert.deepEqual(run.calls[0].options.body, { dryRun: false, prepareWeeklyLock: true });
+  const limited = script([{ status: 502, body: { reason: "BALLDONTLIE schedule wait exceeds request deadline" } }, ok(0)]), w = waits();
+  assert.equal((await refreshPredictions(limited.call, 13, w)).complete, true);
+  assert.deepEqual(w.list, [62000]);
   await assert.rejects(refreshPredictions(script([{ status: 502, body: { reason: "broken" } }]).call, 13, waits()), /broken/);
   await assert.rejects(refreshPredictions(script([ok(0)]).call, 12, waits()), /expected Week 12/);
   await assert.rejects(refreshPredictions(script([ok(4)]).call, 13, { ...waits(), maxCalls: 3 }), /did not complete/);

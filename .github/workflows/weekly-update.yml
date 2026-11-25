@@ -32,8 +32,8 @@ jobs:
     env:
       PUBLISH: ${{ github.event_name == 'schedule' || inputs.publish }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
         with:
           node-version: 24
           cache: npm
@@ -69,7 +69,7 @@ jobs:
             scripts/externalFactorsData.test.mjs scripts/update-nflverse-players.test.mjs scripts/team-artifact-update.test.mjs \
             api-lib/candidateCoverage.test.js api-lib/playerBetDiagnostics.test.js api-lib/modelCorrectness.test.js \
             api-lib/weeklyMulti.test.js api-lib/weeklyMultiPreparation.test.js api-lib/weeklyMultiReadiness.test.js \
-            api-lib/weeklyMultiValuePolicy.test.js api-lib/oddsSnapshots.test.js api-lib/personnelView.test.js
+            api-lib/weeklyMultiValuePolicy.test.js api-lib/marketWeightLearning.test.js api-lib/oddsSnapshots.test.js api-lib/personnelView.test.js
           npm run build
 
       - name: Publish the week's data

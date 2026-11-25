@@ -83,7 +83,7 @@ test("all 14 Week 8 server candidates including 11 outdoor venues are finite and
       date: i === 13 ? "2026-11-03T01:15:00Z" : "2026-10-30T00:15:00Z",
       visitor_team: { abbreviation: away }, home_team: { abbreviation: home } };
   });
-  const context = predictionRefreshContext(source, now);
+  const context = predictionRefreshContext(source, now, { season: 2026, maxCompletedWeek: 7 });
   const handler = createOpponentNetworkHandler({ loadNetwork: async () => team.opponentNetworkByWeek[8] });
   const generate = createServerPredictionGenerator({ loadInputs: (query) => ({
     playByPlay: Promise.resolve(buildTeamMetricsResponse(team, query)),

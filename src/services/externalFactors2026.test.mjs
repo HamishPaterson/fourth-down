@@ -5,6 +5,8 @@ import {
   capExternalMarginAdjustment, computeExternalAdjustments2026,
 } from "./externalFactors2026.js";
 import dataset from "./externalFactors2026Data.js";
+// External factors apply only to the week after the newest completed week in the live data.
+const WEEK = dataset.maxCompletedWeek + 1;
 import { predictMatchup } from "./predictionEngine.js";
 
 test("production enablement and final combined cap are exactly true and two points", () => {
@@ -24,7 +26,7 @@ test("enabled projections cap actual final margin flow-through and preserve fact
   for (const [away, home] of [["MIN", "GB"], ["NE", "DET"], ["SEA", "LV"], ["LAC", "BAL"]]) {
     for (const weather of [null, { dome: true }, { temperature: -10, windSpeed: 45, rain: 8 }]) {
       const prediction = predictMatchup(away, home, {
-        season: 2026, week: 10, kickoff: "2026-11-15T18:00:00Z", weather,
+        season: 2026, week: WEEK, kickoff: "2026-12-31T18:00:00Z", weather,
         scheduleContext: { away: { daysRest: 4, consecutiveRoadGamesIncludingCurrent: 3 },
           home: { daysRest: 14 } },
       });
@@ -37,8 +39,8 @@ test("enabled projections cap actual final margin flow-through and preserve fact
       assert.equal(trace.totalExternalAdjustment,
         capExternalMarginAdjustment(trace.uncappedExternalAdjustment));
       if (Math.abs(trace.uncappedExternalAdjustment) > 2) capped++;
-      const raw = computeExternalAdjustments2026(dataset, { away, home, week: 10,
-        kickoff: "2026-11-15T18:00:00Z", weather });
+      const raw = computeExternalAdjustments2026(dataset, { away, home, week: WEEK,
+        kickoff: "2026-12-31T18:00:00Z", weather });
       assert.deepEqual(trace.venue, raw.trace.venue);
       assert.deepEqual(trace.travel, raw.trace.travel);
       assert.deepEqual(trace.rest, raw.trace.rest);
@@ -54,7 +56,7 @@ test("unavailable datasets and unsupported weather/travel keep explicit existing
   const input = structuredClone(dataset);
   input.factors.timezone.awayEast2.n = 0;
   const result = computeExternalAdjustments2026(input, {
-    away: "LAC", home: "BAL", week: 10, kickoff: "2026-11-15T18:00:00Z",
+    away: "LAC", home: "BAL", week: WEEK, kickoff: "2026-12-31T18:00:00Z",
     weather: { weatherAvailable: false },
   });
   assert.equal(result.active, true);

@@ -1,6 +1,9 @@
 import { createClient } from "@supabase/supabase-js";
 
 let client;
+// Tests stand in a signed-in session; the app always builds the real client below.
+export function setAuthClientForTests(value) { client = value; }
+
 export function getAuthClient() {
   if (client) return client;
   const url = import.meta.env?.VITE_SUPABASE_URL;

@@ -10,7 +10,8 @@ import { buildPlayerProjections } from "../src/services/playerProjectionService.
 import { buildBestBets, selectTdModelPick } from "../src/services/bestBetsService.js";
 import { buildWeeklyMultiSelection } from "./weeklyMulti.js";
 import { CURRENT_MODEL_VERSION, CURRENT_MODEL_KEY } from "../src/services/modelIdentity.js";
-import handler from "../api/nfl/game-stats.js";
+// The sign-in wrapper is covered by authorization.test.js; this exercises the route itself.
+import { handler } from "../api/nfl/game-stats.js";
 import regenerated from "../data/nflverse-player-metrics.js";
 import { getFullGamePrediction, clearFullGamePredictionCache } from "../src/services/gamePredictionService.js";
 import { buildPersonnelView, canonicalTeam } from "./personnelView.js";

@@ -11,6 +11,7 @@ import { FULL_MODEL_VERSION, FULL_MODEL_KEY } from "../src/services/gamePredicti
 import { BEST_BETS_CANDIDATE_VERSION } from "../src/services/bestBetsService.js";
 import { createServerPredictionGenerator, createServerPredictionInputLoader, refreshSavedBestBets } from "./serverPredictions.js";
 import dataset from "../api/nfl/nflverse-team-metrics.js";
+import externalFactors from "../src/services/externalFactors2026Data.js";
 import playerArtifact from "../data/nflverse-player-metrics.js";
 import { playerMetricsResponse } from "./playerMetrics.js";
 import { compareTeams } from "../api/nfl/play-by-play.js";
@@ -210,6 +211,10 @@ for (const missingPlayerWeek of [false, true]) {
 test(`NE-DET server generation with Week 10 player inputs ${missingPlayerWeek ? "missing" : "available"}`, async (t) => {
   const now = new Date("2026-11-11T00:00:00Z");
   t.mock.timers.enable({ apis: ["Date"], now: now.getTime() });
+  // External factors only apply to the week after the newest completed one; simulate Week 10.
+  const completed = externalFactors.maxCompletedWeek;
+  externalFactors.maxCompletedWeek = 9;
+  t.after(() => { externalFactors.maxCompletedWeek = completed; });
   const away = dataset.metricsByWeek[10].NE, home = dataset.metricsByWeek[10].DET;
   const game = { season: 2026, week: 10, away: "NE", home: "DET",
     sourceDate: away.expectedLineup.cutoff, weather: { dome: true } };
@@ -647,12 +652,25 @@ test("schedule validation refuses conflicting duplicate identities, repeated tea
   assert.throws(() => predictionRefreshContext(raw, new Date("2026-10-18T18:00Z")), /after the weekly first kickoff/);
 });
 
+const WEEK8_EXTERNAL = { season: 2026, maxCompletedWeek: 7 };
+
+test("a new week is refused until external factors include the week just finished", () => {
+  const source = [{ id: 1392323, season: 2026, week: 8, date: "2026-10-30T00:15:00.000Z",
+    visitor_team: { abbreviation: "CAR" }, home_team: { abbreviation: "GB" } }];
+  const now = new Date("2026-10-28T00:00:00Z");
+  for (const maxCompletedWeek of [6, 8]) {
+    assert.throws(() => predictionRefreshContext(source, now, { season: 2026, maxCompletedWeek }), /External factors cover/);
+  }
+  assert.throws(() => predictionRefreshContext(source, now, { season: 2025, maxCompletedWeek: 7 }), /External factors cover/);
+  assert.equal(predictionRefreshContext(source, now, WEEK8_EXTERNAL).week, 8);
+});
+
 test("refresh preserves canonical schedule IDs through normalization, cloning, snapshot and database serialization", () => {
   const source = [{ id: 1392336, season: 2026, week: 8, date: "2026-11-03T01:15:00.000Z",
     visitor_team: { abbreviation: "CHI" }, home_team: { abbreviation: "SEA" }, venue: "Lumen Field" },
   { id: 1392323, season: 2026, week: 8, date: "2026-10-30T00:15:00.000Z",
     visitor_team: { abbreviation: "CAR" }, home_team: { abbreviation: "GB" } }];
-  const refreshed = predictionRefreshContext(source, new Date("2026-10-28T00:00:00Z"));
+  const refreshed = predictionRefreshContext(source, new Date("2026-10-28T00:00:00Z"), WEEK8_EXTERNAL);
   const game = JSON.parse(JSON.stringify(refreshed.games.find((g) => g.away === "CHI")));
   assert.equal(game.id, "1392336");
   assert.equal(refreshed.games[0].id, "1392323");
@@ -709,14 +727,14 @@ test("all 14 normalized refresh games pass canonical identity to server generati
       visitor_team: { abbreviation: away }, home_team: { abbreviation: home } };
   });
   const now = new Date("2026-10-28T00:00:00Z");
-  const expected = predictionRefreshContext(source, now);
+  const expected = predictionRefreshContext(source, now, WEEK8_EXTERNAL);
   const events = expected.games.map((game) => ({ id: `provider-${game.id}`,
     away_team: game.away, home_team: game.home, commence_time: game.sourceDate }));
   const before = structuredClone(events);
   let received = 0;
   const result = await run({
     getNow: () => now, readSchedule: async () => source,
-    resolveContext: predictionRefreshContext,
+    resolveContext: (games, at) => predictionRefreshContext(games, at, WEEK8_EXTERNAL),
     loadNetwork: async () => ({ ...network, week: 8 }),
     readOdds: async () => ({ events }),
     createGenerator: () => async (game, odds) => {

@@ -1,4 +1,6 @@
-// How Weekly Multi legs are valued. Every market competes in one pool. Each weight is the
+// How Weekly Multi legs are valued. Every market competes in one pool. These are the standing
+// weights: marketWeightLearning.js refits them from graded results whenever the Multi is
+// prepared, and a market keeps its standing weight until it has 30 graded bets. Each weight is the
 // share of the model's disagreement with the bookmaker that graded results bore out
 // (maximum likelihood), so a market with no demonstrated edge has no value to offer until
 // its record improves. Graded through Week 11 of 2026:

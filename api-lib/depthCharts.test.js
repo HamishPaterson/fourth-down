@@ -7,7 +7,8 @@ import { compareTeams } from "../api/nfl/play-by-play.js";
 import dataset from "../api/nfl/nflverse-team-metrics.js";
 import playerMetrics from "../data/nflverse-player-metrics.js";
 import { playerMetricsResponse } from "./playerMetrics.js";
-import healthHandler, { buildTeamHealth, pointInTimeHealth } from "../api/nfl/qb-roster-health.js";
+// The sign-in wrapper is covered by authorization.test.js; these exercise the route itself.
+import { handler as healthHandler, buildTeamHealth, pointInTimeHealth } from "../api/nfl/qb-roster-health.js";
 import { buildPersonnelView, canonicalPosition } from "./personnelView.js";
 import { predictMatchup } from "../src/services/predictionEngine.js";
 import { getFullGamePrediction, clearFullGamePredictionCache } from "../src/services/gamePredictionService.js";

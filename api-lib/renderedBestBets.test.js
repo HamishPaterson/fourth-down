@@ -6,6 +6,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { createServer } from "vite";
 import { refreshPredictionLedger } from "../src/services/predictionLedger.js";
 import { savedBestBetsDisplay } from "../src/services/savedBestBetsDisplay.js";
+import { setAuthClientForTests } from "../src/services/supabaseAuth.js";
 import { refreshSavedBestBets } from "./serverPredictions.js";
 const rows = JSON.parse(readFileSync(new URL("./fixtures/week7-rendered-bets.json", import.meta.url)));
 rows.forEach((row, index) => {
@@ -30,9 +31,10 @@ const quoteEvents = (snapshot) => [{
 test("full shared ledger remains usable when browser persistence throws QuotaExceededError", async () => {
   const previousWindow = globalThis.window, previousFetch = globalThis.fetch, previousWarn = console.warn;
   const warnings = [], calls = [];
-  globalThis.window = { localStorage: { getItem: () => null, setItem: () => {
+  globalThis.window = { location: { origin: "http://localhost" }, localStorage: { getItem: () => null, setItem: () => {
     const error = new Error("Quota reached"); error.name = "QuotaExceededError"; throw error;
   } }, dispatchEvent() {} };
+  setAuthClientForTests({ auth: { getSession: async () => ({ data: { session: { access_token: "test-session" } }, error: null }) } });
   globalThis.fetch = async (url, options) => {
     calls.push({ url, options });
     const snapshots = rows.map((row) => ({ ...row,
@@ -58,6 +60,7 @@ test("full shared ledger remains usable when browser persistence throws QuotaExc
     assert.equal(warnings[0][1], "QuotaExceededError");
   } finally {
     globalThis.window = previousWindow; globalThis.fetch = previousFetch; console.warn = previousWarn;
+    setAuthClientForTests(undefined);
   }
 });
 

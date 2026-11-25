@@ -3,6 +3,7 @@ import { createWeeklyMultiClient, getLockCycle, secureBearerMatches, makeWeeklyM
 import { readPredictionOdds } from "./serverPredictions.js";
 import { evaluateWeeklyMultiReadiness, savedPredictionRows, validLockPlan } from "./weeklyMultiReadiness.js";
 import { MULTI_VALUE_POLICY } from "./weeklyMultiValuePolicy.js";
+import { gradedObservations, learnValuePolicy, loadGradedRows } from "./marketWeightLearning.js";
 import { PLAYER_PROPS_HELD } from "../src/services/playerPropPolicy.js";
 import { buildLockManifest, persistLockManifest, recordLockExecution } from "./weeklyLockAudit.js";
 import { PRESERVED_LOCK_THROUGH, snapshotAuthority } from "./weeklyLockProvenance.js";
@@ -13,7 +14,10 @@ export function createWeeklyMultiPreparationHandler(overrides = {}) {
   const readOdds = overrides.readOdds || readPredictionOdds;
   const recordExecution = overrides.recordExecution || recordLockExecution;
   const requireApproval = overrides.requireApproval === true;
-  const valuePolicy = overrides.valuePolicy === undefined ? MULTI_VALUE_POLICY : overrides.valuePolicy;
+  // Market weights are refitted from graded results of earlier weeks unless a policy is given.
+  const fixedPolicy = overrides.valuePolicy;
+  const learnPolicy = overrides.learnPolicy ||
+    (async (client, season, week) => learnValuePolicy(gradedObservations(await loadGradedRows(client, season), week)));
   const holdPlayerProps = overrides.holdPlayerProps ?? PLAYER_PROPS_HELD;
   const persistManifest = overrides.persistManifest || persistLockManifest;
   return async (req, res) => {
@@ -70,6 +74,8 @@ export function createWeeklyMultiPreparationHandler(overrides = {}) {
       capturedId = await persistManifest(client, buildLockManifest({
         operationId, plan, predictions, odds, now, result: "INPUTS_CAPTURED",
       }));
+      const valuePolicy = fixedPolicy !== undefined ? fixedPolicy
+        : plan ? await learnPolicy(client, plan.season, plan.week) : MULTI_VALUE_POLICY;
       const readiness = evaluateWeeklyMultiReadiness({ plan, predictions, odds, now, holdPlayerProps, valuePolicy });
       const ready = readiness.canSatisfyLegCount;
       const readinessResult = !ready && readiness.eligiblePredictionCount === readiness.expectedGameCount &&
