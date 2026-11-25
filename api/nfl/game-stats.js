@@ -1877,7 +1877,7 @@ async function loadGradingResults(season, week) {
 async function gradeCurrentSnapshots(supabase, response, { loadResults, now }) {
   const { getCurrentWeekWindow } = await import("./odds.js");
   // Use the existing Tuesday-noon schedule window, including Monday night finals.
-  const window = getCurrentWeekWindow(now.getTime() - 12 * 60 * 60 * 1000);
+  const window = getCurrentWeekWindow(now.getTime() - 5 * 60 * 60 * 1000);
   const start = new Date(window.start);
   const season = start.getUTCFullYear() - (start.getUTCMonth() < 2 ? 1 : 0);
   const context = { season, week: window.week, examined: 0, eligible: 0, deferred: [] };

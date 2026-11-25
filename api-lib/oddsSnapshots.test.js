@@ -531,3 +531,38 @@ test("a non-rate-limit failure partway still stores nothing", async () => {
   assert.equal(res.body.status, "error");
   assert.equal(stored.rows, undefined);
 });
+
+test("a rate-limited market resumes from its dropped games and completes the week", async () => {
+  responder = pagedResponder(3, { limits: 1 });
+  const client = createFakeClient([slotMoneyline()]);
+  const first = await refreshSpread(client);
+  assert.equal(first.res.body.status, "partial");
+  assert.equal(first.res.body.nextOffset, 2, "restarts on the page of the last kickoff seen");
+  fetchCalls = [];
+  responder = pagedResponder(99);
+  const res = createRes();
+  await handleOddsRequest({ ...refreshRequest("point_spread"), url: refreshRequest("point_spread").url + "&resumeOffset=2" }, res,
+    { client, now: NOW + 60000, clock: () => 0, sleep: async () => {} });
+  assert.equal(res.body.status, "ok");
+  assert.deepEqual(fetchCalls.map((call) => call.offset), [2, 3]);
+  const stored = [...client.store.values()].find((entry) => entry.market === "point_spread");
+  assert.deepEqual(stored.rows.map((entry) => entry.event_id), ["g1", "g2", "g3", "g4"]);
+  assert.equal(stored.fetched_at, new Date(NOW).toISOString(), "merged games keep the older fetch time");
+  assert.equal(stored.status, "ok");
+});
+
+for (const [label, entry, offset] of [
+  ["nothing was saved", null, 2],
+  ["the saved job was complete", { status: "ok" }, 2],
+  ["the saved games are too old", { status: "rate_limited", fetched_at: new Date(NOW - 16 * 60000).toISOString() }, 2],
+  ["the offset is invalid", { status: "rate_limited" }, -1],
+]) {
+  test(`resuming is refused when ${label}`, async () => {
+    const rows = [slotMoneyline(), ...(entry ? [snapshot("point_spread", [gameRow(slots[0])], { fetched_at: new Date(NOW - 60000).toISOString(), ...entry })] : [])];
+    const res = createRes();
+    await handleOddsRequest({ ...refreshRequest("point_spread"), url: refreshRequest("point_spread").url + "&resumeOffset=" + offset }, res,
+      { client: createFakeClient(rows), now: NOW, clock: () => 0, sleep: async () => {} });
+    assert.equal(res.statusCode, 409);
+    assert.equal(fetchCalls.length, 0);
+  });
+}

@@ -127,7 +127,7 @@ test("dispatcher does not add Weekly Best Multi cache headers to lock or no-mode
   assert.equal(scheduleResponse.headers["Cache-Control"], undefined);
 });
 
-test("read route returns the current lock record at Tue 23:59 without provider lookup", async () => {
+test("read route returns the current lock record at Tue 06:59 without provider lookup", async () => {
   const expectedLockAt = THURSDAY - 7 * DAY;
   const expectedLockDate = new Date(expectedLockAt);
   assert.equal(expectedLockDate.getUTCDay(), 4);
@@ -136,7 +136,7 @@ test("read route returns the current lock record at Tue 23:59 without provider l
   const record = { season: 2026, week: 4, lock_at: expectedLockDate.toISOString() };
   let providerCalls = 0;
   const handler = createCurrentEntry({
-    getNow: () => date(-2, 23, 59),
+    getNow: () => date(-2, 6, 59),
     fetchGames: async () => { providerCalls += 1; return []; },
     createClient: () => ({
       from: () => ({
@@ -255,15 +255,17 @@ test("legacy week keys remain readable but never gate availability, including da
   }
 });
 
-test("lock and display cycles share Wednesday rollover without a Thursday availability boundary", () => {
+test("lock and display cycles share the Tuesday 07:00 UTC rollover without a Thursday availability boundary", () => {
   const cases = [
-    { label: "Tue 23:59 UTC", at: date(-2, 23, 59), lockOffset: -7, displayOffset: -7, eligible: true, placeholder: false, notYetLocked: false },
+    { label: "Tue 06:59 UTC", at: date(-2, 6, 59), lockOffset: -7, displayOffset: -7, eligible: true, placeholder: false, notYetLocked: false },
+    { label: "Tue 07:00 UTC", at: date(-2, 7), lockOffset: -7, displayOffset: 0, eligible: true, placeholder: true, notYetLocked: true },
     { label: "Wed 00:00 UTC", at: date(-1), lockOffset: -7, displayOffset: 0, eligible: true, placeholder: true, notYetLocked: true },
     { label: "Wed 23:59 UTC", at: date(-1, 23, 59), lockOffset: -7, displayOffset: 0, eligible: true, placeholder: true, notYetLocked: true },
     { label: "Thu 00:00 UTC", at: date(0), lockOffset: 0, displayOffset: 0, eligible: true, placeholder: false, notYetLocked: false },
     { label: "Thu 00:30 UTC", at: date(0, 0, 30), lockOffset: 0, displayOffset: 0, eligible: true, placeholder: false, notYetLocked: false },
     { label: "Thu 01:00 UTC", at: date(0, 1), lockOffset: 0, displayOffset: 0, eligible: true, placeholder: false, notYetLocked: false },
-    { label: "Tue 23:59 UTC following week", at: date(5, 23, 59), lockOffset: 0, displayOffset: 0, eligible: true, placeholder: false, notYetLocked: false },
+    { label: "Tue 06:59 UTC following week", at: date(5, 6, 59), lockOffset: 0, displayOffset: 0, eligible: true, placeholder: false, notYetLocked: false },
+    { label: "Tue 07:00 UTC following week", at: date(5, 7), lockOffset: 0, displayOffset: 7, eligible: true, placeholder: true, notYetLocked: true },
     { label: "Wed 00:00 UTC following week", at: date(6), lockOffset: 0, displayOffset: 7, eligible: true, placeholder: true, notYetLocked: true },
     { label: "Wed 23:59 UTC the following week", at: date(13, 23, 59), lockOffset: 7, displayOffset: 14, eligible: true, placeholder: true, notYetLocked: true },
   ];
@@ -290,7 +292,8 @@ test("boundary inputs map to schedule-backed season/week keys", async () => {
   ];
   const fetchGames = async () => schedule;
   const cases = [
-    { label: "Tue 23:59", at: date(-2, 23, 59), lockAt: date(-7), lockKey: "2026/4", displayAt: date(-7), placeholder: false, displayKey: "2026/4", dryRunKey: "2026/5" },
+    { label: "Tue 06:59", at: date(-2, 6, 59), lockAt: date(-7), lockKey: "2026/4", displayAt: date(-7), placeholder: false, displayKey: "2026/4", dryRunKey: "2026/5" },
+    { label: "Tue 07:00", at: date(-2, 7), lockAt: date(-7), lockKey: "2026/4", displayAt: date(0), placeholder: true, displayKey: "2026/5", dryRunKey: "2026/5" },
     { label: "Wed 00:00", at: date(-1), lockAt: date(-7), lockKey: "2026/4", displayAt: date(0), placeholder: true, displayKey: "2026/5", dryRunKey: "2026/5" },
     { label: "Wed 23:59", at: date(-1, 23, 59), lockAt: date(-7), lockKey: "2026/4", displayAt: date(0), placeholder: true, displayKey: "2026/5", dryRunKey: "2026/5" },
     { label: "Thu 00:00", at: date(0), lockAt: date(0), lockKey: "2026/5", displayAt: date(0), placeholder: false, displayKey: "2026/5", dryRunKey: "2026/5" },

@@ -37,10 +37,11 @@ export function createWeeklyMultiClient() {
 export function getLockCycle(now = new Date()) {
   const mostRecentThursday = getMostRecentThursday(now);
   const nextThursday = mostRecentThursday + 7 * 24 * 60 * 60 * 1000;
-  const wednesdayStart = mostRecentThursday + 6 * 24 * 60 * 60 * 1000;
-  // Keep the existing Wednesday week rollover and legacy storage key.
+  // Same rollover as the rest of the app: Tuesday 5pm Brisbane (07:00 UTC).
+  const rollover = mostRecentThursday + 5 * 24 * 60 * 60 * 1000 + 7 * 60 * 60 * 1000;
+  // Keep the legacy Thursday storage key.
   // The key is not a lock deadline: this week is eligible immediately.
-  const lockAt = now.getTime() >= wednesdayStart ? nextThursday : mostRecentThursday;
+  const lockAt = now.getTime() >= rollover ? nextThursday : mostRecentThursday;
   return {
     lockAt: mostRecentThursday,
     targetLockAt: lockAt,
@@ -701,7 +702,7 @@ export function createWeeklyMultiCurrentHandler(overrides = {}) {
         const settlement = hasPlayerLegs && started ? await settle(savedRecord) : null;
         return savedBody(savedRecord, settlement?.legResults, settlement?.unresolved);
       }
-      if (now.getUTCDay() === 3) {
+      if (cycle.lockAt > now.getTime()) {
         // An unresolved prior week remains visible only until a current lock exists.
         const previous = await readRecord(cycle.lockAt - 7 * 24 * 60 * 60 * 1000);
         if (previous?.legs?.length) {

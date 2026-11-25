@@ -1,8 +1,9 @@
 import { isFinalGame } from "./gameResults.js";
 
 // NFL weeks roll forward only after the previous week's final game is FINAL.
-// Tuesday 8 September 2026 is the start of the Week 1 display window.
-const WEEK_ONE_START_MS = Date.UTC(2026, 8, 8, 0, 0, 0);
+// Weeks start Tuesday 5pm Brisbane (07:00 UTC), after the previous week's Monday night
+// game. Week 1 starts Tuesday 8 September 2026.
+const WEEK_ONE_START_MS = Date.UTC(2026, 8, 8, 7, 0, 0);
 const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
 
 // The calendar week derived purely from the clock. This is the upper bound for

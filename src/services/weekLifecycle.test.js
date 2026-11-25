@@ -2,9 +2,9 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { getCalendarWeek, getDefaultWeek } from "./weekLifecycle.js";
 
-// Week 8 of the 2026 season: Tuesday 27 October 2026 00:00 UTC to Tuesday 3
-// November 2026 00:00 UTC. The Monday-night game kicks off 2026-11-03T01:15Z.
-const WEEK8_TUESDAY = Date.UTC(2026, 9, 27, 0, 0, 0);
+// Week 8 of the 2026 season: Tuesday 27 October 2026 07:00 UTC (5pm Brisbane) to
+// Tuesday 3 November 2026 07:00 UTC. The Monday-night game kicks off 2026-11-03T01:15Z.
+const WEEK8_TUESDAY = Date.UTC(2026, 9, 27, 7, 0, 0);
 const WEEK8_MONDAY_NIGHT = "2026-11-03T01:15:00Z";
 const WEEK8_SUNDAY = "2026-11-01T18:00:00Z";
 
@@ -15,6 +15,9 @@ const game = (week, status, date = WEEK8_SUNDAY) => ({
 test("calendar week is purely time-based and bounded", () => {
   assert.equal(getCalendarWeek(Date.UTC(2026, 8, 8)), 1);
   assert.equal(getCalendarWeek(WEEK8_TUESDAY), 8);
+  assert.equal(getCalendarWeek(WEEK8_TUESDAY - 1), 7);
+  // The previous week's Monday-night game is still in its own week at kickoff.
+  assert.equal(getCalendarWeek(Date.parse(WEEK8_MONDAY_NIGHT)), 8);
   assert.equal(getCalendarWeek(Date.UTC(2026, 10, 3, 12)), 9);
   assert.equal(getCalendarWeek(Date.UTC(2027, 5, 1)), 18);
   assert.equal(getCalendarWeek(Date.UTC(2026, 0, 1)), 1);
@@ -90,4 +93,19 @@ test("international game with an early kickoff still holds the default until fin
     game(8, "Scheduled", "2026-11-01T14:30:00Z"), // international Sunday morning
   ];
   assert.equal(getDefaultWeek(games, Date.UTC(2026, 10, 1, 15)), 8);
+});
+
+test("the server odds window, page calendar and Multi cycle roll over at the same instant", async () => {
+  const { getCurrentWeekWindow } = await import("../../api/nfl/odds.js");
+  const { getLockCycle } = await import("../../api-lib/weeklyMulti.js");
+  for (let week = 2; week <= 18; week += 1) {
+    const start = Date.UTC(2026, 8, 8, 7) + (week - 1) * 7 * 24 * 3600000;
+    for (const [at, expected] of [[start - 1, week - 1], [start, week]]) {
+      assert.equal(getCalendarWeek(at), expected);
+      assert.equal(getCurrentWeekWindow(at).week, expected);
+    }
+    // Kickoff windows still start Tuesday noon UTC, so Monday night stays in its own week.
+    assert.equal(getCurrentWeekWindow(start).start, start + 5 * 3600000);
+    assert.equal(getLockCycle(new Date(start)).targetLockAt - getLockCycle(new Date(start - 1)).targetLockAt, 7 * 24 * 3600000);
+  }
 });

@@ -58,6 +58,7 @@ const MAX_PAGES_PER_MARKET = 10;
 // SharpAPI allows 12 calls a minute. A core job may wait out a short rate limit, but
 // must leave time to store its result inside the 60-second function limit.
 const CORE_RATE_LIMIT_BUDGET_MS = 45 * 1000;
+const RESUME_MAX_AGE_MS = 15 * 60 * 1000;
 const ODDS_CACHE_MS = 5 * 60 * 1000;
 
 // Core odds are read from Supabase snapshots, so the CDN only needs to absorb
@@ -94,7 +95,9 @@ export async function handleOddsRequest(req, res, deps = {}) {
   const params = new URL(req.url || "/", "http://localhost").searchParams;
 
   if (params.has("refreshMarket")) {
-    return handleMarketRefresh(req, res, params.get("refreshMarket"), deps);
+    return handleMarketRefresh(req, res, params.get("refreshMarket"), {
+      ...deps, resumeOffset: params.has("resumeOffset") ? Number(params.get("resumeOffset")) : null,
+    });
   }
 
   const scope = params.get("props") === "1" ? "props" : "core";
@@ -307,8 +310,9 @@ async function handleMarketRefresh(req, res, market, deps) {
       now: new Date(deps.now ?? Date.now()),
       sleep: deps.sleep,
       clock: deps.clock,
+      resumeOffset: deps.resumeOffset ?? null,
     });
-    const httpStatus = { ok: 200, partial: 200, empty: 200, rate_limited: 429, cooldown: 429, error: 502 }[result.status] || 500;
+    const httpStatus = { resume_unavailable: 409, ok: 200, partial: 200, empty: 200, rate_limited: 429, cooldown: 429, error: 502 }[result.status] || 500;
     return res.status(httpStatus).json(result);
   } catch (error) {
     console.error(`Odds snapshot refresh failed for ${market}:`, error?.message || error);
@@ -320,6 +324,7 @@ async function refreshCoreMarket({
   market, apiKey, client, now,
   sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
   clock = Date.now,
+  resumeOffset = null,
 }) {
   const startedAt = clock();
   const window = getCurrentWeekWindow(now.getTime());
@@ -338,6 +343,20 @@ async function refreshCoreMarket({
     };
   }
 
+  // Continue a rate-limited job: its saved games must be recent enough to describe the
+  // same market as the pages still to come.
+  let earlierRows = [];
+  if (resumeOffset !== null) {
+    const age = now.getTime() - new Date(existing?.fetched_at || 0).getTime();
+    if (market === "moneyline" || !Number.isInteger(resumeOffset) || resumeOffset < 1 ||
+        resumeOffset > MAX_CORE_SAFETY_PAGES * PAGE_SIZE || existing?.status !== "rate_limited" ||
+        !hasSnapshotData(existing) || !(age >= 0 && age <= RESUME_MAX_AGE_MS)) {
+      return { market, week: window.week, status: "resume_unavailable", providerRequests: 0 };
+    }
+    earlierRows = snapshotRows(existing);
+  }
+  const earlierEvents = collectUsableEventIds(earlierRows);
+
   let isComplete = null;
   if (market !== "moneyline") {
     const moneyline = snapshots.find((snapshot) => snapshot.market === "moneyline");
@@ -345,11 +364,13 @@ async function refreshCoreMarket({
     // Without a moneyline snapshot, rows are sorted by start time, so the
     // first usable row after this week means every current-week row was seen.
     isComplete = targetEventIds.size
-      ? (records) => hasEveryEvent(collectUsableEventIds(records), targetEventIds)
+      ? (records) => hasEveryEvent(new Set([...earlierEvents, ...collectUsableEventIds(records)]), targetEventIds)
       : (records) => records.some((row) => isUsableRow(row) && isEligibleOddsRow(row) && kickoffMs(row) >= window.end);
   }
 
   const stats = { pages: 0, requests: 0 };
+  // Merged games keep the older fetch time, so nothing is labelled fresher than it is.
+  const fetchedAt = earlierRows.length ? new Date(existing.fetched_at) : now;
   let waited = false;
   const waitForRateLimit = async (error) => {
     const waitMs = ((error.retryAfterSeconds || DEFAULT_RETRY_AFTER_SECONDS) + 1) * 1000;
@@ -373,14 +394,16 @@ async function refreshCoreMarket({
       market === "moneyline" ? MAX_CORE_PAGES_PER_MARKET : MAX_CORE_SAFETY_PAGES,
       isComplete,
       stats,
-      waitForRateLimit
+      waitForRateLimit,
+      resumeOffset ?? 0
     );
   } catch (error) {
-    const partial = error?.status === 429 && isComplete ? completeGameRows(error.records).filter(keep) : [];
-    if (partial.length && partialMayReplace(existing, partial, now)) {
+    const fresh = error?.status === 429 && isComplete ? completeGameRows(error.records).filter(keep) : [];
+    const partial = fresh.length ? mergeGames(earlierRows, fresh) : [];
+    if (partial.length && (earlierRows.length || partialMayReplace(existing, partial, now))) {
       const retryAfterSeconds = error.retryAfterSeconds || DEFAULT_RETRY_AFTER_SECONDS;
       await writeSnapshotSuccess(client, key, {
-        rows: partial, pageCount: stats.pages, now, partialReason: error?.message,
+        rows: partial, pageCount: stats.pages, now: fetchedAt, partialReason: error?.message,
         rateLimitedUntil: new Date(now.getTime() + retryAfterSeconds * 1000),
       });
       return {
@@ -389,10 +412,11 @@ async function refreshCoreMarket({
         status: "partial",
         rowCount: partial.length,
         gameCount: new Set(partial.map((row) => row.event_id)).size,
+        nextOffset: resumePoint(error.records, stats.pageStarts),
         retryAfterSeconds,
         providerRequests: stats.requests,
         pageCount: stats.pages,
-        fetchedAt: now.toISOString(),
+        fetchedAt: fetchedAt.toISOString(),
       };
     }
     const rateLimited = error?.status === 429;
@@ -417,7 +441,7 @@ async function refreshCoreMarket({
     };
   }
 
-  const kept = rows.filter(keep);
+  const kept = mergeGames(earlierRows, rows.filter(keep));
 
   if (!kept.length) {
     await writeSnapshotFailure(client, key, {
@@ -436,7 +460,7 @@ async function refreshCoreMarket({
     };
   }
 
-  await writeSnapshotSuccess(client, key, { rows: kept, pageCount: stats.pages, now });
+  await writeSnapshotSuccess(client, key, { rows: kept, pageCount: stats.pages, now: fetchedAt });
   return {
     market,
     week: window.week,
@@ -444,7 +468,7 @@ async function refreshCoreMarket({
     rowCount: kept.length,
     providerRequests: stats.requests,
     pageCount: stats.pages,
-    fetchedAt: now.toISOString(),
+    fetchedAt: fetchedAt.toISOString(),
   };
 }
 
@@ -454,6 +478,18 @@ function completeGameRows(records) {
   const timed = (records || []).filter((row) => Number.isFinite(kickoffMs(row)) && kickoffMs(row) > 0);
   const lastKickoff = Math.max(...timed.map(kickoffMs));
   return timed.filter((row) => kickoffMs(row) < lastKickoff);
+}
+
+// A later page wins for any game seen in both halves of a resumed job.
+function mergeGames(earlierRows, laterRows) {
+  const later = new Set(laterRows.map((row) => row.event_id));
+  return [...earlierRows.filter((row) => !later.has(row.event_id)), ...laterRows];
+}
+
+// Restart at the first page containing the last kickoff seen, whose games were dropped.
+function resumePoint(records, pageStarts) {
+  const lastKickoff = Math.max(...(records || []).map(kickoffMs).filter((time) => Number.isFinite(time) && time > 0));
+  return pageStarts.find((page) => page.lastKickoff >= lastKickoff)?.offset || null;
 }
 
 // A partial result never displaces current data that covers a game it lacks.
@@ -842,12 +878,13 @@ function hasEveryEvent(found, expected) {
 }
 
 // Same week calculation as Predictions.jsx and Schedule.jsx: week 1 starts
-// Tuesday 8 September 2026 (UTC) and each week lasts seven days.
-const WEEK_ONE_START_MS = Date.UTC(2026, 8, 8, 0, 0, 0);
+// Tuesday 8 September 2026 5pm Brisbane (07:00 UTC), after the previous Monday night game,
+// and each week lasts seven days.
+const WEEK_ONE_START_MS = Date.UTC(2026, 8, 8, 7, 0, 0);
 const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
 // Monday night kickoffs fall just after 00:00 UTC Tuesday, so the window
 // boundary is moved to midday Tuesday to keep them in their own week.
-const WEEK_BOUNDARY_OFFSET_MS = 12 * 60 * 60 * 1000;
+const WEEK_BOUNDARY_OFFSET_MS = 5 * 60 * 60 * 1000;
 
 export function getCurrentWeekWindow(now = Date.now()) {
   const week = Math.min(18, Math.max(1, Math.floor((now - WEEK_ONE_START_MS) / WEEK_MS) + 1));
@@ -1001,13 +1038,15 @@ async function fetchMarket(
   maxPages = MAX_PAGES_PER_MARKET,
   isComplete = null,
   stats = { pages: 0, requests: 0 },
-  onRateLimit = null
+  onRateLimit = null,
+  startOffset = 0
 ) {
   const records = [];
   const seenRecordIds = new Set();
   const seenPages = new Set();
+  stats.pageStarts = [];
 
-  let offset = 0;
+  let offset = startOffset;
   let pageNumber = 0;
 
   while (pageNumber < maxPages) {
@@ -1086,6 +1125,7 @@ async function fetchMarket(
       }
     }
 
+    stats.pageStarts.push({ offset, lastKickoff: Math.max(0, ...pageRows.map(kickoffMs).filter(Number.isFinite)) });
     pageNumber += 1;
     stats.pages = pageNumber;
 
