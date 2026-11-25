@@ -39,6 +39,8 @@ function createFakeClient(initial = []) {
           return query;
         },
         async upsert(payload) {
+          // Mirrors the check constraint in supabase/odds_market_snapshots.sql.
+          assert.ok(["missing", "ok", "rate_limited", "error", "empty"].includes(payload.status), payload.status);
           const key = keyOf(payload);
           store.set(key, { ...(store.get(key) || {}), ...payload });
           return { error: null };
@@ -432,4 +434,100 @@ test("failed refresh keeps last-known-good: fresh inside the window, stale-fallb
     snapshot("total_points", totalRows),
   ]);
   assert.equal((await readCore(aged)).body.cacheStatus, "stale-fallback");
+});
+
+// Week with four kickoffs; each provider page holds one game and arrives in kickoff order.
+const slots = [1, 2, 3, 4].map((day) => ({
+  id: `g${day}`, kickoff: new Date(WINDOW.start + day * 24 * 3600 * 1000).toISOString(),
+}));
+const gameRow = (slot, overrides = {}) => row({
+  event_id: slot.id, event_start_time: slot.kickoff, market_type: "point_spread", line: -3, ...overrides,
+});
+const slotMoneyline = () => snapshot("moneyline", slots.map((slot) => gameRow(slot, { market_type: "moneyline", line: undefined })));
+const pagedResponder = (limitAt, { retryAfter = "50", limits = 1 } = {}) => {
+  let refused = 0;
+  return (url, call) => {
+    if (call > limitAt && refused < limits) {
+      refused++;
+      return { status: 429, body: { error: "Rate limit exceeded" }, headers: { "retry-after": retryAfter } };
+    }
+    const offset = Number(url.searchParams.get("offset"));
+    return { body: { data: slots[offset] ? [gameRow(slots[offset])] : [], pagination: { total: slots.length } } };
+  };
+};
+const refreshSpread = async (client, extra = {}) => {
+  const res = createRes(), waits = [];
+  await handleOddsRequest(refreshRequest("point_spread"), res, {
+    client, now: NOW, clock: () => 0, sleep: async (ms) => { waits.push(ms); }, ...extra,
+  });
+  return { res, waits, stored: [...client.store.values()].find((entry) => entry.market === "point_spread") };
+};
+
+test("a long rate limit keeps only whole games instead of discarding the market", async () => {
+  responder = pagedResponder(3, { limits: 9 });
+  const { res, waits, stored } = await refreshSpread(createFakeClient([slotMoneyline()]));
+  assert.equal(res.statusCode, 200);
+  assert.equal(res.body.status, "partial");
+  assert.deepEqual(waits, []);
+  // Game three is the last one seen and may be incomplete, so it is not stored.
+  assert.deepEqual(stored.rows.map((entry) => entry.event_id), ["g1", "g2"]);
+  assert.equal(stored.status, "rate_limited");
+  assert.equal(stored.fetched_at, new Date(NOW).toISOString());
+  assert.equal(stored.last_error, "Rate limit exceeded");
+  assert.equal(Date.parse(stored.rate_limited_until), NOW + 50000);
+});
+
+test("games sharing the last kickoff are all treated as possibly incomplete", async () => {
+  responder = (url, call) => call > 1 ? { status: 429, headers: { "retry-after": "50" }, body: { error: "Rate limit exceeded" } }
+    : { body: { data: [gameRow(slots[0]), gameRow(slots[1]), gameRow({ id: "g2b", kickoff: slots[1].kickoff })],
+      pagination: { total: 9 } } };
+  const { stored } = await refreshSpread(createFakeClient([slotMoneyline()]));
+  assert.deepEqual(stored.rows.map((entry) => entry.event_id), ["g1"]);
+});
+
+test("a short rate limit is waited out once and the same page is fetched again", async () => {
+  responder = pagedResponder(3, { retryAfter: "6" });
+  const { res, waits, stored } = await refreshSpread(createFakeClient([slotMoneyline()]));
+  assert.equal(res.body.status, "ok");
+  assert.deepEqual(waits, [7000]);
+  assert.deepEqual(fetchCalls.map((call) => call.offset), [0, 1, 2, 3, 3]);
+  assert.equal(stored.rows.length, 4);
+  assert.equal(stored.status, "ok");
+  assert.equal(stored.rate_limited_until, null);
+});
+
+test("the wait is never repeated and never exceeds the function budget", async () => {
+  responder = pagedResponder(3, { retryAfter: "6", limits: 9 });
+  const repeated = await refreshSpread(createFakeClient([slotMoneyline()]));
+  assert.deepEqual(repeated.waits, [7000]);
+  assert.equal(repeated.res.body.status, "partial");
+  fetchCalls = [];
+  responder = pagedResponder(3, { retryAfter: "6", limits: 9 });
+  let calls = 0;
+  const late = await refreshSpread(createFakeClient([slotMoneyline()]), { clock: () => (calls++ ? 40000 : 0) });
+  assert.deepEqual(late.waits, []);
+});
+
+test("a partial result does not displace fresh data covering more games, but replaces stale data", async () => {
+  const full = (ageHours) => snapshot("point_spread", slots.map((slot) => gameRow(slot)), {
+    fetched_at: new Date(NOW - ageHours * 3600 * 1000).toISOString(),
+  });
+  responder = pagedResponder(3, { limits: 9 });
+  const fresh = await refreshSpread(createFakeClient([slotMoneyline(), full(24)]));
+  assert.equal(fresh.res.body.status, "rate_limited");
+  assert.equal(fresh.stored.rows.length, 4);
+  assert.equal(fresh.stored.fetched_at, full(24).fetched_at);
+  fetchCalls = [];
+  responder = pagedResponder(3, { limits: 9 });
+  const stale = await refreshSpread(createFakeClient([slotMoneyline(), full(31)]));
+  assert.equal(stale.res.body.status, "partial");
+  assert.equal(stale.stored.rows.length, 2);
+});
+
+test("a non-rate-limit failure partway still stores nothing", async () => {
+  responder = (url, call) => call > 3 ? { status: 500, body: { error: "boom" } }
+    : { body: { data: [gameRow(slots[Number(url.searchParams.get("offset"))])], pagination: { total: 4 } } };
+  const { res, stored } = await refreshSpread(createFakeClient([slotMoneyline()]));
+  assert.equal(res.body.status, "error");
+  assert.equal(stored.rows, undefined);
 });

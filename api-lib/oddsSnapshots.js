@@ -63,7 +63,9 @@ export function selectRolloverFallback(earlierSnapshots, market, { now, currentE
 }
 
 // Replaces only this market's rows. Nothing else in the table is touched.
-export async function writeSnapshotSuccess(client, key, { rows, pageCount = 0, now = new Date() }) {
+export async function writeSnapshotSuccess(client, key, {
+  rows, pageCount = 0, now = new Date(), partialReason = null, rateLimitedUntil = null,
+}) {
   const timestamp = now.toISOString();
   const { error } = await client.from(SNAPSHOT_TABLE).upsert(
     {
@@ -74,9 +76,10 @@ export async function writeSnapshotSuccess(client, key, { rows, pageCount = 0, n
       page_count: pageCount,
       fetched_at: timestamp,
       last_attempt_at: timestamp,
-      status: "ok",
-      last_error: null,
-      rate_limited_until: null,
+      // The table constraint has no partial status; fresh rows plus rate_limited say the same.
+      status: partialReason ? "rate_limited" : "ok",
+      last_error: partialReason ? String(partialReason).slice(0, 500) : null,
+      rate_limited_until: rateLimitedUntil ? rateLimitedUntil.toISOString() : null,
     },
     { onConflict: ON_CONFLICT }
   );

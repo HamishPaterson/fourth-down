@@ -1,6 +1,7 @@
 import { timingSafeEqual } from "node:crypto";
 import { resolveTeamCode } from "../../src/services/oddsApi.js";
 import {
+  SNAPSHOT_MAX_AGE_MS,
   SNAPSHOT_PROVIDER,
   SNAPSHOT_SEASON,
   createSnapshotClient,
@@ -54,6 +55,9 @@ const MAX_CORE_PAGES_PER_MARKET = 4;
 // Runaway guard only; paging normally ends on coverage or provider exhaustion.
 const MAX_CORE_SAFETY_PAGES = 25;
 const MAX_PAGES_PER_MARKET = 10;
+// SharpAPI allows 12 calls a minute. A core job may wait out a short rate limit, but
+// must leave time to store its result inside the 60-second function limit.
+const CORE_RATE_LIMIT_BUDGET_MS = 45 * 1000;
 const ODDS_CACHE_MS = 5 * 60 * 1000;
 
 // Core odds are read from Supabase snapshots, so the CDN only needs to absorb
@@ -301,8 +305,10 @@ async function handleMarketRefresh(req, res, market, deps) {
       apiKey,
       client,
       now: new Date(deps.now ?? Date.now()),
+      sleep: deps.sleep,
+      clock: deps.clock,
     });
-    const httpStatus = { ok: 200, empty: 200, rate_limited: 429, cooldown: 429, error: 502 }[result.status] || 500;
+    const httpStatus = { ok: 200, partial: 200, empty: 200, rate_limited: 429, cooldown: 429, error: 502 }[result.status] || 500;
     return res.status(httpStatus).json(result);
   } catch (error) {
     console.error(`Odds snapshot refresh failed for ${market}:`, error?.message || error);
@@ -310,7 +316,12 @@ async function handleMarketRefresh(req, res, market, deps) {
   }
 }
 
-async function refreshCoreMarket({ market, apiKey, client, now }) {
+async function refreshCoreMarket({
+  market, apiKey, client, now,
+  sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
+  clock = Date.now,
+}) {
+  const startedAt = clock();
   const window = getCurrentWeekWindow(now.getTime());
   const key = { week: window.week, market };
   const snapshots = await readSnapshots(client, { week: window.week });
@@ -339,6 +350,21 @@ async function refreshCoreMarket({ market, apiKey, client, now }) {
   }
 
   const stats = { pages: 0, requests: 0 };
+  let waited = false;
+  const waitForRateLimit = async (error) => {
+    const waitMs = ((error.retryAfterSeconds || DEFAULT_RETRY_AFTER_SECONDS) + 1) * 1000;
+    if (waited || !stats.pages || clock() - startedAt + waitMs > CORE_RATE_LIMIT_BUDGET_MS) return false;
+    waited = true;
+    await sleep(waitMs);
+    return true;
+  };
+  const marketKey = getMarketKey(market);
+  const keep = (row) =>
+    isUsableRow(row) &&
+    isEligibleOddsRow(row) &&
+    getMarketKey(row?.market_type || row?.market || row?.market_key) === marketKey &&
+    kickoffMs(row) >= window.start &&
+    kickoffMs(row) < window.end;
   let rows;
   try {
     rows = await fetchMarket(
@@ -346,9 +372,29 @@ async function refreshCoreMarket({ market, apiKey, client, now }) {
       market,
       market === "moneyline" ? MAX_CORE_PAGES_PER_MARKET : MAX_CORE_SAFETY_PAGES,
       isComplete,
-      stats
+      stats,
+      waitForRateLimit
     );
   } catch (error) {
+    const partial = error?.status === 429 && isComplete ? completeGameRows(error.records).filter(keep) : [];
+    if (partial.length && partialMayReplace(existing, partial, now)) {
+      const retryAfterSeconds = error.retryAfterSeconds || DEFAULT_RETRY_AFTER_SECONDS;
+      await writeSnapshotSuccess(client, key, {
+        rows: partial, pageCount: stats.pages, now, partialReason: error?.message,
+        rateLimitedUntil: new Date(now.getTime() + retryAfterSeconds * 1000),
+      });
+      return {
+        market,
+        week: window.week,
+        status: "partial",
+        rowCount: partial.length,
+        gameCount: new Set(partial.map((row) => row.event_id)).size,
+        retryAfterSeconds,
+        providerRequests: stats.requests,
+        pageCount: stats.pages,
+        fetchedAt: now.toISOString(),
+      };
+    }
     const rateLimited = error?.status === 429;
     const retryAfterSeconds = rateLimited ? error.retryAfterSeconds || DEFAULT_RETRY_AFTER_SECONDS : null;
     const status = rateLimited ? "rate_limited" : "error";
@@ -371,15 +417,7 @@ async function refreshCoreMarket({ market, apiKey, client, now }) {
     };
   }
 
-  const marketKey = getMarketKey(market);
-  const kept = rows.filter(
-    (row) =>
-      isUsableRow(row) &&
-      isEligibleOddsRow(row) &&
-      getMarketKey(row?.market_type || row?.market || row?.market_key) === marketKey &&
-      kickoffMs(row) >= window.start &&
-      kickoffMs(row) < window.end
-  );
+  const kept = rows.filter(keep);
 
   if (!kept.length) {
     await writeSnapshotFailure(client, key, {
@@ -408,6 +446,22 @@ async function refreshCoreMarket({ market, apiKey, client, now }) {
     pageCount: stats.pages,
     fetchedAt: now.toISOString(),
   };
+}
+
+// Rows arrive sorted by kickoff, so when paging stops early only games that start
+// before the last kickoff seen are certain to be whole.
+function completeGameRows(records) {
+  const timed = (records || []).filter((row) => Number.isFinite(kickoffMs(row)) && kickoffMs(row) > 0);
+  const lastKickoff = Math.max(...timed.map(kickoffMs));
+  return timed.filter((row) => kickoffMs(row) < lastKickoff);
+}
+
+// A partial result never displaces current data that covers a game it lacks.
+function partialMayReplace(existing, partial, now) {
+  if (!hasSnapshotData(existing) ||
+      now.getTime() - new Date(existing.fetched_at).getTime() > SNAPSHOT_MAX_AGE_MS) return true;
+  const covered = new Set(partial.map((row) => row.event_id));
+  return snapshotRows(existing).every((row) => covered.has(row.event_id) || kickoffMs(row) <= now.getTime());
 }
 
 function kickoffMs(row) {
@@ -946,7 +1000,8 @@ async function fetchMarket(
   market,
   maxPages = MAX_PAGES_PER_MARKET,
   isComplete = null,
-  stats = { pages: 0, requests: 0 }
+  stats = { pages: 0, requests: 0 },
+  onRateLimit = null
 ) {
   const records = [];
   const seenRecordIds = new Set();
@@ -989,6 +1044,8 @@ async function fetchMarket(
         ? parseRetryAfter(response.headers?.get?.("retry-after"))
         : null;
       error.records = records;
+      // Repeat the same page when the caller has waited out the limit.
+      if (response.status === 429 && onRateLimit && await onRateLimit(error)) continue;
       throw error;
     }
 
