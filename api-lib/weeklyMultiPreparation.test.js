@@ -317,6 +317,48 @@ test("fresh atomic batch derives its plan before the former deadline, locks once
   assert.equal(db.tables.weekly_best_multis.length, 1);
 });
 
+test("a partially refreshed week cannot lock; the same rows lock once the full plan exists", async () => {
+  // Five of six scheduled games are saved, each individually lock-eligible.
+  const fixture = lockFixture();
+  const savedPlan = fixture.plan;
+  fixture.plan = null;
+  const partial = lockDatabase(fixture);
+  for (const prepare of [true, false]) {
+    const { res } = await run({ fixture, db: partial, prepare });
+    assert.equal(res.body.status, "not ready");
+    assert.deepEqual(res.body.readiness.blockingReasons.includes("LOCK_PLAN_UNAVAILABLE_OR_INVALID"), true);
+  }
+  assert.equal(partial.tables.weekly_best_multis.length, 0);
+
+  const full = { ...savedPlan, expected_game_count: 6,
+    games: [...savedPlan.games, { away: "KC", home: "BUF", kickoff: savedPlan.games[0].kickoff }] };
+  const missing = await run({ fixture: { ...fixture, plan: full } });
+  assert.equal(missing.res.body.status, "not ready");
+  assert.ok(missing.res.body.readiness.blockingReasons.includes("PREDICTIONS_MISSING"));
+  assert.equal(missing.db.tables.weekly_best_multis.length, 0);
+
+  const complete = await run({ fixture: { ...fixture, plan: savedPlan } });
+  assert.equal(complete.res.body.status, "locked");
+});
+
+for (const [label, mutate] of [
+  ["mixed operations", (rows) => { rows[0].batchProvenance.operationId = "00000000-0000-4000-8000-000000000009"; }],
+  ["a row outside the batch", (rows) => { delete rows[0].batchProvenance; }],
+  ["no operation identity", (rows) => rows.forEach((row) => { delete row.batchProvenance.operationId; })],
+]) {
+  test(`a derived plan requires one atomic whole-week operation: ${label}`, async () => {
+    const fixture = atomicBatchFixture();
+    fixture.plan = null;
+    fixture.now = new Date("2026-10-28T06:00:00Z");
+    mutate(fixture.predictions);
+    const db = lockDatabase(fixture);
+    const { res } = await run({ fixture, db });
+    assert.equal(res.body.status, "not ready");
+    assert.ok(res.body.readiness.blockingReasons.includes("LOCK_PLAN_UNAVAILABLE_OR_INVALID"));
+    assert.equal(db.tables.weekly_best_multis.length, 0);
+  });
+}
+
 test("availability polling never fabricates a lock without a persisted authoritative batch", async () => {
   const fixture = atomicBatchFixture();
   fixture.plan = null;

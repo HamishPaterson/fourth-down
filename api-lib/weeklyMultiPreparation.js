@@ -139,6 +139,9 @@ function embeddedOddsPayload(predictions) {
   };
 }
 
+// Saved rows alone cannot prove a week is complete: the batched refresh stores a few
+// games per call. Only the atomic whole-week replacement, whose transaction enforces
+// the full schedule under one operationId, may stand in for an explicit plan.
 async function deriveSavedPlan(client, lockAt, now) {
   const lock = Date.parse(lockAt);
   const { data: rows, error } = await client.from("prediction_snapshots").select("*")
@@ -147,6 +150,9 @@ async function deriveSavedPlan(client, lockAt, now) {
   if (error) throw new Error("PREDICTION_READ_FAILED");
   const snapshots = savedPredictionRows(rows);
   if (!snapshots.length) return null;
+  const operationId = snapshots[0].batchProvenance?.operationId;
+  if (!operationId || snapshots.some((row) => row.batchProvenance?.source !== "server-week-replacement" ||
+      row.batchProvenance.operationId !== operationId)) return null;
   const weeks = new Set(snapshots.map((row) => `${row.season}:${row.week}`));
   if (weeks.size !== 1) return null;
   const { season, week } = (() => { const [s, w] = [...weeks][0].split(":"); return { season: Number(s), week: Number(w) }; })();
