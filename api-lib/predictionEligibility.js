@@ -2,6 +2,7 @@ import { isCurrentModelIdentity } from "../src/services/modelIdentity.js";
 import { BEST_BETS_CANDIDATE_VERSION } from "../src/services/bestBetsService.js";
 import { predictionFeatureStatus } from "../src/services/predictionFeatures.js";
 import { AVAILABILITY_POLICY_VERSION } from "./personnelView.js";
+import { PLAYER_PROJECTION_METHOD } from "../src/services/playerPropPolicy.js";
 import { EXTERNAL_FACTORS_2026_ENABLED, MAX_COMBINED_EXTERNAL_MARGIN_ADJUSTMENT } from "../src/services/externalFactors2026.js";
 
 const number = (value) => value !== null && value !== undefined && value !== "" && Number.isFinite(Number(value));
@@ -21,10 +22,11 @@ export function predictionMissingOdds(snapshot) {
 const repriceable = (snapshot, now) => Boolean(snapshot?.authoritative) && !snapshot.frozenAt &&
   !snapshot.actualWinner && !snapshot.gradedAt && Date.parse(snapshot.kickoff) > now.getTime();
 
-// Saved before the current availability rules, so its players were judged differently.
+// Saved before the current availability rules or player projection method.
 export function predictionAvailabilityOutdated(snapshot, now) {
-  return repriceable(snapshot, now) && ["away", "home"].some((side) =>
-    snapshot.personnelViews?.[side]?.availabilityPolicy !== AVAILABILITY_POLICY_VERSION);
+  return repriceable(snapshot, now) && (snapshot.playerProjections?.method !== PLAYER_PROJECTION_METHOD ||
+    ["away", "home"].some((side) =>
+      snapshot.personnelViews?.[side]?.availabilityPolicy !== AVAILABILITY_POLICY_VERSION));
 }
 
 // Weekly Multi legs must match the exact current quote, so a saved prediction whose

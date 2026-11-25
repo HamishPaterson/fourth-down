@@ -318,6 +318,11 @@ export function buildWeeklyMultiSelection(snapshots, oddsPayload, context, now =
     const bets = [...(bestBetsPayload?.candidates || bestBetsPayload?.recommendations || [])];
     if (scorer?.source === "priced-market") bets.push(scorer);
     for (const bet of bets) {
+      if (context.holdPlayerProps && isPlayerLeg(bet)) {
+        reasonCounts.invalidCandidates += 1;
+        reject(snapshot, bet, ["PLAYER_PROPS_HELD"]);
+        continue;
+      }
       if (context.requireSnapshotEvidence && isPlayerLeg(bet) &&
           (!Number.isFinite(bet.roleConfidence) || bet.roleConfidence < .55 || bet.roleConfidence > 1)) {
         reasonCounts.personnelExcluded += 1;

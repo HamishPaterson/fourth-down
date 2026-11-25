@@ -182,7 +182,7 @@ function displayed(awayCode, quotes = odds, activePlayers = []) {
   for (const side of ["away", "home"]) for (const player of saved.personnelViews[side].players) {
     if (activePlayers.includes(player.canonicalId)) player.status = "Active";
   }
-  const assessment = refreshSavedBestBets(saved, quotes, NOW, { displayOnly: true });
+  const assessment = refreshSavedBestBets(saved, quotes, NOW, { displayOnly: true, holdPlayerProps: false });
   return ui.enrichSavedPredictionWithCurrentMarket(assessment, { away: saved.awayCode, home: saved.homeCode }, quotes.events, NOW);
 }
 test("I/J/K: existing positive-edge props can win Most Likely/Best Value while stale totals stay quarantined", () => {

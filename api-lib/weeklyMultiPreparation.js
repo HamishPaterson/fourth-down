@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { createWeeklyMultiClient, getLockCycle, secureBearerMatches, makeWeeklyMultiRecord } from "./weeklyMulti.js";
 import { readPredictionOdds } from "./serverPredictions.js";
 import { evaluateWeeklyMultiReadiness, savedPredictionRows, validLockPlan } from "./weeklyMultiReadiness.js";
+import { PLAYER_PROPS_HELD } from "../src/services/playerPropPolicy.js";
 import { buildLockManifest, persistLockManifest, recordLockExecution } from "./weeklyLockAudit.js";
 import { PRESERVED_LOCK_THROUGH, snapshotAuthority } from "./weeklyLockProvenance.js";
 
@@ -10,6 +11,7 @@ export function createWeeklyMultiPreparationHandler(overrides = {}) {
   const createClient = overrides.createClient || createWeeklyMultiClient;
   const readOdds = overrides.readOdds || readPredictionOdds;
   const recordExecution = overrides.recordExecution || recordLockExecution;
+  const holdPlayerProps = overrides.holdPlayerProps ?? PLAYER_PROPS_HELD;
   const persistManifest = overrides.persistManifest || persistLockManifest;
   return async (req, res) => {
     res.setHeader("Cache-Control", "no-store");
@@ -65,7 +67,7 @@ export function createWeeklyMultiPreparationHandler(overrides = {}) {
       capturedId = await persistManifest(client, buildLockManifest({
         operationId, plan, predictions, odds, now, result: "INPUTS_CAPTURED",
       }));
-      const readiness = evaluateWeeklyMultiReadiness({ plan, predictions, odds, now });
+      const readiness = evaluateWeeklyMultiReadiness({ plan, predictions, odds, now, holdPlayerProps });
       const ready = readiness.canSatisfyLegCount;
       const readinessResult = !ready && readiness.eligiblePredictionCount === readiness.expectedGameCount &&
         readiness.eligibleBestBetCount === 0 ? "NO_ELIGIBLE_CANDIDATES" : "READINESS_FAILED";

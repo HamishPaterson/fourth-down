@@ -1116,3 +1116,36 @@ test("verified weekly roles survive real orchestration into projections and Best
     assert.ok(receiver(ambiguous.playerProjections));
   } finally { global.fetch = original; clearFullGamePredictionCache(); }
 });
+
+test("departed teammates' workload stays unallocated instead of inflating the remaining players", () => {
+  const scale = (factor) => {
+    const input = fixture();
+    for (const player of Object.values(input.playerMetrics.away.players)) {
+      player.receiving.targetShare *= factor;
+      player.rushing.carryShare *= factor;
+      player.recent.targetsPerGame *= factor;
+      player.recent.rushingAttemptsPerGame *= factor;
+    }
+    return run(input);
+  };
+  // Both shares sit below the single-player caps, so earned workload must scale directly.
+  const full = scale(.4), part = scale(.2);
+  const ratio = (pick, field) => pick(part)[field] / pick(full)[field];
+  for (const [pick, field] of [[receiver, "targets"], [receiver, "receptions"], [receiver, "receivingYards"], [runner, "rushingAttempts"], [runner, "rushingYards"]]) {
+    assert.ok(Math.abs(ratio(pick, field) - .5) < .06, `${field} ${ratio(pick, field)}`);
+  }
+  assert.ok(part.away.unallocatedTargets > full.away.unallocatedTargets);
+  assert.ok(part.away.unallocatedCarries > full.away.unallocatedCarries);
+  assert.equal(qb(part).passingYards, qb(full).passingYards, "team passing projection is unchanged");
+});
+
+test("throwaways reduce targets, and a missing target total never does", () => {
+  const withTargets = (targets) => {
+    const input = fixture();
+    input.playerMetrics.away.teamTotals.targets = targets;
+    return receiver(run(input)).targets;
+  };
+  const attempts = fixture().playerMetrics.away.teamTotals.passAttempts;
+  assert.ok(withTargets(attempts * .92) < withTargets(attempts));
+  assert.equal(withTargets(attempts * 2), withTargets(attempts));
+});

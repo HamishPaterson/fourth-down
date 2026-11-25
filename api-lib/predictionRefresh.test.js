@@ -14,6 +14,7 @@ import dataset from "../api/nfl/nflverse-team-metrics.js";
 import playerArtifact from "../data/nflverse-player-metrics.js";
 import { playerMetricsResponse } from "./playerMetrics.js";
 import { compareTeams } from "../api/nfl/play-by-play.js";
+import { PLAYER_PROJECTION_METHOD } from "../src/services/playerPropPolicy.js";
 import { PERSONNEL_VIEW_VERSION, AVAILABILITY_POLICY_VERSION } from "./personnelView.js";
 import { findOddsForGame, resolveOddsForGame } from "../src/services/oddsApi.js";
 import { buildPredictionSnapshot } from "../src/services/predictionSnapshot.js";
@@ -59,7 +60,7 @@ function fixture(game, now = NOW) {
       awayWinProbability: .65, homeWinProbability: .35,
       modelLayers: { opponentNetwork: { available: true, homePoints: -.5, awayPoints: .5, confidence: .6 } },
       matchupIntelligence: { schemaVersion: MATCHUP_INTELLIGENCE_SCHEMA_VERSION, signals, situational } },
-    playerProjections: { available: true, away: { players: [{ position: "QB" }] }, home: { players: [{ position: "QB" }] } },
+    playerProjections: { available: true, method: PLAYER_PROJECTION_METHOD, away: { players: [{ position: "QB" }] }, home: { players: [{ position: "QB" }] } },
     dataQuality: {
       personnelTiming: { cutoff: KICKOFF },
       sources: { odds: { available: true }, opponentNetwork: { available: true } },
@@ -786,7 +787,8 @@ async function runReprice({ fetchedAt = "2026-10-28T12:34:00Z", locked = null, n
   };
   const saved = weekGames.map((game) => {
     const snapshot = build(game, "2026-10-28T03:00:00.000Z");
-    if (oldPolicy) delete snapshot.personnelViews.home.availabilityPolicy;
+    if (oldPolicy === "method") delete snapshot.playerProjections.method;
+    else if (oldPolicy) delete snapshot.personnelViews.home.availabilityPolicy;
     return { ...snapshot, authoritative: true, ...(frozen ? { frozenAt: "2026-10-28T04:00:00Z" } : {}),
       lockProvenance: { version: 1, source: "server-prepared", predictionId: snapshot.id,
         generationCutoff: lockAt, inputs: [{ source: "odds" }], marketDependencies: [] } };
@@ -865,6 +867,8 @@ test("predictions saved under older availability rules regenerate before the loc
   assert.equal(first.generated, 3); assert.equal(first.res.body.complete, true);
   assert.ok(first.db.rows.map(databaseToSnapshot).every((row) =>
     row.personnelViews.home.availabilityPolicy === AVAILABILITY_POLICY_VERSION));
+  const method = await runReprice({ ...stale, oldPolicy: "method", batchLimit: 3 });
+  assert.equal(method.generated, 3);
   const again = await runReprice({ ...stale, db: first.db });
   assert.equal(again.generated, 0); assert.equal(again.res.body.reused, 3);
   for (const guard of [{ locked: { id: "locked" } }, { now: "2026-10-29T00:05:00Z" }, { frozen: true }, { prepareWeeklyLock: false }]) {

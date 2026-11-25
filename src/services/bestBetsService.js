@@ -17,7 +17,7 @@ export function isQualifiedBestBet(bet) {
     bet.expectedValue >= (bet.category === "Game" ? MIN_GAME_EV : MIN_PROP_EV);
 }
 
-export function buildBestBets({ game, prediction, playerProjections, personnelViews, oddsEvent, dataQuality, teamMetrics, asOf, quoteAsOf = new Date(), audit = false }) {
+export function buildBestBets({ game, prediction, playerProjections, personnelViews, oddsEvent, dataQuality, teamMetrics, asOf, quoteAsOf = new Date(), audit = false, holdPlayerProps = false }) {
   const validation = validateOddsEvents(oddsEvent ? [oddsEvent] : [], { now: new Date(quoteAsOf) });
   const markets = flattenMarkets(validation.events[0]);
   const personnelReady = dataQuality?.personnel !== false ||
@@ -51,7 +51,7 @@ export function buildBestBets({ game, prediction, playerProjections, personnelVi
   const anytimeTdScorer = selectAnytimeTdScorer({
     playerProjections,
     personnelViews,
-    playerBetCandidates: playerBets.recommendations,
+    playerBetCandidates: holdPlayerProps ? [] : playerBets.recommendations,
     diagnostics: playerBets.diagnostics,
     coreDataReady,
   });
@@ -75,7 +75,7 @@ export function buildBestBets({ game, prediction, playerProjections, personnelVi
     allCandidates.filter((bet) => bet.category !== "Game" &&
       (!isAnytimeTdBet(bet) || bet.modelProbability >= .55))
   )
-    .filter((bet) => coreDataReady && isQualifiedBestBet(bet))
+    .filter((bet) => !holdPlayerProps && coreDataReady && isQualifiedBestBet(bet))
     .sort((a, b) => b.score - a.score);
 
   const selectedPlayerBets = selectDiversePlayerProps(qualifiedPlayerBets, 6);
@@ -93,7 +93,8 @@ export function buildBestBets({ game, prediction, playerProjections, personnelVi
   ]
     .slice(0, 8)
     .map((bet, index) => ({ ...bet, rank: index + 1 }));
-  const highlights = selectHighlights(recommendations, allCandidates);
+  const highlights = selectHighlights(recommendations, holdPlayerProps
+    ? allCandidates.filter((bet) => bet.category === "Game") : allCandidates);
   const coreRejections = [
     ...(!personnelReady ? ["unverified_personnel"] : []),
     ...["playByPlay", "teamForm"].filter((key) => dataQuality?.[key] === false).map((key) => `missing_${key}`),
@@ -117,6 +118,7 @@ export function buildBestBets({ game, prediction, playerProjections, personnelVi
     marketDiagnostics: {
       ...marketDiagnostics,
       quoteValidationVersion: QUOTE_VALIDATION_VERSION,
+      playerPropsHeld: holdPlayerProps,
       quarantinedOffers: validation.quarantined.length,
       personnelSource: dataQuality?.personnel !== false ? "personnel" : personnelReady ? "verified-weekly-depth" : "unverified",
       rawPlayerMarkets: markets.filter((market) => isPlayerMarket(market.marketKey)).length,

@@ -7,6 +7,7 @@ import { getStadiumWeather } from "./weatherApi.js";
 import { resolveStadium } from "./stadiums.js";
 import { buildBestBets } from "./bestBetsService.js";
 import { personnelAvailableAt, validDepthLineup, validDepthRoster } from "../../api-lib/depthCharts.js";
+import { PLAYER_PROPS_HELD } from "./playerPropPolicy.js";
 import { buildPersonnelView, PERSONNEL_VIEW_VERSION } from "../../api-lib/personnelView.js";
 import { buildSpecialTeamsModel } from "./specialTeams.js";
 import { CURRENT_MODEL_VERSION as FULL_MODEL_VERSION, CURRENT_MODEL_KEY as FULL_MODEL_KEY } from "./modelIdentity.js";
@@ -239,6 +240,7 @@ async function createPrediction({ game, oddsEvent, season, week, away, home, sig
   });
   dataQuality.playerProjections = playerProjections.available === true;
   const bestBets = buildBestBets({
+    holdPlayerProps: PLAYER_PROPS_HELD,
     game: { ...gameWithWeather, season, week, away, home },
     prediction,
     playerProjections,

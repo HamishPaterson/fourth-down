@@ -1,5 +1,6 @@
 import { validDepthRoster } from "../../api-lib/depthCharts.js";
 import { validatePlayerMetrics } from "../../api-lib/playerMetrics.js";
+import { PLAYER_PROJECTION_METHOD } from "./playerPropPolicy.js";
 import { buildPersonnelView, canonicalTeam } from "../../api-lib/personnelView.js";
 
 const MIN_ROLE_OPPORTUNITIES = 3;
@@ -27,7 +28,7 @@ export function buildPlayerProjections({
   }
 
   const reasons = [];
-  const result = { available: false, generatedAt: new Date().toISOString(), away: null, home: null, reasons };
+  const result = { available: false, method: PLAYER_PROJECTION_METHOD, generatedAt: new Date().toISOString(), away: null, home: null, reasons };
   for (const [side, teamCode, opponentCode] of [["away", away, home], ["home", home, away]]) {
     const metrics = playerMetrics[side];
     const lineup = teamMetrics?.[side]?.expectedLineup;
@@ -283,9 +284,13 @@ function allocateReceivers({ receivingPlayers, passAttempts, passingYards, passi
     return clamp(seasonShare * 0.7 + recentShare * 0.3, 0.01, 0.6);
   });
   const shares = allocateLimitedShares(weightedShares, 0.6);
+  const allocatedShare = shares.reduce((sum, share) => sum + share, 0);
+  // Throwaways and batted balls are pass attempts without a target.
+  const targetRate = positive(totals.targets) && totals.targets <= totals.passAttempts
+    ? clamp(totals.targets / totals.passAttempts, 0.85, 1) : 1;
   const rawYards = receivingPlayers.map((player, index) => {
     const targetShare = shares[index];
-    const targets = passAttempts * targetShare * clamp(number(player.opportunityFactor, 1), 0, 1);
+    const targets = passAttempts * targetRate * targetShare * clamp(number(player.opportunityFactor, 1), 0, 1);
     const catchRate = clamp(number(player?.receiving?.catchRate, 0.65), 0.35, 0.9);
     const yardsPerTarget = clamp(number(player?.receiving?.yardsPerTarget, 7), 3.5, 14);
     return { player, targetShare, targets, receptions: targets * catchRate, yards: targets * yardsPerTarget };
@@ -306,7 +311,7 @@ function allocateReceivers({ receivingPlayers, passAttempts, passingYards, passi
     position: row.player.position,
     targets: round1(row.targets),
     receptions: round1(row.receptions),
-    receivingYards: round1(row.yards * (passingYards / rawTotal)),
+    receivingYards: round1(row.yards * (passingYards * allocatedShare / rawTotal)),
     receivingTouchdowns: round3(passingTouchdowns * redZoneWeights[index] / tdWeightTotal),
     opportunities: round1(row.targets),
   }));
@@ -352,11 +357,13 @@ function allocateRushers({ rushingPlayers, rushAttempts, rushingTouchdowns, tota
   });
 }
 
+// Players no longer available keep their historical share unallocated. Spreading all of
+// it over whoever remains inflated every projection, increasingly so each week.
 function allocateLimitedShares(weights, cap) {
   const total = weights.reduce((sum, weight) => sum + weight, 0);
   if (!total) return weights.map(() => 0);
   const shares = weights.map((weight) => weight / total);
-  let remaining = 1;
+  let remaining = Math.min(1, total);
   let eligible = shares.map((_, index) => index);
   while (eligible.length) {
     const eligibleTotal = eligible.reduce((sum, index) => sum + shares[index], 0);

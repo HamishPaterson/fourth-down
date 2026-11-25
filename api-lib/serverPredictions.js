@@ -16,9 +16,10 @@ import { PRESERVED_LOCK_THROUGH, LOCK_PROVENANCE_VERSION, lockPredictionRejectio
 import dataset from "../api/nfl/nflverse-team-metrics.js";
 import { buildBestBets, BEST_BETS_CANDIDATE_VERSION } from "../src/services/bestBetsService.js";
 import { validateOddsEvents } from "../src/services/quoteValidation.js";
+import { PLAYER_PROPS_HELD } from "../src/services/playerPropPolicy.js";
 import { savedGameIdentity } from "../src/services/savedGameIdentity.js";
 
-export function refreshSavedBestBets(snapshot, odds, now, { displayOnly = false } = {}) {
+export function refreshSavedBestBets(snapshot, odds, now, { displayOnly = false, holdPlayerProps = PLAYER_PROPS_HELD } = {}) {
   if (!displayOnly && snapshot.bestBets?.candidateVersion === BEST_BETS_CANDIDATE_VERSION &&
       Array.isArray(snapshot.bestBets.candidates)) return snapshot;
   if (!completePrediction(snapshot) || (!displayOnly && Date.parse(snapshot.kickoff) <= now.getTime())) {
@@ -33,6 +34,7 @@ export function refreshSavedBestBets(snapshot, odds, now, { displayOnly = false 
     home: { team: snapshot.homeCode, ...dataset.metricsByWeek?.[snapshot.week]?.[snapshot.homeCode] },
   } : null;
   const bestBets = buildBestBets({
+    holdPlayerProps,
     game, prediction: snapshot.predictionPayload, playerProjections: snapshot.playerProjections,
     personnelViews: snapshot.personnelViews,
     oddsEvent: event, dataQuality: snapshot.dataQuality, teamMetrics, asOf: snapshot.generatedAt, quoteAsOf: now,

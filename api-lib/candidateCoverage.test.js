@@ -495,3 +495,20 @@ test("priced player prop resolves personnel through projection playerId when per
 
   assert.ok(result.marketDiagnostics.matchedPlayerMarkets >= 1);
 });
+
+test("held player props never reach Best Bets or the Multi, and game bets are unaffected", () => {
+  const input = fixture(["HOU", "JAX"]);
+  const open = buildBestBets(input), held = buildBestBets({ ...input, holdPlayerProps: true });
+  assert.ok(open.candidates.some((bet) => bet.category !== "Game"));
+  for (const list of [held.candidates, held.recommendations]) assert.ok(list.every((bet) => bet.category === "Game"));
+  assert.deepEqual(held.candidates, open.candidates.filter((bet) => bet.category === "Game"));
+  assert.notEqual(held.anytimeTdScorer.source, "priced-market");
+  assert.equal(held.marketDiagnostics.playerPropsHeld, true);
+  assert.equal(held.marketDiagnostics.qualifiedPlayerProps, 0);
+  // Props already saved by an earlier refresh are refused when the Multi is selected.
+  const saved = snapshot(input, open), odds = { cacheStatus: "fresh", events: [input.oddsEvent] };
+  assert.ok(buildWeeklyMultiSelection([saved], odds, context, NOW).eligibleCandidates.some((bet) => bet.category !== "Game"));
+  const selection = buildWeeklyMultiSelection([saved], odds, { ...context, holdPlayerProps: true }, NOW);
+  assert.ok(selection.eligibleCandidates.every((bet) => bet.category === "Game"));
+  assert.ok(selection.candidateDiagnostics.some((row) => row.reasons.includes("PLAYER_PROPS_HELD")));
+});
