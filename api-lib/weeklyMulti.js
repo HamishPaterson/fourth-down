@@ -4,6 +4,7 @@ import { isPlayerLeg, settleLockedLegs } from "./weeklyMultiSettlement.js";
 import { findOddsForGame, resolveTeamCode } from "../src/services/oddsApi.js";
 import { usableDecimalOdds } from "../src/services/oddsDisplay.js";
 import { validateOddsEvents, canonicalQuoteMarket } from "../src/services/quoteValidation.js";
+import { selectValueLegs, temperedValue } from "./weeklyMultiValuePolicy.js";
 import { createWeeklyMultiPreparationHandler } from "./weeklyMultiPreparation.js";
 import { canonicalTeam, availableForPlayerBet, classifyPlayerAvailability } from "./personnelView.js";
 import { snapshotAuthority } from "./weeklyLockProvenance.js";
@@ -417,6 +418,12 @@ export function buildWeeklyMultiSelection(snapshots, oddsPayload, context, now =
     distinctMatchups = [...byMatchup.values()].sort(compareCandidates);
     if (distinctMatchups.length >= LEG_COUNT || threshold <= FLOOR_PROBABILITY) break;
     threshold = Math.max(FLOOR_PROBABILITY, Math.round((threshold - PROBABILITY_STEP) * 10000) / 10000);
+  }
+  if (context.valuePolicy) {
+    const valued = selectValueLegs(ranked.map((row) => ({ ...row, tempered: temperedValue(row, context.valuePolicy) })),
+      context.valuePolicy, LEG_COUNT);
+    distinctMatchups = valued.legs;
+    threshold = valued.threshold;
   }
   const legs = distinctMatchups.slice(0, LEG_COUNT);
   const oddsTimes = legs.filter((leg) => leg.oddsUpdatedAt).map((leg) => new Date(leg.oddsUpdatedAt).getTime()).filter(Number.isFinite);

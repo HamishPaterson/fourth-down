@@ -36,7 +36,7 @@ export function validLockPlan(plan, now) {
     new Set(games.flatMap((game) => [game.away, game.home])).size === games.length * 2;
 }
 
-export function evaluateWeeklyMultiReadiness({ plan, predictions = [], odds, now = new Date(), holdPlayerProps = false }) {
+export function evaluateWeeklyMultiReadiness({ plan, predictions = [], odds, now = new Date(), holdPlayerProps = false, valuePolicy = null }) {
   const context = { season: plan?.season, week: plan?.week, lockAt: now.toISOString(),
     provenanceLockAt: plan?.lock_at };
   const planValid = validLockPlan(plan, now);
@@ -69,7 +69,7 @@ export function evaluateWeeklyMultiReadiness({ plan, predictions = [], odds, now
       missingGames: expected.length - present,
       status: !planValid ? "UNKNOWN" : fresh === expected.length ? "READY" : "DEGRADED_NON_BLOCKING" }];
   }));
-  const selection = buildWeeklyMultiSelection(accepted, odds, { ...context, requireSnapshotEvidence: true, holdPlayerProps }, now);
+  const selection = buildWeeklyMultiSelection(accepted, odds, { ...context, requireSnapshotEvidence: true, holdPlayerProps, valuePolicy }, now);
   for (const prediction of considered.filter((row) => !accepted.includes(row))) {
     const reasons = lockPredictionRejections(prediction, context, now);
     const bets = [...(prediction.bestBets?.candidates || prediction.bestBets?.recommendations || []),

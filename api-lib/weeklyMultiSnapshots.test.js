@@ -175,6 +175,7 @@ async function runLock({ fetchOdds, database = lockClient(), now = NOW, context 
     }, error: null }; },
   } : originalFrom(table);
   const handler = createWeeklyMultiLockHandler({
+    valuePolicy: null, // covers every leg type; value ranking has its own tests
     holdPlayerProps: false, // these cover prop and TD legs; the hold has its own test
     getNow: () => now, createClient: () => database.client,
     recordExecution: async () => {}, persistManifest: async () => "fixture-manifest",
