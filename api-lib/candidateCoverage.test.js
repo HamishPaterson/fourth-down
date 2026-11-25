@@ -142,9 +142,6 @@ test("scenario quotes exercise candidate eligibility at Out, Questionable and Un
   const targetCandidates = baselineBets.candidates.filter((candidate) =>
     candidate.personnelId === target.personnelId);
   assert.ok(targetCandidates.length > 0, "quoted player markets qualify at baseline");
-  const probabilityAndValue = targetCandidates.map(({ modelProbability, expectedValue, edge }) => ({
-    modelProbability, expectedValue, edge,
-  }));
 
   for (const status of ["Out", "Doubtful", "Unknown"]) {
     record.status = status;
@@ -161,30 +158,24 @@ test("scenario quotes exercise candidate eligibility at Out, Questionable and Un
     assert.equal(selection.legs.some((leg) => leg.personnelId === target.personnelId), false, status);
   }
 
-  Object.assign(record, {
-    status: "Questionable", statusKnown: true, projectedAvailable: true, propEligible: true,
-  });
-  const questionableBets = buildBestBets(input);
-  const questionableCandidates = questionableBets.candidates.filter((candidate) =>
-    candidate.personnelId === target.personnelId);
-  assert.deepEqual(questionableCandidates.map(({ modelProbability, expectedValue, edge }) => ({
-    modelProbability, expectedValue, edge,
-  })), probabilityAndValue, "Best Bets applies no second medical probability deduction");
-  assert.deepEqual(questionableBets.candidates.map(candidateKey).sort(), baselineKeys);
-  const onlyTargetBets = { ...questionableBets, candidates: questionableCandidates, recommendations: questionableCandidates };
-  const questionableSelection = buildWeeklyMultiSelection(
-    [snapshot(input, onlyTargetBets)],
-    { cacheStatus: "fresh", events: [input.oddsEvent] }, context, NOW,
-  );
-  for (const bet of questionableCandidates) {
-    const leg = questionableSelection.legs.find((candidate) => candidate.personnelId === target.personnelId &&
-      candidate.market === bet.market && candidate.selection === bet.selection);
-    assert.ok(leg, "Questionable candidate enters the ordinary Weekly Multi consideration path");
-    assert.ok(Math.abs(leg.modelProbability - bet.modelProbability) <= 0.0001);
-    assert.ok(Math.abs(leg.expectedValue - bet.expectedValue) <= 0.0001);
+  // Injury designations that still leave the player projected remain ineligible to bet,
+  // both when Best Bets is built and when an already-saved candidate reaches the Multi.
+  for (const status of ["Questionable", "Probable"]) {
+    Object.assign(record, { status, statusKnown: true, projectedAvailable: true, propEligible: true });
+    const bets = buildBestBets(input);
+    assert.equal(bets.candidates.some((candidate) => candidate.personnelId === target.personnelId), false, status);
+    assert.notEqual(bets.anytimeTdModelPick?.personnelId, target.personnelId, status);
+    assert.deepEqual(bets.candidates.map(candidateKey).sort(),
+      baselineKeys.filter((key) => !targetCandidates.some((candidate) => candidateKey(candidate) === key)).sort(),
+      `${status} removes only that player's baseline candidate(s)`);
+    const savedBets = { ...baselineBets, candidates: targetCandidates, recommendations: targetCandidates };
+    const selection = buildWeeklyMultiSelection([snapshot(input, savedBets)],
+      { cacheStatus: "fresh", events: [input.oddsEvent] }, context, NOW);
+    assert.equal(selection.legs.some((leg) => leg.personnelId === target.personnelId), false, status);
+    assert.ok(selection.reasonCounts.personnelExcluded > 0, status);
   }
-  assert.deepEqual(questionableCandidates.map(candidateKey),
-    baselineBets.candidates.filter((candidate) => candidate.personnelId === target.personnelId).map(candidateKey));
+  Object.assign(record, { status: "Active", statusKnown: true, projectedAvailable: true, propEligible: true });
+  assert.deepEqual(buildBestBets(input).candidates.map(candidateKey).sort(), baselineKeys);
 });
 
 test("Nico Collins availability Unknown preserves his HOU identity and emits an availability diagnostic", () => {

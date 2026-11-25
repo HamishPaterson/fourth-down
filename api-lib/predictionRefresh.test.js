@@ -14,7 +14,7 @@ import dataset from "../api/nfl/nflverse-team-metrics.js";
 import playerArtifact from "../data/nflverse-player-metrics.js";
 import { playerMetricsResponse } from "./playerMetrics.js";
 import { compareTeams } from "../api/nfl/play-by-play.js";
-import { PERSONNEL_VIEW_VERSION } from "./personnelView.js";
+import { PERSONNEL_VIEW_VERSION, AVAILABILITY_POLICY_VERSION } from "./personnelView.js";
 import { findOddsForGame, resolveOddsForGame } from "../src/services/oddsApi.js";
 import { buildPredictionSnapshot } from "../src/services/predictionSnapshot.js";
 
@@ -31,7 +31,7 @@ const response = () => ({ statusCode: 200, calls: 0, setHeader() {},
   status(n) { this.statusCode = n; return this; }, json(b) { this.calls++; this.body = b; return this; } });
 function fixture(game, now = NOW) {
   const personnelView = (team) => ({
-    version: PERSONNEL_VIEW_VERSION, team, season: game.season, week: game.week,
+    version: PERSONNEL_VIEW_VERSION, availabilityPolicy: AVAILABILITY_POLICY_VERSION, team, season: game.season, week: game.week,
     cutoff: KICKOFF, chart: { available: true, observedAt: "2026-10-14T00:00:00Z" },
     live: { available: false, observedAt: null }, players: [],
     quarterback: { resolved: true, conflict: false }, units: {
@@ -773,7 +773,7 @@ test("anonymous GET/POST cannot save via public refresh or removed administrativ
 
 // Week 8 lock-preparation scenario: predictions saved, then the daily odds refresh lands.
 async function runReprice({ fetchedAt = "2026-10-28T12:34:00Z", locked = null, now = "2026-10-28T21:00:00Z",
-  frozen = false, prepareWeeklyLock = true, rolloverFallback = false, batchLimit = 2, db: reuseDb, sideEffect } = {}) {
+  frozen = false, prepareWeeklyLock = true, rolloverFallback = false, oldPolicy = false, batchLimit = 2, db: reuseDb, sideEffect } = {}) {
   const kickoff = "2026-10-30T00:15:00.000Z", lockAt = "2026-10-29T00:00:00.000Z";
   const at = new Date(now);
   const weekGames = games.slice(0, 3).map((game) => ({ ...game, week: 8, sourceDate: kickoff }));
@@ -786,6 +786,7 @@ async function runReprice({ fetchedAt = "2026-10-28T12:34:00Z", locked = null, n
   };
   const saved = weekGames.map((game) => {
     const snapshot = build(game, "2026-10-28T03:00:00.000Z");
+    if (oldPolicy) delete snapshot.personnelViews.home.availabilityPolicy;
     return { ...snapshot, authoritative: true, ...(frozen ? { frozenAt: "2026-10-28T04:00:00Z" } : {}),
       lockProvenance: { version: 1, source: "server-prepared", predictionId: snapshot.id,
         generationCutoff: lockAt, inputs: [{ source: "odds" }], marketDependencies: [] } };
@@ -855,4 +856,19 @@ test("frozen predictions are never repriced and a newer concurrent save wins", a
   } });
   assert.ok(concurrent.times.some((time) => Date.parse(time) === Date.parse("2026-10-28T20:59:00Z")));
   assert.deepEqual(concurrent.db.writes, []);
+});
+
+test("predictions saved under older availability rules regenerate before the lock, never after it", async () => {
+  const stale = { oldPolicy: true, fetchedAt: "2026-10-28T02:00:00Z" };
+  const first = await runReprice({ ...stale, batchLimit: 3 });
+  assert.equal(first.res.statusCode, 200, first.res.body.reason);
+  assert.equal(first.generated, 3); assert.equal(first.res.body.complete, true);
+  assert.ok(first.db.rows.map(databaseToSnapshot).every((row) =>
+    row.personnelViews.home.availabilityPolicy === AVAILABILITY_POLICY_VERSION));
+  const again = await runReprice({ ...stale, db: first.db });
+  assert.equal(again.generated, 0); assert.equal(again.res.body.reused, 3);
+  for (const guard of [{ locked: { id: "locked" } }, { now: "2026-10-29T00:05:00Z" }, { frozen: true }, { prepareWeeklyLock: false }]) {
+    const result = await runReprice({ ...stale, ...guard });
+    assert.equal(result.generated, 0, JSON.stringify(guard)); assert.deepEqual(result.db.writes, []);
+  }
 });

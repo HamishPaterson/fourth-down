@@ -94,7 +94,7 @@ function savedTdPlayerReason(player, snapshot) {
   if (!id || !player.team || !personnel) return "NO_ELIGIBLE_CANDIDATE";
   if (personnel.statusKnown === false && personnel.status === "Unknown") return "PLAYER_AVAILABILITY_UNKNOWN";
   if (personnel.eligibleBeforeCutoff === false) return "AVAILABILITY_STALE";
-  if (["Doubtful", "Out", "Inactive", "IR", "PUP", "Suspended", "NFI"].includes(personnel.status))
+  if (["Probable", "Questionable", "Doubtful", "Out", "Inactive", "IR", "PUP", "Suspended", "NFI"].includes(personnel.status))
     return personnel.status === "Doubtful" ? "PLAYER_DOUBTFUL" : "PLAYER_UNAVAILABLE";
   const eligible = record ? record.statusKnown === true && record.propEligible === true &&
     record.eligibleBeforeCutoff === true && record.projectedAvailable !== false

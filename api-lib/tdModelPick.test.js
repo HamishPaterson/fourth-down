@@ -177,13 +177,20 @@ const nyjPersonnel = rows.find((row) => row.awayCode === "MIA").personnelViews.h
 nyjPersonnel.find((player) => player.canonicalId === "00-0039794").name = "Braelon Allen";
 nyjPersonnel.find((player) => player.canonicalId === "00-0038120").name = "Breece Hall";
 const odds = JSON.parse(readFileSync(new URL("./fixtures/week7-rendered-quotes.json", import.meta.url)));
-function displayed(awayCode, quotes = odds) {
-  const saved = rows.find((row) => row.awayCode === awayCode);
+function displayed(awayCode, quotes = odds, activePlayers = []) {
+  const saved = structuredClone(rows.find((row) => row.awayCode === awayCode));
+  for (const side of ["away", "home"]) for (const player of saved.personnelViews[side].players) {
+    if (activePlayers.includes(player.canonicalId)) player.status = "Active";
+  }
   const assessment = refreshSavedBestBets(saved, quotes, NOW, { displayOnly: true });
   return ui.enrichSavedPredictionWithCurrentMarket(assessment, { away: saved.awayCode, home: saved.homeCode }, quotes.events, NOW);
 }
 test("I/J/K: existing positive-edge props can win Most Likely/Best Value while stale totals stay quarantined", () => {
-  const cle = displayed("CLE"), tb = displayed("TB");
+  // Both are Questionable in the fixture, which rules them out; Active restores them.
+  for (const [team, name] of [["CLE", "Judkins"], ["TB", "Irving"]]) {
+    assert.ok(displayed(team).bestBets.candidates.every((bet) => !bet.selection.includes(name)), name);
+  }
+  const cle = displayed("CLE", odds, ["00-0040784"]), tb = displayed("TB", odds, ["00-0039361"]);
   assert.equal(ui.buildDisplayHighlights(cle.bestBets).mostLikely.selection, "Quinshon Judkins Under 66.5 rushing + receiving yards");
   assert.equal(ui.buildDisplayHighlights(cle.bestBets).mostLikely.modelProbability, .7747);
   assert.equal(ui.buildDisplayHighlights(tb.bestBets).bestValue.selection, "Bucky Irving Under 2.5 receptions");

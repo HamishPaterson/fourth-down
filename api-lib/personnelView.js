@@ -1,6 +1,9 @@
 import { TEAM_NAMES } from "../src/data.js";
 
 export const PERSONNEL_VIEW_VERSION = 1;
+// Marks how availability was decided. Separate from the schema version, which stored
+// history and the atomic week replacement depend on.
+export const AVAILABILITY_POLICY_VERSION = 2;
 export const QUESTIONABLE_OPPORTUNITY_FACTOR = 0.75;
 export const AVAILABILITY_ABSENCE_PROBABILITY = Object.freeze({
   Active: 0,
@@ -19,6 +22,11 @@ export const AVAILABILITY_ABSENCE_PROBABILITY = Object.freeze({
 const aliases = {
   WAS: "WSH", LA: "LAR", JAC: "JAX", OAK: "LV", SD: "LAC", STL: "LAR",
 };
+// Healthy players carry no injury designation in the live feed, so a recent Active
+// roster listing without one is what confirms them.
+export const CONFIRMED_ACTIVE_MAX_AGE_MS = 24 * 3600000;
+const ROSTER_CLOCK_TOLERANCE_MS = 10 * 60000;
+const confirmedActivePositions = new Set(["QB", "RB", "FB", "WR", "TE"]);
 const unavailable = new Set(["Doubtful", "Out", "Inactive", "IR", "PUP", "Suspended", "NFI"]);
 const nameKey = (value) => String(value || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "")
   .toLowerCase().replace(/\b(jr|sr|ii|iii|iv)\b\.?/g, "").replace(/[^a-z0-9]/g, "");
@@ -41,8 +49,10 @@ export function classifyPlayerAvailability(player, { sourceAvailable = true, obs
     !player.provenance?.live && !player.provenance?.chart ? "UNKNOWN_SOURCE_UNAVAILABLE" : "UNKNOWN_GAME_STATUS");
 }
 
+// Owner policy: any injury designation, Probable and Questionable included, rules a
+// player out of betting. Projections keep their own availability handling.
 export function availableForPlayerBet(player, options) {
-  return ["AVAILABLE", "EXPECTED_ACTIVE", "QUESTIONABLE"].includes(classifyPlayerAvailability(player, options)) &&
+  return classifyPlayerAvailability(player, options) === "AVAILABLE" &&
     player?.statusKnown === true && player.propEligible === true &&
     player.projectedAvailable !== false && player.eligibleBeforeCutoff === true;
 }
@@ -130,12 +140,20 @@ function flattenLivePlayers(roster) {
   return Object.values(groups).flat().filter((player) => player && typeof player === "object")
     .map((player) => ({
       ...player,
-      gsisId: player.gsisId || player.gsis_id || null,
+      gsisId: String(player.gsisId || player.gsis_id || "").trim() || null,
       fullName: player.fullName || player.full_name || null,
       depthChartPosition: player.depthChartPosition || player.depth_chart_position || null,
       depthChartOrder: player.depthChartOrder ?? player.depth_chart_order ?? null,
       injuryStatus: player.injuryStatus ?? player.injury_status ?? null,
     }));
+}
+
+function confirmedActive(live, { position, rosterTime, observedAt, chartStatus, conflicted }) {
+  const age = timestamp(observedAt) - rosterTime;
+  return Boolean(live) && !conflicted && confirmedActivePositions.has(position) &&
+    timestamp(observedAt) !== null && age <= CONFIRMED_ACTIVE_MAX_AGE_MS && age >= -ROSTER_CLOCK_TOLERANCE_MS &&
+    String(live.status || "").trim().toLowerCase() === "active" &&
+    !String(live.injuryStatus || "").trim() && normalizeStatusText(chartStatus) === "Unknown";
 }
 
 function findLiveMatch(chartPlayer, livePlayers, team) {
@@ -164,7 +182,7 @@ export function buildPersonnelView({ team, lineup, roster, cutoff, season, week,
     .filter((player) => canonicalTeam(player.team) === code) : [];
   const leagueTeams = new Map((liveEligible ? roster?.leagueIdentityIndex || [] : [])
     .filter((player) => player?.gsisId && player?.team)
-    .map((player) => [String(player.gsisId), canonicalTeam(player.team)]));
+    .map((player) => [String(player.gsisId).trim(), canonicalTeam(player.team)]));
   const chartRows = chartEligible && canonicalTeam(lineup?.team || code) === code
     ? [...(lineup?.roster || [])] : [];
   const chartRecords = chartRows.map((chart) => {
@@ -175,20 +193,23 @@ export function buildPersonnelView({ team, lineup, roster, cutoff, season, week,
     const transferred = Boolean(transferredTo && transferredTo !== code);
     const sourceConflict = transferred || Boolean(live && (liveTeam !== code ||
       (canonicalPosition(live.depthChartPosition || live.position) !== position)));
+    const identityConflict = sourceConflict || Boolean(live && live.gsisId &&
+      String(live.gsisId) !== String(chart.gsisId));
+    const injuryStatus = confirmedActive(live, {
+      position, rosterTime, observedAt, chartStatus: chart.status, conflicted: identityConflict,
+    }) ? "Active" : live?.injuryStatus;
     const availability = normalizeAvailability({
-      injuryStatus: live?.injuryStatus,
+      injuryStatus,
       rosterStatus: live?.status,
       chartStatus: chart.status,
     });
     const liveAvailability = normalizeAvailability({
-      injuryStatus: live?.injuryStatus,
+      injuryStatus,
       rosterStatus: live?.status,
     });
     const liveDepth = Number(live?.depthChartOrder);
     const chartRank = Number(chart.rank);
     const rank = liveEligible && Number.isInteger(liveDepth) && liveDepth > 0 ? liveDepth : chartRank;
-    const identityConflict = sourceConflict || Boolean(live && live.gsisId &&
-      String(live.gsisId) !== String(chart.gsisId));
     const identity = chart.gsisId || chart.playerId;
     return {
       playerId: String(chart.playerId || identity),
@@ -239,7 +260,8 @@ export function buildPersonnelView({ team, lineup, roster, cutoff, season, week,
     .map((live) => {
       const position = canonicalPosition(live.depthChartPosition || live.position);
       const liveDepth = Number(live.depthChartOrder);
-      const availability = normalizeAvailability({ injuryStatus: live.injuryStatus, rosterStatus: live.status });
+      const injuryStatus = confirmedActive(live, { position, rosterTime, observedAt }) ? "Active" : live.injuryStatus;
+      const availability = normalizeAvailability({ injuryStatus, rosterStatus: live.status });
       const group = groupForPosition(position);
       if (!group || position === "UNKNOWN") return null;
       return {
@@ -368,6 +390,7 @@ export function buildPersonnelView({ team, lineup, roster, cutoff, season, week,
   const known = players.filter((player) => player.statusKnown).length;
   return {
     version: PERSONNEL_VIEW_VERSION,
+    availabilityPolicy: AVAILABILITY_POLICY_VERSION,
     team: code,
     season: lineup?.season ?? null,
     week: lineup?.predictionWeek ?? null,

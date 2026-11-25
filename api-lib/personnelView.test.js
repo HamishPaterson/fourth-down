@@ -1,6 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
+  AVAILABILITY_POLICY_VERSION,
+  availableForPlayerBet,
   buildPersonnelView,
   canonicalPosition,
   normalizeAvailability,
@@ -208,4 +210,59 @@ test("defensive aliases select only supported available depth replacements", () 
   assert.equal(view.players.find((player) => player.canonicalId === "edge-2").replacementFor, "edge-1");
   assert.equal(view.units.front.unavailable[0], "edge-1");
   assert.equal(view.units.front.replacements[0].playerId, "edge-2");
+});
+
+const OBSERVED = "2026-10-15T18:00:00.000Z";
+const viewOf = (players, live, options = {}) => buildPersonnelView({
+  team: "PHI", cutoff, season: 2026, week: 6, observedAt: options.observedAt || OBSERVED,
+  lineup: lineup("PHI", players, options.starter), roster: roster("PHI", live, options),
+});
+const healthyRecord = (chart = {}, live = {}, options = {}) => {
+  const id = "00-0000001", position = options.position || "WR";
+  return viewOf([{ ...chartPlayer(id, position, position), ...chart }],
+    [{ ...livePlayer(id, position, 1, null), ...live }], options).players.find((player) => player.canonicalId === id);
+};
+
+test("a fresh Active listing without an injury designation confirms a healthy player", () => {
+  for (const position of ["QB", "RB", "WR", "TE"]) {
+    const player = healthyRecord({}, {}, { position });
+    assert.equal(player.status, "Active", position);
+    assert.equal(player.availabilityState, "AVAILABLE", position);
+    assert.equal(availableForPlayerBet(player, { observedAt: OBSERVED }), true, position);
+  }
+});
+
+for (const [label, chart, live, options] of [
+  ["an injury designation", {}, { injuryStatus: "Questionable" }],
+  ["an unrecognised injury note", {}, { injuryStatus: "NA" }],
+  ["a roster status other than Active", {}, { status: "Practice Squad" }],
+  ["a missing roster status", {}, { status: null }],
+  ["a chart designation", { status: "Questionable" }, {}],
+  ["a roster more than a day old", {}, {}, { observedAt: "2026-10-16T12:00:01.000Z" }],
+  ["a roster dated ahead of the observation", {}, {}, { observedAt: "2026-10-15T11:49:59.000Z" }],
+  ["a roster after the cutoff", {}, {}, { sourceAsOf: "2026-10-18T17:00:01.000Z", observedAt: "2026-10-18T17:30:00.000Z" }],
+  ["a conflicting position", {}, { depthChartPosition: "TE" }],
+  ["a conflicting identity", {}, { gsisId: "00-0000009" }],
+  ["a player now listed with another team", {}, {}, { leagueIdentityIndex: [{ gsisId: "00-0000001", team: "DAL" }] }],
+  ["an unsupported position", {}, {}, { position: "CB" }],
+]) {
+  test(`${label} never confirms a healthy player`, () => {
+    const player = healthyRecord(chart, live, options);
+    assert.notEqual(player.status, "Active");
+    assert.equal(availableForPlayerBet(player, { observedAt: options?.observedAt || OBSERVED }), false);
+  });
+}
+
+test("a padded live identity still matches, so the healthy backup replaces an Out quarterback", () => {
+  const starter = chartPlayer("00-0034869", "QB", "QB", 1), backup = chartPlayer("00-0035704", "QB", "QB", 2);
+  const view = viewOf([starter, backup], [
+    livePlayer("00-0034869", "QB", 1, "Out"),
+    { ...livePlayer("00-0035704", "QB", 2, null), gsisId: " 00-0035704" },
+  ], { starter });
+  assert.equal(view.players.filter((player) => player.group === "QB").length, 2);
+  assert.ok(view.players.every((player) => !player.identityConflict));
+  assert.equal(view.quarterback.player.canonicalId, "00-0035704");
+  assert.equal(view.quarterback.player.replacementFor, "00-0034869");
+  assert.equal(view.quarterback.resolved, true);
+  assert.equal(view.availabilityPolicy, AVAILABILITY_POLICY_VERSION);
 });

@@ -117,7 +117,8 @@ test("fresh spread survives while stale quote, changed price and missing quote a
 });
 
 test("all 14 current quote assessments preserve saved model bodies, with stale totals quarantined", () => {
-  const expected = [2, 0, 2, 2, 2, 2, 2, 2, 5, 3, 3, 0, 0, 0];
+  // Six former candidates were on Questionable players, who are never considered for bets.
+  const expected = [2, 0, 2, 1, 2, 2, 2, 2, 2, 2, 2, 0, 0, 0];
   rows.forEach((snapshot, index) => {
     const before = structuredClone(snapshot);
     const assessment = refreshSavedBestBets(snapshot, odds, NOW, { displayOnly: true });

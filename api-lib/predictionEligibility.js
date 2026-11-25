@@ -1,6 +1,7 @@
 import { isCurrentModelIdentity } from "../src/services/modelIdentity.js";
 import { BEST_BETS_CANDIDATE_VERSION } from "../src/services/bestBetsService.js";
 import { predictionFeatureStatus } from "../src/services/predictionFeatures.js";
+import { AVAILABILITY_POLICY_VERSION } from "./personnelView.js";
 import { EXTERNAL_FACTORS_2026_ENABLED, MAX_COMBINED_EXTERNAL_MARGIN_ADJUSTMENT } from "../src/services/externalFactors2026.js";
 
 const number = (value) => value !== null && value !== undefined && value !== "" && Number.isFinite(Number(value));
@@ -17,12 +18,20 @@ export function predictionMissingOdds(snapshot) {
   return diagnostics?.bookmakerCount === 0 || diagnostics?.marketCount === 0;
 }
 
+const repriceable = (snapshot, now) => Boolean(snapshot?.authoritative) && !snapshot.frozenAt &&
+  !snapshot.actualWinner && !snapshot.gradedAt && Date.parse(snapshot.kickoff) > now.getTime();
+
+// Saved before the current availability rules, so its players were judged differently.
+export function predictionAvailabilityOutdated(snapshot, now) {
+  return repriceable(snapshot, now) && ["away", "home"].some((side) =>
+    snapshot.personnelViews?.[side]?.availabilityPolicy !== AVAILABILITY_POLICY_VERSION);
+}
+
 // Weekly Multi legs must match the exact current quote, so a saved prediction whose
 // game has odds fetched after it was generated can no longer be locked.
 export function predictionOddsOutdated(snapshot, event, now) {
   const generated = Date.parse(snapshot?.generatedAt);
-  if (!snapshot?.authoritative || snapshot.frozenAt || snapshot.actualWinner || snapshot.gradedAt ||
-      !Number.isFinite(generated) || !(Date.parse(snapshot.kickoff) > now.getTime())) return false;
+  if (!repriceable(snapshot, now) || !Number.isFinite(generated)) return false;
   return (event?.bookmakers || []).some((book) => (book.markets || []).some((market) =>
     (market.outcomes || []).some((outcome) => {
       const fetched = Date.parse(outcome.quoteSource?.fetchedAt);

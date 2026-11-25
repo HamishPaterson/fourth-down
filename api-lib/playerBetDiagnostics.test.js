@@ -8,13 +8,13 @@ import { scorerProbabilityLabel, playerDiagnosticSummary, playerReasonMessage, p
 const NOW = "2026-10-28T23:00:00Z";
 const CUTOFF = "2026-10-30T00:15:00Z";
 for (const [status, state, eligible] of [
-  ["Active", "AVAILABLE", true], ["Probable", "EXPECTED_ACTIVE", true], ["Questionable", "QUESTIONABLE", true],
+  ["Active", "AVAILABLE", true], ["Probable", "EXPECTED_ACTIVE", false], ["Questionable", "QUESTIONABLE", false],
   ["Doubtful", "DOUBTFUL", false], ["Out", "OUT", false], ["IR", "IR", false], ["PUP", "PUP", false],
   ["Suspended", "SUSPENDED", false], ["Unknown", "UNKNOWN_GAME_STATUS", false],
 ]) {
   test(`availability ${status} is explicitly ${state}, eligible=${eligible}`, () => {
     const player = activePersonnelRecord("player", "NE", { status, statusKnown: status !== "Unknown",
-      propEligible: eligible, observationTimestamp: NOW, cutoff: CUTOFF });
+      propEligible: ["Active", "Probable", "Questionable"].includes(status), observationTimestamp: NOW, cutoff: CUTOFF });
     assert.equal(classifyPlayerAvailability(player), state);
     assert.equal(availableForPlayerBet(player), eligible);
   });

@@ -260,8 +260,8 @@ export function selectTdModelPick({ game, playerProjections, personnelViews, odd
       : !record || record.identityConflict || record.sourceConflict ||
       player.personnel?.confidence === "unmatched" ? "IDENTITY_UNRESOLVED"
       : !teams.includes(canonicalTeam(player.team)) || canonicalTeam(record.team) !== canonicalTeam(player.team) ? "TEAM_MISMATCH"
-        : ["Doubtful", "Out", "Inactive", "IR", "PUP", "Suspended", "NFI"].includes(status) ||
-          ["DOUBTFUL", "OUT", "IR", "PUP", "SUSPENDED"].includes(availability) ||
+        : ["Probable", "Questionable", "Doubtful", "Out", "Inactive", "IR", "PUP", "Suspended", "NFI"].includes(status) ||
+          ["EXPECTED_ACTIVE", "QUESTIONABLE", "DOUBTFUL", "OUT", "IR", "PUP", "SUSPENDED"].includes(availability) ||
           record.projectedAvailable !== true || player.available === false || player.eligible === false ? "PLAYER_UNAVAILABLE"
           : record.eligibleBeforeCutoff !== true || availability === "UNKNOWN_STALE" ? "AVAILABILITY_STALE"
             : ["UNKNOWN_IDENTITY", "UNKNOWN_NOT_IN_LINEUP", "UNSUPPORTED_ROLE"].includes(availability) ? "IDENTITY_UNRESOLVED"

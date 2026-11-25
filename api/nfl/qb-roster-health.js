@@ -268,7 +268,7 @@ export function buildTeamHealth(
     )
     .map((player) => {
       const normalised = normalizePlayer(player);
-      const shared = personnelById.get(String(player.gsis_id || ""));
+      const shared = personnelById.get(String(player.gsis_id || "").trim());
       if (!shared) return {
         ...normalised,
         depth: null,
