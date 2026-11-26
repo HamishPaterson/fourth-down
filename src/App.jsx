@@ -14,6 +14,8 @@ import { getTeamTheme } from "./services/teamThemes.js";
 import { getTeams } from "./services/nflApi.js";
 import { TEAM_NAMES } from "./data.js";
 import { readFavoriteTeam, saveFavoriteTeamPreference } from "./services/favoriteTeamPreference.js";
+import { WhatsNewDialog } from "./components/PatchNotes.jsx";
+import { LATEST_PATCH_NOTES, markPatchNotesSeen, shouldShowPatchNotes } from "./patchNotes.js";
 
 export default function App() {
   const [page, setPage] = useState("home");
@@ -22,6 +24,18 @@ export default function App() {
   const [selectedTeam, setSelectedTeam] = useState(null);
   const [favoriteTeam, setFavoriteTeam] = useState(readFavoriteTeam);
   const [updateAvailable, setUpdateAvailable] = useState(false);
+  const [showWhatsNew, setShowWhatsNew] = useState(() => shouldShowPatchNotes());
+
+  function closeWhatsNew() {
+    markPatchNotesSeen(LATEST_PATCH_NOTES.id);
+    setShowWhatsNew(false);
+  }
+
+  function openAllPatchNotes() {
+    closeWhatsNew();
+    navigateTo("settings");
+    window.requestAnimationFrame(() => document.getElementById("patch-notes")?.scrollIntoView({ block: "start" }));
+  }
 
   useEffect(() => {
     let active = true;
@@ -171,6 +185,7 @@ export default function App() {
           </button>
         </div>
       )}
+      {showWhatsNew && <WhatsNewDialog note={LATEST_PATCH_NOTES} onClose={closeWhatsNew} onOpenAll={openAllPatchNotes} />}
       <Header onHome={() => navigateTo("home")} />
       <Navigation page={page} onChange={navigateTo} />
       <main className="content">

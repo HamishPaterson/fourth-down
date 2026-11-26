@@ -1,6 +1,8 @@
 import { useState } from "react";
-import { Activity, ChevronRight, Layers, Settings as SettingsIcon } from "lucide-react";
+import { Activity, ChevronRight, Layers, ScrollText, Settings as SettingsIcon } from "lucide-react";
 import { TEAM_NAMES } from "../data.js";
+import { PatchNotesList } from "../components/PatchNotes.jsx";
+import { PATCH_NOTES } from "../patchNotes.js";
 
 export default function Settings({ favoriteTeam, onSave, onNavigate }) {
   const [saved, setSaved] = useState(false);
@@ -56,6 +58,14 @@ export default function Settings({ favoriteTeam, onSave, onNavigate }) {
             <ChevronRight size={20} />
           </button>
           <p className="note">API credentials remain in Vercel Environment Variables and are not exposed here.</p>
+        </section>
+
+        <section className="card settings-card settings-patch-notes-card" id="patch-notes">
+          <div className="settings-card-heading">
+            <span className="settings-icon"><ScrollText size={20} /></span>
+            <div><small>UPDATES</small><h2>Patch notes</h2></div>
+          </div>
+          <PatchNotesList notes={PATCH_NOTES} />
         </section>
       </div>
     </section>
