@@ -2,9 +2,9 @@
   "season": 2026,
   "week": 12,
   "purpose": "Side-by-side test of the real-data model (4678b1c) against the published Week 12 predictions. Not a live prediction.",
-  "newModelCommit": "4678b1c",
-  "generatedAt": "2026-11-26T01:15:10.285Z",
-  "note": "Generated after the weekly cutoff from the inputs available at generation time (rosters, injuries and odds as fetched then). GB@LAR had kicked off; the other 15 games had not.",
+  "newModelCommit": "4678b1c plus the quarterback-change fix",
+  "generatedAt": "2026-11-26T01:47:25.103Z",
+  "note": "Generated after the weekly cutoff from the inputs available at generation time (rosters, injuries and odds as fetched then). GB@LAR had kicked off; the other 15 games had not. Regenerated with the quarterback-change fix (Drake Maye out, Tommy DeVito starting for NE).",
   "games": [
     {
       "away": "GB",
@@ -306,10 +306,10 @@
       "newModel": {
         "awayScore": 24,
         "homeScore": 17,
-        "margin": -7.78,
+        "margin": -7.721,
         "winner": "NYG",
-        "awayWinProbability": 0.755,
-        "homeWinProbability": 0.245
+        "awayWinProbability": 0.751,
+        "homeWinProbability": 0.249
       },
       "newModelInputs": {
         "base": "current-season team scoring",
@@ -317,7 +317,7 @@
           "away": 23.867,
           "home": 21.316
         },
-        "playerRatingsEdge": -0.111,
+        "playerRatingsEdge": -0.107,
         "playerRatingsCoverage": 1
       }
     },
@@ -409,12 +409,12 @@
         "homeWinProbability": 0.442
       },
       "newModel": {
-        "awayScore": 23,
-        "homeScore": 17,
-        "margin": -5.255,
-        "winner": "NE",
-        "awayWinProbability": 0.682,
-        "homeWinProbability": 0.318
+        "awayScore": 20,
+        "homeScore": 20,
+        "margin": 0.457,
+        "winner": "LAC",
+        "awayWinProbability": 0.483,
+        "homeWinProbability": 0.517
       },
       "newModelInputs": {
         "base": "current-season team scoring",
@@ -422,7 +422,7 @@
           "away": 23.245,
           "home": 21.426
         },
-        "playerRatingsEdge": -0.3,
+        "playerRatingsEdge": -0.102,
         "playerRatingsCoverage": 1
       }
     },
@@ -446,10 +446,10 @@
       "newModel": {
         "awayScore": 19,
         "homeScore": 31,
-        "margin": 11.545,
+        "margin": 11.496,
         "winner": "SF",
-        "awayWinProbability": 0.16,
-        "homeWinProbability": 0.84
+        "awayWinProbability": 0.162,
+        "homeWinProbability": 0.838
       },
       "newModelInputs": {
         "base": "current-season team scoring",
@@ -479,12 +479,12 @@
         "homeWinProbability": 0.128
       },
       "newModel": {
-        "awayScore": 27,
-        "homeScore": 15,
-        "margin": -10.31,
+        "awayScore": 29,
+        "homeScore": 14,
+        "margin": -12.893,
         "winner": "WSH",
-        "awayWinProbability": 0.815,
-        "homeWinProbability": 0.185
+        "awayWinProbability": 0.862,
+        "homeWinProbability": 0.138
       },
       "newModelInputs": {
         "base": "current-season team scoring",
@@ -492,7 +492,7 @@
           "away": 24.339,
           "home": 21.432
         },
-        "playerRatingsEdge": -0.17,
+        "playerRatingsEdge": -0.26,
         "playerRatingsCoverage": 1
       }
     },

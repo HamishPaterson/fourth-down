@@ -11,7 +11,7 @@ import { PLAYER_PROPS_HELD } from "./playerPropPolicy.js";
 import { buildPersonnelView, PERSONNEL_VIEW_VERSION } from "../../api-lib/personnelView.js";
 import { buildSpecialTeamsModel } from "./specialTeams.js";
 import PLAYER_RATINGS from "../../data/player-ratings-2026.js";
-import { nameKey, teamUnitRatings } from "./fourthDownRatings.js";
+import { UNITS, nameKey, teamUnitRatings } from "./fourthDownRatings.js";
 import { CURRENT_MODEL_VERSION as FULL_MODEL_VERSION, CURRENT_MODEL_KEY as FULL_MODEL_KEY } from "./modelIdentity.js";
 
 export { FULL_MODEL_VERSION, FULL_MODEL_KEY };
@@ -184,7 +184,7 @@ async function createPrediction({ game, oddsEvent, season, week, away, home, sig
   const modelLayers = {
     ...extractLayers(values.teamForm),
     ...extractLayers(values.playByPlay),
-    playerRatings: buildPlayerRatingsLayer({ away, home, season, week, awayRoster, homeRoster }),
+    playerRatings: buildPlayerRatingsLayer({ away, home, season, week, awayRoster, homeRoster, personnelViews }),
     opponentNetwork:
       values.opponentNetwork?.modelLayer ||
       values.opponentNetwork?.modelLayers?.opponentNetwork ||
@@ -194,7 +194,11 @@ async function createPrediction({ game, oddsEvent, season, week, away, home, sig
       personnel?.home?.quarterback,
       qbrAvailable ? getQuarterbackQbr(selectedStartingQuarterback(personnelViews.away)) : null,
       qbrAvailable ? getQuarterbackQbr(selectedStartingQuarterback(personnelViews.home)) : null,
-      week
+      week,
+      {
+        away: quarterbackChange({ team: away, season, week, starter: selectedStartingQuarterback(personnelViews.away) }),
+        home: quarterbackChange({ team: home, season, week, starter: selectedStartingQuarterback(personnelViews.home) }),
+      }
     ),
     rosterHealth: buildPersonnelLayer(
       personnel?.away?.rosterHealth,
@@ -410,9 +414,40 @@ function selectedStartingQuarterback(personnelView) {
   return decision?.resolved ? decision.player || null : null;
 }
 
-export function buildQuarterbackLayer(awayPersonnel, homePersonnel, awayQbr, homeQbr, week) {
+// A team's stats this season were built with its usual starter. When someone else starts,
+// the gap in Fourth Down ratings is worth QB_POINTS_PER_RATING points a game: 2026 starters'
+// true EPA per dropback spread (0.09 once week-to-week noise is removed) over the 9-point
+// rating spread, times 36 dropbacks a game, with half of each dropback credited to the
+// quarterback. An elite starter replaced by a replacement-level backup costs about 5 points.
+export const QB_POINTS_PER_RATING = 0.18;
+const QB_CHANGE_MAX_POINTS = 7;
+
+export function quarterbackChange({ team, season, week, starter, ratings = PLAYER_RATINGS }) {
+  if (!starter || ratings?.season !== Number(season) || ratings?.predictionWeek !== Number(week)) return null;
+  const list = ratings.teams?.[team]?.qb || [];
+  const usual = list[0];
+  if (!usual) return null;
+  const same = (rated) => (starter.canonicalId && rated.gsisId && String(starter.canonicalId) === String(rated.gsisId)) ||
+    (nameKey(starter.name) && nameKey(starter.name) === nameKey(rated.name));
+  if (same(usual)) return null;
+  const replacement = list.find(same);
+  const rating = replacement?.rating ?? UNITS.qb.replacement;
+  const points = clamp((rating - usual.rating) * QB_POINTS_PER_RATING, -QB_CHANGE_MAX_POINTS, QB_CHANGE_MAX_POINTS);
+  return {
+    points,
+    usual: { name: usual.name, rating: usual.rating },
+    starter: { name: starter.name, rating, rated: Boolean(replacement) },
+    reason: `Quarterback change: ${starter.name} (${rating}) starts instead of ${usual.name} (${usual.rating}); ${points >= 0 ? "+" : ""}${points.toFixed(2)} model points`,
+  };
+}
+
+export function buildQuarterbackLayer(awayPersonnel, homePersonnel, awayQbr, homeQbr, week, changes = {}) {
   const qbrWeight = Number(week) >= 5 ? 0.65 : Number(week) >= 4 ? 0.55 : 0.4;
-  const blend = (personnel, qbr) => {
+  const blend = (personnel, qbr, change) => {
+    // Season QBR describes the usual starter, so it gives way to the rating gap.
+    if (change) {
+      return { available: true, points: change.points, confidence: 0.8, qbrWeight: 0, reasons: [change.reason] };
+    }
     const performance = qbrPointAdjustment(qbr, week);
     const personnelPoints = nullableFinite(personnel?.points);
     const personnelAvailable = personnelPoints !== null && personnel?.available !== false;
@@ -431,8 +466,8 @@ export function buildQuarterbackLayer(awayPersonnel, homePersonnel, awayQbr, hom
       reasons: performance.reasons,
     };
   };
-  const away = blend(awayPersonnel, awayQbr);
-  const home = blend(homePersonnel, homeQbr);
+  const away = blend(awayPersonnel, awayQbr, changes.away);
+  const home = blend(homePersonnel, homeQbr, changes.home);
   return {
     active: Math.abs(away.points) >= 0.05 || Math.abs(home.points) >= 0.05,
     available: away.available || home.available,
@@ -445,6 +480,7 @@ export function buildQuarterbackLayer(awayPersonnel, homePersonnel, awayQbr, hom
       ...away.reasons,
       ...home.reasons,
     ],
+    quarterbackChange: { away: changes.away || null, home: changes.home || null },
     qbr: {
       away: awayQbr,
       home: homeQbr,
@@ -502,7 +538,9 @@ function buildPersonnelLayer(away, home) {
 // live roster lists as out is replaced by the next player in the unit.
 const UNAVAILABLE_STATUS = /^(out|doubtful|ir|injured reserve|pup|physically unable|suspended|nfi|non-football|inactive)/i;
 
-function unavailablePlayers(roster) {
+// The live roster is dropped once it is newer than the weekly cutoff, so the point-in-time
+// personnel view's statuses count as well.
+function unavailablePlayers(roster, personnelView) {
   const ids = new Set(), names = new Set();
   for (const player of Object.values(roster?.groups || {}).flat()) {
     if (!player || !(UNAVAILABLE_STATUS.test(String(player.injuryStatus || "").trim()) ||
@@ -511,7 +549,27 @@ function unavailablePlayers(roster) {
     const key = nameKey(player.fullName || [player.firstName, player.lastName].filter(Boolean).join(" "));
     if (key) names.add(key);
   }
+  for (const player of personnelView?.players || []) {
+    if (!player || !UNAVAILABLE_STATUS.test(String(player.status || "").trim())) continue;
+    if (player.canonicalId) ids.add(String(player.canonicalId));
+    if (player.gsisId) ids.add(String(player.gsisId));
+    const key = nameKey(player.name);
+    if (key) names.add(key);
+  }
   return (rated) => (rated.gsisId && ids.has(String(rated.gsisId))) || names.has(nameKey(rated.name));
+}
+
+// The quarterback the personnel view selected to start is the unit's quarterback; snap share
+// would still pick an injured starter who took most of the recent snaps.
+function withSelectedQuarterback(teamRatings, personnelView) {
+  const starter = selectedStartingQuarterback(personnelView);
+  const list = teamRatings?.qb || [];
+  if (!starter || !list.length) return teamRatings;
+  const same = (rated) => (starter.canonicalId && rated.gsisId && String(starter.canonicalId) === String(rated.gsisId)) ||
+    (nameKey(starter.name) && nameKey(starter.name) === nameKey(rated.name));
+  const chosen = list.find(same) ||
+    { gsisId: starter.canonicalId || null, name: starter.name, rating: UNITS.qb.replacement, share: 0 };
+  return { ...teamRatings, qb: [chosen, ...list.filter((rated) => rated !== chosen)] };
 }
 
 function unitStrength(units) {
@@ -523,13 +581,15 @@ function unitStrength(units) {
   };
 }
 
-export function buildPlayerRatingsLayer({ away, home, season, week, awayRoster, homeRoster, ratings = PLAYER_RATINGS }) {
+export function buildPlayerRatingsLayer({ away, home, season, week, awayRoster, homeRoster, personnelViews, ratings = PLAYER_RATINGS }) {
   if (ratings?.season !== Number(season) || ratings?.predictionWeek !== Number(week) ||
       !ratings.teams?.[away] || !ratings.teams?.[home]) {
     return { ...neutralLayer(), reasons: [`Fourth Down player ratings for Week ${week} are not available`] };
   }
-  const awayRated = teamUnitRatings(ratings.teams[away], { unavailable: unavailablePlayers(awayRoster) });
-  const homeRated = teamUnitRatings(ratings.teams[home], { unavailable: unavailablePlayers(homeRoster) });
+  const awayRated = teamUnitRatings(withSelectedQuarterback(ratings.teams[away], personnelViews?.away),
+    { unavailable: unavailablePlayers(awayRoster, personnelViews?.away) });
+  const homeRated = teamUnitRatings(withSelectedQuarterback(ratings.teams[home], personnelViews?.home),
+    { unavailable: unavailablePlayers(homeRoster, personnelViews?.home) });
   if (awayRated.coverage < 0.45 || homeRated.coverage < 0.45) return neutralLayer();
   const awayUnits = unitStrength(awayRated.units), homeUnits = unitStrength(homeRated.units);
 
