@@ -29,3 +29,31 @@ export function teamUnitRatings(teamRatings, { unavailable = () => false } = {})
   }
   return { units: out, coverage: places ? filled / places : 0 };
 }
+
+// A regular starter averages at least this share of his side's snaps over recent games.
+// Defensive linemen, running backs and tight ends rotate, so their starters play fewer.
+export const STARTER_SHARE = Object.freeze({ qb: 0.6, rb: 0.45, wr: 0.6, te: 0.5, ol: 0.6, front: 0.5, lb: 0.6, db: 0.6 });
+
+// Points of margin a team loses when a regular starter misses the game, measured on 2,318
+// regular-season games from 2016-2025 (6,300 starter absences) by scripts/fit-absence-values.mjs:
+// margin = home field + each team's strength that season - the cost of each side's absences,
+// cost = starter + quality x (how well he had played that season, in standard deviations from
+// the season's regular starters at his unit, shrunk for sample). Quality slopes are shared
+// within groups (skill positions, defence) because single positions are too thin. Adding the
+// absences cut the error on held-out weeks from 13.19 to 13.05 points (MAE 10.39 to 10.25).
+// Standard errors: quarterback 0.73 / 1.09, offensive line 0.30, others 0.3-0.7 / 0.45-0.59.
+export const ABSENCE_COSTS = Object.freeze({
+  qb: Object.freeze({ starter: 3.16, quality: 3.82 }),
+  rb: Object.freeze({ starter: 0.29, quality: 0.74 }),
+  wr: Object.freeze({ starter: 0.86, quality: 0.74 }),
+  te: Object.freeze({ starter: 0.68, quality: 0.74 }),
+  ol: Object.freeze({ starter: 0.91, quality: 0 }),
+  front: Object.freeze({ starter: 0.76, quality: 0.70 }),
+  lb: Object.freeze({ starter: 0.61, quality: 0.70 }),
+  db: Object.freeze({ starter: 0.37, quality: 0.70 }),
+});
+
+export function absenceCost(unit, quality) {
+  const cost = ABSENCE_COSTS[unit];
+  return cost ? Math.max(0, cost.starter + cost.quality * (Number.isFinite(quality) ? quality : 0)) : 0;
+}

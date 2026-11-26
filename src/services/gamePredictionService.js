@@ -8,10 +8,10 @@ import { resolveStadium } from "./stadiums.js";
 import { buildBestBets } from "./bestBetsService.js";
 import { personnelAvailableAt, validDepthLineup, validDepthRoster } from "../../api-lib/depthCharts.js";
 import { PLAYER_PROPS_HELD } from "./playerPropPolicy.js";
-import { buildPersonnelView, PERSONNEL_VIEW_VERSION } from "../../api-lib/personnelView.js";
+import { AVAILABILITY_ABSENCE_PROBABILITY, buildPersonnelView, normalizeAvailability, PERSONNEL_VIEW_VERSION } from "../../api-lib/personnelView.js";
 import { buildSpecialTeamsModel } from "./specialTeams.js";
 import PLAYER_RATINGS from "../../data/player-ratings-2026.js";
-import { UNITS, nameKey, teamUnitRatings } from "./fourthDownRatings.js";
+import { ABSENCE_COSTS, STARTER_SHARE, absenceCost, nameKey, teamUnitRatings } from "./fourthDownRatings.js";
 import { CURRENT_MODEL_VERSION as FULL_MODEL_VERSION, CURRENT_MODEL_KEY as FULL_MODEL_KEY } from "./modelIdentity.js";
 
 export { FULL_MODEL_VERSION, FULL_MODEL_KEY };
@@ -184,7 +184,7 @@ async function createPrediction({ game, oddsEvent, season, week, away, home, sig
   const modelLayers = {
     ...extractLayers(values.teamForm),
     ...extractLayers(values.playByPlay),
-    playerRatings: buildPlayerRatingsLayer({ away, home, season, week, awayRoster, homeRoster, personnelViews }),
+    playerRatings: buildPlayerRatingsLayer({ away, home, season, week }),
     opponentNetwork:
       values.opponentNetwork?.modelLayer ||
       values.opponentNetwork?.modelLayers?.opponentNetwork ||
@@ -200,10 +200,9 @@ async function createPrediction({ game, oddsEvent, season, week, away, home, sig
         home: quarterbackChange({ team: home, season, week, starter: selectedStartingQuarterback(personnelViews.home) }),
       }
     ),
-    rosterHealth: buildPersonnelLayer(
-      personnel?.away?.rosterHealth,
-      personnel?.home?.rosterHealth
-    ),
+    // Missing players priced by their rating gap to the next man up (replaces the fixed
+    // position weights of the personnel route's roster-health estimate).
+    rosterHealth: buildInjuryLayer({ away, home, season, week, awayRoster, homeRoster, personnelViews }),
   };
 
   const prediction = predictMatchup(away, home, {
@@ -415,12 +414,18 @@ function selectedStartingQuarterback(personnelView) {
 }
 
 // A team's stats this season were built with its usual starter. When someone else starts,
-// the gap in Fourth Down ratings is worth QB_POINTS_PER_RATING points a game: 2026 starters'
-// true EPA per dropback spread (0.09 once week-to-week noise is removed) over the 9-point
-// rating spread, times 36 dropbacks a game, with half of each dropback credited to the
-// quarterback. An elite starter replaced by a replacement-level backup costs about 5 points.
-export const QB_POINTS_PER_RATING = 0.18;
-const QB_CHANGE_MAX_POINTS = 7;
+// the measured cost of losing that starter applies (ABSENCE_COSTS: 3.2 points for an
+// average starter, 3.8 more per standard deviation of quality; from 2,318 past games, which
+// were mostly backups stepping in). If the replacement has a real season of his own, he is
+// compared on quality with the team's season mix of quarterbacks (weighted by dropbacks),
+// because the team's season stats already include his own games.
+const QB_CHANGE_MAX_POINTS = 10;
+
+function seasonQuarterbackQuality(list) {
+  const measured = list.filter((player) => Number.isFinite(player.quality) && player.dropbacks > 0);
+  const dropbacks = measured.reduce((sum, player) => sum + player.dropbacks, 0);
+  return dropbacks ? measured.reduce((sum, player) => sum + player.quality * player.dropbacks, 0) / dropbacks : null;
+}
 
 export function quarterbackChange({ team, season, week, starter, ratings = PLAYER_RATINGS }) {
   if (!starter || ratings?.season !== Number(season) || ratings?.predictionWeek !== Number(week)) return null;
@@ -431,13 +436,21 @@ export function quarterbackChange({ team, season, week, starter, ratings = PLAYE
     (nameKey(starter.name) && nameKey(starter.name) === nameKey(rated.name));
   if (same(usual)) return null;
   const replacement = list.find(same);
-  const rating = replacement?.rating ?? UNITS.qb.replacement;
-  const points = clamp((rating - usual.rating) * QB_POINTS_PER_RATING, -QB_CHANGE_MAX_POINTS, QB_CHANGE_MAX_POINTS);
+  const established = Number.isFinite(replacement?.quality) && replacement.share >= STARTER_SHARE.qb / 2;
+  const baseline = seasonQuarterbackQuality(list) ?? usual.quality ?? 0;
+  const cost = established
+    ? ABSENCE_COSTS.qb.quality * (baseline - replacement.quality)
+    : absenceCost("qb", usual.quality);
+  const points = clamp(-cost, -QB_CHANGE_MAX_POINTS, QB_CHANGE_MAX_POINTS);
   return {
     points,
-    usual: { name: usual.name, rating: usual.rating },
-    starter: { name: starter.name, rating, rated: Boolean(replacement) },
-    reason: `Quarterback change: ${starter.name} (${rating}) starts instead of ${usual.name} (${usual.rating}); ${points >= 0 ? "+" : ""}${points.toFixed(2)} model points`,
+    usual: { name: usual.name, rating: usual.rating, quality: usual.quality ?? null },
+    starter: { name: starter.name, rating: replacement?.rating ?? null, quality: replacement?.quality ?? null, established },
+    reason: `Quarterback change: ${starter.name} starts instead of ${usual.name}` +
+      (established
+        ? ` (${starter.name} ${replacement.quality.toFixed(2)} SD against the team's season quarterback play ${baseline.toFixed(2)} SD)`
+        : ` (backup for a ${(usual.quality ?? 0).toFixed(2)} SD starter)`) +
+      `; ${points >= 0 ? "+" : ""}${points.toFixed(2)} model points`,
   };
 }
 
@@ -518,58 +531,80 @@ function qbrPointAdjustment(qbr, week) {
   };
 }
 
-function buildPersonnelLayer(away, home) {
-  const awayAvailable = away?.available !== false && nullableFinite(away?.points) !== null;
-  const homeAvailable = home?.available !== false && nullableFinite(home?.points) !== null;
-  const awayPoints = awayAvailable ? finite(away.points) : 0;
-  const homePoints = homeAvailable ? finite(home.points) : 0;
-  return {
-    available: awayAvailable || homeAvailable,
-    active: Boolean(awayPoints || homePoints),
-    awayPoints,
-    homePoints,
-    confidence: Math.min(awayAvailable ? finite(away.confidence) : 0, homeAvailable ? finite(home.confidence) : 0),
-    reasons: [...toArray(away?.reasons), ...toArray(home?.reasons)],
-  };
-}
-
 // Fourth Down's own player ratings (data/player-ratings-2026.js), rebuilt every week from
-// NFLverse play-by-play and snap counts. Starters come from recent snap share; anyone the
-// live roster lists as out is replaced by the next player in the unit.
-const UNAVAILABLE_STATUS = /^(out|doubtful|ir|injured reserve|pup|physically unable|suspended|nfi|non-football|inactive)/i;
+// NFLverse play-by-play and snap counts. The ratings layer measures each team at full
+// strength (starters by recent snap share); missing players are priced by the injury layer
+// and a changed quarterback by the quarterback layer, so nothing is counted twice.
 
-// The live roster is dropped once it is newer than the weekly cutoff, so the point-in-time
-// personnel view's statuses count as well.
-function unavailablePlayers(roster, personnelView) {
-  const ids = new Set(), names = new Set();
+// Chance each player misses the game, from the live roster and the point-in-time personnel
+// view (the live roster is dropped once it is newer than the weekly cutoff). The higher of
+// the two counts.
+function absenceLookup(roster, personnelView) {
+  const byId = new Map(), byName = new Map();
+  const note = (id, name, status, absence) => {
+    if (!(absence > 0)) return;
+    const entry = { status, absence };
+    for (const [map, key] of [[byId, id && String(id)], [byName, nameKey(name)]]) {
+      if (key && !(map.get(key)?.absence >= absence)) map.set(key, entry);
+    }
+  };
   for (const player of Object.values(roster?.groups || {}).flat()) {
-    if (!player || !(UNAVAILABLE_STATUS.test(String(player.injuryStatus || "").trim()) ||
-      UNAVAILABLE_STATUS.test(String(player.status || "").trim()))) continue;
-    if (player.gsisId) ids.add(String(player.gsisId));
-    const key = nameKey(player.fullName || [player.firstName, player.lastName].filter(Boolean).join(" "));
-    if (key) names.add(key);
+    if (!player) continue;
+    const availability = normalizeAvailability({ injuryStatus: player.injuryStatus, rosterStatus: player.status });
+    note(player.gsisId, player.fullName || [player.firstName, player.lastName].filter(Boolean).join(" "),
+      availability.status, availability.absenceProbability);
   }
   for (const player of personnelView?.players || []) {
-    if (!player || !UNAVAILABLE_STATUS.test(String(player.status || "").trim())) continue;
-    if (player.canonicalId) ids.add(String(player.canonicalId));
-    if (player.gsisId) ids.add(String(player.gsisId));
-    const key = nameKey(player.name);
-    if (key) names.add(key);
+    if (!player || player.statusKnown === false) continue;
+    const absence = AVAILABILITY_ABSENCE_PROBABILITY[player.status];
+    note(player.canonicalId || player.gsisId, player.name, player.status, absence);
   }
-  return (rated) => (rated.gsisId && ids.has(String(rated.gsisId))) || names.has(nameKey(rated.name));
+  return (rated) => (rated.gsisId && byId.get(String(rated.gsisId))) || byName.get(nameKey(rated.name)) || null;
 }
 
-// The quarterback the personnel view selected to start is the unit's quarterback; snap share
-// would still pick an injured starter who took most of the recent snaps.
-function withSelectedQuarterback(teamRatings, personnelView) {
-  const starter = selectedStartingQuarterback(personnelView);
-  const list = teamRatings?.qb || [];
-  if (!starter || !list.length) return teamRatings;
-  const same = (rated) => (starter.canonicalId && rated.gsisId && String(starter.canonicalId) === String(rated.gsisId)) ||
-    (nameKey(starter.name) && nameKey(starter.name) === nameKey(rated.name));
-  const chosen = list.find(same) ||
-    { gsisId: starter.canonicalId || null, name: starter.name, rating: UNITS.qb.replacement, share: 0 };
-  return { ...teamRatings, qb: [chosen, ...list.filter((rated) => rated !== chosen)] };
+// Most a team's non-quarterback absences can cost together. Past games rarely had more than
+// a few starters out at once, so the measured costs are not proven beyond that.
+const INJURY_MAX_POINTS = 8;
+const OUT_THRESHOLD = 0.75; // Doubtful and worse count in full
+
+// Expected points a team loses to missing non-quarterback regular starters: each costs the
+// measured ABSENCE_COSTS for his unit and quality, times the chance he misses the game.
+export function teamInjuryCost(teamRatings, absenceOf) {
+  let points = 0;
+  const players = [];
+  for (const unit of Object.keys(ABSENCE_COSTS)) {
+    if (unit === "qb") continue;
+    for (const player of (teamRatings?.[unit] || []).filter((p) => p.share >= STARTER_SHARE[unit])) {
+      const absence = absenceOf(player);
+      if (!absence) continue;
+      const cost = absenceCost(unit, player.quality) * (absence.absence >= OUT_THRESHOLD ? 1 : absence.absence);
+      if (cost <= 0) continue;
+      points += cost;
+      players.push({ name: player.name, unit, status: absence.status, quality: player.quality ?? null, points: Math.round(cost * 100) / 100 });
+    }
+  }
+  return { points: Math.min(points, INJURY_MAX_POINTS), players: players.sort((a, b) => b.points - a.points) };
+}
+
+export function buildInjuryLayer({ away, home, season, week, awayRoster, homeRoster, personnelViews, ratings = PLAYER_RATINGS }) {
+  if (ratings?.season !== Number(season) || ratings?.predictionWeek !== Number(week) ||
+      !ratings.teams?.[away] || !ratings.teams?.[home]) {
+    return { ...neutralLayer(), reasons: [`Injury pricing needs Fourth Down player ratings for Week ${week}`] };
+  }
+  const awayCost = teamInjuryCost(ratings.teams[away], absenceLookup(awayRoster, personnelViews?.away));
+  const homeCost = teamInjuryCost(ratings.teams[home], absenceLookup(homeRoster, personnelViews?.home));
+  const describe = (code, cost) => cost.players.length
+    ? `${code} missing ${cost.players.map((p) => `${p.name} (${p.unit}, ${p.status}, -${p.points})`).join(", ")}`
+    : `${code}: no priced injuries`;
+  return {
+    active: awayCost.points > 0.01 || homeCost.points > 0.01,
+    available: true,
+    awayPoints: round3(-awayCost.points) || 0,
+    homePoints: round3(-homeCost.points) || 0,
+    confidence: 0.8,
+    injuries: { away: awayCost.players, home: homeCost.players },
+    reasons: [describe(away, awayCost), describe(home, homeCost)],
+  };
 }
 
 function unitStrength(units) {
@@ -581,15 +616,13 @@ function unitStrength(units) {
   };
 }
 
-export function buildPlayerRatingsLayer({ away, home, season, week, awayRoster, homeRoster, personnelViews, ratings = PLAYER_RATINGS }) {
+export function buildPlayerRatingsLayer({ away, home, season, week, ratings = PLAYER_RATINGS }) {
   if (ratings?.season !== Number(season) || ratings?.predictionWeek !== Number(week) ||
       !ratings.teams?.[away] || !ratings.teams?.[home]) {
     return { ...neutralLayer(), reasons: [`Fourth Down player ratings for Week ${week} are not available`] };
   }
-  const awayRated = teamUnitRatings(withSelectedQuarterback(ratings.teams[away], personnelViews?.away),
-    { unavailable: unavailablePlayers(awayRoster, personnelViews?.away) });
-  const homeRated = teamUnitRatings(withSelectedQuarterback(ratings.teams[home], personnelViews?.home),
-    { unavailable: unavailablePlayers(homeRoster, personnelViews?.home) });
+  const awayRated = teamUnitRatings(ratings.teams[away]);
+  const homeRated = teamUnitRatings(ratings.teams[home]);
   if (awayRated.coverage < 0.45 || homeRated.coverage < 0.45) return neutralLayer();
   const awayUnits = unitStrength(awayRated.units), homeUnits = unitStrength(homeRated.units);
 

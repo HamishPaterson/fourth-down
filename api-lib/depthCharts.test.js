@@ -10,7 +10,7 @@ import { playerMetricsResponse } from "./playerMetrics.js";
 // The sign-in wrapper is covered by authorization.test.js; these exercise the route itself.
 import { handler as healthHandler, buildTeamHealth, pointInTimeHealth } from "../api/nfl/qb-roster-health.js";
 import { buildPersonnelView, canonicalPosition } from "./personnelView.js";
-import { predictMatchup } from "../src/services/predictionEngine.js";
+import { predictMatchup, PERSONNEL_PASS_THROUGH } from "../src/services/predictionEngine.js";
 import { getFullGamePrediction, clearFullGamePredictionCache } from "../src/services/gamePredictionService.js";
 import { getQbRosterHealth } from "../src/services/nflApi.js";
 
@@ -429,8 +429,9 @@ test("frozen HOU tackle and defensive removals use canonical injury weights and 
         },
       },
     });
-    assert.equal(adjusted.modelLayers.rosterHealth.awayPoints, -scenario.weight / 2);
-    assert.equal(adjusted.modelLayers.rosterHealth.homePoints, scenario.weight / 2);
+    // Missing-player layers are scaled up for the share the scoring simulation passes through.
+    assert.equal(adjusted.modelLayers.rosterHealth.awayPoints, Math.round(-scenario.weight / 2 / PERSONNEL_PASS_THROUGH * 1000) / 1000);
+    assert.equal(adjusted.modelLayers.rosterHealth.homePoints, Math.round(scenario.weight / 2 / PERSONNEL_PASS_THROUGH * 1000) / 1000);
     assert.ok(adjusted.home.expectedPoints > baseline.home.expectedPoints);
     assert.ok(adjusted.continuousMargin > baseline.continuousMargin);
     assert.ok(adjusted.awayWinProbability < baseline.awayWinProbability);
@@ -578,8 +579,10 @@ test("historical orchestration gates post-cutoff Sleeper/playerRatings but permi
     // roster feed, so a Week 2 prediction made now has none.
     assert.equal(earlier.prediction.modelLayers.playerRatings.available, false);
     assert.match(earlier.prediction.modelLayers.playerRatings.reasons[0], /Week 2 are not available/);
-    assert.equal(earlier.prediction.modelLayers.quarterback.homePoints, -1);
-    assert.equal(earlier.prediction.modelLayers.rosterHealth.homePoints, -1);
+    assert.equal(earlier.prediction.modelLayers.quarterback.homePoints, Math.round(-1 / PERSONNEL_PASS_THROUGH * 1000) / 1000);
+    // Injuries are priced from the same week's ratings, so a Week 2 prediction made now has none.
+    assert.equal(earlier.prediction.modelLayers.rosterHealth.available, false);
+    assert.match(earlier.prediction.modelLayers.rosterHealth.reasons[0], /needs Fourth Down player ratings for Week 2/);
     assert.equal(earlier.dataQuality.personnelTiming.personnel, true);
     missingRatings = true;
     const missing = await run();

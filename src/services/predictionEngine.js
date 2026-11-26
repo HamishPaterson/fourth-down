@@ -765,12 +765,18 @@ export function createModelLayers(input = {}) {
   ];
 
   const totalMovingLayers = new Set(["scoringBaseline", "pace"]);
+  // Missing players are measured in points from past games (src/services/fourthDownRatings.js),
+  // and an elite quarterback out costs about 9, so these two keep a wider limit and sit
+  // outside the shared limit on the evidence layers.
+  const personnelLayers = new Set(["quarterback", "rosterHealth"]);
   const layers = Object.fromEntries(
     layerNames.map((name) => {
       const normalised = name === "specialTeams"
         ? normaliseModelLayer(null)
-        : normaliseModelLayer(input?.[name]);
-      return [name, totalMovingLayers.has(name) ? normalised : centreComparativeLayer(normalised)];
+        : personnelLayers.has(name) ? scalePersonnelLayer(normaliseModelLayer(input?.[name], 2 * PERSONNEL_EDGE_LIMIT))
+          : normaliseModelLayer(input?.[name]);
+      return [name, totalMovingLayers.has(name) ? normalised
+        : centreComparativeLayer(normalised, personnelLayers.has(name) ? PERSONNEL_EDGE_LIMIT : LAYER_EDGE_LIMIT)];
     })
   );
   layers.specialTeams = {
@@ -785,13 +791,31 @@ export function createModelLayers(input = {}) {
 
   return {
     ...layers,
-    awayPoints: round3(clamp(layerNames.reduce((total, name) => total + layers[name].awayPoints, 0), -7.5, 7.5)),
-    homePoints: round3(clamp(layerNames.reduce((total, name) => total + layers[name].homePoints, 0), -7.5, 7.5)),
+    awayPoints: round3(sideTotal(layers, layerNames, personnelLayers, "awayPoints")),
+    homePoints: round3(sideTotal(layers, layerNames, personnelLayers, "homePoints")),
   };
 }
 
-function centreComparativeLayer(layer) {
-  const edge = clamp((layer.homePoints - layer.awayPoints) / 2, -2.5, 2.5);
+const LAYER_EDGE_LIMIT = 2.5;
+const PERSONNEL_EDGE_LIMIT = 6;
+const LAYER_TOTAL_LIMIT = 7.5;
+// The scoring simulation delivers on average 87% of a layer's points to the final margin
+// (measured over eight matchups and costs of 2 to 9 points). Missing-player costs are measured
+// in real points of margin, so they are scaled up to arrive at full size.
+export const PERSONNEL_PASS_THROUGH = 0.87;
+
+function scalePersonnelLayer(layer) {
+  return { ...layer, awayPoints: layer.awayPoints / PERSONNEL_PASS_THROUGH, homePoints: layer.homePoints / PERSONNEL_PASS_THROUGH };
+}
+
+function sideTotal(layers, names, personnel, side) {
+  const evidence = names.filter((name) => !personnel.has(name)).reduce((total, name) => total + layers[name][side], 0);
+  const missing = names.filter((name) => personnel.has(name)).reduce((total, name) => total + layers[name][side], 0);
+  return clamp(evidence, -LAYER_TOTAL_LIMIT, LAYER_TOTAL_LIMIT) + clamp(missing, -PERSONNEL_EDGE_LIMIT, PERSONNEL_EDGE_LIMIT);
+}
+
+function centreComparativeLayer(layer, limit = LAYER_EDGE_LIMIT) {
+  const edge = clamp((layer.homePoints - layer.awayPoints) / 2, -limit, limit);
   return {
     ...layer,
     awayPoints: round3(-edge),
@@ -799,12 +823,12 @@ function centreComparativeLayer(layer) {
   };
 }
 
-function normaliseModelLayer(layer) {
+function normaliseModelLayer(layer, limit = 7.5) {
   return {
     active: Boolean(layer?.active),
     available: layer?.available !== false,
-    awayPoints: clamp(num(layer?.awayPoints, 0), -7.5, 7.5),
-    homePoints: clamp(num(layer?.homePoints, 0), -7.5, 7.5),
+    awayPoints: clamp(num(layer?.awayPoints, 0), -limit, limit),
+    homePoints: clamp(num(layer?.homePoints, 0), -limit, limit),
     confidence: clamp(num(layer?.confidence, 0), 0, 1),
     reasons: Array.isArray(layer?.reasons) ? layer.reasons : [],
     awayPassingMultiplier: clamp(num(layer?.awayPassingMultiplier, 1), 0.8, 1.2),

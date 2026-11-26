@@ -1,6 +1,10 @@
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { UNITS, nameKey, teamUnitRatings, unitForPosition } from "../src/services/fourthDownRatings.js";
+import { STARTER_SHARE, individualPerformance } from "./fit-absence-values.mjs";
+
+const EMPTY_STATS = { dropbacks: 0, dropbackEpa: 0, carries: 0, rushEpa: 0, rushSuccess: 0, targets: 0, targetEpa: 0,
+  sacks: 0, hits: 0, tfl: 0, forcedFumbles: 0, tackles: 0, ints: 0, passesDefended: 0 };
 
 export { UNITS, nameKey, teamUnitRatings, unitForPosition };
 
@@ -157,8 +161,23 @@ export function buildWeekRatings({ plays, snapRows, pfrToGsis, priors, week }) {
     const gsisId = pfrToGsis.get(entry.pfrId) || null;
     const opponentStats = teams.get(entry.team);
     const raw = rawPerformance(entry.unit, gsisId ? players.get(gsisId) : null, entry.snaps, teams.get(entry.team), opponentStats);
-    rows.push({ ...entry, gsisId, raw, prior: priorFor(priors, entry.name, entry.unit) });
+    const individual = individualPerformance(entry.unit, { ...EMPTY_STATS, ...(gsisId ? players.get(gsisId) : {}) }, entry.snaps);
+    rows.push({ ...entry, gsisId, raw, individual, prior: priorFor(priors, entry.name, entry.unit) });
   }
+  // Quality on exactly the scale the absence costs were fitted on (scripts/fit-absence-values.mjs):
+  // standard deviations from this season's regular starters at the unit, shrunk for sample.
+  const qualityScale = {};
+  for (const unit of Object.keys(UNITS)) {
+    const values = rows.filter((row) => row.unit === unit && row.individual && row.recentShare >= STARTER_SHARE[unit] &&
+      row.individual.sample >= UNITS[unit].sample / 2).map((row) => row.individual.value);
+    qualityScale[unit] = { mean: mean(values), sd: sd(values) };
+  }
+  const qualityOf = (row) => {
+    if (!row.individual) return null;
+    const { mean: m, sd: s } = qualityScale[row.unit];
+    const z = Math.max(-MAX_Z, Math.min(MAX_Z, (row.individual.value - m) / s));
+    return round(z * row.individual.sample / (row.individual.sample + UNITS[row.unit].sample), 2);
+  };
   // Each unit's performance is placed on the scale of its regular starters' EA ratings.
   const scale = {};
   for (const unit of Object.keys(UNITS)) {
@@ -177,7 +196,7 @@ export function buildWeekRatings({ plays, snapRows, pfrToGsis, priors, week }) {
     const rating = Math.max(40, Math.min(99, prior + (performance - prior) * weight));
     const list = ((teamsOut[row.team] ||= {})[row.unit] ||= []);
     list.push({ gsisId: row.gsisId, pfrId: row.pfrId, name: row.name, rating: round(rating), prior: row.prior,
-      performance: round(performance), sample: row.raw.sample, recentShare: round(row.recentShare, 2) });
+      performance: round(performance), sample: row.raw.sample, recentShare: round(row.recentShare, 2), quality: qualityOf(row) });
   }
   for (const units of Object.values(teamsOut)) {
     for (const [unit, list] of Object.entries(units)) {
@@ -220,7 +239,8 @@ export function buildRatingsArtifact({ plays, snapRows, players, eaRecords, seas
     pfrToGsis, priors: buildPriorIndex(eaRecords), week });
   const teams = Object.fromEntries(Object.entries(built.teams).sort(([a], [b]) => a.localeCompare(b)).map(([code, units]) =>
     [code, Object.fromEntries(Object.entries(units).map(([unit, list]) => [unit, list.map((player) => ({
-      gsisId: player.gsisId, name: player.name, rating: player.rating, share: player.recentShare }))]))]));
+      gsisId: player.gsisId, name: player.name, rating: player.rating, share: player.recentShare, quality: player.quality,
+      ...(unit === "qb" ? { dropbacks: player.sample } : {}) }))]))]));
   return { schemaVersion: 1, season, predictionWeek: week, latestCompletedWeek, generatedAt: now.toISOString(),
     source: "NFLverse play-by-play and snap counts; prior is last season's final EA rating", scale: built.scale, teams };
 }

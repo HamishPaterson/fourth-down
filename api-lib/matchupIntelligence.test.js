@@ -247,7 +247,8 @@ test("zero contributions cannot support an explanation, including a saturated sc
   assert.ok(predict().matchupIntelligence.signals.every((s) => !s.explanationSafe));
   const input = fixture();
   input.teamMetrics.home.passingEpaPerPlay = 1;
-  const strong = Object.fromEntries(["quarterback", "rosterHealth", "playerRatings", "opponentNetwork"]
+  // Missing-player layers sit outside the shared limit, so the stack is filled with evidence layers.
+  const strong = Object.fromEntries(["playByPlayEfficiency", "opponentAdjustedEfficiency", "playerRatings", "opponentNetwork"]
     .map((key) => [key, { active: true, awayPoints: -2.5, homePoints: 2.5, confidence: 1 }]));
   const saturated = predict(input, { modelLayers: { ...strong, scoringBaseline: baseline }   });
   const passing = saturated.matchupIntelligence.signals.find((s) => s.layer === "passMatchup");

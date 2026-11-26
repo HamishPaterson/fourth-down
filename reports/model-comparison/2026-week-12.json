@@ -2,9 +2,9 @@
   "season": 2026,
   "week": 12,
   "purpose": "Side-by-side test of the real-data model (4678b1c) against the published Week 12 predictions. Not a live prediction.",
-  "newModelCommit": "4678b1c plus the quarterback-change fix",
-  "generatedAt": "2026-11-26T01:47:25.103Z",
-  "note": "Generated after the weekly cutoff from the inputs available at generation time (rosters, injuries and odds as fetched then). GB@LAR had kicked off; the other 15 games had not. Regenerated with the quarterback-change fix (Drake Maye out, Tommy DeVito starting for NE).",
+  "newModelCommit": "4678b1c plus the quarterback-change fix and measured absence costs",
+  "generatedAt": "2026-11-26T03:32:37.767Z",
+  "note": "Generated after the weekly cutoff from the inputs available at generation time (rosters, injuries and odds as fetched then). GB@LAR had kicked off; the other 15 games had not. Quarterback changes are priced with the costs measured on 2016-2025 games; non-quarterback injury reports are not, because the live rosters were past the Week 12 cutoff.",
   "games": [
     {
       "away": "GB",
@@ -26,10 +26,10 @@
       "newModel": {
         "awayScore": 19,
         "homeScore": 27,
-        "margin": 7.871,
+        "margin": 7.824,
         "winner": "LAR",
-        "awayWinProbability": 0.243,
-        "homeWinProbability": 0.757
+        "awayWinProbability": 0.244,
+        "homeWinProbability": 0.756
       },
       "newModelInputs": {
         "base": "current-season team scoring",
@@ -61,10 +61,10 @@
       "newModel": {
         "awayScore": 24,
         "homeScore": 28,
-        "margin": 3.749,
+        "margin": 3.647,
         "winner": "DET",
-        "awayWinProbability": 0.367,
-        "homeWinProbability": 0.633
+        "awayWinProbability": 0.37,
+        "homeWinProbability": 0.63
       },
       "newModelInputs": {
         "base": "current-season team scoring",
@@ -96,10 +96,10 @@
       "newModel": {
         "awayScore": 17,
         "homeScore": 32,
-        "margin": 14.605,
+        "margin": 14.899,
         "winner": "DAL",
-        "awayWinProbability": 0.115,
-        "homeWinProbability": 0.885
+        "awayWinProbability": 0.111,
+        "homeWinProbability": 0.889
       },
       "newModelInputs": {
         "base": "current-season team scoring",
@@ -131,10 +131,10 @@
       "newModel": {
         "awayScore": 26,
         "homeScore": 28,
-        "margin": 2.04,
+        "margin": 2.108,
         "winner": "BUF",
-        "awayWinProbability": 0.426,
-        "homeWinProbability": 0.574
+        "awayWinProbability": 0.424,
+        "homeWinProbability": 0.576
       },
       "newModelInputs": {
         "base": "current-season team scoring",
@@ -166,10 +166,10 @@
       "newModel": {
         "awayScore": 24,
         "homeScore": 22,
-        "margin": -3.049,
+        "margin": -3.096,
         "winner": "DEN",
-        "awayWinProbability": 0.609,
-        "homeWinProbability": 0.391
+        "awayWinProbability": 0.611,
+        "homeWinProbability": 0.389
       },
       "newModelInputs": {
         "base": "current-season team scoring",
@@ -201,10 +201,10 @@
       "newModel": {
         "awayScore": 15,
         "homeScore": 21,
-        "margin": 11.024,
+        "margin": 11.175,
         "winner": "MIN",
-        "awayWinProbability": 0.17,
-        "homeWinProbability": 0.83
+        "awayWinProbability": 0.167,
+        "homeWinProbability": 0.833
       },
       "newModelInputs": {
         "base": "current-season team scoring",
@@ -236,10 +236,10 @@
       "newModel": {
         "awayScore": 16,
         "homeScore": 30,
-        "margin": 13.9,
+        "margin": 13.937,
         "winner": "HOU",
-        "awayWinProbability": 0.122,
-        "homeWinProbability": 0.878
+        "awayWinProbability": 0.121,
+        "homeWinProbability": 0.879
       },
       "newModelInputs": {
         "base": "current-season team scoring",
@@ -271,10 +271,10 @@
       "newModel": {
         "awayScore": 17,
         "homeScore": 33,
-        "margin": 15.611,
+        "margin": 15.72,
         "winner": "CIN",
-        "awayWinProbability": 0.099,
-        "homeWinProbability": 0.901
+        "awayWinProbability": 0.098,
+        "homeWinProbability": 0.902
       },
       "newModelInputs": {
         "base": "current-season team scoring",
@@ -306,10 +306,10 @@
       "newModel": {
         "awayScore": 24,
         "homeScore": 17,
-        "margin": -7.721,
+        "margin": -7.775,
         "winner": "NYG",
-        "awayWinProbability": 0.751,
-        "homeWinProbability": 0.249
+        "awayWinProbability": 0.753,
+        "homeWinProbability": 0.247
       },
       "newModelInputs": {
         "base": "current-season team scoring",
@@ -317,7 +317,7 @@
           "away": 23.867,
           "home": 21.316
         },
-        "playerRatingsEdge": -0.107,
+        "playerRatingsEdge": -0.111,
         "playerRatingsCoverage": 1
       }
     },
@@ -341,10 +341,10 @@
       "newModel": {
         "awayScore": 23,
         "homeScore": 20,
-        "margin": -3.472,
+        "margin": -3.663,
         "winner": "NYJ",
-        "awayWinProbability": 0.623,
-        "homeWinProbability": 0.377
+        "awayWinProbability": 0.629,
+        "homeWinProbability": 0.371
       },
       "newModelInputs": {
         "base": "current-season team scoring",
@@ -376,7 +376,7 @@
       "newModel": {
         "awayScore": 13,
         "homeScore": 34,
-        "margin": 19.673,
+        "margin": 19.701,
         "winner": "JAX",
         "awayWinProbability": 0.08,
         "homeWinProbability": 0.92
@@ -409,12 +409,12 @@
         "homeWinProbability": 0.442
       },
       "newModel": {
-        "awayScore": 20,
+        "awayScore": 22,
         "homeScore": 20,
-        "margin": 0.457,
-        "winner": "LAC",
-        "awayWinProbability": 0.483,
-        "homeWinProbability": 0.517
+        "margin": -1.589,
+        "winner": "NE",
+        "awayWinProbability": 0.557,
+        "homeWinProbability": 0.443
       },
       "newModelInputs": {
         "base": "current-season team scoring",
@@ -422,7 +422,7 @@
           "away": 23.245,
           "home": 21.426
         },
-        "playerRatingsEdge": -0.102,
+        "playerRatingsEdge": -0.3,
         "playerRatingsCoverage": 1
       }
     },
@@ -446,10 +446,10 @@
       "newModel": {
         "awayScore": 19,
         "homeScore": 31,
-        "margin": 11.496,
+        "margin": 13.523,
         "winner": "SF",
-        "awayWinProbability": 0.162,
-        "homeWinProbability": 0.838
+        "awayWinProbability": 0.128,
+        "homeWinProbability": 0.872
       },
       "newModelInputs": {
         "base": "current-season team scoring",
@@ -481,10 +481,10 @@
       "newModel": {
         "awayScore": 29,
         "homeScore": 14,
-        "margin": -12.893,
+        "margin": -11.888,
         "winner": "WSH",
-        "awayWinProbability": 0.862,
-        "homeWinProbability": 0.138
+        "awayWinProbability": 0.845,
+        "homeWinProbability": 0.155
       },
       "newModelInputs": {
         "base": "current-season team scoring",
@@ -492,7 +492,7 @@
           "away": 24.339,
           "home": 21.432
         },
-        "playerRatingsEdge": -0.26,
+        "playerRatingsEdge": -0.17,
         "playerRatingsCoverage": 1
       }
     },
@@ -516,10 +516,10 @@
       "newModel": {
         "awayScore": 20,
         "homeScore": 27,
-        "margin": 6.923,
+        "margin": 6.808,
         "winner": "CLE",
-        "awayWinProbability": 0.27,
-        "homeWinProbability": 0.73
+        "awayWinProbability": 0.273,
+        "homeWinProbability": 0.727
       },
       "newModelInputs": {
         "base": "current-season team scoring",
