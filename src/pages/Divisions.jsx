@@ -4,8 +4,10 @@ import { getTeams, getStandings } from "../services/nflApi.js";
 import { getTeamTheme } from "../services/teamThemes.js";
 import { getTeamRatings } from "../services/teamRatings.js";
 import TeamLogo from "../components/TeamLogo.jsx";
+import TeamCardStats from "../components/TeamCardStats.jsx";
 import FourthDownLoader from "../components/FourthDownLoader.jsx";
 import { shouldShowBlockingLoader } from "../components/fourthDownLoader.js";
+import { DivisionTab } from "../components/LeagueTabs.jsx";
 
 // Canonical league structure. Controls dropdown order and division buckets.
 const LEAGUE_STRUCTURE = [
@@ -159,27 +161,19 @@ export default function Divisions({
         </div>
       )}
 
-      <div className="schedule-controls division-controls">
-        <label>
-          Division
-          <select
-            value={selectedDivision}
-            onChange={(event) => setSelectedDivision(event.target.value)}
-          >
-            {LEAGUE_STRUCTURE.map((conference) => (
-              <optgroup label={conference.conference} key={conference.conference}>
-                {conference.divisions.map((d) => (
-                  <option
-                    key={`${conference.conference} ${d.name}`}
-                    value={`${conference.conference} ${d.name}`}
-                  >
-                    {conference.conference} {d.name}
-                  </option>
-                ))}
-              </optgroup>
-            ))}
-          </select>
-        </label>
+      {/* All eight divisions as tabs, a row per conference, each showing its four teams. */}
+      <div className="division-controls division-tab-groups" role="tablist" aria-label="Division">
+        {LEAGUE_STRUCTURE.map((conference) => (
+          <div className="league-tiles division-tiles" key={conference.conference}>
+            {conference.divisions.map((d) => {
+              const id = `${conference.conference} ${d.name}`;
+              return (
+                <DivisionTab key={id} conference={conference.conference} name={d.name} teams={d.teams}
+                  active={selectedDivision === id} onSelect={() => setSelectedDivision(id)} />
+              );
+            })}
+          </div>
+        ))}
       </div>
 
       <div className="team-grid">
@@ -216,16 +210,8 @@ export default function Divisions({
 
               <span className="team-card-copy">
                 <strong>{team.full_name}</strong>
-                <small>{division.id}</small>
-                <small>{formatRecord(standing)}</small>
-                <small>
-                  ESPN FPI {ratings.overall}
-                  {" • "}
-                  OFF {ratings.offense}
-                  {" • "}
-                  DEF {ratings.defense}
-                </small>
               </span>
+              <TeamCardStats division={division.id} record={formatRecord(standing)} ratings={ratings} />
 
               <ArrowRight className="team-card-arrow" size={18} />
             </button>

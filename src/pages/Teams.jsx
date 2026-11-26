@@ -4,6 +4,7 @@ import { getTeams } from "../services/nflApi.js";
 import { getTeamTheme } from "../services/teamThemes.js";
 import { getTeamRatings } from "../services/teamRatings.js";
 import TeamLogo from "../components/TeamLogo.jsx";
+import TeamCardStats from "../components/TeamCardStats.jsx";
 import FourthDownLoader from "../components/FourthDownLoader.jsx";
 import { shouldShowBlockingLoader } from "../components/fourthDownLoader.js";
 
@@ -134,13 +135,8 @@ export default function Teams({ onOpenTeam, onOpenConference }) {
               </span>
               <span className="team-card-copy">
                 <strong>{team.full_name}</strong>
-                <small>{team.conference} {team.division}</small>
-                <small>
-                  ESPN FPI {ratings.overall} {" • "}
-                  OFF {ratings.offense} {" • "}
-                  DEF {ratings.defense}
-                </small>
               </span>
+              <TeamCardStats division={[team.conference, team.division].filter(Boolean).join(" ")} ratings={ratings} />
               <ArrowRight className="team-card-arrow" size={18} />
             </button>
           );

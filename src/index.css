@@ -2248,3 +2248,96 @@ body {
   .whats-new-actions > button { flex: 1 1 auto; }
   .patch-notes-release summary { flex-wrap: wrap; }
 }
+
+/* Conference and division tabs: conference logos and division team banners */
+.conference-page .conference-subnav .roster-tab { padding: 10px 16px; color: #ffffff; background: rgba(10, 10, 10, .85); border-color: rgba(255, 255, 255, .18); }
+.conference-page .conference-subnav .roster-tab.active { color: #000000; background: #ffffff; border-color: #ffffff; }
+.league-tiles { display: grid; gap: 12px; }
+.conference-tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); max-width: 720px; margin-bottom: 20px; }
+.division-tab-groups { display: grid; gap: 12px; margin-bottom: 20px; }
+.division-tiles { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.league-tile {
+  position: relative;
+  display: flex;
+  overflow: hidden;
+  padding: 0;
+  border: 2px solid rgba(255, 255, 255, .14);
+  border-radius: 16px;
+  color: #ffffff;
+  background: #0b0b0b;
+  text-align: left;
+  filter: saturate(.7) brightness(.68);
+  transition: filter .15s ease, border-color .15s ease;
+}
+.league-tile:hover { filter: saturate(.9) brightness(.88); }
+.league-tile.active { filter: none; border-color: #ffffff; box-shadow: 0 0 0 1px #ffffff, 0 14px 30px rgba(0, 0, 0, .45); }
+.league-tile:focus-visible { outline: 3px solid #ffffff; outline-offset: 2px; }
+.conference-tile { align-items: center; gap: 16px; min-height: 112px; padding: 14px 18px; }
+.conference-tile.active { background: linear-gradient(120deg, var(--league-color) 0%, rgba(10, 10, 10, .92) 75%); }
+.conference-tile-logo {
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  width: 96px;
+  height: 80px;
+  border-radius: 12px;
+  background: #ffffff;
+}
+.conference-tile-logo img { max-width: 78px; max-height: 60px; object-fit: contain; }
+.league-tile-label { display: grid; gap: 4px; min-width: 0; }
+.league-tile-label strong { font-size: 26px; line-height: 1; letter-spacing: .04em; }
+.league-tile-label small { font-size: 13px; font-weight: 700; opacity: .8; }
+.division-tile { flex-direction: column; min-height: 132px; }
+.division-tile-stripes { display: grid; grid-template-columns: repeat(4, 1fr); flex: 1; min-height: 92px; }
+.division-tile-stripe {
+  display: grid;
+  place-items: center;
+  background: linear-gradient(180deg, var(--stripe) 0%, color-mix(in srgb, var(--stripe) 70%, #000000) 100%);
+}
+.division-tile-logo { filter: drop-shadow(0 3px 6px rgba(0, 0, 0, .35)); }
+.division-tile-label {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 9px 12px;
+  background: rgba(0, 0, 0, .82);
+  border-top: 3px solid var(--league-color);
+}
+.division-tile-label small { font-size: 12px; font-weight: 900; letter-spacing: .14em; opacity: .75; }
+.division-tile-label strong { font-size: 17px; }
+@media (max-width: 900px) {
+  .division-tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 620px) {
+  .conference-tiles { grid-template-columns: 1fr; }
+  .conference-tile { min-height: 92px; }
+  .conference-tile-logo { width: 78px; height: 64px; }
+  .conference-tile-logo img { max-width: 62px; max-height: 48px; }
+  .league-tile-label strong { font-size: 22px; }
+  .division-tile { min-height: 112px; }
+  .division-tile-stripes { min-height: 74px; }
+  .division-tile-logo { width: 34px !important; height: 34px !important; }
+}
+
+/* Team card stats: division and record, then FPI / offence / defence in labelled boxes */
+.team-card-stats { display: grid; gap: 10px; grid-column: 1 / -1; position: relative; z-index: 1; }
+.team-card-meta { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+.team-card-division {
+  color: rgba(255, 255, 255, .78);
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+.team-card-record { color: #ffffff; font-size: 20px; font-weight: 900; line-height: 1; letter-spacing: .02em; }
+.team-card-ratings { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.team-card-rating {
+  display: grid;
+  gap: 2px;
+  padding: 8px 10px;
+  border: 1px solid rgba(255, 255, 255, .14);
+  border-radius: 10px;
+  background: rgba(0, 0, 0, .45);
+}
+.team-card-rating-label { color: rgba(255, 255, 255, .7); font-size: 10px; font-weight: 900; letter-spacing: .12em; }
+.team-card-rating-value { color: #ffffff; font-size: 18px; font-weight: 900; line-height: 1.1; font-variant-numeric: tabular-nums; }

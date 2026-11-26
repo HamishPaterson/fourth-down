@@ -4,8 +4,10 @@ import { getTeams, getStandings } from "../services/nflApi.js";
 import { getTeamTheme } from "../services/teamThemes.js";
 import { getTeamRatings } from "../services/teamRatings.js";
 import TeamLogo from "../components/TeamLogo.jsx";
+import TeamCardStats from "../components/TeamCardStats.jsx";
 import Divisions from "./Divisions.jsx";
 import FourthDownLoader from "../components/FourthDownLoader.jsx";
+import { ConferenceTab } from "../components/LeagueTabs.jsx";
 import { shouldShowBlockingLoader } from "../components/fourthDownLoader.js";
 
 // All 16 teams per conference, grouped by division.
@@ -185,20 +187,11 @@ export default function Conference({ onSelectTeam }) {
         />
       ) : (
         <>
-          <div className="schedule-controls conference-controls">
-            <label>
-              Conference
-              <select
-                value={selectedConference}
-                onChange={(event) => setSelectedConference(event.target.value)}
-              >
-                {CONFERENCES.map((c) => (
-                  <option key={c.name} value={c.name}>
-                    {c.name} — {c.full}
-                  </option>
-                ))}
-              </select>
-            </label>
+          <div className="league-tiles conference-tiles conference-controls" role="tablist" aria-label="Conference">
+            {CONFERENCES.map((c) => (
+              <ConferenceTab key={c.name} name={c.name} active={selectedConference === c.name}
+                onSelect={() => setSelectedConference(c.name)} />
+            ))}
           </div>
 
           <div className="team-grid">
@@ -236,16 +229,8 @@ export default function Conference({ onSelectTeam }) {
 
                   <span className="team-card-copy">
                     <strong>{team.full_name}</strong>
-                    <small>{division}</small>
-                    <small>{formatRecord(standing)}</small>
-                    <small>
-                      ESPN FPI {ratings.overall}
-                      {" • "}
-                      OFF {ratings.offense}
-                      {" • "}
-                      DEF {ratings.defense}
-                    </small>
                   </span>
+                  <TeamCardStats division={division} record={formatRecord(standing)} ratings={ratings} />
 
                   <ArrowRight className="team-card-arrow" size={18} />
                 </button>
