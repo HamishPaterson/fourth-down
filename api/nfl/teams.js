@@ -1,6 +1,7 @@
 const API_URL = "https://api.balldontlie.io/nfl/v1/teams";
 
 import { withApprovedUser } from "../../api-lib/authorization.js";
+import { DAY, providerCache } from "../../api-lib/serverCache.js";
 
 export default withApprovedUser(handler);
 export async function handler(req, res) {
@@ -14,13 +15,19 @@ export async function handler(req, res) {
   }
 
   try {
-    const response = await fetch(API_URL, {
-      headers: { Authorization: apiKey, Accept: "application/json" },
+    // The 32 teams barely change: one provider call a day per server, shared by every user.
+    const body = await providerCache("teams", DAY, async () => {
+      const response = await fetch(API_URL, {
+        headers: { Authorization: apiKey, Accept: "application/json" },
+      });
+      const result = await readJsonResponse(response);
+      if (!response.ok) throw Object.assign(new Error(result.error || `Teams request failed (${response.status})`), { status: response.status, body: result });
+      return result;
     });
-    const body = await readJsonResponse(response);
     res.setHeader("Cache-Control", "s-maxage=86400, stale-while-revalidate=604800");
-    return res.status(response.status).json(body);
+    return res.status(200).json(body);
   } catch (error) {
+    if (error?.body) return res.status(error.status).json(error.body);
     return res.status(500).json({
       error: "Failed to load teams",
       details: error instanceof Error ? error.message : String(error),

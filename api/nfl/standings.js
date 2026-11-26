@@ -7,8 +7,16 @@ const BALLDONTLIE_BASE = "https://api.balldontlie.io/nfl/v1";
 
 import { withApprovedUser } from "../../api-lib/authorization.js";
 
+// Our BALLDONTLIE plan does not include standings: every request came back 401 and used part
+// of the shared 5-a-minute allowance. Until the plan includes them, answer the same way
+// without calling the provider.
+export const STANDINGS_IN_PLAN = false;
+
 export default withApprovedUser(handler);
 export async function handler(req, res) {
+  if (!STANDINGS_IN_PLAN) {
+    return res.status(401).json({ error: "Standings are not included in the current data plan" });
+  }
   const apiKey = process.env.BALLDONTLIE_API_KEY;
 
   if (!apiKey) {

@@ -47,6 +47,7 @@ let playerCacheUntil = 0;
 let playerCacheFetchedAt = null;
 
 import { withApprovedUser } from "../../api-lib/authorization.js";
+import { DAY, providerCache } from "../../api-lib/serverCache.js";
 
 export default withApprovedUser(handler);
 export async function handler(req, res) {
@@ -132,9 +133,20 @@ export async function handler(req, res) {
   }
 }
 
+// A week's cutoff (its first kickoff) does not change once known: one provider call per
+// week per server, shared by every matchup opened.
 async function fetchPersonnelCutoff(season, week) {
   const apiKey = process.env.BALLDONTLIE_API_KEY;
   if (!apiKey) return null;
+  // Only a found cutoff is kept; a missing one is asked for again next time.
+  return providerCache(`personnel-cutoff:${season}:${week}`, DAY, async () => {
+    const cutoff = await fetchPersonnelCutoffFromProvider(apiKey, season, week);
+    if (!cutoff) throw Object.assign(new Error("No cutoff yet"), { noCutoff: true });
+    return cutoff;
+  }).catch((error) => { if (error?.noCutoff) return null; throw error; });
+}
+
+async function fetchPersonnelCutoffFromProvider(apiKey, season, week) {
   const url = new URL("https://api.balldontlie.io/nfl/v1/games");
   url.searchParams.set("seasons[]", String(season));
   url.searchParams.set("weeks[]", String(week));

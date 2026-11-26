@@ -1,6 +1,7 @@
 const API_BASE = "https://api.balldontlie.io/nfl/v1";
 
 import { withApprovedUser } from "../../api-lib/authorization.js";
+import { DAY, MINUTE, providerCache } from "../../api-lib/serverCache.js";
 
 export default withApprovedUser(handler);
 export async function handler(req, res) {
@@ -19,16 +20,18 @@ export async function handler(req, res) {
   }
 
   try {
-    const response = await fetch(`${API_BASE}/games/${gameId}`, {
-      headers: { Authorization: apiKey, Accept: "application/json" },
-    });
-    const body = await readJsonResponse(response);
-
-    if (!response.ok) {
-      return res.status(response.status).json({
-        error: body.error || `BALLDONTLIE returned HTTP ${response.status}`,
+    // Live scores need to stay fresh, so a game is shared for a minute; a finished one for a day.
+    const result = await providerCache(`game:${gameId}`,
+      (answer) => (/final/i.test(String(answer.body?.data?.status || "")) ? DAY : MINUTE),
+      async () => {
+        const response = await fetch(`${API_BASE}/games/${gameId}`, {
+          headers: { Authorization: apiKey, Accept: "application/json" },
+        });
+        const answer = { status: response.status, body: await readJsonResponse(response) };
+        if (!response.ok) throw Object.assign(new Error("upstream"), { upstream: answer });
+        return answer;
       });
-    }
+    const body = result.body;
     if (!body.data) {
       return res.status(404).json({ error: "Game data was not returned" });
     }
@@ -38,6 +41,11 @@ export async function handler(req, res) {
       refreshedAt: new Date().toISOString(),
     });
   } catch (error) {
+    if (error?.upstream) {
+      return res.status(error.upstream.status).json({
+        error: error.upstream.body?.error || `BALLDONTLIE returned HTTP ${error.upstream.status}`,
+      });
+    }
     return res.status(500).json({
       error: "Failed to retrieve live game information",
       details: error instanceof Error ? error.message : String(error),

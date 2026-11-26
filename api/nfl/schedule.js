@@ -1,4 +1,5 @@
 import { createWeeklyMultiCurrentHandler } from "../../api-lib/weeklyMulti.js";
+import { MINUTE, providerCache } from "../../api-lib/serverCache.js";
 import { withApprovedUser } from "../../api-lib/authorization.js";
 import { isFinalGame } from "../../src/services/gameResults.js";
 
@@ -431,7 +432,15 @@ function scoreOrNull(value) {
 }
 
 
-async function fetchWeekGames(
+// The schedule users browse: one provider call per week a minute, shared by every user.
+// Failures are not kept. Fresh results (noStore) are only requested by the server's grader,
+// which must see final scores as soon as they land, so they always go to the provider.
+function fetchWeekGames(apiKey, season, week, noStore = false) {
+  if (noStore) return fetchWeekGamesFromProvider(apiKey, season, week, true);
+  return providerCache(`week-games:${season}:${week}`, MINUTE, () => fetchWeekGamesFromProvider(apiKey, season, week, false));
+}
+
+async function fetchWeekGamesFromProvider(
   apiKey,
   season,
   week,
