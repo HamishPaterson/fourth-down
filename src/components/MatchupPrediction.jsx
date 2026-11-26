@@ -3,7 +3,7 @@ import { apiFetch as fetch } from "../services/supabaseAuth.js";
 import { predictMatchup } from "../services/predictionEngine.js";
 import { findOddsForGame, getCoreMarket, getNflOdds } from "../services/oddsApi.js";
 import { applyPredictionSnapshot } from "../services/predictionSnapshot.js";
-import { getStandings, getQbRosterHealth, getTeamForm, getOpponentNetwork, getPlayByPlayMetrics } from "../services/nflApi.js";
+import { getQbRosterHealth, getTeamForm, getOpponentNetwork, getPlayByPlayMetrics } from "../services/nflApi.js";
 import { buildSpecialTeamsModel } from "../services/specialTeams.js";
 import {
   savePredictionSnapshot,
@@ -240,7 +240,6 @@ export default function MatchupPrediction({ awayCode, homeCode, kickoff, venue, 
   const [savedOddsEvent, setSavedOddsEvent] = useState(() => readMarketSnapshot(marketSnapshotKey));
   const [loadedOddsEvent, setLoadedOddsEvent] = useState(null);
   const marketEvent = oddsEvent || loadedOddsEvent || savedOddsEvent;
-  const [standingsByCode, setStandingsByCode] = useState({});
   const [loadedPersonnel, setPersonnel] = useState(null);
   const personnel = loadedPersonnel?.week === Number(week) ? loadedPersonnel : null;
   const [teamForm, setTeamForm] = useState(null);
@@ -427,27 +426,10 @@ export default function MatchupPrediction({ awayCode, homeCode, kickoff, venue, 
     return () => controller.abort();
   }, [awayCode, homeCode]);
 
-  useEffect(() => {
-    const controller = new AbortController();
-    getStandings(controller.signal)
-      .then((rows) => {
-        const map = {};
-        for (const row of rows) {
-          const code = normalizeCode(row?.abbreviation);
-          if (code) map[code] = row;
-        }
-        setStandingsByCode(map);
-      })
-      .catch(() => setStandingsByCode({}));
-    return () => controller.abort();
-  }, []);
-
   if (!awayCode || !homeCode) {
     return <div className="team-statistics-empty matchup-split-panel">Projection will appear once both teams are set.</div>;
   }
 
-  const homeStanding = standingsByCode[normalizeCode(homeCode)];
-  const awayStanding = standingsByCode[normalizeCode(awayCode)];
   const personnelViews = officialSnapshot?.personnelViews || {
     away: personnel?.away?.personnelView,
     home: personnel?.home?.personnelView,
@@ -490,8 +472,8 @@ export default function MatchupPrediction({ awayCode, homeCode, kickoff, venue, 
     weather,
     market: marketEvent,
     week,
-    homeSplit: homeStanding ? { home: homeStanding.home, road: homeStanding.road } : undefined,
-    awaySplit: awayStanding ? { home: awayStanding.home, road: awayStanding.road } : undefined,
+    // Home/road records are left out, as on the server, so this fallback agrees with saved
+    // predictions; using them would change home-field advantage and needs testing first.
     scheduleContext,
     modelLayers: {
       ...(teamForm?.modelLayers || {}),

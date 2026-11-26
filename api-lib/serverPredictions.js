@@ -93,8 +93,8 @@ export function createServerPredictionInputLoader({ weeklyNetwork, sourceGames, 
   return ({ away, home, season, week }) => {
     const query = { away, home, season, week };
     return {
-      // Standings are not in our BALLDONTLIE plan (HTTP 401); home field uses its prior and the
-      // 2026 external venue factors instead. Skipping saves a rejected call per refresh.
+      // Standings (home/road records) do not feed predictions: home field uses its prior and the
+      // 2026 external venue factors. Turning them on changes predictions and needs testing first.
       standings: STANDINGS_AVAILABLE ? once(`standings:${season}`, () => invoke(standings, { season }).then((body) => body.data)) : Promise.resolve(null),
       personnel: invoke(personnel, query, weeklyCutoff ? { predictionCutoff: weeklyCutoff } : {}),
       kicker: invoke(kicker, { ...query, season: season - 1 }),

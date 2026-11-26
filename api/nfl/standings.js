@@ -1,54 +1,34 @@
 // api/nfl/standings.js
-// Vercel serverless function — proxies NFL standings from BallDontLie.
-// Normalizes to a clean shape (incl. home/road splits) so the frontend
-// never has to guess field names.
-
-const BALLDONTLIE_BASE = "https://api.balldontlie.io/nfl/v1";
+// NFL standings from ESPN's public standings feed (division level), which applies the official
+// tiebreakers to division order and playoff seeds. Our BALLDONTLIE plan does not include
+// standings. Returns the shape the pages already use, kept on the server for 10 minutes.
 
 import { withApprovedUser } from "../../api-lib/authorization.js";
+import { MINUTE, providerCache } from "../../api-lib/serverCache.js";
 
-// Our BALLDONTLIE plan does not include standings: every request came back 401 and used part
-// of the shared 5-a-minute allowance. Until the plan includes them, answer the same way
-// without calling the provider.
-export const STANDINGS_IN_PLAN = false;
+const ESPN_STANDINGS = "https://site.api.espn.com/apis/v2/sports/football/nfl/standings";
+const CACHE_MS = 10 * MINUTE;
+const TEAM_ALIASES = { WAS: "WSH", LA: "LAR", JAC: "JAX", OAK: "LV", SD: "LAC", STL: "LAR" };
+const DIVISION_NAMES = { EAST: "East", NORTH: "North", SOUTH: "South", WEST: "West" };
 
 export default withApprovedUser(handler);
-export async function handler(req, res) {
-  if (!STANDINGS_IN_PLAN) {
-    return res.status(401).json({ error: "Standings are not included in the current data plan" });
-  }
-  const apiKey = process.env.BALLDONTLIE_API_KEY;
-
-  if (!apiKey) {
-    return res
-      .status(500)
-      .json({ error: "Missing BALLDONTLIE_API_KEY environment variable" });
-  }
-
-  const season = String(req.query.season || defaultSeason());
-
+export async function handler(req, res, { fetchImpl = globalThis.fetch } = {}) {
+  if (req.method && req.method !== "GET") return res.status(405).json({ error: "Method not allowed" });
+  const season = String(req.query?.season || defaultSeason());
+  if (!/^\d{4}$/.test(season)) return res.status(400).json({ error: "A valid season is required" });
   try {
-    const response = await fetch(
-      `${BALLDONTLIE_BASE}/standings?season=${encodeURIComponent(season)}`,
-      { headers: { Authorization: apiKey } }
-    );
-
-    const body = await response.json();
-
-    if (!response.ok) {
-      return res.status(response.status).json({
-        error: body.error || `Standings request failed (${response.status})`,
+    const data = await providerCache(`standings:${season}`, CACHE_MS, async () => {
+      const response = await fetchImpl(`${ESPN_STANDINGS}?season=${season}&level=3`, {
+        headers: { Accept: "application/json" }, signal: AbortSignal.timeout(15000),
       });
-    }
-
-    const rows = Array.isArray(body.data) ? body.data : [];
-    const data = rows.map(normalize).filter((row) => row.abbreviation);
-
-    return res.status(200).json({ data, season, count: data.length });
+      if (!response.ok) throw Object.assign(new Error(`Standings request failed (${response.status})`), { status: response.status });
+      const rows = parseEspnStandings(await response.json());
+      if (rows.length !== 32) throw Object.assign(new Error(`Standings returned ${rows.length} teams`), { status: 502 });
+      return rows;
+    });
+    return res.status(200).json({ data, season, count: data.length, source: "ESPN" });
   } catch (error) {
-    return res
-      .status(500)
-      .json({ error: error?.message || "Standings request failed" });
+    return res.status(error?.status >= 400 ? error.status : 500).json({ error: error?.message || "Standings request failed" });
   }
 }
 
@@ -56,110 +36,63 @@ export async function handler(req, res) {
 // otherwise the previous year (Jan/Feb belong to the prior season).
 function defaultSeason() {
   const now = new Date();
-  const year = now.getFullYear();
-  return now.getMonth() >= 2 ? year : year - 1;
+  return now.getMonth() >= 2 ? now.getFullYear() : now.getFullYear() - 1;
 }
 
-// Defensively pull values from whatever field names BallDontLie returns.
-function normalize(entry) {
-  const team = entry?.team || entry || {};
+// ESPN nests conferences (AFC, NFC) over divisions, each division's entries in standings order.
+export function parseEspnStandings(json) {
+  const rows = [];
+  for (const conference of json?.children || []) {
+    const conferenceName = String(conference.abbreviation || conference.name || "").toUpperCase();
+    for (const division of conference.children || []) {
+      const divisionKey = String(division.abbreviation || division.name || "").toUpperCase().split(" ").pop();
+      const divisionName = DIVISION_NAMES[divisionKey] || division.name || null;
+      (division.standings?.entries || []).forEach((entry, index) => {
+        rows.push(normalize(entry, { conference: conferenceName, division: divisionName, divisionRank: index + 1 }));
+      });
+    }
+  }
+  return rows.filter((row) => row.abbreviation);
+}
 
-  const abbreviation = String(team.abbreviation || entry.abbreviation || "")
-    .trim()
-    .toUpperCase();
-
-  const wins = firstNumber(entry.wins, entry.win, entry.record?.wins);
-  const losses = firstNumber(entry.losses, entry.loss, entry.record?.losses);
-  const ties = firstNumber(entry.ties, entry.tie, entry.record?.ties) ?? 0;
-
-  const divisionRank = firstNumber(
-    entry.division_rank,
-    entry.divisionRank,
-    entry.rank
-  );
-  const conferenceRank = firstNumber(
-    entry.conference_rank,
-    entry.conferenceRank
-  );
-  const playoffSeed = firstNumber(entry.playoff_seed, entry.playoffSeed);
-  const pointsFor = firstNumber(entry.points_for, entry.pointsFor);
-  const pointsAgainst = firstNumber(entry.points_against, entry.pointsAgainst);
-
-  // Home / road splits — try several common shapes.
-  const homeWins = firstNumber(
-    entry.home_wins,
-    entry.homeWins,
-    entry.home_record?.wins,
-    entry.home?.wins,
-    parseRecord(entry.home_record).wins,
-    parseRecord(entry.home).wins
-  );
-  const homeLosses = firstNumber(
-    entry.home_losses,
-    entry.homeLosses,
-    entry.home_record?.losses,
-    entry.home?.losses,
-    parseRecord(entry.home_record).losses,
-    parseRecord(entry.home).losses
-  );
-  const roadWins = firstNumber(
-    entry.road_wins,
-    entry.roadWins,
-    entry.away_wins,
-    entry.awayWins,
-    entry.road_record?.wins,
-    entry.away_record?.wins,
-    parseRecord(entry.road_record).wins,
-    parseRecord(entry.away_record).wins
-  );
-  const roadLosses = firstNumber(
-    entry.road_losses,
-    entry.roadLosses,
-    entry.away_losses,
-    entry.awayLosses,
-    entry.road_record?.losses,
-    entry.away_record?.losses,
-    parseRecord(entry.road_record).losses,
-    parseRecord(entry.away_record).losses
-  );
-
-  const played = (wins ?? 0) + (losses ?? 0) + (ties ?? 0);
-  const winPct =
-    played > 0 ? ((wins ?? 0) + (ties ?? 0) * 0.5) / played : null;
-
+function normalize(entry, { conference, division, divisionRank }) {
+  const stats = Object.fromEntries((entry?.stats || []).map((stat) => [stat.name, stat]));
+  const value = (name) => {
+    const number = Number(stats[name]?.value);
+    return Number.isFinite(number) ? number : null;
+  };
+  const record = (name) => parseRecord(stats[name]?.displayValue ?? stats[name]?.summary);
+  const code = String(entry?.team?.abbreviation || "").trim().toUpperCase();
+  const wins = value("wins") ?? 0, losses = value("losses") ?? 0, ties = value("ties") ?? 0;
+  const played = wins + losses + ties;
+  const seed = value("playoffSeed");
   return {
-    abbreviation,
-    conference: team.conference || entry.conference || null,
-    division: team.division || entry.division || null,
-    wins: wins ?? 0,
-    losses: losses ?? 0,
-    ties: ties ?? 0,
-    winPct,
-    divisionRank: divisionRank ?? null,
-    conferenceRank: conferenceRank ?? null,
-    playoffSeed: playoffSeed ?? null,
-    pointsFor: pointsFor ?? null,
-    pointsAgainst: pointsAgainst ?? null,
-    home: { wins: homeWins ?? 0, losses: homeLosses ?? 0 },
-    road: { wins: roadWins ?? 0, losses: roadLosses ?? 0 },
+    abbreviation: TEAM_ALIASES[code] || code,
+    name: entry?.team?.displayName || null,
+    conference,
+    division,
+    wins,
+    losses,
+    ties,
+    winPct: played > 0 ? (wins + ties * 0.5) / played : null,
+    divisionRank,
+    // ESPN seeds every team 1-16 within its conference: the conference order.
+    conferenceRank: seed,
+    playoffSeed: seed != null && seed <= 7 ? seed : null,
+    pointsFor: value("pointsFor"),
+    pointsAgainst: value("pointsAgainst"),
+    pointDifferential: value("pointDifferential") ?? value("differential"),
+    streak: stats.streak?.displayValue ?? null,
+    divisionRecord: stats.divisionRecord?.displayValue ?? stats["vs. Div."]?.displayValue ?? null,
+    conferenceRecord: stats["vs. Conf."]?.displayValue ?? null,
+    home: record("Home"),
+    road: record("Road"),
   };
 }
 
-// Parse a "W-L" or "W-L-T" string into {wins, losses} if present.
-function parseRecord(value) {
-  if (typeof value !== "string") return {};
-  const parts = value.split("-").map((p) => Number(p.trim()));
-  if (parts.length >= 2 && parts.every((n) => Number.isFinite(n))) {
-    return { wins: parts[0], losses: parts[1] };
-  }
-  return {};
-}
-
-function firstNumber(...values) {
-  for (const value of values) {
-    if (value === null || value === undefined || value === "") continue;
-    const number = Number(value);
-    if (Number.isFinite(number)) return number;
-  }
-  return null;
+// "W-L" or "W-L-T" into { wins, losses, ties }.
+function parseRecord(text) {
+  const parts = String(text || "").split("-").map((part) => Number(part.trim()));
+  if (parts.length < 2 || !parts.every(Number.isFinite)) return { wins: 0, losses: 0, ties: 0 };
+  return { wins: parts[0], losses: parts[1], ties: parts[2] || 0 };
 }

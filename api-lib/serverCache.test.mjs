@@ -66,12 +66,50 @@ test("a live game is shared for a minute; a finished game is not asked for again
   assert.equal(fake.calls.length, 1);
 });
 
-test("standings are not requested from a plan that does not include them", async () => {
-  const fake = provider(() => ok({ data: [] }));
-  const res = response();
-  try { await standings({ method: "GET", query: {} }, res); } finally { fake.restore(); }
-  assert.equal(fake.calls.length, 0);
-  assert.equal(res.code, 401);
+// ESPN's division-level standings: two conferences, four divisions each, entries in order.
+function espnStandings({ teams = 32 } = {}) {
+  const codes = ["BUF", "NE", "NYJ", "MIA", "CIN", "CLE", "PIT", "BAL", "JAX", "HOU", "IND", "TEN", "DEN", "KC", "LV", "LAC",
+    "NYG", "DAL", "WSH", "PHI", "DET", "CHI", "MIN", "GB", "CAR", "TB", "ATL", "NO", "SF", "LAR", "SEA", "ARI"].slice(0, teams);
+  const stat = (name, value, displayValue = String(value)) => ({ name, value, displayValue });
+  const entry = (code, i) => ({ team: { abbreviation: code === "LAR" ? "LA" : code, displayName: code },
+    stats: [stat("wins", 9 - (i % 4)), stat("losses", 1 + (i % 4)), stat("ties", 0), stat("playoffSeed", (i % 16) + 1),
+      stat("pointsFor", 300), stat("pointsAgainst", 200), stat("pointDifferential", 100), stat("streak", 0, "W3"),
+      stat("Home", 0, "4-1"), stat("Road", 0, "5-0-1"), stat("vs. Div.", 0, "2-1"), stat("vs. Conf.", 0, "6-1")] });
+  const division = (conf, name, start) => ({ abbreviation: `${conf} ${name}`, standings: { entries: codes.slice(start, start + 4).map((c, j) => entry(c, start + j)) } });
+  return { children: ["AFC", "NFC"].map((conf, c) => ({ abbreviation: conf,
+    children: ["EAST", "NORTH", "SOUTH", "WEST"].map((d, i) => division(conf, d, c * 16 + i * 4)) })) };
+}
+
+test("standings come from ESPN in the shape the pages use, shared for ten minutes", async () => {
+  providerCache.clear();
+  const fake = provider(() => ok(espnStandings()));
+  const runs = [];
+  try {
+    for (let user = 0; user < 4; user++) { const res = response(); await standings({ method: "GET", query: { season: "2026" } }, res); runs.push(res); }
+  } finally { fake.restore(); }
+  assert.equal(fake.calls.length, 1);
+  assert.match(fake.calls[0], /site.api.espn.com.*season=2026.*level=3/);
+  const { code, body } = runs[0];
+  assert.equal(code, 200);
+  assert.equal(body.count, 32);
+  const buf = body.data.find((row) => row.abbreviation === "BUF");
+  assert.deepEqual({ conference: buf.conference, division: buf.division, divisionRank: buf.divisionRank, conferenceRank: buf.conferenceRank,
+    playoffSeed: buf.playoffSeed, wins: buf.wins, losses: buf.losses, home: buf.home, road: buf.road, streak: buf.streak },
+    { conference: "AFC", division: "East", divisionRank: 1, conferenceRank: 1, playoffSeed: 1, wins: 9, losses: 1,
+      home: { wins: 4, losses: 1, ties: 0 }, road: { wins: 5, losses: 0, ties: 1 }, streak: "W3" });
+  assert.equal(body.data.find((row) => row.abbreviation === "MIA").divisionRank, 4);
+  assert.ok(body.data.some((row) => row.abbreviation === "LAR"), "ESPN's LA becomes LAR");
+  assert.equal(body.data.find((row) => row.conferenceRank === 8).playoffSeed, null, "only seeds 1-7 make the playoffs");
+});
+
+test("an incomplete or failed standings answer is reported and not kept", async () => {
+  providerCache.clear();
+  const fake = provider((url, n) => (n === 1 ? ok(espnStandings({ teams: 20 })) : n === 2 ? new Response("down", { status: 503 }) : ok(espnStandings())));
+  const codes = [];
+  try {
+    for (let i = 0; i < 3; i++) { const res = response(); await standings({ method: "GET", query: { season: "2026" } }, res); codes.push(res.code); }
+  } finally { fake.restore(); }
+  assert.deepEqual(codes, [502, 503, 200]);
 });
 
 import scheduleRoute from "../api/nfl/schedule.js";
