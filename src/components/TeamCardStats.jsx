@@ -1,16 +1,20 @@
-// The stats on a team card: division, record, and ESPN's FPI with its offence and defence parts,
-// each in its own labelled box so they read at a glance.
-function signed(value) {
-  const number = Number(value);
-  if (value === null || value === undefined || !Number.isFinite(number)) return "—";
-  return `${number > 0 ? "+" : number < 0 ? "−" : ""}${Math.abs(number).toFixed(1)}`;
+import { getTeamRanks, rankBand } from "../services/teamRatings.js";
+
+// The stats on a team card: division and record, then where the team ranks in the league
+// overall, on offence and on defence (from ESPN's power ratings), with a plain-language label.
+function ordinal(rank) {
+  if (!Number.isFinite(rank)) return "—";
+  const tens = rank % 100, ones = rank % 10;
+  const suffix = tens >= 11 && tens <= 13 ? "th" : ones === 1 ? "st" : ones === 2 ? "nd" : ones === 3 ? "rd" : "th";
+  return `${rank}${suffix}`;
 }
 
-export default function TeamCardStats({ division, record, ratings }) {
+export default function TeamCardStats({ division, record, team }) {
+  const ranks = getTeamRanks(team);
   const stats = [
-    ["FPI", ratings?.overall, "ESPN Football Power Index: points better than an average team"],
-    ["OFF", ratings?.offense, "Offence's share of FPI"],
-    ["DEF", ratings?.defense, "Defence's share of FPI"],
+    ["Overall", ranks.overall, "How strong the team is overall, ranked against all 32 teams (ESPN power rating)"],
+    ["Offence", ranks.offense, "How good the offence is, ranked against all 32 teams"],
+    ["Defence", ranks.defense, "How good the defence is, ranked against all 32 teams"],
   ];
   return (
     <span className="team-card-stats">
@@ -19,10 +23,12 @@ export default function TeamCardStats({ division, record, ratings }) {
         {record && <span className="team-card-record">{record}</span>}
       </span>
       <span className="team-card-ratings">
-        {stats.map(([label, value, title]) => (
-          <span key={label} className="team-card-rating" title={title}>
+        {stats.map(([label, rank, title]) => (
+          <span key={label} className="team-card-rating" title={title}
+            aria-label={`${label}: ${ordinal(rank)} of ${ranks.total}${rankBand(rank) ? `, ${rankBand(rank)}` : ""}`}>
             <span className="team-card-rating-label">{label}</span>
-            <span className="team-card-rating-value">{signed(value)}</span>
+            <span className="team-card-rating-value">{ordinal(rank)}</span>
+            <span className="team-card-rating-band">{rankBand(rank) || "No rating"}</span>
           </span>
         ))}
       </span>

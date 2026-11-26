@@ -2,7 +2,6 @@ import { useEffect, useState } from "react";
 import { ArrowRight, ChevronRight, Layers } from "lucide-react";
 import { getTeams } from "../services/nflApi.js";
 import { getTeamTheme } from "../services/teamThemes.js";
-import { getTeamRatings } from "../services/teamRatings.js";
 import TeamLogo from "../components/TeamLogo.jsx";
 import TeamCardStats from "../components/TeamCardStats.jsx";
 import FourthDownLoader from "../components/FourthDownLoader.jsx";
@@ -121,7 +120,6 @@ export default function Teams({ onOpenTeam, onOpenConference }) {
 
       <div className="team-grid">
         {teams.map((team) => {
-          const ratings = getTeamRatings(team);
           return (
             <button
               type="button"
@@ -136,7 +134,7 @@ export default function Teams({ onOpenTeam, onOpenConference }) {
               <span className="team-card-copy">
                 <strong>{team.full_name}</strong>
               </span>
-              <TeamCardStats division={[team.conference, team.division].filter(Boolean).join(" ")} ratings={ratings} />
+              <TeamCardStats division={[team.conference, team.division].filter(Boolean).join(" ")} team={team.abbreviation} />
               <ArrowRight className="team-card-arrow" size={18} />
             </button>
           );

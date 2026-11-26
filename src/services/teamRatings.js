@@ -35,6 +35,37 @@ export function getTeamRatings(team, { snapshot = ESPN_FPI_RATINGS } = {}) {
 }
 
 
+// League rank (1 = best of 32) for overall strength, offence and defence, from ESPN's FPI
+// ratings. In FPI a higher number is better for all three, defence included.
+const rankCache = new WeakMap();
+export function getTeamRanks(team, { snapshot = ESPN_FPI_RATINGS } = {}) {
+  if (!rankCache.has(snapshot)) {
+    const teams = Object.entries(snapshot.teams || {});
+    const ranks = {};
+    for (const part of ["overall", "offense", "defense"]) {
+      const values = teams.map(([code, stored]) => [code, Number(stored?.espnFpi?.[part])]).filter(([, v]) => Number.isFinite(v));
+      for (const [code, value] of values) {
+        (ranks[code] ||= {})[part] = 1 + values.filter(([, other]) => other > value).length; // ties share a rank
+      }
+    }
+    rankCache.set(snapshot, { ranks, total: teams.length });
+  }
+  const { ranks, total } = rankCache.get(snapshot);
+  const code = normalizeTeamCode(typeof team === "string" ? team : team?.abbreviation);
+  const found = ranks[code];
+  return { overall: found?.overall ?? null, offense: found?.offense ?? null, defense: found?.defense ?? null, total };
+}
+
+// Plain-language band for a league rank out of 32.
+export function rankBand(rank) {
+  if (!Number.isFinite(rank)) return null;
+  if (rank <= 5) return "Elite";
+  if (rank <= 12) return "Good";
+  if (rank <= 20) return "Average";
+  if (rank <= 27) return "Below average";
+  return "Poor";
+}
+
 // QBR follows the personnel-selected starting quarterback's identity, never
 // the team. Exact canonicalId/GSIS match first; a uniquely matched normalised
 // name is the only secondary identity. No roster or team fallback exists, so

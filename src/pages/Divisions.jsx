@@ -2,7 +2,6 @@ import { useEffect, useMemo, useState } from "react";
 import { ArrowRight } from "lucide-react";
 import { getTeams, getStandings } from "../services/nflApi.js";
 import { getTeamTheme } from "../services/teamThemes.js";
-import { getTeamRatings } from "../services/teamRatings.js";
 import TeamLogo from "../components/TeamLogo.jsx";
 import TeamCardStats from "../components/TeamCardStats.jsx";
 import FourthDownLoader from "../components/FourthDownLoader.jsx";
@@ -187,7 +186,6 @@ export default function Divisions({
             conference: division.conference,
             division: division.id,
           };
-          const ratings = getTeamRatings(liveTeam || code);
           const rank = standing ? index + 1 : null;
 
           return (
@@ -211,7 +209,7 @@ export default function Divisions({
               <span className="team-card-copy">
                 <strong>{team.full_name}</strong>
               </span>
-              <TeamCardStats division={division.id} record={formatRecord(standing)} ratings={ratings} />
+              <TeamCardStats division={division.id} record={formatRecord(standing)} team={code} />
 
               <ArrowRight className="team-card-arrow" size={18} />
             </button>

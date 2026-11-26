@@ -2341,3 +2341,4 @@ body {
 }
 .team-card-rating-label { color: rgba(255, 255, 255, .7); font-size: 10px; font-weight: 900; letter-spacing: .12em; }
 .team-card-rating-value { color: #ffffff; font-size: 18px; font-weight: 900; line-height: 1.1; font-variant-numeric: tabular-nums; }
+.team-card-rating-band { color: rgba(255, 255, 255, .72); font-size: 11px; font-weight: 700; }
