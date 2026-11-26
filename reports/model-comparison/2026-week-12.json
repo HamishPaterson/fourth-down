@@ -1,0 +1,570 @@
+{
+  "season": 2026,
+  "week": 12,
+  "purpose": "Side-by-side test of the real-data model (4678b1c) against the published Week 12 predictions. Not a live prediction.",
+  "newModelCommit": "4678b1c",
+  "generatedAt": "2026-11-26T01:15:10.285Z",
+  "note": "Generated after the weekly cutoff from the inputs available at generation time (rosters, injuries and odds as fetched then). GB@LAR had kicked off; the other 15 games had not.",
+  "games": [
+    {
+      "away": "GB",
+      "home": "LAR",
+      "kickoff": "2026-11-26T01:00:00.000Z",
+      "bookmaker": {
+        "homeMargin": 2.5,
+        "total": 44.5,
+        "spreadSource": "spread"
+      },
+      "published": {
+        "awayScore": 19,
+        "homeScore": 26,
+        "margin": 7.417,
+        "winner": "LAR",
+        "awayWinProbability": 0.256,
+        "homeWinProbability": 0.744
+      },
+      "newModel": {
+        "awayScore": 19,
+        "homeScore": 27,
+        "margin": 7.871,
+        "winner": "LAR",
+        "awayWinProbability": 0.243,
+        "homeWinProbability": 0.757
+      },
+      "newModelInputs": {
+        "base": "current-season team scoring",
+        "teamScoring": {
+          "away": 21.162,
+          "home": 23.701
+        },
+        "playerRatingsEdge": 0.229,
+        "playerRatingsCoverage": 1
+      }
+    },
+    {
+      "away": "CHI",
+      "home": "DET",
+      "kickoff": "2026-11-26T18:00:00.000Z",
+      "bookmaker": {
+        "homeMargin": -1.5,
+        "total": 55.5,
+        "spreadSource": "spread"
+      },
+      "published": {
+        "awayScore": 29,
+        "homeScore": 30,
+        "margin": 0.548,
+        "winner": "DET",
+        "awayWinProbability": 0.48,
+        "homeWinProbability": 0.52
+      },
+      "newModel": {
+        "awayScore": 24,
+        "homeScore": 28,
+        "margin": 3.749,
+        "winner": "DET",
+        "awayWinProbability": 0.367,
+        "homeWinProbability": 0.633
+      },
+      "newModelInputs": {
+        "base": "current-season team scoring",
+        "teamScoring": {
+          "away": 23.138,
+          "home": 23.944
+        },
+        "playerRatingsEdge": -0.019,
+        "playerRatingsCoverage": 1
+      }
+    },
+    {
+      "away": "PHI",
+      "home": "DAL",
+      "kickoff": "2026-11-26T21:30:00.000Z",
+      "bookmaker": {
+        "homeMargin": 8.5,
+        "total": 48,
+        "spreadSource": "spread"
+      },
+      "published": {
+        "awayScore": 17,
+        "homeScore": 34,
+        "margin": 17.549,
+        "winner": "DAL",
+        "awayWinProbability": 0.084,
+        "homeWinProbability": 0.916
+      },
+      "newModel": {
+        "awayScore": 17,
+        "homeScore": 32,
+        "margin": 14.605,
+        "winner": "DAL",
+        "awayWinProbability": 0.115,
+        "homeWinProbability": 0.885
+      },
+      "newModelInputs": {
+        "base": "current-season team scoring",
+        "teamScoring": {
+          "away": 22.115,
+          "home": 25.328
+        },
+        "playerRatingsEdge": 0.396,
+        "playerRatingsCoverage": 1
+      }
+    },
+    {
+      "away": "KC",
+      "home": "BUF",
+      "kickoff": "2026-11-27T01:20:00.000Z",
+      "bookmaker": {
+        "homeMargin": 2.75,
+        "total": 47,
+        "spreadSource": "spread"
+      },
+      "published": {
+        "awayScore": 24,
+        "homeScore": 29,
+        "margin": 4.698,
+        "winner": "BUF",
+        "awayWinProbability": 0.337,
+        "homeWinProbability": 0.663
+      },
+      "newModel": {
+        "awayScore": 26,
+        "homeScore": 28,
+        "margin": 2.04,
+        "winner": "BUF",
+        "awayWinProbability": 0.426,
+        "homeWinProbability": 0.574
+      },
+      "newModelInputs": {
+        "base": "current-season team scoring",
+        "teamScoring": {
+          "away": 24.324,
+          "home": 23.772
+        },
+        "playerRatingsEdge": -0.042,
+        "playerRatingsCoverage": 1
+      }
+    },
+    {
+      "away": "DEN",
+      "home": "PIT",
+      "kickoff": "2026-11-27T20:00:00.000Z",
+      "bookmaker": {
+        "homeMargin": -3.5,
+        "total": 36.5,
+        "spreadSource": "spread"
+      },
+      "published": {
+        "awayScore": 23,
+        "homeScore": 17,
+        "margin": -4.942,
+        "winner": "DEN",
+        "awayWinProbability": 0.671,
+        "homeWinProbability": 0.329
+      },
+      "newModel": {
+        "awayScore": 24,
+        "homeScore": 22,
+        "margin": -3.049,
+        "winner": "DEN",
+        "awayWinProbability": 0.609,
+        "homeWinProbability": 0.391
+      },
+      "newModelInputs": {
+        "base": "current-season team scoring",
+        "teamScoring": {
+          "away": 22.511,
+          "home": 21.991
+        },
+        "playerRatingsEdge": -0.095,
+        "playerRatingsCoverage": 1
+      }
+    },
+    {
+      "away": "ATL",
+      "home": "MIN",
+      "kickoff": "2026-11-29T18:00:00.000Z",
+      "bookmaker": {
+        "homeMargin": 7,
+        "total": 41.5,
+        "spreadSource": "spread"
+      },
+      "published": {
+        "awayScore": 13,
+        "homeScore": 23,
+        "margin": 14.87,
+        "winner": "MIN",
+        "awayWinProbability": 0.111,
+        "homeWinProbability": 0.889
+      },
+      "newModel": {
+        "awayScore": 15,
+        "homeScore": 21,
+        "margin": 11.024,
+        "winner": "MIN",
+        "awayWinProbability": 0.17,
+        "homeWinProbability": 0.83
+      },
+      "newModelInputs": {
+        "base": "current-season team scoring",
+        "teamScoring": {
+          "away": 20.146,
+          "home": 22.327
+        },
+        "playerRatingsEdge": 0.006,
+        "playerRatingsCoverage": 1
+      }
+    },
+    {
+      "away": "BAL",
+      "home": "HOU",
+      "kickoff": "2026-11-29T18:00:00.000Z",
+      "bookmaker": {
+        "homeMargin": 6.75,
+        "total": 47.5,
+        "spreadSource": "spread"
+      },
+      "published": {
+        "awayScore": 15,
+        "homeScore": 31,
+        "margin": 16.842,
+        "winner": "HOU",
+        "awayWinProbability": 0.088,
+        "homeWinProbability": 0.912
+      },
+      "newModel": {
+        "awayScore": 16,
+        "homeScore": 30,
+        "margin": 13.9,
+        "winner": "HOU",
+        "awayWinProbability": 0.122,
+        "homeWinProbability": 0.878
+      },
+      "newModelInputs": {
+        "base": "current-season team scoring",
+        "teamScoring": {
+          "away": 22.526,
+          "home": 25.293
+        },
+        "playerRatingsEdge": 0.12,
+        "playerRatingsCoverage": 1
+      }
+    },
+    {
+      "away": "NO",
+      "home": "CIN",
+      "kickoff": "2026-11-29T18:00:00.000Z",
+      "bookmaker": {
+        "homeMargin": 9.75,
+        "total": 50.5,
+        "spreadSource": "spread"
+      },
+      "published": {
+        "awayScore": 17,
+        "homeScore": 36,
+        "margin": 16.852,
+        "winner": "CIN",
+        "awayWinProbability": 0.087,
+        "homeWinProbability": 0.913
+      },
+      "newModel": {
+        "awayScore": 17,
+        "homeScore": 33,
+        "margin": 15.611,
+        "winner": "CIN",
+        "awayWinProbability": 0.099,
+        "homeWinProbability": 0.901
+      },
+      "newModelInputs": {
+        "base": "current-season team scoring",
+        "teamScoring": {
+          "away": 21.873,
+          "home": 25.718
+        },
+        "playerRatingsEdge": 0.286,
+        "playerRatingsCoverage": 1
+      }
+    },
+    {
+      "away": "NYG",
+      "home": "IND",
+      "kickoff": "2026-11-29T18:00:00.000Z",
+      "bookmaker": {
+        "homeMargin": -6.5,
+        "total": 42,
+        "spreadSource": "spread"
+      },
+      "published": {
+        "awayScore": 24,
+        "homeScore": 14,
+        "margin": -10.969,
+        "winner": "NYG",
+        "awayWinProbability": 0.827,
+        "homeWinProbability": 0.173
+      },
+      "newModel": {
+        "awayScore": 24,
+        "homeScore": 17,
+        "margin": -7.78,
+        "winner": "NYG",
+        "awayWinProbability": 0.755,
+        "homeWinProbability": 0.245
+      },
+      "newModelInputs": {
+        "base": "current-season team scoring",
+        "teamScoring": {
+          "away": 23.867,
+          "home": 21.316
+        },
+        "playerRatingsEdge": -0.111,
+        "playerRatingsCoverage": 1
+      }
+    },
+    {
+      "away": "NYJ",
+      "home": "MIA",
+      "kickoff": "2026-11-29T18:00:00.000Z",
+      "bookmaker": {
+        "homeMargin": -3.5,
+        "total": 40.5,
+        "spreadSource": "spread"
+      },
+      "published": {
+        "awayScore": 23,
+        "homeScore": 17,
+        "margin": -4.458,
+        "winner": "NYJ",
+        "awayWinProbability": 0.655,
+        "homeWinProbability": 0.345
+      },
+      "newModel": {
+        "awayScore": 23,
+        "homeScore": 20,
+        "margin": -3.472,
+        "winner": "NYJ",
+        "awayWinProbability": 0.623,
+        "homeWinProbability": 0.377
+      },
+      "newModelInputs": {
+        "base": "current-season team scoring",
+        "teamScoring": {
+          "away": 22.45,
+          "home": 20.938
+        },
+        "playerRatingsEdge": -0.27,
+        "playerRatingsCoverage": 0.96
+      }
+    },
+    {
+      "away": "TEN",
+      "home": "JAX",
+      "kickoff": "2026-11-29T18:00:00.000Z",
+      "bookmaker": {
+        "homeMargin": 14.5,
+        "total": 48.5,
+        "spreadSource": "spread"
+      },
+      "published": {
+        "awayScore": 12,
+        "homeScore": 38,
+        "margin": 21.97,
+        "winner": "JAX",
+        "awayWinProbability": 0.08,
+        "homeWinProbability": 0.92
+      },
+      "newModel": {
+        "awayScore": 13,
+        "homeScore": 34,
+        "margin": 19.673,
+        "winner": "JAX",
+        "awayWinProbability": 0.08,
+        "homeWinProbability": 0.92
+      },
+      "newModelInputs": {
+        "base": "current-season team scoring",
+        "teamScoring": {
+          "away": 20.573,
+          "home": 25.98
+        },
+        "playerRatingsEdge": 0.414,
+        "playerRatingsCoverage": 1
+      }
+    },
+    {
+      "away": "NE",
+      "home": "LAC",
+      "kickoff": "2026-11-29T21:05:00.000Z",
+      "bookmaker": {
+        "homeMargin": 1.5,
+        "total": 35.5,
+        "spreadSource": "spread"
+      },
+      "published": {
+        "awayScore": 17,
+        "homeScore": 16,
+        "margin": -1.622,
+        "winner": "NE",
+        "awayWinProbability": 0.558,
+        "homeWinProbability": 0.442
+      },
+      "newModel": {
+        "awayScore": 23,
+        "homeScore": 17,
+        "margin": -5.255,
+        "winner": "NE",
+        "awayWinProbability": 0.682,
+        "homeWinProbability": 0.318
+      },
+      "newModelInputs": {
+        "base": "current-season team scoring",
+        "teamScoring": {
+          "away": 23.245,
+          "home": 21.426
+        },
+        "playerRatingsEdge": -0.3,
+        "playerRatingsCoverage": 1
+      }
+    },
+    {
+      "away": "SEA",
+      "home": "SF",
+      "kickoff": "2026-11-29T21:25:00.000Z",
+      "bookmaker": {
+        "homeMargin": 3,
+        "total": 45.5,
+        "spreadSource": "spread"
+      },
+      "published": {
+        "awayScore": 19,
+        "homeScore": 30,
+        "margin": 11.453,
+        "winner": "SF",
+        "awayWinProbability": 0.164,
+        "homeWinProbability": 0.836
+      },
+      "newModel": {
+        "awayScore": 19,
+        "homeScore": 31,
+        "margin": 11.545,
+        "winner": "SF",
+        "awayWinProbability": 0.16,
+        "homeWinProbability": 0.84
+      },
+      "newModelInputs": {
+        "base": "current-season team scoring",
+        "teamScoring": {
+          "away": 21.831,
+          "home": 24.659
+        },
+        "playerRatingsEdge": 0.423,
+        "playerRatingsCoverage": 1
+      }
+    },
+    {
+      "away": "WSH",
+      "home": "ARI",
+      "kickoff": "2026-11-29T21:25:00.000Z",
+      "bookmaker": {
+        "homeMargin": -7,
+        "total": 41.5,
+        "spreadSource": "spread"
+      },
+      "published": {
+        "awayScore": 27,
+        "homeScore": 12,
+        "margin": -13.744,
+        "winner": "WSH",
+        "awayWinProbability": 0.872,
+        "homeWinProbability": 0.128
+      },
+      "newModel": {
+        "awayScore": 27,
+        "homeScore": 15,
+        "margin": -10.31,
+        "winner": "WSH",
+        "awayWinProbability": 0.815,
+        "homeWinProbability": 0.185
+      },
+      "newModelInputs": {
+        "base": "current-season team scoring",
+        "teamScoring": {
+          "away": 24.339,
+          "home": 21.432
+        },
+        "playerRatingsEdge": -0.17,
+        "playerRatingsCoverage": 1
+      }
+    },
+    {
+      "away": "LV",
+      "home": "CLE",
+      "kickoff": "2026-11-30T01:20:00.000Z",
+      "bookmaker": {
+        "homeMargin": 4.888,
+        "total": 40.5,
+        "spreadSource": "moneyline"
+      },
+      "published": {
+        "awayScore": 17,
+        "homeScore": 26,
+        "margin": 7.968,
+        "winner": "CLE",
+        "awayWinProbability": 0.243,
+        "homeWinProbability": 0.757
+      },
+      "newModel": {
+        "awayScore": 20,
+        "homeScore": 27,
+        "margin": 6.923,
+        "winner": "CLE",
+        "awayWinProbability": 0.27,
+        "homeWinProbability": 0.73
+      },
+      "newModelInputs": {
+        "base": "current-season team scoring",
+        "teamScoring": {
+          "away": 23.307,
+          "home": 23.393
+        },
+        "playerRatingsEdge": 0.035,
+        "playerRatingsCoverage": 1
+      }
+    },
+    {
+      "away": "CAR",
+      "home": "TB",
+      "kickoff": "2026-12-01T01:15:00.000Z",
+      "bookmaker": {
+        "homeMargin": 2.333,
+        "total": 43.5,
+        "spreadSource": "moneyline"
+      },
+      "published": {
+        "awayScore": 23,
+        "homeScore": 23,
+        "margin": 0.817,
+        "winner": "TB",
+        "awayWinProbability": 0.47,
+        "homeWinProbability": 0.53
+      },
+      "newModel": {
+        "awayScore": 22,
+        "homeScore": 22,
+        "margin": -0.098,
+        "winner": "CAR",
+        "awayWinProbability": 0.504,
+        "homeWinProbability": 0.496
+      },
+      "newModelInputs": {
+        "base": "current-season team scoring",
+        "teamScoring": {
+          "away": 23.679,
+          "home": 22.921
+        },
+        "playerRatingsEdge": 0.025,
+        "playerRatingsCoverage": 1
+      }
+    }
+  ]
+}
