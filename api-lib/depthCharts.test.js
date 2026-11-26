@@ -574,7 +574,10 @@ test("historical orchestration gates post-cutoff Sleeper/playerRatings but permi
     observedAt = "2026-09-17T12:00:00Z";
     injuryPoints = -2;
     const earlier = await run();
-    assert.equal(earlier.prediction.modelLayers.playerRatings.available, true);
+    // Player ratings come only from the file built for the prediction week, never from a
+    // roster feed, so a Week 2 prediction made now has none.
+    assert.equal(earlier.prediction.modelLayers.playerRatings.available, false);
+    assert.match(earlier.prediction.modelLayers.playerRatings.reasons[0], /Week 2 are not available/);
     assert.equal(earlier.prediction.modelLayers.quarterback.homePoints, -1);
     assert.equal(earlier.prediction.modelLayers.rosterHealth.homePoints, -1);
     assert.equal(earlier.dataQuality.personnelTiming.personnel, true);

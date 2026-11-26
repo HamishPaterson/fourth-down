@@ -401,8 +401,13 @@ export function computeMarketProjection(event, week = 1) {
 
   const spreads = [];
   const totals = [];
+  const moneylineSpreads = [];
   const homeName = normalizeMarketName(event.home_team);
   const homeNickname = marketNickname(homeName);
+  const isHome = (outcome) => {
+    const outcomeName = normalizeMarketName(outcome?.name);
+    return outcomeName === homeName || (homeNickname && marketNickname(outcomeName) === homeNickname);
+  };
 
   for (const bookmaker of event.bookmakers) {
     const markets = Array.isArray(bookmaker?.markets) ? bookmaker.markets : [];
@@ -421,14 +426,19 @@ export function computeMarketProjection(event, week = 1) {
     const total = nullableNum(totalOutcome?.point);
     if (spread != null) spreads.push(spread);
     if (total != null) totals.push(total);
+    const moneyline = moneylineHomeSpread(markets.find((market) => market.key === "h2h"), isHome);
+    if (moneyline != null) moneylineSpreads.push(moneyline);
   }
 
-  if (!spreads.length || !totals.length) return neutral;
-  const homeSpread = median(spreads);
+  // Spreads are often posted after moneylines and totals; until then the moneyline gives
+  // the bookmaker's margin (within 0.67 points on 68 games that had both).
+  const spreadFromMoneyline = !spreads.length && moneylineSpreads.length > 0;
+  if ((!spreads.length && !spreadFromMoneyline) || !totals.length) return neutral;
+  const homeSpread = spreadFromMoneyline ? median(moneylineSpreads) : median(spreads);
   const total = median(totals);
   if (total < 20 || total > 90 || Math.abs(homeSpread) > 30) return neutral;
 
-  const booksUsed = Math.min(spreads.length, totals.length);
+  const booksUsed = Math.min(spreadFromMoneyline ? moneylineSpreads.length : spreads.length, totals.length);
   const reliability = booksUsed >= 5
     ? 1
     : booksUsed >= 3
@@ -437,7 +447,7 @@ export function computeMarketProjection(event, week = 1) {
         ? 0.8
         : 0.65;
   const baseWeight = marketWeightForWeek(week);
-  const effectiveWeight = baseWeight * reliability;
+  const effectiveWeight = baseWeight * reliability * (spreadFromMoneyline ? MONEYLINE_SPREAD_RELIABILITY : 1);
 
   return {
     active: effectiveWeight > 0,
@@ -445,11 +455,34 @@ export function computeMarketProjection(event, week = 1) {
     effectiveWeight: round3(effectiveWeight),
     reliability: round3(reliability),
     booksUsed,
+    spreadSource: spreadFromMoneyline ? "moneyline" : "spread",
     homeSpread: round3(homeSpread),
     total: round3(total),
     awayExpected: round3((total + homeSpread) / 2),
     homeExpected: round3((total - homeSpread) / 2),
   };
+}
+
+// Bookmaker margin implied by a no-vig moneyline: spread = -scale * logit(home win chance).
+const MONEYLINE_SPREAD_SCALE = 6.9;
+const MONEYLINE_SPREAD_RELIABILITY = 0.9;
+function moneylineDecimal(price) {
+  const value = Number(price);
+  if (!Number.isFinite(value)) return null;
+  if (value > 1 && value < 100) return value;
+  if (value >= 100) return 1 + value / 100;
+  if (value <= -100) return 1 + 100 / -value;
+  return null;
+}
+function moneylineHomeSpread(market, isHome) {
+  const outcomes = Array.isArray(market?.outcomes) ? market.outcomes : [];
+  if (outcomes.length !== 2) return null;
+  const home = outcomes.find(isHome), away = outcomes.find((outcome) => outcome !== home);
+  const homeOdds = moneylineDecimal(home?.price), awayOdds = moneylineDecimal(away?.price);
+  if (!home || !away || !homeOdds || !awayOdds) return null;
+  const homeChance = (1 / homeOdds) / (1 / homeOdds + 1 / awayOdds);
+  if (!(homeChance > 0.01 && homeChance < 0.99)) return null;
+  return -MONEYLINE_SPREAD_SCALE * Math.log(homeChance / (1 - homeChance));
 }
 
 function buildTeamSpecificProjection(

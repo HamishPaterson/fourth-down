@@ -1,4 +1,6 @@
 import { handler as standings } from "../api/nfl/standings.js";
+
+export const STANDINGS_AVAILABLE = false;
 import { handler as personnel } from "../api/nfl/qb-roster-health.js";
 import { handler as kicker } from "../api/nfl/kicker-stats.js";
 import { handler as teamForm, databaseToSnapshot, writePredictionVersion } from "../api/nfl/game-stats.js";
@@ -91,7 +93,9 @@ export function createServerPredictionInputLoader({ weeklyNetwork, sourceGames, 
   return ({ away, home, season, week }) => {
     const query = { away, home, season, week };
     return {
-      standings: once(`standings:${season}`, () => invoke(standings, { season }).then((body) => body.data)),
+      // Standings are not in our BALLDONTLIE plan (HTTP 401); home field uses its prior and the
+      // 2026 external venue factors instead. Skipping saves a rejected call per refresh.
+      standings: STANDINGS_AVAILABLE ? once(`standings:${season}`, () => invoke(standings, { season }).then((body) => body.data)) : Promise.resolve(null),
       personnel: invoke(personnel, query, weeklyCutoff ? { predictionCutoff: weeklyCutoff } : {}),
       kicker: invoke(kicker, { ...query, season: season - 1 }),
       teamForm: invoke(teamForm, query, sourceGames ? { predictionSeasonGames: sourceGames } : {}),

@@ -10,6 +10,8 @@ import { personnelAvailableAt, validDepthLineup, validDepthRoster } from "../../
 import { PLAYER_PROPS_HELD } from "./playerPropPolicy.js";
 import { buildPersonnelView, PERSONNEL_VIEW_VERSION } from "../../api-lib/personnelView.js";
 import { buildSpecialTeamsModel } from "./specialTeams.js";
+import PLAYER_RATINGS from "../../data/player-ratings-2026.js";
+import { nameKey, teamUnitRatings } from "./fourthDownRatings.js";
 import { CURRENT_MODEL_VERSION as FULL_MODEL_VERSION, CURRENT_MODEL_KEY as FULL_MODEL_KEY } from "./modelIdentity.js";
 
 export { FULL_MODEL_VERSION, FULL_MODEL_KEY };
@@ -182,7 +184,7 @@ async function createPrediction({ game, oddsEvent, season, week, away, home, sig
   const modelLayers = {
     ...extractLayers(values.teamForm),
     ...extractLayers(values.playByPlay),
-    playerRatings: buildPlayerRatingsLayer(awayRoster, homeRoster),
+    playerRatings: buildPlayerRatingsLayer({ away, home, season, week, awayRoster, homeRoster }),
     opponentNetwork:
       values.opponentNetwork?.modelLayer ||
       values.opponentNetwork?.modelLayers?.opponentNetwork ||
@@ -495,20 +497,50 @@ function buildPersonnelLayer(away, home) {
   };
 }
 
-function buildPlayerRatingsLayer(awayRoster, homeRoster) {
-  const away = buildUnits(awayRoster);
-  const home = buildUnits(homeRoster);
+// Fourth Down's own player ratings (data/player-ratings-2026.js), rebuilt every week from
+// NFLverse play-by-play and snap counts. Starters come from recent snap share; anyone the
+// live roster lists as out is replaced by the next player in the unit.
+const UNAVAILABLE_STATUS = /^(out|doubtful|ir|injured reserve|pup|physically unable|suspended|nfi|non-football|inactive)/i;
 
-  if (away.coverage < 0.45 || home.coverage < 0.45) return neutralLayer();
+function unavailablePlayers(roster) {
+  const ids = new Set(), names = new Set();
+  for (const player of Object.values(roster?.groups || {}).flat()) {
+    if (!player || !(UNAVAILABLE_STATUS.test(String(player.injuryStatus || "").trim()) ||
+      UNAVAILABLE_STATUS.test(String(player.status || "").trim()))) continue;
+    if (player.gsisId) ids.add(String(player.gsisId));
+    const key = nameKey(player.fullName || [player.firstName, player.lastName].filter(Boolean).join(" "));
+    if (key) names.add(key);
+  }
+  return (rated) => (rated.gsisId && ids.has(String(rated.gsisId))) || names.has(nameKey(rated.name));
+}
 
-  const awayPass = away.passingOffense - home.passDefense;
-  const homePass = home.passingOffense - away.passDefense;
-  const awayRush = away.rushingOffense - home.runDefense;
-  const homeRush = home.rushingOffense - away.runDefense;
+function unitStrength(units) {
+  return {
+    passingOffense: units.qb * 0.35 + units.wr * 0.25 + units.te * 0.1 + units.ol * 0.3,
+    rushingOffense: units.rb * 0.35 + units.ol * 0.65,
+    passDefense: units.front * 0.4 + units.lb * 0.15 + units.db * 0.45,
+    runDefense: units.front * 0.6 + units.lb * 0.4,
+  };
+}
+
+export function buildPlayerRatingsLayer({ away, home, season, week, awayRoster, homeRoster, ratings = PLAYER_RATINGS }) {
+  if (ratings?.season !== Number(season) || ratings?.predictionWeek !== Number(week) ||
+      !ratings.teams?.[away] || !ratings.teams?.[home]) {
+    return { ...neutralLayer(), reasons: [`Fourth Down player ratings for Week ${week} are not available`] };
+  }
+  const awayRated = teamUnitRatings(ratings.teams[away], { unavailable: unavailablePlayers(awayRoster) });
+  const homeRated = teamUnitRatings(ratings.teams[home], { unavailable: unavailablePlayers(homeRoster) });
+  if (awayRated.coverage < 0.45 || homeRated.coverage < 0.45) return neutralLayer();
+  const awayUnits = unitStrength(awayRated.units), homeUnits = unitStrength(homeRated.units);
+
+  const awayPass = awayUnits.passingOffense - homeUnits.passDefense;
+  const homePass = homeUnits.passingOffense - awayUnits.passDefense;
+  const awayRush = awayUnits.rushingOffense - homeUnits.runDefense;
+  const homeRush = homeUnits.rushingOffense - awayUnits.runDefense;
   const awayRaw = clamp(awayPass * 0.04 + awayRush * 0.025, -2.5, 2.5);
   const homeRaw = clamp(homePass * 0.04 + homeRush * 0.025, -2.5, 2.5);
   const edge = clamp((homeRaw - awayRaw) / 2, -1.25, 1.25);
-  const confidence = Math.min(away.coverage, home.coverage);
+  const confidence = Math.min(awayRated.coverage, homeRated.coverage);
 
   return {
     active: Math.abs(edge) >= 0.01,
@@ -522,45 +554,9 @@ function buildPlayerRatingsLayer(awayRoster, homeRoster) {
     homeRushingMultiplier: clamp(1 + homeRush * 0.004, 0.88, 1.12),
     awayFieldGoalOpportunityMultiplier: 1,
     homeFieldGoalOpportunityMultiplier: 1,
-    reasons: [`Player-rating coverage ${Math.round(confidence * 100)}%`],
-  };
-}
-
-function buildUnits(roster) {
-  const players = Object.values(roster?.groups || {}).flat();
-  const rated = players.filter(
-    (player) => player?.active !== false && nullableFinite(player?.playerRating) !== null
-  );
-  const starters = rated.filter((player) => Number(player.depthChartOrder) === 1);
-  const pool = starters.length >= 12 ? starters : rated;
-
-  const unit = (positions, limit) => {
-    const matches = pool
-      .filter((player) => positions.includes(String(player.position || "").toUpperCase()))
-      .sort((a, b) => (a.depthChartOrder ?? 99) - (b.depthChartOrder ?? 99))
-      .slice(0, limit);
-    if (!matches.length) return null;
-    return matches.reduce((sum, player) => sum + Number(player.playerRating), 0) / matches.length;
-  };
-
-  const qb = unit(["QB"], 1);
-  const rb = unit(["RB", "HB", "FB"], 2);
-  const wr = unit(["WR"], 3);
-  const te = unit(["TE"], 2);
-  const ol = unit(["LT", "LG", "C", "RG", "RT", "G", "OG", "T", "OT", "OL"], 5);
-  const front = unit(["DE", "DT", "DL", "NT", "EDGE", "LEDG", "REDG", "OLB"], 5);
-  const lb = unit(["LB", "ILB", "MLB", "OLB"], 3);
-  const db = unit(["CB", "DB", "S", "FS", "SS"], 5);
-  if ([qb, rb, wr, te, ol, front, lb, db].some((rating) => rating === null)) {
-    return { coverage: 0 };
-  }
-
-  return {
-    passingOffense: qb * 0.35 + wr * 0.25 + te * 0.1 + ol * 0.3,
-    rushingOffense: rb * 0.35 + ol * 0.65,
-    passDefense: front * 0.4 + lb * 0.15 + db * 0.45,
-    runDefense: front * 0.6 + lb * 0.4,
-    coverage: players.length ? rated.length / players.length : 0,
+    units: { away: awayRated.units, home: homeRated.units },
+    source: { predictionWeek: ratings.predictionWeek, latestCompletedWeek: ratings.latestCompletedWeek, generatedAt: ratings.generatedAt },
+    reasons: [`Fourth Down player ratings through Week ${ratings.latestCompletedWeek}, ${Math.round(confidence * 100)}% of unit places rated`],
   };
 }
 

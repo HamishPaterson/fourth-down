@@ -769,7 +769,9 @@ test("actual server input loader reuses weekly network, season schedule and pers
       assert.equal(result.value.modelLayer.available, true);
       assert.equal(result.value.ratings, network.ratings);
     }
-    assert.equal(requests.filter((url) => url.includes("/standings")).length, 1);
+    // Standings and team-form stats are not in our BALLDONTLIE plan, so neither is requested.
+    assert.equal(requests.filter((url) => url.includes("/standings")).length, 0);
+    assert.deepEqual(requests.filter((url) => url.includes("api.balldontlie.io")), []);
   } finally { globalThis.fetch = original; }
 });
 

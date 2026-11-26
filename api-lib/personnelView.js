@@ -26,7 +26,9 @@ const aliases = {
 // roster listing without one is what confirms them.
 export const CONFIRMED_ACTIVE_MAX_AGE_MS = 24 * 3600000;
 const ROSTER_CLOCK_TOLERANCE_MS = 10 * 60000;
-const confirmedActivePositions = new Set(["QB", "RB", "FB", "WR", "TE"]);
+// Kickers too: without confirmation 31 of 32 kickers fell back to league-average accuracy.
+// Kickers still cannot become player bets (classifyPlayerAvailability rejects the role).
+const confirmedActivePositions = new Set(["QB", "RB", "FB", "WR", "TE", "K"]);
 const unavailable = new Set(["Doubtful", "Out", "Inactive", "IR", "PUP", "Suspended", "NFI"]);
 const nameKey = (value) => String(value || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "")
   .toLowerCase().replace(/\b(jr|sr|ii|iii|iv)\b\.?/g, "").replace(/[^a-z0-9]/g, "");

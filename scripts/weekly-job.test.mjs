@@ -73,10 +73,12 @@ test("season guard covers Week 2 to Week 18 only", () => {
 test("every input must be for the week being published", () => {
   const good = { week: 13, team: { teamMetricsAuditsByWeek: { 13: { referenceWeek: 12 } } },
     players: { latestCompletedWeek: 12, playerMetricsByWeek: { 13: {} } }, external: { maxCompletedWeek: 12 },
+    ratings: { predictionWeek: 13, latestCompletedWeek: 12 },
     espn: { predictionWeek: 13, fpiRows: Array(32), efficiencyRows: Array(32) } };
   assert.deepEqual(verifyWeeklyData(good), []);
-  assert.deepEqual(verifyWeeklyData({ ...good, week: 14 }), ["NFLverse team metrics", "NFLverse player metrics", "external factors", "ESPN"]);
+  assert.deepEqual(verifyWeeklyData({ ...good, week: 14 }), ["NFLverse team metrics", "NFLverse player metrics", "player ratings", "external factors", "ESPN"]);
   assert.deepEqual(verifyWeeklyData({ ...good, external: { maxCompletedWeek: 11 } }), ["external factors"]);
+  assert.deepEqual(verifyWeeklyData({ ...good, ratings: { predictionWeek: 12, latestCompletedWeek: 11 } }), ["player ratings"]);
 });
 
 // ESPN payloads rebuilt from the stored rows, so the parser must reproduce them exactly.

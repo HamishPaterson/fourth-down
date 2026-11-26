@@ -266,3 +266,12 @@ test("a padded live identity still matches, so the healthy backup replaces an Ou
   assert.equal(view.quarterback.resolved, true);
   assert.equal(view.availabilityPolicy, AVAILABILITY_POLICY_VERSION);
 });
+
+test("a healthy kicker is confirmed for the kicking model but never becomes a player bet", () => {
+  const kicker = healthyRecord({}, {}, { position: "K" });
+  assert.equal(kicker.status, "Active");
+  assert.equal(kicker.statusKnown, true);
+  assert.equal(kicker.availabilityState, "UNSUPPORTED_ROLE");
+  assert.equal(availableForPlayerBet(kicker, { observedAt: OBSERVED }), false);
+  assert.equal(healthyRecord({}, { injuryStatus: "Questionable" }, { position: "K" }).status, "Questionable");
+});

@@ -9,6 +9,13 @@ const STATS_URL =
 const GAMES_URL =
   "https://api.balldontlie.io/nfl/v1/games";
 
+// Our BALLDONTLIE plan does not include the box-score stats endpoint (HTTP 401). Until it
+// does, team form is built from real final scores in the season schedule, which the plan
+// does include: the scoring baseline (points scored and allowed, recency-weighted and
+// regressed) is the model's own starting point instead of the bookmaker's totals. The
+// box-score layers this route used to add are covered by the NFLverse play-by-play layers.
+export const TEAM_FORM_STATS_AVAILABLE = false;
+
 const LEAGUE_PRIOR = 22;
 const PRIOR_GAMES = 4;
 
@@ -103,7 +110,9 @@ export async function handler(req, res) {
       });
     }
 
-    if (week <= 1) {
+    // Without box-score stats only server predictions, which pass the schedule they already
+    // hold, build scoring form; a browser request would refetch the whole schedule.
+    if (week <= 1 || (!TEAM_FORM_STATS_AVAILABLE && !req.predictionSeasonGames)) {
       return sendNeutralResponse(
         res,
         season,
@@ -148,6 +157,24 @@ export async function handler(req, res) {
         away,
         home
       );
+    }
+
+    if (!TEAM_FORM_STATS_AVAILABLE) {
+      const leagueAverage = getDynamicLeagueAverage(completedGames);
+      return res.status(200).json({
+        season,
+        week,
+        leagueAverage,
+        away: { ...createNeutralForm(away), games: awayGames.length },
+        home: { ...createNeutralForm(home), games: homeGames.length },
+        modelLayers: {
+          ...createNeutralLayers(),
+          scoringBaseline: buildScoringBaseline(away, home, awayGames, homeGames, completedGames, leagueAverage),
+        },
+        sampleGames: awayGames.length + homeGames.length,
+        source: "final scores from the season schedule",
+        refreshedAt: new Date().toISOString(),
+      });
     }
 
     const recentGames =
