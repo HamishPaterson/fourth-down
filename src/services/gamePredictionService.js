@@ -12,6 +12,7 @@ import { AVAILABILITY_ABSENCE_PROBABILITY, buildPersonnelView, normalizeAvailabi
 import { buildSpecialTeamsModel } from "./specialTeams.js";
 import PLAYER_RATINGS from "../../data/player-ratings-2026.js";
 import { ABSENCE_COSTS, STARTER_SHARE, absenceCost, nameKey, teamUnitRatings } from "./fourthDownRatings.js";
+import { reportedDeparture } from "./rosterChanges.js";
 import { CURRENT_MODEL_VERSION as FULL_MODEL_VERSION, CURRENT_MODEL_KEY as FULL_MODEL_KEY } from "./modelIdentity.js";
 
 export { FULL_MODEL_VERSION, FULL_MODEL_KEY };
@@ -427,11 +428,17 @@ function seasonQuarterbackQuality(list) {
   return dropbacks ? measured.reduce((sum, player) => sum + player.quality * player.dropbacks, 0) / dropbacks : null;
 }
 
-export function quarterbackChange({ team, season, week, starter, ratings = PLAYER_RATINGS }) {
-  if (!starter || ratings?.season !== Number(season) || ratings?.predictionWeek !== Number(week)) return null;
+export function quarterbackChange({ team, season, week, starter: selected, ratings = PLAYER_RATINGS }) {
+  if (ratings?.season !== Number(season) || ratings?.predictionWeek !== Number(week)) return null;
   const list = ratings.teams?.[team]?.qb || [];
   const usual = list[0];
   if (!usual) return null;
+  // A starter who has left the team cannot start: the next quarterback still on it does.
+  const next = list.find((rated) => rated !== usual && !leftTeam(team, rated));
+  const starter = selected && !leftTeam(team, { ...selected, gsisId: selected.canonicalId })
+    ? selected
+    : leftTeam(team, usual) && next ? { name: next.name, canonicalId: next.gsisId } : null;
+  if (!starter) return null;
   const same = (rated) => (starter.canonicalId && rated.gsisId && String(starter.canonicalId) === String(rated.gsisId)) ||
     (nameKey(starter.name) && nameKey(starter.name) === nameKey(rated.name));
   if (same(usual)) return null;
@@ -539,7 +546,7 @@ function qbrPointAdjustment(qbr, week) {
 // Chance each player misses the game, from the live roster and the point-in-time personnel
 // view (the live roster is dropped once it is newer than the weekly cutoff). The higher of
 // the two counts.
-function absenceLookup(roster, personnelView) {
+function absenceLookup(roster, personnelView, team) {
   const byId = new Map(), byName = new Map();
   const note = (id, name, status, absence) => {
     if (!(absence > 0)) return;
@@ -559,7 +566,17 @@ function absenceLookup(roster, personnelView) {
     const absence = AVAILABILITY_ABSENCE_PROBABILITY[player.status];
     note(player.canonicalId || player.gsisId, player.name, player.status, absence);
   }
-  return (rated) => (rated.gsisId && byId.get(String(rated.gsisId))) || byName.get(nameKey(rated.name)) || null;
+  // A player who has left the team (released, cut, traded, retired) is out for good: the
+  // team's stats were built with him, so his loss is priced like any absence.
+  const gone = (rated) => leftTeam(team, rated);
+  return (rated) => (gone(rated) ? { status: "Left team", absence: 1 } : null) ||
+    (rated.gsisId && byId.get(String(rated.gsisId))) || byName.get(nameKey(rated.name)) || null;
+}
+
+// Left the team: flagged by the weekly ratings build from the official roster, or a move
+// reported before the feeds show it (data/roster-changes.js).
+function leftTeam(team, rated) {
+  return Boolean(rated?.departed || reportedDeparture(team, rated));
 }
 
 // Most a team's non-quarterback absences can cost together. Past games rarely had more than
@@ -591,8 +608,8 @@ export function buildInjuryLayer({ away, home, season, week, awayRoster, homeRos
       !ratings.teams?.[away] || !ratings.teams?.[home]) {
     return { ...neutralLayer(), reasons: [`Injury pricing needs Fourth Down player ratings for Week ${week}`] };
   }
-  const awayCost = teamInjuryCost(ratings.teams[away], absenceLookup(awayRoster, personnelViews?.away));
-  const homeCost = teamInjuryCost(ratings.teams[home], absenceLookup(homeRoster, personnelViews?.home));
+  const awayCost = teamInjuryCost(ratings.teams[away], absenceLookup(awayRoster, personnelViews?.away, away));
+  const homeCost = teamInjuryCost(ratings.teams[home], absenceLookup(homeRoster, personnelViews?.home, home));
   const describe = (code, cost) => cost.players.length
     ? `${code} missing ${cost.players.map((p) => `${p.name} (${p.unit}, ${p.status}, -${p.points})`).join(", ")}`
     : `${code}: no priced injuries`;

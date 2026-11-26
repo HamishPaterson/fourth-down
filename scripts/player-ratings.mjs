@@ -231,7 +231,8 @@ export function validateRatingsArtifact(artifact, { season, week }) {
   return problems;
 }
 
-export function buildRatingsArtifact({ plays, snapRows, players, eaRecords, season, week, now = new Date() }) {
+// departedFrom(team, player) is true when the official roster no longer lists him at the team.
+export function buildRatingsArtifact({ plays, snapRows, players, eaRecords, season, week, now = new Date(), departedFrom = () => false }) {
   const regular = plays.filter((play) => Number(play.season) === season && String(play.season_type) === "REG");
   const latestCompletedWeek = Math.max(0, ...regular.map((play) => n(play.week)).filter((value) => value !== null && value < week));
   const pfrToGsis = new Map(players.filter((row) => row.pfr_id && row.gsis_id).map((row) => [row.pfr_id, row.gsis_id]));
@@ -240,7 +241,8 @@ export function buildRatingsArtifact({ plays, snapRows, players, eaRecords, seas
   const teams = Object.fromEntries(Object.entries(built.teams).sort(([a], [b]) => a.localeCompare(b)).map(([code, units]) =>
     [code, Object.fromEntries(Object.entries(units).map(([unit, list]) => [unit, list.map((player) => ({
       gsisId: player.gsisId, name: player.name, rating: player.rating, share: player.recentShare, quality: player.quality,
-      ...(unit === "qb" ? { dropbacks: player.sample } : {}) }))]))]));
+      ...(unit === "qb" ? { dropbacks: player.sample } : {}),
+      ...(departedFrom(code, { gsisId: player.gsisId, pfrId: player.pfrId, name: player.name }) ? { departed: true } : {}) }))]))]));
   return { schemaVersion: 1, season, predictionWeek: week, latestCompletedWeek, generatedAt: now.toISOString(),
     source: "NFLverse play-by-play and snap counts; prior is last season's final EA rating", scale: built.scale, teams };
 }
@@ -260,7 +262,10 @@ if (process.argv[1] && import.meta.url === pathToFileURL(path.resolve(process.ar
   const [plays, snapRows, players] = await Promise.all([download(`${RELEASE}/pbp/play_by_play_${season}.csv.gz`),
     download(`${RELEASE}/snap_counts/snap_counts_${season}.csv`), download(`${RELEASE}/players/players.csv`)]);
   const eaRecords = JSON.parse(await readFile("api/nfl/ea_player_records.json", "utf8"));
-  const artifact = buildRatingsArtifact({ plays, snapRows, players, eaRecords, season, week });
+  // Run scripts/update-rosters.mjs first so the official roster is current.
+  const { officialEntry } = await import("../api-lib/officialRosters.js");
+  const artifact = buildRatingsArtifact({ plays, snapRows, players, eaRecords, season, week,
+    departedFrom: (team, player) => officialEntry(team, player) === null });
   const problems = validateRatingsArtifact(artifact, { season, week });
   if (problems.length) throw new Error(`Week ${week} player ratings not ready: ${problems.join(", ")}`);
   const destination = `data/player-ratings-${season}.js`, temporary = `${destination}.tmp`;

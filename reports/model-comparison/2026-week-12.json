@@ -2,9 +2,9 @@
   "season": 2026,
   "week": 12,
   "purpose": "Side-by-side test of the real-data model (4678b1c) against the published Week 12 predictions. Not a live prediction.",
-  "newModelCommit": "4678b1c plus the quarterback-change fix and measured absence costs",
-  "generatedAt": "2026-11-26T03:32:37.767Z",
-  "note": "Generated after the weekly cutoff from the inputs available at generation time (rosters, injuries and odds as fetched then). GB@LAR had kicked off; the other 15 games had not. Quarterback changes are priced with the costs measured on 2016-2025 games; non-quarterback injury reports are not, because the live rosters were past the Week 12 cutoff.",
+  "newModelCommit": "4678b1c plus the quarterback-change fix, measured absence costs and official-roster checks",
+  "generatedAt": "2026-11-26T03:52:54.194Z",
+  "note": "Generated after the weekly cutoff from the inputs available at generation time (rosters, injuries and odds as fetched then). GB@LAR had kicked off; the other 15 games had not. Quarterback changes are priced with the costs measured on 2016-2025 games, including Aaron Rodgers released by PIT (owner report, 2026-11-26) and Daniel Jones cut by IND; non-quarterback injury reports are not, because the live rosters were past the Week 12 cutoff.",
   "games": [
     {
       "away": "GB",
@@ -165,11 +165,11 @@
       },
       "newModel": {
         "awayScore": 24,
-        "homeScore": 22,
-        "margin": -3.096,
+        "homeScore": 21,
+        "margin": -3.355,
         "winner": "DEN",
-        "awayWinProbability": 0.611,
-        "homeWinProbability": 0.389
+        "awayWinProbability": 0.619,
+        "homeWinProbability": 0.381
       },
       "newModelInputs": {
         "base": "current-season team scoring",

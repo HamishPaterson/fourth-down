@@ -1,5 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
+import { officialEntry, officiallyUnavailable, onTeam } from "../../api-lib/officialRosters.js";
 
 const SLEEPER_PLAYERS_URL =
   "https://api.sleeper.app/v1/players/nfl";
@@ -94,6 +95,16 @@ export async function handler(req, res) {
               player.team
             ) === team
         )
+        // Sleeper keeps retired and released players on their old team; only players on the
+        // official roster, and not reported gone (data/roster-changes.js), are kept.
+        .filter((player) => onTeam(team, player))
+        .map((player) => {
+          const official = officialEntry(team, player);
+          // Reserve lists, inactive and suspended players cannot play even when Sleeper says Active.
+          return officiallyUnavailable(official) && !player.injury_status
+            ? { ...player, status: "Inactive" }
+            : player;
+        })
         .map((player) =>
           mapPlayer(player, team)
         )

@@ -57,6 +57,7 @@ jobs:
         run: |
           node scripts/update-nflverse.mjs 2026 > /tmp/nflverse.log || { tail -5 /tmp/nflverse.log; exit 1; }
           node scripts/update-nflverse-players.mjs 2026 "$WEEK"
+          node scripts/update-rosters.mjs 2026
           node scripts/player-ratings.mjs 2026 "$WEEK"
           node scripts/update-espn.mjs "$WEEK"
           npm run -s audit:external-factors > /tmp/external.log || { tail -5 /tmp/external.log; exit 1; }
@@ -71,7 +72,7 @@ jobs:
             api-lib/candidateCoverage.test.js api-lib/playerBetDiagnostics.test.js api-lib/modelCorrectness.test.js \
             api-lib/weeklyMulti.test.js api-lib/weeklyMultiPreparation.test.js api-lib/weeklyMultiReadiness.test.js \
             api-lib/weeklyMultiValuePolicy.test.js api-lib/marketWeightLearning.test.js api-lib/oddsSnapshots.test.js api-lib/personnelView.test.js \
-            src/services/playerRatingsLayer.test.mjs
+            src/services/playerRatingsLayer.test.mjs api-lib/officialRosters.test.mjs
           npm run build
 
       - name: Publish the week's data
@@ -82,7 +83,8 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add api/nfl/nflverse-team-metrics.js data/nflverse-player-metrics.js data/player-ratings-2026.js data/external-factors-2026.json \
+          git add api/nfl/nflverse-team-metrics.js data/nflverse-player-metrics.js data/player-ratings-2026.js data/nflverse-rosters-2026.js \
+            data/external-factors-2026.json \
             src/services/espnSnapshotData.js src/services/externalFactors2026Data.js
           if git diff --cached --quiet; then echo "No data changes."; exit 0; fi
           git commit -m "Update Week $WEEK model inputs"
