@@ -1,8 +1,4 @@
 ﻿import { useEffect, useMemo, useState } from "react";
-import { CheckCircle2, MinusCircle, XCircle } from "lucide-react";
-import TeamLogo from "../components/TeamLogo.jsx";
-import { TEAM_NAMES } from "../data.js";
-import { getTeamTheme } from "../services/teamThemes.js";
 import { isValidCompletedResult, normalizeResultTeam as normalizeTeamCode } from "../services/gameResults.js";
 import {
   hasMigratedSharedLedger,
@@ -11,6 +7,7 @@ import {
   refreshPredictionLedger,
 } from "../services/predictionLedger.js";
 import FourthDownLoader from "../components/FourthDownLoader.jsx";
+import { PickRow, groupByDay } from "./Predictions.jsx";
 import { shouldShowBlockingLoader } from "../components/fourthDownLoader.js";
 
 const CURRENT_SCORING_MODEL_START_WEEK = 2;
@@ -18,6 +15,7 @@ const CURRENT_SCORING_MODEL_START_WEEK = 2;
 export default function Results() {
   const [rows, setRows] = useState(() => readPredictionLedger());
   const [week, setWeek] = useState("all");
+  const [expandedResult, setExpandedResult] = useState(null);
   const [syncStatus, setSyncStatus] = useState("Loading results...");
   const [initialLoading, setInitialLoading] = useState(true);
 
@@ -208,11 +206,21 @@ export default function Results() {
           <p>Games appear here after a pre-game prediction has been saved and the final score is available.</p>
         </div>
       ) : (
-        <div className="results-game-grid">
-          {[...filtered].sort(sortResults).map((result) => (
-            <ResultGameCard key={result.id} result={result} />
-          ))}
-        </div>
+        resultGroups(filtered, week).map(([label, games]) => (
+          <section key={label} className="picks-day results-day">
+            <h2>{label}</h2>
+            <div className="picks-list">
+              {games.map((result) => (
+                <PickRow
+                  key={result.id}
+                  prediction={result}
+                  expanded={expandedResult === result.id}
+                  onToggle={() => setExpandedResult((current) => (current === result.id ? null : result.id))}
+                />
+              ))}
+            </div>
+          </section>
+        ))
       )}
 
       <p className="prediction-note results-storage-note">
@@ -275,102 +283,6 @@ function getResultSeason(row) {
   if (Number.isInteger(explicit)) return explicit;
   const kickoff = new Date(row.kickoff);
   return Number.isNaN(kickoff.getTime()) ? new Date().getUTCFullYear() : kickoff.getUTCFullYear();
-}
-
-function ResultGameCard({ result }) {
-  const awayTheme = getTeamTheme(result.awayCode);
-  const homeTheme = getTeamTheme(result.homeCode);
-  const style = {
-    "--away-primary": awayTheme["--team-primary"],
-    "--away-secondary": awayTheme["--team-secondary"],
-    "--away-glow": awayTheme["--team-glow"],
-    "--away-watermark": awayTheme["--team-watermark"],
-    "--home-primary": homeTheme["--team-primary"],
-    "--home-secondary": homeTheme["--team-secondary"],
-    "--home-glow": homeTheme["--team-glow"],
-    "--home-watermark": homeTheme["--team-watermark"],
-  };
-
-  return (
-    <article className="card results-game-card" style={style}>
-      <span className="results-away-watermark" aria-hidden="true" />
-      <span className="results-home-watermark" aria-hidden="true" />
-      <span className="results-centre-line" aria-hidden="true" />
-
-      <div className="game-meta results-game-meta">
-        <span>Regular season · Week {result.week}</span>
-        <strong>FINAL</strong>
-      </div>
-
-      <div className="results-scoreboard">
-        <ResultTeam
-          code={result.awayCode}
-          score={result.actualAwayScore}
-          winner={result.actualWinner === result.awayCode}
-          side="away"
-        />
-
-        <div className="results-score-divider">
-          <small>{formatDate(result.kickoff)}</small>
-          <strong>{result.actualAwayScore} - {result.actualHomeScore}</strong>
-          <span>FINAL</span>
-        </div>
-
-        <ResultTeam
-          code={result.homeCode}
-          score={result.actualHomeScore}
-          winner={result.actualWinner === result.homeCode}
-          side="home"
-        />
-      </div>
-
-      <div className="results-picks-grid">
-        <PickResult
-          label="Fourth Down"
-          pick={result.fourthDownPick}
-          correct={result.fourthDownCorrect}
-        />
-        <PickResult
-          label="Odds makers"
-          pick={result.oddsPick}
-          correct={result.oddsCorrect}
-        />
-        <div className="results-pick-panel results-actual-panel">
-          <small>Actual winner</small>
-          <strong>{teamName(result.actualWinner)}</strong>
-          <span>{result.actualWinner}</span>
-        </div>
-      </div>
-    </article>
-  );
-}
-
-function ResultTeam({ code, score, winner, side }) {
-  return (
-    <div className={`results-team results-team-${side}${winner ? " winner" : ""}`}>
-      <span className="results-logo-stage">
-        <TeamLogo team={code} size={108} />
-      </span>
-      <strong>{teamName(code)}</strong>
-      <small>{side === "away" ? "Away" : "Home"}</small>
-      <span className="results-team-score">{score}</span>
-      {winner && <span className="results-winner-pill">WINNER</span>}
-    </div>
-  );
-}
-
-function PickResult({ label, pick, correct }) {
-  const Icon = pick == null ? MinusCircle : correct ? CheckCircle2 : XCircle;
-  const status = pick == null ? "Not recorded" : correct ? "Correct" : "Incorrect";
-  const className = pick == null ? "ungraded" : correct ? "correct" : "incorrect";
-
-  return (
-    <div className={`results-pick-panel ${className}`}>
-      <small>{label} picked</small>
-      <strong>{pick ? teamName(pick) : "Not available"}</strong>
-      <span><Icon size={16} /> {status}</span>
-    </div>
-  );
 }
 
 function SummaryCard({ title, record, tone }) {
@@ -504,21 +416,10 @@ function formatLead(fourthDown, odds) {
   return `${difference > 0 ? "+" : ""}${difference.toFixed(1)} pts`;
 }
 
-function teamName(code) {
-  return TEAM_NAMES[code] || code || "Not available";
+// Same layout as Picks: newest week first under week headings, or by day for a single week.
+function resultGroups(rows, week) {
+  const byKickoff = (a, b) => new Date(a.kickoff) - new Date(b.kickoff);
+  if (week !== "all") return groupByDay([...rows].sort(byKickoff));
+  const weeks = [...new Set(rows.map((row) => Number(row.week)))].sort((a, b) => b - a);
+  return weeks.map((value) => [`Week ${value}`, rows.filter((row) => Number(row.week) === value).sort(byKickoff)]);
 }
-
-function formatDate(value) {
-  const date = new Date(value);
-  return Number.isNaN(date.getTime())
-    ? ""
-    : date.toLocaleDateString(undefined, { day: "numeric", month: "short" });
-}
-
-function sortResults(first, second) {
-  return Number(second.week) - Number(first.week) || new Date(second.kickoff) - new Date(first.kickoff);
-}
-
-
-
-

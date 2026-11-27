@@ -453,7 +453,7 @@ function kickoffDay(value) {
   return Number.isNaN(date.getTime()) ? null : date.toLocaleDateString(undefined, { weekday: "long" });
 }
 
-function groupByDay(rows) {
+export function groupByDay(rows) {
   const groups = new Map();
   for (const row of rows) {
     const label = kickoffDay(row.kickoff) || "Time to be confirmed";
@@ -552,14 +552,14 @@ function FeaturedPick({ prediction, onOpen }) {
 // One game. Tapping it opens a small panel underneath with the score prediction and Best Bets;
 // tapping the selected tab again opens the full matchup. Finished games show the winner's logo
 // on a slanted panel at the end of the row instead of our pick.
-function PickRow({ prediction, onOpen, expanded = false, onToggle }) {
+export function PickRow({ prediction, onOpen, expanded = false, onToggle }) {
   const [tab, setTab] = useState("score");
   const isFinal = hasFinalResult(prediction);
   const winner = isFinal ? normalizeTeamCode(prediction.actualWinner) : null;
   const correct = isFinal && prediction.fourthDownPick && winner !== "TIE"
     ? normalizeTeamCode(prediction.fourthDownPick) === winner : null;
   const subtitle = isFinal
-    ? `Final · ${displayScore(prediction.actualAwayScore)}–${displayScore(prediction.actualHomeScore)}`
+    ? ""
     : `${kickoffTime(prediction.kickoff)}${prediction.game?.venue ? ` · ${prediction.game.venue}` : ""}`;
   const canOpen = typeof onOpen === "function" && prediction.game;
   const openMatchup = () => canOpen && onOpen({ ...prediction.game, savedPrediction: prediction });
@@ -581,15 +581,19 @@ function PickRow({ prediction, onOpen, expanded = false, onToggle }) {
         </span>
         <span className="pick-row-copy">
           <strong>{nickname(prediction.awayCode)} at {nickname(prediction.homeCode)}</strong>
-          <small>
-            {isFinal && correct !== null ? (
-              <span className={correct ? "pick-row-correct" : "pick-row-missed"}
-                role="img" aria-label={correct ? "Pick correct" : "Pick missed"} title={correct ? "Pick correct" : "Pick missed"}>
-                {correct ? <CheckCircle2 size={14} aria-hidden="true" /> : <XCircle size={14} aria-hidden="true" />}
-              </span>
-            ) : null}
-            {isFinal && correct !== null ? subtitle.replace(/^Final ·/, "") : subtitle}
-          </small>
+          {isFinal ? (
+            <span className="pick-row-score" aria-label={`Final score ${displayScore(prediction.actualAwayScore)} to ${displayScore(prediction.actualHomeScore)}`}>
+              {correct !== null && (
+                <span className={correct ? "pick-row-correct" : "pick-row-missed"}
+                  role="img" aria-label={correct ? "Pick correct" : "Pick missed"} title={correct ? "Pick correct" : "Pick missed"}>
+                  {correct ? <CheckCircle2 size={20} aria-hidden="true" /> : <XCircle size={20} aria-hidden="true" />}
+                </span>
+              )}
+              <span aria-hidden="true">{displayScore(prediction.actualAwayScore)}–{displayScore(prediction.actualHomeScore)}</span>
+            </span>
+          ) : (
+            <small>{subtitle}</small>
+          )}
         </span>
         {isFinal ? (
           <span className={`pick-row-slant pick-row-winner${correct === null ? "" : correct ? " correct" : " missed"}`}
@@ -600,7 +604,6 @@ function PickRow({ prediction, onOpen, expanded = false, onToggle }) {
           <span className="pick-row-slant pick-row-upcoming"
             aria-label={normalizeTeamCode(prediction.fourthDownPick) ? `Our pick: ${pickLine(prediction)}${pickChance(prediction) ? `, ${pickChance(prediction)}` : ""}` : "No pick"}>
             {normalizeTeamCode(prediction.fourthDownPick) && <TeamLogo team={normalizeTeamCode(prediction.fourthDownPick)} size={96} />}
-            {pickChance(prediction) && <small className="pick-row-chance" aria-hidden="true">{pickChance(prediction)}</small>}
           </span>
         )}
       </button>
@@ -654,7 +657,7 @@ function PickScorePanel({ prediction }) {
         {team(prediction.homeCode, home, prediction.fourthDownHomeWinProbability)}
       </div>
       <div className="pick-score-facts">
-        <span><small>Our pick</small><strong>{pickLine(prediction)}</strong></span>
+        <span><small>Our pick</small><strong>{pickLine(prediction)}</strong>{pickChance(prediction) && <em>{pickChance(prediction)}</em>}</span>
         <span><small>Projected total</small><strong>{hasScores ? Number(away) + Number(home) : "—"}</strong></span>
         <span><small>Bookies' pick</small><strong>{prediction.oddsPick ? normalizeTeamCode(prediction.oddsPick) : "—"}</strong></span>
       </div>

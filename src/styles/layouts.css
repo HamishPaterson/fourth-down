@@ -371,20 +371,6 @@ button.standings-row:hover { background-color: var(--fd-raised); }
   transform: translate(-46%, -50%) rotate(-10deg);
   filter: drop-shadow(0 3px 8px rgba(0, 0, 0, .5));
 }
-/* Win chance before kick-off, as a small label on the pick's logo. */
-.pick-row-chance {
-  position: absolute;
-  z-index: 1;
-  right: 8px;
-  bottom: 6px;
-  padding: 2px 7px;
-  border-radius: 9px;
-  color: var(--fd-chalk);
-  background: rgba(12, 13, 17, .8);
-  font-size: 11px;
-  font-weight: 700;
-  white-space: nowrap;
-}
 .pick-row-winner.correct { background: linear-gradient(135deg, #22A061, #146B3F); }
 .pick-row-winner.missed { background: linear-gradient(135deg, #C9373F, #8A1F27); }
 .pick-row-winner > strong { position: absolute; top: 50%; left: calc(50% + 10px); transform: translate(-50%, -50%); font-family: var(--fd-display); font-size: 20px; font-weight: 800; text-transform: uppercase; }
@@ -448,6 +434,7 @@ button.standings-row:hover { background-color: var(--fd-raised); }
 .pick-score-facts span { display: grid; gap: 2px; padding: 10px; border-radius: 14px; background: var(--fd-raised); text-align: center; }
 .pick-score-facts small { color: var(--fd-muted); font-size: 11px; }
 .pick-score-facts strong { font-family: var(--fd-display); font-size: 18px; font-weight: 800; }
+.pick-score-facts em { color: var(--accent); font-size: 12px; font-style: normal; font-weight: 700; }
 .content .pick-score-final { margin: 0; color: var(--fd-muted); font-size: 13px; text-align: center; }
 
 /* ---------- Rating colours: Elite gold, Good green, Average neutral, Below average orange, Poor red ---------- */
@@ -479,3 +466,10 @@ button.standings-row:hover { background-color: var(--fd-raised); }
   .pick-row-copy strong { font-size: 14px; }
   .pick-row-copy small { font-size: 12px; }
 }
+
+/* Finished games: the final score, big. */
+.pick-row-score { display: inline-flex; align-items: center; gap: 6px; font-family: var(--fd-display); font-size: 34px; font-weight: 800; line-height: 1; letter-spacing: .01em; }
+.pick-row-score .pick-row-correct { color: #6EE7A0; display: inline-flex; }
+.pick-row-score .pick-row-missed { color: #FF8A8A; display: inline-flex; }
+.pick-row.final .pick-row-copy { gap: 4px; }
+@media (max-width: 520px) { .pick-row-score { font-size: 28px; } }

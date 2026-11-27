@@ -23,7 +23,7 @@ before(async () => {
       if (id.replace(/\\/g, "/").endsWith("/src/pages/Predictions.jsx"))
         return `${code}\nexport { mapScheduleGame, findLedgerRow, sortPredictions, filterPredictions, enrichSavedPredictionWithCurrentMarket };`;
       if (id.replace(/\\/g, "/").endsWith("/src/pages/Results.jsx"))
-        return `${code}\nexport { isValidCompletedResult, ResultGameCard };`;
+        return `${code}\nexport { isValidCompletedResult };`;
     } }] });
   ui = await server.ssrLoadModule("/src/pages/Predictions.jsx");
   results = await server.ssrLoadModule("/src/pages/Results.jsx");
@@ -144,7 +144,8 @@ test("L: Results renders saved finals without provider calls or prediction chang
     assert.equal(graded.fourthDownCorrect, true);
     assert.equal(graded.fourthDownAwayScore, 24);
     assert.equal(graded.fourthDownHomeScore, 28);
-    assert.match(renderToStaticMarkup(createElement(results.ResultGameCard, { result: graded })), /24 - 30/);
+    // Results shows each graded game with the same row as Picks.
+    assert.match(renderToStaticMarkup(createElement(ui.PickRow, { prediction: graded })), /24–30/);
     assert.equal(calls.length, 0);
     assert.deepEqual(row, before);
   } finally { globalThis.fetch = originalFetch; }
