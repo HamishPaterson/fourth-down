@@ -20,7 +20,8 @@ export default defineConfig(({ command, mode }) => {
     server: localDev
       ? {
           proxy: {
-            '/api': {
+            // Only /api/… routes; the app's own /api-lib/… modules must still load locally.
+            '^/api/': {
               target: LIVE_APP,
               changeOrigin: true,
               // Read-only: returning false makes Vite answer 404 instead of forwarding.

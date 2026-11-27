@@ -346,13 +346,15 @@ button.standings-row:hover { background-color: var(--fd-raised); }
   overflow: hidden;
   clip-path: polygon(26px 0, 100% 0, 100% 100%, 0 100%);
   background: var(--fd-raised-2);
+  container-type: inline-size;
 }
 .pick-row-slant img {
   position: absolute;
   top: 50%;
   left: calc(50% + 14px);
-  width: 96px !important;
-  height: 96px !important;
+  /* Grows with the panel on wider screens; cropping at the top and bottom is intended. */
+  width: max(96px, 68cqi) !important;
+  height: max(96px, 68cqi) !important;
   object-fit: contain;
   transform: translate(-46%, -50%) rotate(-10deg);
   filter: drop-shadow(0 3px 8px rgba(0, 0, 0, .5));
@@ -360,6 +362,7 @@ button.standings-row:hover { background-color: var(--fd-raised); }
 /* Win chance before kick-off, as a small label on the pick's logo. */
 .pick-row-chance {
   position: absolute;
+  z-index: 1;
   right: 8px;
   bottom: 6px;
   padding: 2px 7px;
