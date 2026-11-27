@@ -1,4 +1,4 @@
-import { getTeamRanks, ordinalRank as ordinal, rankBand } from "../services/teamRatings.js";
+import { getTeamRanks, ordinalRank as ordinal, rankBand, rankBandKey } from "../services/teamRatings.js";
 
 // The stats on a team card: division and record, then where the team ranks in the league
 // overall, on offence and on defence (from ESPN's power ratings), with a plain-language label.
@@ -18,7 +18,7 @@ export default function TeamCardStats({ division, record, team }) {
       </span>
       <span className="team-card-ratings">
         {stats.map(([label, rank, title]) => (
-          <span key={label} className="team-card-rating" title={title}
+          <span key={label} className="team-card-rating" title={title} data-band={rankBandKey(rank)}
             aria-label={`${label}: ${ordinal(rank)} of ${ranks.total}${rankBand(rank) ? `, ${rankBand(rank)}` : ""}`}>
             <span className="team-card-rating-label">{label}</span>
             <span className="team-card-rating-value">{ordinal(rank)}</span>

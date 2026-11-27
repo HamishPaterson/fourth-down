@@ -501,7 +501,7 @@ test("actual Multi render guards invalid individual/combined odds while preservi
     }));
     assert.match(markup, /Odds unavailable/);
     assert.match(markup, /Pending/);
-    assert.match(markup, /Model probability 40.0%/);
+    assert.match(markup, /40.0% chance to land/);
     assert.match(markup, /Successful leg/);
     assert.match(markup, /Failed leg/);
     assert.doesNotMatch(markup, /Infinity|NaN|\$0\.00/);

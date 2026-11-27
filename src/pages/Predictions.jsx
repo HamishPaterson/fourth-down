@@ -33,8 +33,6 @@ const SEASON = 2026;
 const SCHEDULE_CACHE_PREFIX = "fourth-down:schedule";
 const SCHEDULE_CACHE_TTL_MS = 15 * 60 * 1000;
 const pendingScheduleRequests = new Map();
-const WEEKLY_PARLAY_MODEL_PROBABILITY_MIN = 0.65;
-const WEEKLY_PARLAY_MODEL_PROBABILITY_FLOOR = 0.55;
 const WEEKLY_PARLAY_LEG_COUNT = 5;
 
 export default function Predictions({ onOpen, favoriteTeam, onOpenTeam }) {
@@ -621,7 +619,7 @@ function PickRow({ prediction, onOpen, expanded = false, onToggle }) {
             : <PickScorePanel prediction={prediction} />}
           {canOpen && (
             <button type="button" className="pick-details-open" onClick={openMatchup}>
-              Tap the tab again, or here, for the full matchup <ChevronRight size={16} aria-hidden="true" />
+              Matchup <ChevronRight size={16} aria-hidden="true" />
             </button>
           )}
         </div>
@@ -1468,7 +1466,7 @@ export function WeeklyParlay({ parlay, week }) {
           </h2>
           {parlay?.placeholder ? (
             <p style={{ margin: "8px 0", color: "rgba(255,255,255,.72)", fontSize: "12px" }}>
-              Weekly Best Multi locks as soon as complete valid inputs are available.
+              This week's multi will appear here once it's ready.
             </p>
           ) : statusLabels.length > 0 && (
             <div style={{ display: "flex", flexWrap: "wrap", gap: "6px", marginBottom: "8px" }}>
@@ -1483,18 +1481,9 @@ export function WeeklyParlay({ parlay, week }) {
             <p style={{ margin: 0, color: "rgba(255,255,255,.64)", fontSize: "12px" }}>
               {parlay.reason || "Weekly Best Multi is not ready yet. Please check back later."}
             </p>
-          ) : !parlay?.placeholder && parlay?.status !== "missed" && (
-            <p style={{ margin: 0, color: "rgba(255,255,255,.64)", fontSize: "12px" }}>
-              Up to {WEEKLY_PARLAY_LEG_COUNT} eligible legs across market families, with at most one Anytime TD. Priced legs require positive edge; unpriced TD uses role-adjusted probability. The probability gate relaxes from {formatPercent(WEEKLY_PARLAY_MODEL_PROBABILITY_MIN)} to {formatPercent(WEEKLY_PARLAY_MODEL_PROBABILITY_FLOOR)} only when needed.
-            </p>
-          )}
+          ) : null}
           {parlay?.reason && parlay?.status !== "not ready" && (
             <p className="prediction-note">{parlay.reason}</p>
-          )}
-          {parlay?.modelProbabilityThreshold !== null && parlay?.modelProbabilityThreshold !== undefined && (
-            <small style={{ display: "block", marginTop: "5px", color: "rgba(255,255,255,.46)", fontSize: "9px" }}>
-              {parlay.locked ? "Selected" : "Current selection"} at {formatPercent(parlay.modelProbabilityThreshold)} threshold
-            </small>
           )}
         </div>
 
@@ -1516,7 +1505,7 @@ export function WeeklyParlay({ parlay, week }) {
           </strong>
           {parlay?.modelProbability !== null && parlay?.modelProbability !== undefined && (
             <span style={{ display: "block", marginTop: "6px", color: "rgba(255,255,255,.55)", fontSize: "9px" }}>
-              Model probability {formatPercent(parlay.modelProbability)}
+              {formatPercent(parlay.modelProbability)} chance to land
             </span>
           )}
         </div>}

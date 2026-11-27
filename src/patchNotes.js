@@ -2,6 +2,26 @@
 // anyone who has not seen the newest entry is shown it once when they open the app.
 export const PATCH_NOTES = [
   {
+    id: "2026-11-27-colours",
+    date: "27 November 2026",
+    title: "Colour-coded ratings",
+    sections: [
+      {
+        heading: "Teams",
+        items: [
+          "Team ratings are colour coded: gold for Elite, green for Good, grey for Average, orange for Below average and red for Poor.",
+        ],
+      },
+      {
+        heading: "Picks",
+        items: [
+          "Open a game and tap Matchup to see the full breakdown.",
+          "The Weekly Multi is simpler, with the technical selection notes removed.",
+        ],
+      },
+    ],
+  },
+  {
     id: "2026-11-27-picks-tap",
     date: "27 November 2026",
     title: "Quicker picks and a back button",

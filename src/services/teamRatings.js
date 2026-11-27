@@ -74,6 +74,11 @@ export function rankBand(rank) {
   return "Poor";
 }
 
+// Short key for colouring a rank band: elite (gold), good (green), average, below (orange), poor (red).
+export function rankBandKey(rank) {
+  return ({ Elite: "elite", Good: "good", Average: "average", "Below average": "below", Poor: "poor" })[rankBand(rank)] || "none";
+}
+
 // QBR follows the personnel-selected starting quarterback's identity, never
 // the team. Exact canonicalId/GSIS match first; a uniquely matched normalised
 // name is the only secondary identity. No roster or team fallback exists, so

@@ -10,7 +10,7 @@ import {
 } from "lucide-react";
 import TeamLogo from "../components/TeamLogo.jsx";
 import { getTeamTheme } from "../services/teamThemes.js";
-import { getTeamRanks, ordinalRank, rankBand } from "../services/teamRatings.js";
+import { getTeamRanks, ordinalRank, rankBand, rankBandKey } from "../services/teamRatings.js";
 import { getStandings, getTeamSeasonStats } from "../services/nflApi.js";
 import { getPlayerRating } from "../services/playerRatings.js";
 
@@ -297,7 +297,7 @@ const offense = deduplicatePlayers([
 
         <div className="team-rank-grid">
           {[["Overall", ranks.overall], ["Offence", ranks.offense], ["Defence", ranks.defense]].map(([label, rank]) => (
-            <div key={label} className="rating-item team-rank-item">
+            <div key={label} className="rating-item team-rank-item" data-band={rankBandKey(rank)}>
               <small>{label}</small>
               <strong>{ordinalRank(rank)}</strong>
               <span>{rankBand(rank) || "No rating"}</span>
