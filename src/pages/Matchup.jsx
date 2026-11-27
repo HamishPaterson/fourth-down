@@ -581,9 +581,11 @@ function createMatchupTheme(
   return {
     "--away-primary": away["--team-primary"],
     "--away-secondary": away["--team-secondary"],
+    "--away-glow": away["--team-glow"],
     "--away-watermark": away["--team-watermark"],
     "--home-primary": home["--team-primary"],
     "--home-secondary": home["--team-secondary"],
+    "--home-glow": home["--team-glow"],
     "--home-watermark": home["--team-watermark"],
   };
 }

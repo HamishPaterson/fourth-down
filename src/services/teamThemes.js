@@ -50,6 +50,24 @@ export function getTeamTheme(code) {
   return {
     "--team-primary": primary,
     "--team-secondary": secondary,
+    "--team-glow": teamGlow(primary, secondary),
     "--team-watermark": logo ? `url("/logos/${logo}")` : "none",
   };
+}
+
+// The colour a card fades in from. Usually the team's main colour, but a near-black main
+// colour (Steelers, Raiders, Bears) would vanish on the dark cards, so those use their
+// second colour instead.
+export function teamGlow(primary, secondary) {
+  return relativeLuminance(primary) < 0.011 ? secondary : primary;
+}
+
+function relativeLuminance(hex) {
+  const value = String(hex || "").replace("#", "");
+  if (!/^[0-9a-f]{6}$/i.test(value)) return 1;
+  const [r, g, b] = [0, 2, 4].map((i) => {
+    const channel = parseInt(value.slice(i, i + 2), 16) / 255;
+    return channel <= 0.03928 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4;
+  });
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
 }

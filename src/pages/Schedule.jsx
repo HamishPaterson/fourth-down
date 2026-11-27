@@ -441,9 +441,11 @@ function GameCard({ game, onOpen }) {
   const matchupTheme = {
     "--away-primary": awayTheme["--team-primary"],
     "--away-secondary": awayTheme["--team-secondary"],
+    "--away-glow": awayTheme["--team-glow"],
     "--away-watermark": awayTheme["--team-watermark"],
     "--home-primary": homeTheme["--team-primary"],
     "--home-secondary": homeTheme["--team-secondary"],
+    "--home-glow": homeTheme["--team-glow"],
     "--home-watermark": homeTheme["--team-watermark"],
   };
 
