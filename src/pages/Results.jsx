@@ -72,7 +72,7 @@ export default function Results() {
 
         const count = canonicalRows.filter(isValidCompletedResult).length;
         setSyncStatus(
-          `Results updated Â· ${count} graded game${count === 1 ? "" : "s"}`
+          `Results updated · ${count} graded game${count === 1 ? "" : "s"}`
         );
         setInitialLoading(false);
       } catch (error) {
@@ -115,7 +115,6 @@ export default function Results() {
 
   const fourthDown = calculateRecord(filtered, "fourthDownCorrect", "fourthDownPick");
   const odds = calculateRecord(filtered, "oddsCorrect", "oddsPick");
-  const calibration = calculateCalibration(filtered);
   const currentModelScoreRows = filtered.filter(
     (row) => Number(row.week) >= CURRENT_SCORING_MODEL_START_WEEK
   );
@@ -164,37 +163,19 @@ export default function Results() {
 
       <div className="results-summary-grid">
         <CalibrationCard
-          label="Brier score"
-          value={weekOneHistorical ? "Unavailable" : calibration.graded ? calibration.brier.toFixed(3) : "Not graded"}
-          detail={weekOneHistorical ? "Pre-game win probabilities were not recorded for Week 1." : `${calibration.graded} of ${filtered.length} games eligible`}
-        />
-        <CalibrationCard
           label="Average margin error"
           value={weekOneHistorical ? "Unavailable" : scoring.graded ? `${scoring.marginError.toFixed(1)} pts` : "Not graded"}
-          detail={`Weeks 2+ Â· ${scoring.graded} score-graded games`}
+          detail={`Weeks 2+ · ${scoring.graded} score-graded games`}
         />
         <CalibrationCard
           label="Average total error"
           value={weekOneHistorical ? "Unavailable" : scoring.graded ? `${scoring.totalError.toFixed(1)} pts` : "Not graded"}
-          detail={`Weeks 2+ Â· ${scoring.graded} score-graded games`}
-        />
-      </div>
-
-      <div className="results-summary-grid">
-        <CalibrationCard
-          label="Fourth Down total bias"
-          value={weekOneHistorical ? "Unavailable" : scoring.graded ? formatSignedMetric(scoring.totalBias) : "Not graded"}
-          detail={`Weeks 2+ Â· ${scoring.graded} score-graded games`}
-        />
-        <CalibrationCard
-          label="Fourth Down margin bias"
-          value={weekOneHistorical ? "Unavailable" : scoring.graded ? formatSignedMetric(scoring.marginBias) : "Not graded"}
-          detail={`Weeks 2+ Â· ${scoring.graded} score-graded games`}
+          detail={`Weeks 2+ · ${scoring.graded} score-graded games`}
         />
         <CalibrationCard
           label="Market total error"
           value={marketScoring.totalGraded ? `${marketScoring.totalError.toFixed(1)} pts` : "Unavailable"}
-          detail={`Weeks 2+ Â· ${marketScoring.totalGraded} market-total games`}
+          detail={`Weeks 2+ · ${marketScoring.totalGraded} market-total games`}
         />
       </div>
 
@@ -317,7 +298,7 @@ function ResultGameCard({ result }) {
       <span className="results-centre-line" aria-hidden="true" />
 
       <div className="game-meta results-game-meta">
-        <span>Regular season Â· Week {result.week}</span>
+        <span>Regular season · Week {result.week}</span>
         <strong>FINAL</strong>
       </div>
 
@@ -404,26 +385,6 @@ function SummaryCard({ title, record, tone }) {
 
 function CalibrationCard({ label, value, detail }) {
   return <div className="card results-summary-card"><small>{label}</small><strong>{value}</strong><span>{detail}</span></div>;
-}
-
-function calculateCalibration(rows) {
-  const graded = rows.filter(
-    (row) =>
-      Number.isFinite(Number(row.fourthDownWinnerProbability)) &&
-      row.actualWinner &&
-      row.actualWinner !== "TIE" &&
-      row.fourthDownPick
-  );
-
-  if (!graded.length) return { graded: 0, brier: 0 };
-
-  const brier = graded.reduce((total, row) => {
-    const probability = Number(row.fourthDownWinnerProbability);
-    const outcome = normalizeTeamCode(row.fourthDownPick) === normalizeTeamCode(row.actualWinner) ? 1 : 0;
-    return total + (probability - outcome) ** 2;
-  }, 0) / graded.length;
-
-  return { graded: graded.length, brier };
 }
 
 function calculateScoringAccuracy(rows) {
@@ -524,12 +485,6 @@ function hasFourthDownScores(row) {
 
 function isMissingScore(value) {
   return value === null || value === undefined || value === "";
-}
-
-function formatSignedMetric(value) {
-  const number = Number(value);
-  if (!Number.isFinite(number)) return "-";
-  return `${number >= 0 ? "+" : ""}${number.toFixed(1)} pts`;
 }
 
 function calculateRecord(rows, correctKey, pickKey) {

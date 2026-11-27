@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { ArrowLeft } from "lucide-react";
 import Header from "./components/Header.jsx";
 import Navigation from "./components/Navigation.jsx";
 import Matchup from "./pages/Matchup.jsx";
@@ -27,7 +28,6 @@ import { LATEST_PATCH_NOTES, markPatchNotesSeen, shouldShowPatchNotes } from "./
 export default function App() {
   const [page, setPage] = useState("predictions");
   const [selectedGame, setSelectedGame] = useState(null);
-  const predictionsScrollPosition = useRef(0);
   const [selectedTeam, setSelectedTeam] = useState(null);
   const [teamChoice, setTeamChoice] = useState(readFavoriteTeamChoice);
   const favoriteTeam = teamChoice.team;
@@ -111,43 +111,66 @@ export default function App() {
     };
   }, [updateAvailable]);
 
+  // Pages the back button returns to. The bottom menu and the brand start a fresh trail;
+  // opening a matchup, team or other detail page adds the current page to it.
+  const backTrail = useRef([]);
+  const [canGoBack, setCanGoBack] = useState(false);
+  const pageState = useRef({ page, selectedGame, selectedTeam });
+  useEffect(() => { pageState.current = { page, selectedGame, selectedTeam }; }, [page, selectedGame, selectedTeam]);
+
   function navigateTo(destination, options = {}) {
     const resolvedDestination =
       destination === "schedule" || destination === "favorite-schedule" || destination === "home"
         ? "predictions"
         : destination;
 
-    setPage(resolvedDestination);
-
-    if (resolvedDestination === "predictions" && options.restorePredictionsScroll) {
-      window.requestAnimationFrame(() => {
-        window.requestAnimationFrame(() => {
-          window.scrollTo({
-            top: predictionsScrollPosition.current,
-            left: 0,
-            behavior: "auto",
-          });
-        });
-      });
-      return;
+    if (options.topLevel) {
+      backTrail.current = [];
+    } else if (resolvedDestination !== pageState.current.page || options.forcePush) {
+      backTrail.current.push({ ...pageState.current, scrollY: window.scrollY });
+      // A browser history entry lets the phone back gesture and Android back button work too.
+      try { window.history.pushState({ fourthDownBack: backTrail.current.length }, ""); } catch { /* back button still works */ }
     }
-
+    setCanGoBack(backTrail.current.length > 0);
+    setPage(resolvedDestination);
     window.scrollTo({ top: 0, left: 0, behavior: "auto" });
   }
 
-  function openMatchup(game) {
-    predictionsScrollPosition.current = window.scrollY;
-    setSelectedGame(game);
-    navigateTo("matchup");
+  function restorePrevious() {
+    const previous = backTrail.current.pop();
+    setCanGoBack(backTrail.current.length > 0);
+    if (!previous) return;
+    setSelectedGame(previous.selectedGame);
+    setSelectedTeam(previous.selectedTeam);
+    setPage(previous.page);
+    // The page may still be loading, so keep trying for a moment until it is tall enough.
+    const target = previous.scrollY || 0;
+    let attempts = 0;
+    const restore = () => {
+      window.scrollTo({ top: target, left: 0, behavior: "auto" });
+      if (Math.abs(window.scrollY - target) > 2 && attempts++ < 30) window.setTimeout(restore, 100);
+    };
+    window.requestAnimationFrame(restore);
   }
 
-  function backToPredictions() {
-    navigateTo("predictions", { restorePredictionsScroll: true });
+  useEffect(() => {
+    window.addEventListener("popstate", restorePrevious);
+    return () => window.removeEventListener("popstate", restorePrevious);
+  }, []);
+
+  function goBack() {
+    if (window.history.state?.fourthDownBack) window.history.back();
+    else restorePrevious();
+  }
+
+  function openMatchup(game) {
+    setSelectedGame(game);
+    navigateTo("matchup", { forcePush: true });
   }
 
   function openTeam(team) {
     setSelectedTeam(team);
-    navigateTo("team-detail");
+    navigateTo("team-detail", { forcePush: true });
   }
 
   // Opens a team page from just its code (the header's favourite team, the Picks page strip).
@@ -235,14 +258,19 @@ export default function App() {
         <TeamPicker onConfirm={answerTeamPicker} onSkip={() => answerTeamPicker(null)} />
       )}
       {teamChoice.decided && showWhatsNew && <WhatsNewDialog note={LATEST_PATCH_NOTES} onClose={closeWhatsNew} onOpenAll={openAllPatchNotes} />}
-      <Header onHome={() => navigateTo("predictions")} favoriteTeam={favoriteTeam}
-        onOpenFavorite={() => openTeamByCode(favoriteTeam)} />
-      <Navigation page={page} onChange={navigateTo} />
+      <Header onHome={() => navigateTo("predictions", { topLevel: true })} favoriteTeam={favoriteTeam}
+        onOpenFavorite={() => openTeamByCode(favoriteTeam)} canGoBack={canGoBack} />
+      {canGoBack && (
+        <button type="button" className="floating-back-button" onClick={goBack} aria-label="Back">
+          <ArrowLeft size={22} aria-hidden="true" />
+        </button>
+      )}
+      <Navigation page={page} onChange={(destination) => navigateTo(destination, { topLevel: true })} />
       <main className="content">
 
-        {page === "matchup" && <Matchup game={selectedGame} onBack={backToPredictions} />}
+        {page === "matchup" && <Matchup game={selectedGame} onBack={goBack} />}
         {page === "teams" && <Teams onOpenTeam={openTeam} onOpenConference={() => navigateTo("conference")} />}
-        {page === "team-detail" && <TeamDetail team={selectedTeam} onBack={() => navigateTo("teams")} />}
+        {page === "team-detail" && <TeamDetail team={selectedTeam} onBack={goBack} />}
         {page === "conference" && <Conference onSelectTeam={openTeam} />}
         {page === "predictions" && <Predictions onOpen={openMatchup} favoriteTeam={favoriteTeam} onOpenTeam={openTeamByCode} />}
         {page === "results" && <Results />}

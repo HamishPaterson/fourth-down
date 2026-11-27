@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import { apiFetch as fetch } from "../services/supabaseAuth.js";
 import {
-  ArrowLeft,
   CalendarDays,
   Clock,
   CloudSun,
@@ -235,9 +234,6 @@ export default function Matchup({ game, onBack }) {
       style={matchupTheme}
     >
       <div className="matchup-topbar">
-        <button type="button" className="header-round-button" onClick={onBack} aria-label="Back to picks">
-          <ArrowLeft size={20} aria-hidden="true" />
-        </button>
         <span className="matchup-status-chip">
           <span aria-hidden="true" />
           {showScore ? formatStatus(gameStatus) : validKickoff ? `Kicks off ${kickoff.toLocaleString(undefined, { weekday: "short", hour: "numeric", minute: "2-digit" })}` : formatStatus(gameStatus)}

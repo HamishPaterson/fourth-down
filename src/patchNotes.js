@@ -2,6 +2,33 @@
 // anyone who has not seen the newest entry is shown it once when they open the app.
 export const PATCH_NOTES = [
   {
+    id: "2026-11-27-picks-tap",
+    date: "27 November 2026",
+    title: "Quicker picks and a back button",
+    sections: [
+      {
+        heading: "Picks",
+        items: [
+          "Tap a game to see the score prediction and Best Bets right there. Tap the tab again to open the full matchup.",
+          "Finished games show the winner's logo across the end of the row, with a green tick or red cross next to the final score.",
+        ],
+      },
+      {
+        heading: "Getting around",
+        items: [
+          "A floating back button at the top takes you back to where you were. Your phone's back gesture works too.",
+          "A new football logo in the top corner.",
+        ],
+      },
+      {
+        heading: "Results",
+        items: [
+          "The Results page is simpler: the Brier score and bias tiles are gone.",
+        ],
+      },
+    ],
+  },
+  {
     id: "2026-11-27-layouts",
     date: "27 November 2026",
     title: "Picks, matchups and standings, redesigned",

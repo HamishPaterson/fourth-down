@@ -42,6 +42,7 @@ export default function Predictions({ onOpen, favoriteTeam, onOpenTeam }) {
   const [week, setWeek] = useState(() => calendarWeek);
   const [rows, setRows] = useState([]);
   const [filter, setFilter] = useState("all");
+  const [expandedPick, setExpandedPick] = useState(null);
   const [day, setDay] = useState("all");
   const [status, setStatus] = useState("Loading predictions...");
 
@@ -402,13 +403,18 @@ export default function Predictions({ onOpen, favoriteTeam, onOpenTeam }) {
           <section key={label} className="picks-day">
             <h2>{label}</h2>
             <div className="picks-list">
-              {rows.map((prediction) => (
-                <PickRow
-                  key={prediction.id || matchupKey(prediction.week, prediction.awayCode, prediction.homeCode)}
-                  prediction={prediction}
-                  onOpen={onOpen}
-                />
-              ))}
+              {rows.map((prediction) => {
+                const key = prediction.id || matchupKey(prediction.week, prediction.awayCode, prediction.homeCode);
+                return (
+                  <PickRow
+                    key={key}
+                    prediction={prediction}
+                    onOpen={onOpen}
+                    expanded={expandedPick === key}
+                    onToggle={() => setExpandedPick((current) => (current === key ? null : key))}
+                  />
+                );
+              })}
             </div>
           </section>
         ))
@@ -543,43 +549,121 @@ function FeaturedPick({ prediction, onOpen }) {
   ) : <div className="featured-pick">{content}</div>;
 }
 
-function PickRow({ prediction, onOpen }) {
+// One game. Tapping it opens a small panel underneath with the score prediction and Best Bets;
+// tapping the selected tab again opens the full matchup. Finished games show the winner's logo
+// on a slanted panel at the end of the row instead of our pick.
+function PickRow({ prediction, onOpen, expanded = false, onToggle }) {
+  const [tab, setTab] = useState("score");
   const isFinal = hasFinalResult(prediction);
-  const correct = isFinal && prediction.fourthDownPick
-    ? normalizeTeamCode(prediction.fourthDownPick) === normalizeTeamCode(prediction.actualWinner) : null;
+  const winner = isFinal ? normalizeTeamCode(prediction.actualWinner) : null;
+  const correct = isFinal && prediction.fourthDownPick && winner !== "TIE"
+    ? normalizeTeamCode(prediction.fourthDownPick) === winner : null;
   const subtitle = isFinal
     ? `Final · ${prediction.awayCode} ${displayScore(prediction.actualAwayScore)}–${displayScore(prediction.actualHomeScore)} ${prediction.homeCode}`
     : `${kickoffTime(prediction.kickoff)}${prediction.game?.venue ? ` · ${prediction.game.venue}` : ""}`;
   const canOpen = typeof onOpen === "function" && prediction.game;
-  const body = (
-    <>
-      <span className="pick-row-badges">
-        <TeamBadge code={prediction.awayCode} />
-        <TeamBadge code={prediction.homeCode} />
-      </span>
-      <span className="pick-row-copy">
-        <strong>{nickname(prediction.awayCode)} at {nickname(prediction.homeCode)}</strong>
-        <small>{subtitle}</small>
-      </span>
-      <span className="pick-row-pick">
-        <strong>{pickLine(prediction)}</strong>
-        {isFinal && correct !== null ? (
-          <small className={correct ? "pick-row-correct" : "pick-row-missed"}>
-            {correct ? <CheckCircle2 size={13} aria-hidden="true" /> : <XCircle size={13} aria-hidden="true" />}
-            {correct ? "Correct" : "Missed"}
+  const openMatchup = () => canOpen && onOpen({ ...prediction.game, savedPrediction: prediction });
+  const bestBetsAvailable = isFinal ? Boolean(prediction.bestBets) : Number(prediction.week) === Number(getCalendarWeek());
+  const detailsId = `pick-details-${resultGameKey(prediction) || prediction.id}`.replace(/[^A-Za-z0-9_-]/g, "-");
+
+  function chooseTab(next) {
+    if (next === tab) openMatchup();
+    else setTab(next);
+  }
+
+  return (
+    <div className={`pick-item${expanded ? " expanded" : ""}`}>
+      <button type="button" className={`pick-row${isFinal ? " final" : ""}`} style={teamCardStyle(prediction)}
+        onClick={() => onToggle?.()} aria-expanded={expanded} aria-controls={detailsId}>
+        <span className="pick-row-badges">
+          <TeamBadge code={prediction.awayCode} />
+          <TeamBadge code={prediction.homeCode} />
+        </span>
+        <span className="pick-row-copy">
+          <strong>{nickname(prediction.awayCode)} at {nickname(prediction.homeCode)}</strong>
+          <small>
+            {isFinal && correct !== null ? (
+              <span className={correct ? "pick-row-correct" : "pick-row-missed"}
+                role="img" aria-label={correct ? "Pick correct" : "Pick missed"} title={correct ? "Pick correct" : "Pick missed"}>
+                {correct ? <CheckCircle2 size={14} aria-hidden="true" /> : <XCircle size={14} aria-hidden="true" />}
+              </span>
+            ) : null}
+            {isFinal && correct !== null ? subtitle.replace(/^Final ·/, "") : subtitle}
           </small>
+        </span>
+        {isFinal ? (
+          <span className="pick-row-winner"
+            aria-label={winner === "TIE" ? "Tied game" : `${TEAM_NAMES[winner] || winner} won${correct === null ? "" : correct ? ", our pick was correct" : ", our pick missed"}`}>
+            {winner === "TIE" ? <strong>Tie</strong> : <TeamLogo team={winner} size={96} />}
+          </span>
         ) : (
-          <small>{pickChance(prediction) || (prediction.source === "full-model-error" ? "Model fallback" : "")}</small>
+          <span className="pick-row-pick">
+            <strong>{pickLine(prediction)}</strong>
+            <small>{pickChance(prediction) || (prediction.source === "full-model-error" ? "Model fallback" : "")}</small>
+          </span>
         )}
-      </span>
-    </>
+      </button>
+
+      {expanded && (
+        <div className="pick-details" id={detailsId}>
+          <div className="pick-details-tabs" role="tablist" aria-label="Game details">
+            <button type="button" role="tab" aria-selected={tab === "score"} className={tab === "score" ? "active" : ""}
+              onClick={() => chooseTab("score")}>Score prediction</button>
+            {bestBetsAvailable && (
+              <button type="button" role="tab" aria-selected={tab === "bets"} className={tab === "bets" ? "active" : ""}
+                onClick={() => chooseTab("bets")}>
+                Best bets{prediction.bestBets?.qualified > 0 && <span>{prediction.bestBets.qualified}</span>}
+              </button>
+            )}
+          </div>
+          {tab === "bets" && bestBetsAvailable
+            ? <BestBetsPanel bestBets={prediction.bestBets} kickoff={prediction.kickoff} awayCode={prediction.awayCode} homeCode={prediction.homeCode} />
+            : <PickScorePanel prediction={prediction} />}
+          {canOpen && (
+            <button type="button" className="pick-details-open" onClick={openMatchup}>
+              Tap the tab again, or here, for the full matchup <ChevronRight size={16} aria-hidden="true" />
+            </button>
+          )}
+        </div>
+      )}
+    </div>
   );
-  return canOpen ? (
-    <button type="button" className="pick-row" style={teamCardStyle(prediction)}
-      onClick={() => onOpen({ ...prediction.game, savedPrediction: prediction })}>
-      {body}
-    </button>
-  ) : <div className="pick-row" style={teamCardStyle(prediction)}>{body}</div>;
+}
+
+function PickScorePanel({ prediction }) {
+  const isFinal = hasFinalResult(prediction);
+  const away = prediction.fourthDownAwayScore;
+  const home = prediction.fourthDownHomeScore;
+  const hasScores = Number.isFinite(Number(away)) && Number.isFinite(Number(home)) && away !== null && home !== null;
+  const chance = (value) => (Number.isFinite(Number(value)) && value !== null ? `${Math.round(Number(value) * 100)}% win` : "");
+  const pick = normalizeTeamCode(prediction.fourthDownPick);
+  const team = (code, score, probability) => (
+    <div className={`pick-score-team${pick === normalizeTeamCode(code) ? " picked" : ""}`}>
+      <TeamBadge code={code} size={34} />
+      <span>{nickname(code)}</span>
+      <strong>{displayScore(score)}</strong>
+      <small>{chance(probability)}</small>
+    </div>
+  );
+  return (
+    <div className="pick-score-panel" role="tabpanel">
+      <div className="pick-score-teams">
+        {team(prediction.awayCode, away, prediction.fourthDownAwayWinProbability)}
+        <span className="pick-score-dash" aria-hidden="true">–</span>
+        {team(prediction.homeCode, home, prediction.fourthDownHomeWinProbability)}
+      </div>
+      <div className="pick-score-facts">
+        <span><small>Our pick</small><strong>{pickLine(prediction)}</strong></span>
+        <span><small>Projected total</small><strong>{hasScores ? Number(away) + Number(home) : "—"}</strong></span>
+        <span><small>Bookies' pick</small><strong>{prediction.oddsPick ? normalizeTeamCode(prediction.oddsPick) : "—"}</strong></span>
+      </div>
+      {isFinal && (
+        <p className="pick-score-final">
+          Final: {prediction.awayCode} {displayScore(prediction.actualAwayScore)}–{displayScore(prediction.actualHomeScore)} {prediction.homeCode} · {completedPickLabel(prediction).toLowerCase().replace(/^pick/, "Pick")}
+        </p>
+      )}
+    </div>
+  );
 }
 
 function YourTeamStrip({ team, game, onOpenTeam }) {
