@@ -511,18 +511,20 @@ function FeaturedPick({ prediction, onOpen }) {
   const canOpen = typeof onOpen === "function" && prediction.game;
   const content = (
     <>
+      <span className="featured-pick-watermark away" aria-hidden="true"><TeamLogo team={normalizeTeamCode(prediction.awayCode)} size={240} /></span>
+      <span className="featured-pick-watermark home" aria-hidden="true"><TeamLogo team={normalizeTeamCode(prediction.homeCode)} size={240} /></span>
       <div className="featured-pick-meta">
         <span>{kickoffTime(prediction.kickoff)}{prediction.game?.venue ? ` · ${prediction.game.venue}` : ""}</span>
         <span className="featured-pick-chip">Best pick</span>
       </div>
       <div className="featured-pick-teams">
-        <div className="featured-pick-team">
-          <TeamBadge code={prediction.awayCode} size={56} />
+        <div className={`featured-pick-team${pickIsHome ? "" : " picked"}`}>
+          <span className="featured-pick-logo"><TeamLogo team={normalizeTeamCode(prediction.awayCode)} size={120} /></span>
           <strong>{nickname(prediction.awayCode)}</strong>
         </div>
         <span className="featured-pick-at">at</span>
-        <div className="featured-pick-team home">
-          <TeamBadge code={prediction.homeCode} size={56} />
+        <div className={`featured-pick-team home${pickIsHome ? " picked" : ""}`}>
+          <span className="featured-pick-logo"><TeamLogo team={normalizeTeamCode(prediction.homeCode)} size={120} /></span>
           <strong>{nickname(prediction.homeCode)}</strong>
         </div>
       </div>
@@ -540,11 +542,11 @@ function FeaturedPick({ prediction, onOpen }) {
     </>
   );
   return canOpen ? (
-    <button type="button" className="featured-pick" onClick={() => onOpen({ ...prediction.game, savedPrediction: prediction })}
+    <button type="button" className="featured-pick" style={teamCardStyle(prediction)} onClick={() => onOpen({ ...prediction.game, savedPrediction: prediction })}
       aria-label={`Best pick: ${TEAM_NAMES[prediction.awayCode] || prediction.awayCode} at ${TEAM_NAMES[prediction.homeCode] || prediction.homeCode}, ${pickLine(prediction)}. Open matchup`}>
       {content}
     </button>
-  ) : <div className="featured-pick">{content}</div>;
+  ) : <div className="featured-pick" style={teamCardStyle(prediction)}>{content}</div>;
 }
 
 // One game. Tapping it opens a small panel underneath with the score prediction and Best Bets;

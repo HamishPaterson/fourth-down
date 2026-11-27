@@ -120,32 +120,44 @@
 .your-team-copy strong { font-family: var(--fd-display); font-size: 22px; font-weight: 800; text-transform: uppercase; line-height: 1; }
 .your-team-copy span { color: var(--fd-muted); font-size: 13px; }
 
+/* Best pick: a dark card with each team's colour fading in from its side and big faded logos
+   behind, like the original prediction cards. */
 .featured-pick {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
   display: flex;
   flex-direction: column;
   gap: 14px;
   width: 100%;
   padding: 18px 20px 20px;
-  border: 0;
+  border: 1px solid var(--fd-line);
   border-radius: 28px;
-  color: var(--accent-ink);
+  color: var(--fd-text);
   text-align: left;
-  background: var(--accent);
+  background:
+    radial-gradient(55% 120% at 0% 50%, color-mix(in srgb, var(--away-glow) 34%, transparent), transparent 70%),
+    radial-gradient(55% 120% at 100% 50%, color-mix(in srgb, var(--home-glow) 30%, transparent), transparent 70%),
+    linear-gradient(160deg, var(--fd-raised), var(--fd-surface));
 }
-.featured-pick:hover { filter: brightness(1.05); }
-.featured-pick-meta { display: flex; justify-content: space-between; align-items: center; gap: 10px; font-size: 13px; font-weight: 600; }
-.featured-pick-chip { flex: 0 0 auto; padding: 5px 10px; border-radius: 12px; color: var(--fd-chalk); background: var(--accent-ink); font-size: 12px; }
-.featured-pick-teams { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; }
-.featured-pick-team { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; min-width: 0; }
-.featured-pick-team.home { align-items: flex-end; text-align: right; }
-.featured-pick-team .pick-badge { background: var(--fd-chalk); box-shadow: 0 0 0 3px var(--accent-ink); }
-.featured-pick-team strong { font-family: var(--fd-display); font-size: 26px; font-weight: 800; line-height: .95; text-transform: uppercase; }
-.featured-pick-at { font-family: var(--fd-display); font-size: 18px; font-weight: 700; opacity: .7; }
+.featured-pick:hover { filter: brightness(1.06); }
+.featured-pick-watermark { position: absolute; z-index: -1; top: 50%; opacity: .07; pointer-events: none; transform: translateY(-50%); }
+.featured-pick-watermark.away { left: -70px; }
+.featured-pick-watermark.home { right: -70px; }
+.featured-pick-watermark img { width: 240px !important; height: 240px !important; object-fit: contain; }
+.featured-pick-meta { display: flex; justify-content: space-between; align-items: center; gap: 10px; color: var(--fd-muted); font-size: 13px; font-weight: 600; }
+.featured-pick-chip { flex: 0 0 auto; padding: 5px 10px; border-radius: 12px; color: var(--accent-ink); background: var(--accent); font-size: 12px; font-weight: 700; }
+.featured-pick-teams { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 8px; }
+.featured-pick-team { display: flex; flex-direction: column; align-items: center; gap: 8px; min-width: 0; text-align: center; }
+.featured-pick-logo img { width: clamp(84px, 13vw, 120px) !important; height: clamp(84px, 13vw, 120px) !important; object-fit: contain; filter: drop-shadow(0 10px 16px rgba(0, 0, 0, .5)); }
+.featured-pick-team strong { font-family: var(--fd-display); font-size: 24px; font-weight: 800; line-height: .95; text-transform: uppercase; }
+.featured-pick-team.picked strong { color: var(--accent); }
+.featured-pick-at { color: var(--fd-muted); font-family: var(--fd-display); font-size: 18px; font-weight: 700; }
 .featured-pick-result { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
-.featured-pick-result strong { font-family: var(--fd-display); font-size: 34px; font-weight: 800; line-height: 1; text-transform: uppercase; }
-.featured-pick-result span { font-size: 13px; font-weight: 700; }
-.featured-pick-bar { display: flex; height: 8px; overflow: hidden; border-radius: 4px; background: color-mix(in srgb, var(--accent-ink) 22%, transparent); }
-.featured-pick-bar span { border-radius: 4px; background: var(--accent-ink); }
+.featured-pick-result strong { color: var(--accent); font-family: var(--fd-display); font-size: 34px; font-weight: 800; line-height: 1; text-transform: uppercase; }
+.featured-pick-result span { color: var(--fd-muted); font-size: 13px; font-weight: 700; }
+.featured-pick-bar { display: flex; height: 8px; overflow: hidden; border-radius: 4px; background: var(--fd-raised-2); }
+.featured-pick-bar span { border-radius: 4px; background: var(--fd-chalk); }
 
 .picks-day h2 { margin: 6px 4px 10px; font-size: 24px; }
 .picks-list { display: grid; gap: 10px; }
