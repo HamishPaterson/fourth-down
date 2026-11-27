@@ -1691,6 +1691,25 @@ export function createPredictionLedgerHandler({
   };
 }
 
+const RESULTS_VIEW_COLUMNS = [
+  "id", "game_key", "season", "week", "kickoff", "away_code", "home_code", "fourth_down_pick",
+  "predicted_away_score", "predicted_home_score", "away_win_probability", "home_win_probability",
+  "market_pick", "market_away_score", "market_home_score", "market_total", "market_spread",
+  "model_version", "frozen_at", "actual_away_score", "actual_home_score", "actual_winner",
+  "fourth_down_correct", "market_correct", "graded_at", "created_at", "updated_at",
+].join(",");
+
+// The win probability Fourth Down gave its own pick.
+export function pickedWinProbability(snapshot) {
+  const pick = String(snapshot?.fourthDownPick || "").toUpperCase();
+  const value = pick && pick === String(snapshot.homeCode || "").toUpperCase()
+    ? snapshot.fourthDownHomeWinProbability
+    : pick && pick === String(snapshot.awayCode || "").toUpperCase()
+      ? snapshot.fourthDownAwayWinProbability
+      : null;
+  return value === null || value === undefined || value === "" || !Number.isFinite(Number(value)) ? null : Number(value);
+}
+
 async function readSnapshots(supabase, request, response) {
   const season = ledgerIntegerOrNull(request.query?.season);
   const week = ledgerIntegerOrNull(request.query?.week);
@@ -1699,9 +1718,12 @@ async function readSnapshots(supabase, request, response) {
     return response.status(400).json({ error: "Invalid prediction season or week" });
   }
 
+  const resultsView = String(request.query?.view || "").toLowerCase() === "results";
   let query = supabase
     .from("prediction_snapshots")
-    .select("*")
+    // Each row's stored detail (data_quality) is over half a megabyte, so the Results page
+    // reads only the plain columns it grades from; reading every full row timed out.
+    .select(resultsView ? RESULTS_VIEW_COLUMNS : "*")
     .order("week", { ascending: true })
     .order("kickoff", { ascending: true });
 
@@ -1716,7 +1738,8 @@ async function readSnapshots(supabase, request, response) {
 
   let snapshots = (data || []).map(databaseToSnapshot);
 
-  if (String(request.query?.view || "").toLowerCase() === "results") {
+  if (resultsView) {
+    snapshots = snapshots.map((snapshot) => ({ ...snapshot, fourthDownWinnerProbability: snapshot.fourthDownWinnerProbability ?? pickedWinProbability(snapshot) }));
     snapshots = snapshots.map((snapshot) => ({
       id: snapshot.id,
       season: snapshot.season,
