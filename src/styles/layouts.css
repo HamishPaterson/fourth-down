@@ -473,3 +473,69 @@ button.standings-row:hover { background-color: var(--fd-raised); }
 .pick-row-score .pick-row-missed { color: #FF8A8A; display: inline-flex; }
 .pick-row.final .pick-row-copy { gap: 4px; }
 @media (max-width: 520px) { .pick-row-score { font-size: 28px; } }
+
+/* ---------- Best Bets: readable on any screen ---------- */
+.best-bets-panel { min-height: 0; }
+.best-bet-highlights { gap: 10px; margin: 12px 0; }
+.best-bet-highlight {
+  padding: 14px 16px;
+  border: 0;
+  border-radius: 16px;
+  background:
+    radial-gradient(60% 140% at 0% 50%, color-mix(in srgb, var(--bet-team, var(--accent)) 24%, transparent), transparent 70%),
+    var(--fd-surface) !important;
+  box-shadow: none !important;
+}
+.best-bet-highlight > small { color: var(--accent); font-size: 12px; font-weight: 800; letter-spacing: .08em; }
+.best-bet-highlight > strong { margin-top: 6px; color: var(--fd-text); font-size: 18px; }
+.best-bet-highlight > span { margin-top: 4px; color: var(--fd-text); opacity: 1; font-size: 14px; }
+.best-bet-highlight > p { margin-top: 6px; color: var(--fd-muted); opacity: 1; font-size: 13px; line-height: 1.45; }
+.best-bets-list { gap: 12px; }
+.best-bet-card {
+  margin-bottom: 0;
+  padding: 18px 18px 16px;
+  border: 0;
+  border-radius: 18px;
+  color: var(--fd-text);
+  background:
+    radial-gradient(60% 140% at 0% 50%, color-mix(in srgb, var(--bet-team, var(--accent)) 24%, transparent), transparent 70%),
+    var(--fd-surface) !important;
+  box-shadow: none !important;
+}
+.best-bet-td { margin-bottom: 12px; }
+.best-bet-heading small { color: var(--accent); font-size: 12px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
+.best-bet-heading strong { margin-top: 5px; color: var(--fd-text); font-size: 20px; line-height: 1.2; }
+.best-bet-provider { display: block; margin-top: 4px; color: var(--fd-muted); font-size: 12px; font-style: normal; }
+.best-bet-price { padding: 8px 12px; border-radius: 12px; color: var(--accent-ink); background: var(--accent); font-size: 16px; font-weight: 800; }
+.best-bet-metrics { gap: 8px; margin: 14px 0; }
+.best-bet-metrics.three { grid-template-columns: repeat(3, 1fr); }
+.best-bet-metrics span { padding: 10px 8px; border-radius: 12px; background: var(--fd-raised-2); }
+.best-bet-metrics small { color: var(--fd-muted); opacity: 1; font-size: 11px; font-weight: 700; letter-spacing: .04em; }
+.best-bet-metrics strong { margin-top: 3px; color: var(--fd-text); font-size: 17px; }
+.best-bet-card p { margin: 10px 0 6px; color: var(--fd-text); font-size: 14px; line-height: 1.5; }
+.best-bet-card p.best-bet-why { padding: 12px 14px; border-radius: 12px; color: var(--fd-muted); background: var(--fd-raised-2); }
+.best-bet-card p.best-bet-why strong { color: var(--fd-text); }
+.best-bet-confidence { display: inline-flex; margin: 4px 8px 6px 0; padding: 5px 10px; border-radius: 999px; color: #14100C; background: #FF9F6E; font-size: 13px; font-weight: 800; }
+.best-bet-confidence.high { color: var(--accent-ink); background: var(--accent); }
+.best-bet-confidence.medium { background: #FFD166; }
+.best-bet-risk { color: #FFCC83; font-size: 14px; line-height: 1.45; }
+.best-bet-card footer { margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--fd-line); color: var(--fd-muted); opacity: 1; font-size: 12px; }
+.best-bets-market-note { margin: 0 0 12px; padding: 12px 14px; border: 0; border-radius: 14px; color: #FFD79D; background: rgba(255, 204, 131, .1); font-size: 13px; }
+.best-bets-empty { min-height: 160px; border-color: var(--fd-line); }
+.best-bets-empty span { color: var(--fd-muted); opacity: 1; font-size: 14px; }
+.best-bets-disclaimer { color: var(--fd-muted); opacity: 1; font-size: 12px; }
+@media (max-width: 520px) {
+  .best-bet-heading strong { font-size: 18px; }
+  .best-bet-metrics.three { grid-template-columns: 1fr 1fr; }
+}
+
+/* The open pick panel fades in from both teams' sides, like the pick rows. */
+.pick-details {
+  background:
+    radial-gradient(70% 120% at 0% 40%, color-mix(in srgb, var(--away-glow, transparent) 28%, transparent), transparent 70%),
+    radial-gradient(70% 120% at 100% 40%, color-mix(in srgb, var(--home-glow, transparent) 24%, transparent), transparent 70%),
+    var(--fd-surface);
+}
+.pick-score-facts span,
+.best-bet-metrics span,
+.best-bet-card p.best-bet-why { background: color-mix(in srgb, var(--fd-raised-2) 78%, transparent); }

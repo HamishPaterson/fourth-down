@@ -609,7 +609,7 @@ export function PickRow({ prediction, onOpen, expanded = false, onToggle }) {
       </button>
 
       {expanded && (
-        <div className="pick-details" id={detailsId}>
+        <div className="pick-details" id={detailsId} style={teamCardStyle(prediction)}>
           <div className="pick-details-tabs" role="tablist" aria-label="Game details">
             <button type="button" role="tab" aria-selected={tab === "score"} className={tab === "score" ? "active" : ""}
               onClick={() => chooseTab("score")}>Score prediction</button>
@@ -1012,9 +1012,7 @@ function BestBetsPanel({ bestBets, kickoff, awayCode, homeCode }) {
                   <small>{bet.category} · {bet.market}</small>
                   <strong>{formatFullPlayerSelection(bet.selection)}</strong>
                   {bet.rawMarketType && (
-                    <em style={{ display: "block", marginTop: "3px", opacity: 0.55, fontSize: "8px", fontStyle: "normal" }}>
-                      Provider market: {bet.rawMarketType} · Full game
-                    </em>
+                    <em className="best-bet-provider">Provider market: {bet.rawMarketType} · Full game</em>
                   )}
                 </div>
                 <span className="best-bet-price">{formatAustralianOdds(bet.decimalOdds, bet.price)}</span>
@@ -1026,10 +1024,10 @@ function BestBetsPanel({ bestBets, kickoff, awayCode, homeCode }) {
                 <span><small>Est. EV</small><strong>+{formatPercent(bet.expectedValue)}</strong></span>
               </div>
               <p>{bet.reason}</p>
-              <p style={{ marginTop: "8px", padding: "9px", borderRadius: "8px", background: "rgba(255,255,255,0.06)" }}>
+              <p className="best-bet-why">
                 <strong>Why it qualified:</strong> {bet.qualificationReason}
               </p>
-              <small style={{ display: "inline-flex", margin: "2px 8px 5px 0", padding: "4px 8px", borderRadius: "999px", background: bet.confidenceLevel === "High" ? "var(--accent)" : bet.confidenceLevel === "Medium" ? "#ffd166" : "#ff9f6e", color: "#090b08", fontWeight: 900 }}>
+              <small className={`best-bet-confidence ${String(bet.confidenceLevel || "Cautious").toLowerCase()}`}>
                 {bet.confidenceLevel || "Cautious"} confidence
               </small>
               <small className="best-bet-risk">Risk: {bet.risk}</small>
@@ -1097,30 +1095,24 @@ function AnytimeTdScorer({ scorer, awayCode, homeCode }) {
   const hasPrice = usableDecimalOdds(scorer?.decimalOdds, scorer?.price) !== null;
 
   return (
-    <article
-      className="best-bet-card"
-      style={{
-        ...getBetTeamStyle(scorer, awayCode, homeCode),
-        marginBottom: "12px",
-      }}
-    >
+    <article className="best-bet-card best-bet-td" style={getBetTeamStyle(scorer, awayCode, homeCode)}>
       <div className="best-bet-heading">
         <div>
-          <small style={{ color: "#ffad5c" }}>ANYTIME TD SCORER</small>
+          <small>Anytime TD scorer</small>
           <strong>{selection}</strong>
         </div>
         <span className="best-bet-price">
           {modelPick ? "Model pick" : "Unavailable"}
         </span>
       </div>
-      <div className="best-bet-metrics" style={{ gridTemplateColumns: "repeat(3, 1fr)" }}>
+      <div className="best-bet-metrics three">
         <span><small>Model probability</small><strong>{scorerProbabilityLabel(scorer)}</strong></span>
         <span><small>Confidence</small><strong>{scorer?.confidenceLevel || "Cautious"}{modelPick ? ` · Role ${(scorer.roleConfidence * 100).toFixed(0)}%` : ""}</strong></span>
         <span><small>Price</small><strong>{hasPrice ? formatAustralianOdds(scorer.decimalOdds, scorer.price) : "Unavailable"}</strong></span>
       </div>
       <p>{scorer?.explanation || "Player touchdown projections are unavailable."}</p>
       {scorer?.qualificationReason && (
-        <p style={{ marginTop: "8px", padding: "9px", borderRadius: "8px", background: "rgba(255,255,255,0.06)" }}>
+        <p className="best-bet-why">
           <strong>Why this scorer:</strong> {scorer.qualificationReason}
         </p>
       )}
@@ -1176,12 +1168,8 @@ function getBetTeamStyle(bet, awayCode, homeCode) {
   const teamCode = resolveBetTeamCode(bet, awayCode, homeCode);
   const colours = BET_TEAM_COLOURS[teamCode];
   if (!colours) return undefined;
-  const [primary, secondary] = colours;
-  return {
-    borderColor: secondary,
-    background: `linear-gradient(135deg, ${hexToRgba(primary, 0.94)} 0%, ${hexToRgba(primary, 0.82)} 58%, ${hexToRgba(secondary, 0.48)} 100%)`,
-    boxShadow: `inset 5px 0 0 ${secondary}`,
-  };
+  // A thin stripe in the team's colour; the card itself stays on the dark surface so text is easy to read.
+  return { "--bet-team": getTeamTheme(teamCode)["--team-glow"] };
 }
 
 function resolveBetTeamCode(bet, awayCode, homeCode) {
@@ -1207,12 +1195,6 @@ function extractPlayerNameFromSelection(selection) {
   return String(selection || "")
     .replace(/\s+(?:anytime TD|over|under)\b.*$/i, "")
     .trim();
-}
-
-function hexToRgba(hex, alpha) {
-  const value = String(hex || "").replace("#", "");
-  const integer = Number.parseInt(value, 16);
-  return `rgba(${(integer >> 16) & 255}, ${(integer >> 8) & 255}, ${integer & 255}, ${alpha})`;
 }
 
 function formatFullPlayerSelection(value) {
