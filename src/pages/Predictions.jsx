@@ -557,7 +557,7 @@ function PickRow({ prediction, onOpen, expanded = false, onToggle }) {
   const correct = isFinal && prediction.fourthDownPick && winner !== "TIE"
     ? normalizeTeamCode(prediction.fourthDownPick) === winner : null;
   const subtitle = isFinal
-    ? `Final · ${prediction.awayCode} ${displayScore(prediction.actualAwayScore)}–${displayScore(prediction.actualHomeScore)} ${prediction.homeCode}`
+    ? `Final · ${displayScore(prediction.actualAwayScore)}–${displayScore(prediction.actualHomeScore)}`
     : `${kickoffTime(prediction.kickoff)}${prediction.game?.venue ? ` · ${prediction.game.venue}` : ""}`;
   const canOpen = typeof onOpen === "function" && prediction.game;
   const openMatchup = () => canOpen && onOpen({ ...prediction.game, savedPrediction: prediction });
@@ -590,14 +590,15 @@ function PickRow({ prediction, onOpen, expanded = false, onToggle }) {
           </small>
         </span>
         {isFinal ? (
-          <span className="pick-row-winner"
+          <span className={`pick-row-slant pick-row-winner${correct === null ? "" : correct ? " correct" : " missed"}`}
             aria-label={winner === "TIE" ? "Tied game" : `${TEAM_NAMES[winner] || winner} won${correct === null ? "" : correct ? ", our pick was correct" : ", our pick missed"}`}>
             {winner === "TIE" ? <strong>Tie</strong> : <TeamLogo team={winner} size={96} />}
           </span>
         ) : (
-          <span className="pick-row-pick">
-            <strong>{pickLine(prediction)}</strong>
-            <small>{pickChance(prediction) || (prediction.source === "full-model-error" ? "Model fallback" : "")}</small>
+          <span className="pick-row-slant pick-row-upcoming"
+            aria-label={normalizeTeamCode(prediction.fourthDownPick) ? `Our pick: ${pickLine(prediction)}${pickChance(prediction) ? `, ${pickChance(prediction)}` : ""}` : "No pick"}>
+            {normalizeTeamCode(prediction.fourthDownPick) && <TeamLogo team={normalizeTeamCode(prediction.fourthDownPick)} size={96} />}
+            {pickChance(prediction) && <small className="pick-row-chance" aria-hidden="true">{pickChance(prediction)}</small>}
           </span>
         )}
       </button>

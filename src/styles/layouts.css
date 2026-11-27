@@ -319,17 +319,15 @@ button.standings-row:hover { background-color: var(--fd-raised); }
   width: 44px;
   height: 44px;
   padding: 0;
-  border: 1px solid var(--fd-line);
+  border: 0;
   border-radius: 22px;
-  color: var(--fd-text);
-  background: color-mix(in srgb, var(--fd-raised) 82%, transparent);
-  -webkit-backdrop-filter: blur(14px);
-  backdrop-filter: blur(14px);
+  color: var(--accent-ink);
+  background: var(--accent);
   box-shadow: 0 8px 24px rgba(0, 0, 0, .45);
   cursor: pointer;
 }
-.floating-back-button:hover { background: var(--fd-raised-2); }
-.floating-back-button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.floating-back-button:hover { filter: brightness(1.1); }
+.floating-back-button:focus-visible { outline: 2px solid var(--fd-chalk); outline-offset: 2px; }
 .app-header.has-back .brand { margin-left: 56px; }
 @media (max-width: 600px) {
   .floating-back-button { top: calc(env(safe-area-inset-top, 0px) + 12px); }
@@ -338,23 +336,18 @@ button.standings-row:hover { background-color: var(--fd-raised); }
 /* ---------- Pick rows: finished games and the tap-open panel ---------- */
 .pick-item { display: grid; }
 .pick-row { position: relative; overflow: hidden; cursor: pointer; }
-.pick-row.final { padding-right: calc(25% + 10px); }
+/* Every row ends in a slanted panel: our pick's logo before kick-off, the winner's logo after. */
+.pick-row { --slant-width: clamp(100px, 25%, 260px); padding-right: calc(var(--slant-width) + 10px); }
 .pick-item.expanded .pick-row { border-radius: 22px 22px 8px 8px; }
-.pick-row-winner {
+.pick-row-slant {
   position: absolute;
   inset: 0 0 0 auto;
-  width: 25%;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: flex-end;
-  padding: 0 6px 7px 22px;
+  width: var(--slant-width);
   overflow: hidden;
   clip-path: polygon(26px 0, 100% 0, 100% 100%, 0 100%);
   background: var(--fd-raised-2);
 }
-/* The winner's full logo across the slanted panel. */
-.pick-row-winner img {
+.pick-row-slant img {
   position: absolute;
   top: 50%;
   left: calc(50% + 14px);
@@ -364,6 +357,21 @@ button.standings-row:hover { background-color: var(--fd-raised); }
   transform: translate(-46%, -50%) rotate(-10deg);
   filter: drop-shadow(0 3px 8px rgba(0, 0, 0, .5));
 }
+/* Win chance before kick-off, as a small label on the pick's logo. */
+.pick-row-chance {
+  position: absolute;
+  right: 8px;
+  bottom: 6px;
+  padding: 2px 7px;
+  border-radius: 9px;
+  color: var(--fd-chalk);
+  background: rgba(12, 13, 17, .8);
+  font-size: 11px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.pick-row-winner.correct { background: linear-gradient(135deg, #22A061, #146B3F); }
+.pick-row-winner.missed { background: linear-gradient(135deg, #C9373F, #8A1F27); }
 .pick-row-winner > strong { position: absolute; top: 50%; left: calc(50% + 10px); transform: translate(-50%, -50%); font-family: var(--fd-display); font-size: 20px; font-weight: 800; text-transform: uppercase; }
 .pick-row-copy small .pick-row-correct,
 .pick-row-copy small .pick-row-missed { display: inline-flex; align-items: center; gap: 3px; font-weight: 700; vertical-align: -2px; margin-right: 2px; }
@@ -449,4 +457,10 @@ button.standings-row:hover { background-color: var(--fd-raised); }
     padding: 10px 8px;
     font-size: 13px;
   }
+}
+@media (max-width: 520px) {
+  .pick-row { gap: 9px; padding-left: 12px; }
+  .pick-row-badges .pick-badge { --badge-size: 34px !important; }
+  .pick-row-copy strong { font-size: 14px; }
+  .pick-row-copy small { font-size: 12px; }
 }
