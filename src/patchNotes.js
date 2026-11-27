@@ -2,6 +2,33 @@
 // anyone who has not seen the newest entry is shown it once when they open the app.
 export const PATCH_NOTES = [
   {
+    id: "2026-11-27-layouts",
+    date: "27 November 2026",
+    title: "Picks, matchups and standings, redesigned",
+    sections: [
+      {
+        heading: "Picks",
+        items: [
+          "The app now opens on this week's picks: the game we're most confident about up top, then every game by day with our pick and win chance.",
+          "Your team's game is pinned at the top. Tap it, or your team's badge in the corner, to open its page.",
+        ],
+      },
+      {
+        heading: "Matchups",
+        items: [
+          "Each matchup leads with both teams, our win chance, the bookies' line and a \"What's driving it\" breakdown showing how many points each factor is worth.",
+          "Best Bets, odds, weather and the full model detail are all still there further down.",
+        ],
+      },
+      {
+        heading: "Standings",
+        items: [
+          "Standings show the leader up top, then a simple table with record, points difference, current run and playoff seeds.",
+        ],
+      },
+    ],
+  },
+  {
     id: "2026-11-27",
     date: "27 November 2026",
     title: "A new look, in your team's colours",

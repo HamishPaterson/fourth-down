@@ -1,13 +1,13 @@
 import { useEffect, useState } from "react";
 import { apiFetch as fetch } from "../services/supabaseAuth.js";
 import {
+  ArrowLeft,
   CalendarDays,
   Clock,
   CloudSun,
   MapPin,
   RefreshCw,
 } from "lucide-react";
-import { TEAM_NAMES } from "../data.js";
 import { getTeamTheme } from "../services/teamThemes.js";
 import {
   getStadiumWeather,
@@ -17,9 +17,9 @@ import {
   findOddsForGame,
   getNflOdds,
 } from "../services/oddsApi.js";
-import TeamLogo from "../components/TeamLogo.jsx";
 import BettingOdds from "../components/BettingOdds.jsx";
 import MatchupPrediction from "../components/MatchupPrediction.jsx";
+import { PredictionCard } from "./Predictions.jsx";
 import FourthDownLoader from "../components/FourthDownLoader.jsx";
 import { shouldShowBlockingLoader } from "../components/fourthDownLoader.js";
 
@@ -231,145 +231,73 @@ export default function Matchup({ game, onBack }) {
 
   return (
     <section
-      className="matchup-page-themed"
+      className="matchup-page-themed matchup-page"
       style={matchupTheme}
     >
-      <span
-        className="matchup-page-away-watermark"
-        aria-hidden="true"
-      />
-      <span
-        className="matchup-page-home-watermark"
-        aria-hidden="true"
-      />
-
-      <div className="matchup-toolbar">
-        <button
-          type="button"
-          className="secondary matchup-away-action"
-          onClick={onBack}
-        >
-          Back to Predictions
+      <div className="matchup-topbar">
+        <button type="button" className="header-round-button" onClick={onBack} aria-label="Back to picks">
+          <ArrowLeft size={20} aria-hidden="true" />
         </button>
-
-        <button
-          type="button"
-          className="secondary refresh-button matchup-home-action"
-          onClick={refreshAll}
-          disabled={loading || oddsLoading}
-        >
-          <RefreshCw
-            size={16}
-            className={loading || oddsLoading ? "spin" : ""}
-          />
-          Refresh game
+        <span className="matchup-status-chip">
+          <span aria-hidden="true" />
+          {showScore ? formatStatus(gameStatus) : validKickoff ? `Kicks off ${kickoff.toLocaleString(undefined, { weekday: "short", hour: "numeric", minute: "2-digit" })}` : formatStatus(gameStatus)}
+        </span>
+        <button type="button" className="header-round-button" onClick={refreshAll}
+          disabled={loading || oddsLoading} aria-label="Refresh game">
+          <RefreshCw size={18} className={loading || oddsLoading ? "spin" : ""} aria-hidden="true" />
         </button>
       </div>
 
-      <div className="card matchup-card matchup-battle-card">
-        <div className="game-meta matchup-battle-meta">
-          <span>
-            Regular season · Week {liveGame?.week || game.week}
-          </span>
-          <span className="game-status">
-            {formatStatus(gameStatus)}
-          </span>
-        </div>
-
-        <div className="matchup-row matchup-battle-row">
-          <LargeTeam
-            code={awayCode}
-            label="Away"
-            score={awayScore}
-            showScore={showScore}
-            side="away"
-          />
-
-          <div className="versus large matchup-battle-versus">
-            <small>MATCHUP</small>
-            <strong>VS</strong>
+      <MatchupPrediction
+        key={`${awayCode}:${homeCode}:${game.week}`}
+        savedPrediction={game.savedPrediction}
+        awayCode={awayCode}
+        homeCode={homeCode}
+        kickoff={validKickoff ? kickoff.toISOString() : null}
+        venue={liveGame?.venue || game.venue}
+        weather={weather}
+        oddsEvent={oddsEvent}
+        week={Number(game.week || liveGame?.week || 1)}
+        scheduleContext={game.scheduleContext || null}
+        actualAwayScore={isCompletedStatus(gameStatus) ? awayScore : null}
+        actualHomeScore={isCompletedStatus(gameStatus) ? homeScore : null}
+        liveScore={showScore ? { away: awayScore, home: homeScore, label: formatStatus(gameStatus) } : null}
+      >
+        <section className="card matchup-section" aria-label="Game details">
+          <h2>Game details</h2>
+          <div className="matchup-details-grid matchup-colour-details">
+            <GameDetail className="away-detail" icon={<CalendarDays size={18} />} label="Date" value={dateText} />
+            <GameDetail className="split-detail" icon={<Clock size={18} />} label="Local time" value={timeText} />
+            <GameDetail className="home-detail" icon={<MapPin size={18} />} label="Venue"
+              value={liveGame?.venue || game.venue || "Venue unavailable"} />
+            <GameDetail className="weather-detail" icon={<CloudSun size={18} />} label="Weather"
+              value={describeWeather(weather) || "Forecast unavailable"} />
           </div>
+          {liveGame ? (
+            <QuarterScoreTable game={liveGame} awayCode={awayCode} homeCode={homeCode} />
+          ) : (
+            <EmptyPanel title="Scoring by quarter" text="Quarter scores will appear once game information is available." />
+          )}
+        </section>
 
-          <LargeTeam
-            code={homeCode}
-            label="Home"
-            score={homeScore}
-            showScore={showScore}
-            side="home"
-          />
-        </div>
-
-        <div className="matchup-details-grid matchup-colour-details">
-          <GameDetail
-            className="away-detail"
-            icon={<CalendarDays size={18} />}
-            label="Date"
-            value={dateText}
-          />
-          <GameDetail
-            className="split-detail"
-            icon={<Clock size={18} />}
-            label="Local time"
-            value={timeText}
-          />
-          <GameDetail
-            className="home-detail"
-            icon={<MapPin size={18} />}
-            label="Venue"
-            value={
-              liveGame?.venue ||
-              game.venue ||
-              "Venue unavailable"
-            }
-          />
-          <GameDetail
-            className="weather-detail"
-            icon={<CloudSun size={18} />}
-            label="Weather"
-            value={
-              describeWeather(weather) ||
-              "Forecast unavailable"
-            }
-          />
-        </div>
-
-        <BettingOdds
-          event={oddsEvent}
-          awayCode={awayCode}
-          homeCode={homeCode}
-          status={oddsStatus}
-          loading={oddsLoading}
-          onRefresh={loadOdds}
-        />
-
-        {liveGame ? (
-          <QuarterScoreTable
-            game={liveGame}
-            awayCode={awayCode}
-            homeCode={homeCode}
-          />
-        ) : (
-          <EmptyPanel
-            title="Scoring by quarter"
-            text="Quarter scores will appear once game information is available."
-          />
+        {game.savedPrediction && (
+          <section className="matchup-section matchup-pick-detail" aria-label="Pick and best bets">
+            <h2>Pick and best bets</h2>
+            <PredictionCard prediction={game.savedPrediction} />
+          </section>
         )}
 
-        <MatchupPrediction
-          key={`${awayCode}:${homeCode}:${game.week}`}
-          savedPrediction={game.savedPrediction}
-          awayCode={awayCode}
-          homeCode={homeCode}
-          kickoff={validKickoff ? kickoff.toISOString() : null}
-          venue={liveGame?.venue || game.venue}
-          weather={weather}
-          oddsEvent={oddsEvent}
-          week={Number(game.week || liveGame?.week || 1)}
-          scheduleContext={game.scheduleContext || null}
-          actualAwayScore={isCompletedStatus(gameStatus) ? awayScore : null}
-          actualHomeScore={isCompletedStatus(gameStatus) ? homeScore : null}
-        />
-      </div>
+        <section className="card matchup-section" aria-label="Odds">
+          <BettingOdds
+            event={oddsEvent}
+            awayCode={awayCode}
+            homeCode={homeCode}
+            status={oddsStatus}
+            loading={oddsLoading}
+            onRefresh={loadOdds}
+          />
+        </section>
+      </MatchupPrediction>
 
       {status && (
         <div
@@ -434,29 +362,6 @@ function scoreOrNull(value) {
 
   const score = Number(value);
   return Number.isFinite(score) ? score : null;
-}
-
-function LargeTeam({
-  code,
-  label,
-  score,
-  showScore,
-  side,
-}) {
-  return (
-    <div
-      className={`large-team battle-team battle-team-${side}`}
-    >
-      <span className="battle-logo-stage">
-        <TeamLogo team={code} size={150} />
-      </span>
-      <h2>{TEAM_NAMES[code] || code}</h2>
-      <small>{label}</small>
-      {showScore && (
-        <div className="live-team-score">{score}</div>
-      )}
-    </div>
-  );
 }
 
 function GameDetail({

@@ -1,9 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
-import { ArrowRight } from "lucide-react";
 import { getTeams, getStandings } from "../services/nflApi.js";
-import { getTeamTheme } from "../services/teamThemes.js";
-import TeamLogo from "../components/TeamLogo.jsx";
-import TeamCardStats from "../components/TeamCardStats.jsx";
+import StandingsTable from "../components/StandingsTable.jsx";
 import Divisions from "./Divisions.jsx";
 import FourthDownLoader from "../components/FourthDownLoader.jsx";
 import { ConferenceTab } from "../components/LeagueTabs.jsx";
@@ -149,8 +146,8 @@ export default function Conference({ onSelectTeam }) {
     <section className="conference-page">
       <div className="section-heading">
         <div>
-          <span className="eyebrow">LEAGUE STRUCTURE</span>
-          <h1>Conference</h1>
+          <p className="picks-kicker">Ladder and playoff seeds</p>
+          <h1>Standings</h1>
         </div>
         <span className="count-pill">{status}</span>
       </div>
@@ -193,48 +190,16 @@ export default function Conference({ onSelectTeam }) {
             ))}
           </div>
 
-          <div className="team-grid">
-            {rankedCodes.map((code, index) => {
-              const liveTeam = teamsByCode[code];
-              const standing = standingsByCode[code];
-              const division = DIVISION_BY_CODE[code];
-              const team = {
-                abbreviation: code,
-                full_name: TEAM_NAMES[code] || code,
-                ...liveTeam,
-                conference: conference.name,
-                division,
-              };
-              const rank = standing ? index + 1 : null;
-
-              return (
-                <button
-                  type="button"
-                  className="card api-team team-colour-card"
-                  key={code}
-                  style={getTeamTheme(code)}
-                  onClick={() => onSelectTeam?.(team)}
-                >
-                  <span className="team-card-watermark" aria-hidden="true" />
-
-                  <span className="division-rank" aria-hidden="true">
-                    {rank ?? "—"}
-                  </span>
-
-                  <span className="team-card-logo">
-                    <TeamLogo team={code} size={76} />
-                  </span>
-
-                  <span className="team-card-copy">
-                    <strong>{team.full_name}</strong>
-                  </span>
-                  <TeamCardStats division={division} record={formatRecord(standing)} team={code} />
-
-                  <ArrowRight className="team-card-arrow" size={18} />
-                </button>
-              );
-            })}
-          </div>
+          <StandingsTable
+            showSeeds
+            leaderLabel={standingsByCode[rankedCodes[0]]?.playoffSeed === 1 ? `${conference.name} top seed` : `${conference.name} leader`}
+            onSelectTeam={onSelectTeam}
+            teams={rankedCodes.map((code) => ({
+              code,
+              standing: standingsByCode[code],
+              team: { abbreviation: code, full_name: TEAM_NAMES[code] || code, ...teamsByCode[code], conference: conference.name, division: DIVISION_BY_CODE[code] },
+            }))}
+          />
         </>
       )}
     </section>
@@ -262,12 +227,6 @@ function rankConference(codes, standingsByCode) {
 
     return (sb.wins ?? 0) - (sa.wins ?? 0);
   });
-}
-
-function formatRecord(standing) {
-  if (!standing) return "0-0";
-  const { wins = 0, losses = 0, ties = 0 } = standing;
-  return ties > 0 ? `${wins}-${losses}-${ties}` : `${wins}-${losses}`;
 }
 
 function normalizeTeamCode(code) {

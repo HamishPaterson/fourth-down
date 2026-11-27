@@ -149,7 +149,7 @@ test("first open asks for a team; the answer persists, reaches the account, and 
   assert.equal(picker(), undefined, "the picker closes once answered");
   assert.equal(find(renderApp(), (node) => node.props?.favoriteTeam === "PIT").props.favoriteTeam, "PIT");
   assert.equal(renderApp().props.style["--accent"], TEAM_ACCENTS.PIT[1]);
-  find(renderApp(), (node) => node.props?.page === "home" && node.props.onChange).props.onChange("settings");
+  find(renderApp(), (node) => node.props?.page === "predictions" && node.props.onChange).props.onChange("settings");
   const settings = find(renderApp(), (node) => typeof node.props?.onSave === "function").props;
   settings.onSave(null);
   assert.equal(renderApp().props.style["--accent"], "#FF6B1A");

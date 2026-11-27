@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
 import { apiFetch as fetch } from "../services/supabaseAuth.js";
-import { CheckCircle2, CircleHelp, CloudSun, MapPin, Swords, Wind, XCircle } from "lucide-react";
+import { CheckCircle2, ChevronRight, CircleHelp, CloudSun, MapPin, Swords, Wind, XCircle } from "lucide-react";
 import TeamLogo from "../components/TeamLogo.jsx";
 import { TEAM_NAMES } from "../data.js";
 import { getTeamTheme } from "../services/teamThemes.js";
+import { teamNickname } from "../services/teamAccent.js";
 import {
   hasMigratedSharedLedger,
   migrateLocalPredictionLedger,
@@ -36,11 +37,12 @@ const WEEKLY_PARLAY_MODEL_PROBABILITY_MIN = 0.65;
 const WEEKLY_PARLAY_MODEL_PROBABILITY_FLOOR = 0.55;
 const WEEKLY_PARLAY_LEG_COUNT = 5;
 
-export default function Predictions({ onOpen }) {
+export default function Predictions({ onOpen, favoriteTeam, onOpenTeam }) {
   const calendarWeek = getCalendarWeek();
   const [week, setWeek] = useState(() => calendarWeek);
   const [rows, setRows] = useState([]);
   const [filter, setFilter] = useState("all");
+  const [day, setDay] = useState("all");
   const [status, setStatus] = useState("Loading predictions...");
 
   // The default displayed week follows the authoritative game lifecycle: while
@@ -337,99 +339,92 @@ export default function Predictions({ onOpen }) {
 
   if (showInitialLoader) return <FourthDownLoader />;
 
-  return (
-    <section className="predictions-page">
-      <div className="section-heading predictions-heading">
-        <div>
-          <span className="eyebrow">WEEKLY FORECAST</span>
-          <h1>Predictions</h1>
-          <p>
-            Fourth Down&apos;s current picks and projected scores before
-            kickoff.
-          </p>
-        </div>
+  const sorted = [...filtered].sort(sortPredictions);
+  const days = [...new Set(sorted.map((row) => kickoffDay(row.kickoff)).filter(Boolean))];
+  const featured = day === "all" && filter === "all" ? pickOfTheWeek(sorted) : null;
+  const visible = sorted.filter((row) => row !== featured && (day === "all" || kickoffDay(row.kickoff) === day));
+  const groups = groupByDay(visible);
+  const favouriteGame = favoriteTeam
+    ? predictions.find((row) => [row.awayCode, row.homeCode].map(normalizeTeamCode).includes(normalizeTeamCode(favoriteTeam)))
+    : null;
 
-        <div className="predictions-filters">
-          <label>
-            Week
-            <select
-              value={week}
-              onChange={(event) => setWeek(Number(event.target.value))}
-            >
-              {Array.from({ length: calendarWeek }, (_, index) => index + 1).map(
-                (value) => (
-                  <option key={value} value={value}>
-                    Week {value}
-                  </option>
-                )
-              )}
+  return (
+    <section className="predictions-page picks-page">
+      <div className="picks-heading">
+        <p className="picks-kicker">Week {week} · {predictions.length} game{predictions.length === 1 ? "" : "s"}</p>
+        <h1>Our picks</h1>
+        <div className="picks-controls">
+          <label className="picks-select">
+            <span className="visually-hidden">Week</span>
+            <select value={week} onChange={(event) => setWeek(Number(event.target.value))} aria-label="Week">
+              {Array.from({ length: calendarWeek }, (_, index) => index + 1).map((value) => (
+                <option key={value} value={value}>Week {value}</option>
+              ))}
             </select>
           </label>
-
-          <label>
-            View
-            <select
-              value={filter}
-              onChange={(event) => setFilter(event.target.value)}
-            >
-              <option value="all">All predictions</option>
-              <option value="completed">Completed Games</option>
-              <option value="agree">Market agreement</option>
-              <option value="disagree">Market disagreement</option>
+          <label className="picks-select">
+            <span className="visually-hidden">Show</span>
+            <select value={filter} onChange={(event) => setFilter(event.target.value)} aria-label="Show">
+              <option value="all">All games</option>
+              <option value="completed">Completed games</option>
+              <option value="agree">Agrees with the bookies</option>
+              <option value="disagree">Differs from the bookies</option>
               <option value="close">Close games</option>
             </select>
           </label>
         </div>
       </div>
 
-      <WeeklyParlay parlay={weeklyParlay} week={weeklyParlay?.week} />
+      {days.length > 1 && (
+        <nav className="picks-days" aria-label="Game day">
+          {["all", ...days].map((value) => (
+            <button key={value} type="button" className={day === value ? "active" : ""}
+              aria-pressed={day === value} onClick={() => setDay(value)}>
+              {value === "all" ? "All" : value}
+            </button>
+          ))}
+        </nav>
+      )}
 
-      <div className="predictions-summary-grid">
-        <PredictionSummary
-          icon={<Swords size={20} />}
-          label="Upcoming predictions"
-          value={predictions.filter((row) => !hasFinalResult(row)).length}
-        />
-        <PredictionSummary
-          icon={<CheckCircle2 size={20} />}
-          label="Market agreement"
-          value={agreement}
-        />
-        <PredictionSummary
-          icon={<CircleHelp size={20} />}
-          label="Market disagreement"
-          value={disagreement}
-        />
-        <PredictionSummary
-          icon={<CircleHelp size={20} />}
-          label="Projected close games"
-          value={closeGames}
-        />
-      </div>
+      {favoriteTeam && (
+        <YourTeamStrip team={favoriteTeam} game={favouriteGame} onOpenTeam={onOpenTeam} />
+      )}
 
-      {filtered.length === 0 ? (
+      {featured && <FeaturedPick prediction={featured} onOpen={onOpen} />}
+
+      {sorted.length === 0 ? (
         <div className="card empty predictions-empty">
           <h2>{filter === "completed" ? "No completed games" : "No predictions available"}</h2>
           <p>{filter === "completed" ? `No games have a final result for Week ${week}.` : status}</p>
         </div>
       ) : (
-        <div className="predictions-game-grid">
-          {[...filtered].sort(sortPredictions).map((prediction) => (
-            <PredictionCard
-              key={
-                prediction.id ||
-                matchupKey(
-                  prediction.week,
-                  prediction.awayCode,
-                  prediction.homeCode
-                )
-              }
-              prediction={prediction}
-              onOpen={onOpen}
-            />
-          ))}
-        </div>
+        groups.map(([label, rows]) => (
+          <section key={label} className="picks-day">
+            <h2>{label}</h2>
+            <div className="picks-list">
+              {rows.map((prediction) => (
+                <PickRow
+                  key={prediction.id || matchupKey(prediction.week, prediction.awayCode, prediction.homeCode)}
+                  prediction={prediction}
+                  onOpen={onOpen}
+                />
+              ))}
+            </div>
+          </section>
+        ))
       )}
+
+      <WeeklyParlay parlay={weeklyParlay} week={weeklyParlay?.week} />
+
+      <section className="picks-glance" aria-label="This week at a glance">
+        <h2>At a glance</h2>
+        <div className="predictions-summary-grid">
+          <PredictionSummary icon={<Swords size={20} />} label="Still to play" value={predictions.filter((row) => !hasFinalResult(row)).length} />
+          <PredictionSummary icon={<CheckCircle2 size={20} />} label="Agree with the bookies" value={agreement} />
+          <PredictionSummary icon={<CircleHelp size={20} />} label="Differ from the bookies" value={disagreement} />
+          <PredictionSummary icon={<CircleHelp size={20} />} label="Close games" value={closeGames} />
+        </div>
+      </section>
 
       <div className="schedule-status">{status}</div>
 
@@ -439,6 +434,171 @@ export default function Predictions({ onOpen }) {
         Predictions freeze at kickoff for grading and sync to the shared Supabase ledger for every device.
       </p>
     </section>
+  );
+}
+
+// The upcoming game Fourth Down is most confident about.
+function pickOfTheWeek(rows) {
+  return rows
+    .filter((row) => !hasFinalResult(row) && row.fourthDownPick && Number.isFinite(Number(row.fourthDownWinnerProbability)))
+    .sort((a, b) => Number(b.fourthDownWinnerProbability) - Number(a.fourthDownWinnerProbability))[0] || null;
+}
+
+function kickoffDay(value) {
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date.toLocaleDateString(undefined, { weekday: "long" });
+}
+
+function groupByDay(rows) {
+  const groups = new Map();
+  for (const row of rows) {
+    const label = kickoffDay(row.kickoff) || "Time to be confirmed";
+    if (!groups.has(label)) groups.set(label, []);
+    groups.get(label).push(row);
+  }
+  return [...groups.entries()];
+}
+
+function kickoffTime(value) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "Kickoff TBC";
+  return date.toLocaleString(undefined, { weekday: "short", hour: "numeric", minute: "2-digit" });
+}
+
+function pickLine(prediction) {
+  const pick = normalizeTeamCode(prediction.fourthDownPick);
+  if (!pick) return "No pick";
+  const margin = projectedMargin(prediction);
+  return margin === 0 ? `${pick} lean` : margin === 99 ? pick : `${pick} by ${margin}`;
+}
+
+function pickChance(prediction) {
+  const probability = Number(prediction.fourthDownWinnerProbability);
+  return Number.isFinite(probability) && prediction.fourthDownWinnerProbability !== null
+    ? `${Math.round(probability * 100)}% win` : null;
+}
+
+function nickname(code) {
+  return teamNickname(normalizeTeamCode(code)) || code;
+}
+
+function TeamBadge({ code, size = 38 }) {
+  return (
+    <span className="pick-badge" style={{ "--badge-size": `${size}px` }}>
+      <TeamLogo team={normalizeTeamCode(code)} size={Math.round(size * 0.78)} />
+    </span>
+  );
+}
+
+function teamCardStyle(prediction) {
+  const away = getTeamTheme(prediction.awayCode);
+  const home = getTeamTheme(prediction.homeCode);
+  return {
+    "--away-primary": away["--team-primary"], "--away-secondary": away["--team-secondary"], "--away-glow": away["--team-glow"],
+    "--home-primary": home["--team-primary"], "--home-secondary": home["--team-secondary"], "--home-glow": home["--team-glow"],
+  };
+}
+
+function FeaturedPick({ prediction, onOpen }) {
+  const awayChance = Number(prediction.fourthDownAwayWinProbability);
+  const homeChance = Number(prediction.fourthDownHomeWinProbability);
+  const pickIsHome = normalizeTeamCode(prediction.fourthDownPick) === normalizeTeamCode(prediction.homeCode);
+  const pickChanceValue = pickIsHome ? homeChance : awayChance;
+  const canOpen = typeof onOpen === "function" && prediction.game;
+  const content = (
+    <>
+      <div className="featured-pick-meta">
+        <span>{kickoffTime(prediction.kickoff)}{prediction.game?.venue ? ` · ${prediction.game.venue}` : ""}</span>
+        <span className="featured-pick-chip">Best pick</span>
+      </div>
+      <div className="featured-pick-teams">
+        <div className="featured-pick-team">
+          <TeamBadge code={prediction.awayCode} size={56} />
+          <strong>{nickname(prediction.awayCode)}</strong>
+        </div>
+        <span className="featured-pick-at">at</span>
+        <div className="featured-pick-team home">
+          <TeamBadge code={prediction.homeCode} size={56} />
+          <strong>{nickname(prediction.homeCode)}</strong>
+        </div>
+      </div>
+      <div className="featured-pick-result">
+        <strong>{pickLine(prediction)}</strong>
+        {Number.isFinite(awayChance) && Number.isFinite(homeChance) && (
+          <span>{Math.round(awayChance * 100)}% · {Math.round(homeChance * 100)}%</span>
+        )}
+      </div>
+      {Number.isFinite(pickChanceValue) && (
+        <div className="featured-pick-bar" aria-hidden="true">
+          <span style={{ width: `${Math.round((Number.isFinite(awayChance) ? awayChance : 0.5) * 100)}%` }} />
+        </div>
+      )}
+    </>
+  );
+  return canOpen ? (
+    <button type="button" className="featured-pick" onClick={() => onOpen({ ...prediction.game, savedPrediction: prediction })}
+      aria-label={`Best pick: ${TEAM_NAMES[prediction.awayCode] || prediction.awayCode} at ${TEAM_NAMES[prediction.homeCode] || prediction.homeCode}, ${pickLine(prediction)}. Open matchup`}>
+      {content}
+    </button>
+  ) : <div className="featured-pick">{content}</div>;
+}
+
+function PickRow({ prediction, onOpen }) {
+  const isFinal = hasFinalResult(prediction);
+  const correct = isFinal && prediction.fourthDownPick
+    ? normalizeTeamCode(prediction.fourthDownPick) === normalizeTeamCode(prediction.actualWinner) : null;
+  const subtitle = isFinal
+    ? `Final · ${prediction.awayCode} ${displayScore(prediction.actualAwayScore)}–${displayScore(prediction.actualHomeScore)} ${prediction.homeCode}`
+    : `${kickoffTime(prediction.kickoff)}${prediction.game?.venue ? ` · ${prediction.game.venue}` : ""}`;
+  const canOpen = typeof onOpen === "function" && prediction.game;
+  const body = (
+    <>
+      <span className="pick-row-badges">
+        <TeamBadge code={prediction.awayCode} />
+        <TeamBadge code={prediction.homeCode} />
+      </span>
+      <span className="pick-row-copy">
+        <strong>{nickname(prediction.awayCode)} at {nickname(prediction.homeCode)}</strong>
+        <small>{subtitle}</small>
+      </span>
+      <span className="pick-row-pick">
+        <strong>{pickLine(prediction)}</strong>
+        {isFinal && correct !== null ? (
+          <small className={correct ? "pick-row-correct" : "pick-row-missed"}>
+            {correct ? <CheckCircle2 size={13} aria-hidden="true" /> : <XCircle size={13} aria-hidden="true" />}
+            {correct ? "Correct" : "Missed"}
+          </small>
+        ) : (
+          <small>{pickChance(prediction) || (prediction.source === "full-model-error" ? "Model fallback" : "")}</small>
+        )}
+      </span>
+    </>
+  );
+  return canOpen ? (
+    <button type="button" className="pick-row" style={teamCardStyle(prediction)}
+      onClick={() => onOpen({ ...prediction.game, savedPrediction: prediction })}>
+      {body}
+    </button>
+  ) : <div className="pick-row" style={teamCardStyle(prediction)}>{body}</div>;
+}
+
+function YourTeamStrip({ team, game, onOpenTeam }) {
+  const code = normalizeTeamCode(team);
+  const opponent = game ? (normalizeTeamCode(game.awayCode) === code ? `at ${nickname(game.homeCode)}` : `vs ${nickname(game.awayCode)}`) : null;
+  const detail = !game ? "No game this week"
+    : hasFinalResult(game) ? `${opponent} · Final ${game.awayCode} ${displayScore(game.actualAwayScore)}–${displayScore(game.actualHomeScore)} ${game.homeCode}`
+      : `${opponent} · ${kickoffTime(game.kickoff)} · we pick ${pickLine(game)}`;
+  return (
+    <button type="button" className="your-team-strip" onClick={() => onOpenTeam?.(code)}
+      aria-label={`Your team: ${TEAM_NAMES[code] || code}. Open team page`}>
+      <TeamBadge code={code} size={44} />
+      <span className="your-team-copy">
+        <small>Your team</small>
+        <strong>{nickname(code)}</strong>
+        <span>{detail}</span>
+      </span>
+      <ChevronRight size={20} aria-hidden="true" />
+    </button>
   );
 }
 

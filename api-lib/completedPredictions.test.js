@@ -75,7 +75,7 @@ test("F/G: Completed Games filters resolved rows only and empty weeks remain emp
   assert.deepEqual(ui.filterPredictions([completed, upcoming], "completed"), [completed]);
   assert.deepEqual(ui.filterPredictions([upcoming], "completed"), []);
   const source = readFileSync(new URL("../src/pages/Predictions.jsx", import.meta.url), "utf8");
-  assert.match(source, /<option value="completed">Completed Games<\/option>/);
+  assert.match(source, /<option value="completed">Completed games<\/option>/);
   assert.match(source, /No games have a final result for Week/);
 });
 

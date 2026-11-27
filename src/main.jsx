@@ -5,6 +5,7 @@ import '@fontsource/barlow-condensed/latin-800.css'
 import AuthGate from './components/AuthGate.jsx'
 import './index.css'
 import './styles/night-game.css'
+import './styles/layouts.css'
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>

@@ -21,6 +21,8 @@ import { classifyDataHealth, normaliseLayers, saveDataHealthSnapshot } from "../
 import { personnelAvailableAt } from "../../api-lib/depthCharts.js";
 import { TEAM_NAMES } from "../data.js";
 import MatchupIntelligencePanel from "./MatchupIntelligencePanel.jsx";
+import TeamLogo from "./TeamLogo.jsx";
+import { buildMatchupDrivers } from "../services/matchupDrivers.js";
 
 async function readRosterResponse(response) {
   const body = await response.json();
@@ -228,7 +230,7 @@ function normalizeCode(code) {
   return aliases[normalized] || normalized;
 }
 
-export default function MatchupPrediction({ awayCode, homeCode, kickoff, venue, weather, oddsEvent, savedPrediction, week, scheduleContext, actualAwayScore = null, actualHomeScore = null }) {
+export default function MatchupPrediction({ awayCode, homeCode, kickoff, venue, weather, oddsEvent, savedPrediction, week, scheduleContext, actualAwayScore = null, actualHomeScore = null, liveScore = null, children = null }) {
   const season = Number(savedPrediction?.season) || 2026;
   const matchingSnapshot = (rows) => findPredictionSnapshot(rows, Number(week) || 0, awayCode, homeCode, season);
   const suppliedSnapshot = matchingSnapshot([savedPrediction].filter(Boolean));
@@ -693,21 +695,13 @@ export default function MatchupPrediction({ awayCode, homeCode, kickoff, venue, 
   return (
     <div className="matchup-prediction team-statistics matchup-team-statistics">
       {predictionLoadError && <p role="status" className="prediction-note">{predictionLoadError}</p>}
-      <div className="team-statistics-heading">
-        <div><span className="eyebrow">MODEL PROJECTION</span><h3>Predicted result</h3></div>
+      <MatchupHero prediction={prediction} winnerLabel={winnerLabel} comparison={comparison} liveScore={liveScore} />
+
+      {children}
+
+      <div className="team-statistics-heading matchup-model-heading" id="matchup-model">
+        <div><span className="eyebrow">MODEL DETAIL</span><h3>How the model got there</h3></div>
         <span className="prediction-confidence">{confidence}</span>
-      </div>
-
-      <div className="prediction-scoreline">
-        <div className="prediction-score prediction-score-away"><small>{away.code}</small><strong>{away.score}</strong></div>
-        <div className="prediction-score-divider"><small>PROJECTED</small><span>-</span></div>
-        <div className="prediction-score prediction-score-home"><small>{home.code}</small><strong>{home.score}</strong></div>
-      </div>
-
-      <div className="prediction-summary">
-        <span>{winnerLabel}</span>
-        <span>{winner ? `${winner} win probability ${Math.round(prediction.winnerWinProbability * 100)}%` : "Win probability 50% each"}</span>
-        <span>Projected total {total}</span>
       </div>
 
       {personnelNotices.map((notice) => <p key={notice} role="status" className="prediction-note">{notice}</p>)}
@@ -1210,4 +1204,103 @@ function formatSignedLocal(value) {
 function finiteNumber(value) {
   const number = Number(value);
   return Number.isFinite(number) ? number : 0;
+}
+
+// The top of a matchup, as in the design prototype: both teams facing each other with the
+// pick's win chance between them, the result tiles, and the factors behind the pick.
+function MatchupHero({ prediction, winnerLabel, comparison, liveScore }) {
+  const { away, home, winner, total } = prediction;
+  const pickIsHome = winner === home.code;
+  const pickChance = Math.round((Number(prediction.winnerWinProbability) || 0.5) * 100);
+  const awayChance = Math.round((Number(prediction.awayWinProbability) || 0.5) * 100);
+  const homeChance = Math.round((Number(prediction.homeWinProbability) || 0.5) * 100);
+  const marketMargin = comparison.available ? comparison.marketHome - comparison.marketAway : null;
+  const bookiesLine = marketMargin === null ? "—"
+    : Math.abs(marketMargin) < 0.05 ? "Even"
+      : `${marketMargin > 0 ? home.code : away.code} by ${Math.abs(marketMargin).toFixed(1)}`;
+  const drivers = buildMatchupDrivers(prediction);
+  const largest = Math.max(0.5, ...drivers.map((driver) => Math.abs(driver.points)));
+  const team = (side, code) => (
+    <div className={`matchup-hero-team ${side}${winner === code ? " picked" : ""}`}>
+      <span className="matchup-hero-logo"><TeamLogo team={code} size={58} /></span>
+      <strong>{splitTeamName(code)}</strong>
+      <small>{side === "away" ? "Away" : "Home"}</small>
+    </div>
+  );
+
+  return (
+    <div className="matchup-hero">
+      <div className="matchup-hero-teams">
+        {team("away", away.code)}
+        <div className="matchup-hero-centre">
+          {liveScore ? (
+            <>
+              <strong className="matchup-hero-score">{liveScore.away}–{liveScore.home}</strong>
+              <small>{liveScore.label}</small>
+            </>
+          ) : (
+            <>
+              <strong>{winner ? pickChance : 50}<span>%</span></strong>
+              <small>{winner ? `${winner} win chance` : "Even game"}</small>
+            </>
+          )}
+        </div>
+        {team("home", home.code)}
+      </div>
+
+      <section className="matchup-hero-card" aria-label="Our prediction">
+        <div className="matchup-hero-pick">
+          <h2>{winnerLabel}</h2>
+          <span>Our prediction</span>
+        </div>
+        <div className="matchup-hero-tiles">
+          <div className={`matchup-hero-tile ${pickIsHome ? "" : "accent"}`}>
+            <strong>{awayChance}%</strong><small>{away.code} win chance</small>
+          </div>
+          <div className={`matchup-hero-tile ${pickIsHome ? "accent" : "chalk"}`}>
+            <strong>{homeChance}%</strong><small>{home.code} win chance</small>
+          </div>
+          <div className="matchup-hero-tile">
+            <strong>{bookiesLine}</strong><small>Bookies&apos; line</small>
+          </div>
+        </div>
+        <p className="matchup-hero-score-line">
+          Projected {away.code} {away.score} – {home.score} {home.code} · Projected total {total} · {prediction.confidence} confidence
+        </p>
+      </section>
+
+      {drivers.length > 0 && (
+        <section className="matchup-drivers" aria-label="What's driving it">
+          <h2>What&apos;s driving it</h2>
+          <ul>
+            {drivers.map((driver) => {
+              const width = `${Math.round((Math.abs(driver.points) / largest) * 100)}%`;
+              const helpsHome = driver.points > 0;
+              const helpsPick = driver.team === winner;
+              return (
+                <li key={driver.label}>
+                  <div className="matchup-driver-label">
+                    <span>{driver.label}</span>
+                    <span>{driver.team} +{Math.abs(driver.points).toFixed(1)}</span>
+                  </div>
+                  <div className="matchup-driver-bar" aria-hidden="true">
+                    <span className="away-half">{!helpsHome && <i className={helpsPick ? "pick" : ""} style={{ width }} />}</span>
+                    <span className="home-half">{helpsHome && <i className={helpsPick ? "pick" : ""} style={{ width }} />}</span>
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+          <p className="matchup-drivers-note">Points each factor adds to the projected margin. “Team strength and form” is season scoring, team ratings and the small bookmaker blend.</p>
+        </section>
+      )}
+    </div>
+  );
+}
+
+function splitTeamName(code) {
+  const full = TEAM_NAMES[code] || code;
+  const parts = full.split(" ");
+  const place = parts.slice(0, -1).join(" ");
+  return <>{place && <span>{place}</span>}{parts[parts.length - 1]}</>;
 }

@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import Header from "./components/Header.jsx";
 import Navigation from "./components/Navigation.jsx";
-import Home from "./pages/Home.jsx";
 import Matchup from "./pages/Matchup.jsx";
 import Teams from "./pages/Teams.jsx";
 import TeamDetail from "./pages/TeamDetail.jsx";
@@ -26,7 +25,7 @@ import { WhatsNewDialog } from "./components/PatchNotes.jsx";
 import { LATEST_PATCH_NOTES, markPatchNotesSeen, shouldShowPatchNotes } from "./patchNotes.js";
 
 export default function App() {
-  const [page, setPage] = useState("home");
+  const [page, setPage] = useState("predictions");
   const [selectedGame, setSelectedGame] = useState(null);
   const predictionsScrollPosition = useRef(0);
   const [selectedTeam, setSelectedTeam] = useState(null);
@@ -114,7 +113,7 @@ export default function App() {
 
   function navigateTo(destination, options = {}) {
     const resolvedDestination =
-      destination === "schedule" || destination === "favorite-schedule"
+      destination === "schedule" || destination === "favorite-schedule" || destination === "home"
         ? "predictions"
         : destination;
 
@@ -151,18 +150,15 @@ export default function App() {
     navigateTo("team-detail");
   }
 
-  async function navigateFromHome(destination) {
-    if (destination === "favorite-team") {
-      try {
-        const teams = await getTeams();
-        const favorite = teams.find((team) => normalizeTeamCode(team.abbreviation) === normalizeTeamCode(favoriteTeam));
-        openTeam(favorite || { abbreviation: favoriteTeam, full_name: TEAM_NAMES[favoriteTeam] || favoriteTeam });
-      } catch {
-        openTeam({ abbreviation: favoriteTeam, full_name: TEAM_NAMES[favoriteTeam] || favoriteTeam });
-      }
-      return;
+  // Opens a team page from just its code (the header's favourite team, the Picks page strip).
+  async function openTeamByCode(code) {
+    const fallback = { abbreviation: code, full_name: TEAM_NAMES[code] || code };
+    try {
+      const teams = await getTeams();
+      openTeam(teams.find((team) => normalizeTeamCode(team.abbreviation) === normalizeTeamCode(code)) || fallback);
+    } catch {
+      openTeam(fallback);
     }
-    navigateTo(destination);
   }
 
   // team: a team code, or null for no favourite team (Fourth Down orange).
@@ -239,16 +235,16 @@ export default function App() {
         <TeamPicker onConfirm={answerTeamPicker} onSkip={() => answerTeamPicker(null)} />
       )}
       {teamChoice.decided && showWhatsNew && <WhatsNewDialog note={LATEST_PATCH_NOTES} onClose={closeWhatsNew} onOpenAll={openAllPatchNotes} />}
-      <Header onHome={() => navigateTo("home")} />
+      <Header onHome={() => navigateTo("predictions")} favoriteTeam={favoriteTeam}
+        onOpenFavorite={() => openTeamByCode(favoriteTeam)} />
       <Navigation page={page} onChange={navigateTo} />
       <main className="content">
-        {page === "home" && <Home favoriteTeam={favoriteTeam} onNavigate={navigateFromHome} />}
 
         {page === "matchup" && <Matchup game={selectedGame} onBack={backToPredictions} />}
         {page === "teams" && <Teams onOpenTeam={openTeam} onOpenConference={() => navigateTo("conference")} />}
         {page === "team-detail" && <TeamDetail team={selectedTeam} onBack={() => navigateTo("teams")} />}
         {page === "conference" && <Conference onSelectTeam={openTeam} />}
-        {page === "predictions" && <Predictions onOpen={openMatchup} />}
+        {page === "predictions" && <Predictions onOpen={openMatchup} favoriteTeam={favoriteTeam} onOpenTeam={openTeamByCode} />}
         {page === "results" && <Results />}
         {page === "data-health" && <DataHealth />}
         {page === "settings" && <Settings favoriteTeam={favoriteTeam} onSave={saveFavoriteTeam} onNavigate={navigateTo} />}

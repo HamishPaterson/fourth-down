@@ -1,9 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
-import { ArrowRight } from "lucide-react";
 import { getTeams, getStandings } from "../services/nflApi.js";
-import { getTeamTheme } from "../services/teamThemes.js";
-import TeamLogo from "../components/TeamLogo.jsx";
-import TeamCardStats from "../components/TeamCardStats.jsx";
+import StandingsTable from "../components/StandingsTable.jsx";
 import FourthDownLoader from "../components/FourthDownLoader.jsx";
 import { shouldShowBlockingLoader } from "../components/fourthDownLoader.js";
 import { DivisionTab } from "../components/LeagueTabs.jsx";
@@ -175,47 +172,15 @@ export default function Divisions({
         ))}
       </div>
 
-      <div className="team-grid">
-        {rankedCodes.map((code, index) => {
-          const liveTeam = teamsByCode[code];
-          const standing = standingsByCode[code];
-          const team = {
-            abbreviation: code,
-            full_name: TEAM_NAMES[code] || code,
-            ...liveTeam,
-            conference: division.conference,
-            division: division.id,
-          };
-          const rank = standing ? index + 1 : null;
-
-          return (
-            <button
-              type="button"
-              className="card api-team team-colour-card"
-              key={code}
-              style={getTeamTheme(code)}
-              onClick={() => onSelectTeam?.(team)}
-            >
-              <span className="team-card-watermark" aria-hidden="true" />
-
-              <span className="division-rank" aria-hidden="true">
-                {rank ?? "—"}
-              </span>
-
-              <span className="team-card-logo">
-                <TeamLogo team={code} size={76} />
-              </span>
-
-              <span className="team-card-copy">
-                <strong>{team.full_name}</strong>
-              </span>
-              <TeamCardStats division={division.id} record={formatRecord(standing)} team={code} />
-
-              <ArrowRight className="team-card-arrow" size={18} />
-            </button>
-          );
-        })}
-      </div>
+      <StandingsTable
+        leaderLabel={`${division.id} leader`}
+        onSelectTeam={onSelectTeam}
+        teams={rankedCodes.map((code) => ({
+          code,
+          standing: standingsByCode[code],
+          team: { abbreviation: code, full_name: TEAM_NAMES[code] || code, ...teamsByCode[code], conference: division.conference, division: division.id },
+        }))}
+      />
     </section>
   );
 }
@@ -242,12 +207,6 @@ function rankDivision(codes, standingsByCode) {
 
     return (sb.wins ?? 0) - (sa.wins ?? 0);
   });
-}
-
-function formatRecord(standing) {
-  if (!standing) return "0-0";
-  const { wins = 0, losses = 0, ties = 0 } = standing;
-  return ties > 0 ? `${wins}-${losses}-${ties}` : `${wins}-${losses}`;
 }
 
 function normalizeTeamCode(code) {
