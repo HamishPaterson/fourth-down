@@ -149,3 +149,11 @@ export async function getPlayByPlayMetrics(away, home, season, week, signal) {
   if (!response.ok) throw new Error(body.error || `Play-by-play request failed (${response.status})`);
   return body;
 }
+
+// One team's season averages (points and yards per game, gained and allowed) from ESPN.
+export async function getTeamSeasonStats(team, signal) {
+  const response = await fetch(`/api/nfl/standings?team=${encodeURIComponent(team)}`, { signal });
+  const body = await response.json();
+  if (!response.ok) throw new Error(body.error || `Team statistics request failed (${response.status})`);
+  return body.data || null;
+}

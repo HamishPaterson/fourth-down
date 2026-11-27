@@ -2,6 +2,34 @@
 // anyone who has not seen the newest entry is shown it once when they open the app.
 export const PATCH_NOTES = [
   {
+    id: "2026-11-27",
+    date: "27 November 2026",
+    title: "A new look, in your team's colours",
+    sections: [
+      {
+        heading: "Your team",
+        items: [
+          "Pick your favourite team and the app switches to your team's colours. Skip it to keep Fourth Down orange.",
+          "Change or clear your team any time in Settings. Your choice is saved to your account, so it follows you to other devices.",
+        ],
+      },
+      {
+        heading: "Design",
+        items: [
+          "A cleaner dark design across every page, with bolder headings and a floating menu at the bottom of the screen.",
+        ],
+      },
+      {
+        heading: "Standings and teams",
+        items: [
+          "The standings pages work again, with tabs for each conference and all eight divisions.",
+          "Team cards show where each team ranks in the league overall, on offence and on defence, in plain language.",
+          "Team pages now show live standings (division place, playoff position, record, points, home and away) and points and yards per game, gained and allowed.",
+        ],
+      },
+    ],
+  },
+  {
     id: "2026-11-26",
     date: "26 November 2026",
     title: "Predictions built from real data",

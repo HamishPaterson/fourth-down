@@ -779,7 +779,7 @@ function BestBetsPanel({ bestBets, kickoff, awayCode, homeCode }) {
               <p style={{ marginTop: "8px", padding: "9px", borderRadius: "8px", background: "rgba(255,255,255,0.06)" }}>
                 <strong>Why it qualified:</strong> {bet.qualificationReason}
               </p>
-              <small style={{ display: "inline-flex", margin: "2px 8px 5px 0", padding: "4px 8px", borderRadius: "999px", background: bet.confidenceLevel === "High" ? "#b9ff55" : bet.confidenceLevel === "Medium" ? "#ffd166" : "#ff9f6e", color: "#090b08", fontWeight: 900 }}>
+              <small style={{ display: "inline-flex", margin: "2px 8px 5px 0", padding: "4px 8px", borderRadius: "999px", background: bet.confidenceLevel === "High" ? "var(--accent)" : bet.confidenceLevel === "Medium" ? "#ffd166" : "#ff9f6e", color: "#090b08", fontWeight: 900 }}>
                 {bet.confidenceLevel || "Cautious"} confidence
               </small>
               <small className="best-bet-risk">Risk: {bet.risk}</small>
@@ -1199,10 +1199,10 @@ export function WeeklyParlay({ parlay, week }) {
         position: "relative",
         marginBottom: "22px",
         padding: "22px",
-        border: "1px solid rgba(185, 255, 85, 0.42)",
-        borderRadius: "18px",
-        background: "linear-gradient(145deg, rgba(10, 25, 30, .98), rgba(5, 11, 14, .99))",
-        boxShadow: "0 18px 46px rgba(0, 0, 0, .26)",
+        border: 0,
+        borderRadius: "28px",
+        background: "var(--fd-surface)",
+        boxShadow: "none",
         overflow: "hidden",
       }}
     >
@@ -1227,7 +1227,7 @@ export function WeeklyParlay({ parlay, week }) {
           ) : statusLabels.length > 0 && (
             <div style={{ display: "flex", flexWrap: "wrap", gap: "6px", marginBottom: "8px" }}>
               {statusLabels.map((label) => (
-                <strong key={label} style={{ color: label === "Partial" || label === "No legs available" ? "#ffd166" : "#b9ff55", fontSize: "11px", textTransform: "uppercase" }}>
+                <strong key={label} style={{ color: label === "Partial" || label === "No legs available" ? "#ffd166" : "var(--accent)", fontSize: "11px", textTransform: "uppercase" }}>
                   {label}
                 </strong>
               ))}
@@ -1256,16 +1256,16 @@ export function WeeklyParlay({ parlay, week }) {
           style={{
             minWidth: "150px",
             padding: "13px 15px",
-            border: "1px solid rgba(185,255,85,.24)",
+            border: "1px solid color-mix(in srgb, var(--accent) 24%, transparent)",
             borderRadius: "13px",
-            background: "rgba(185,255,85,.065)",
+            background: "color-mix(in srgb, var(--accent) 6.5%, transparent)",
             textAlign: "right",
           }}
         >
           <small style={{ display: "block", color: "rgba(255,255,255,.58)", fontSize: "9px", fontWeight: 800, letterSpacing: ".08em" }}>
             COMBINED ODDS
           </small>
-          <strong style={{ display: "block", marginTop: "3px", color: "#b9ff55", fontSize: "1.55rem", lineHeight: 1.05 }}>
+          <strong style={{ display: "block", marginTop: "3px", color: "var(--accent)", fontSize: "1.55rem", lineHeight: 1.05 }}>
             {Number.isFinite(parlay?.decimalOdds) && parlay.decimalOdds > 1 ? `$${parlay.decimalOdds.toFixed(2)}` : "Pending"}
           </strong>
           {parlay?.modelProbability !== null && parlay?.modelProbability !== undefined && (
@@ -1280,7 +1280,7 @@ export function WeeklyParlay({ parlay, week }) {
         <div style={{ display: "grid", gap: "11px" }}>
           {legs.map((bet, index) => {
             const result = bet.result || "pending";
-            const resultColour = result === "won" ? "#43d17a" : result === "lost" ? "#ff5d68" : "#b9ff55";
+            const resultColour = result === "won" ? "#43d17a" : result === "lost" ? "#ff5d68" : "var(--accent)";
             return (
             <article
               key={`${bet.market}:${bet.selection}:${bet.sportsbook}`}
@@ -1304,7 +1304,7 @@ export function WeeklyParlay({ parlay, week }) {
                   placeItems: "center",
                   borderRadius: "9px",
                   background: "rgba(0,0,0,.24)",
-                  color: "#b9ff55",
+                  color: "var(--accent)",
                   fontSize: "12px",
                   fontWeight: 900,
                 }}
@@ -1396,7 +1396,7 @@ export function WeeklyParlay({ parlay, week }) {
 
 function getBetAccentColour(bet, awayCode, homeCode) {
   const teamCode = resolveBetTeamCode(bet, awayCode, homeCode);
-  return BET_TEAM_COLOURS[teamCode]?.[1] || BET_TEAM_COLOURS[teamCode]?.[0] || "#b9ff55";
+  return BET_TEAM_COLOURS[teamCode]?.[1] || BET_TEAM_COLOURS[teamCode]?.[0] || "var(--accent)";
 }
 
 function PredictionSummary({ icon, label, value }) {

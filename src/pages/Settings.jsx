@@ -1,14 +1,18 @@
 import { useState } from "react";
 import { Activity, ChevronRight, Layers, ScrollText, Settings as SettingsIcon } from "lucide-react";
 import { TEAM_NAMES } from "../data.js";
+import TeamLogo from "../components/TeamLogo.jsx";
+import TeamPicker from "../components/TeamPicker.jsx";
 import { PatchNotesList } from "../components/PatchNotes.jsx";
 import { PATCH_NOTES } from "../patchNotes.js";
 
 export default function Settings({ favoriteTeam, onSave, onNavigate }) {
   const [saved, setSaved] = useState(false);
   const [saveError, setSaveError] = useState(null);
+  const [picking, setPicking] = useState(false);
 
   function saveTeam(team) {
+    setPicking(false);
     try {
       onSave(team);
       setSaved(true);
@@ -36,14 +40,20 @@ export default function Settings({ favoriteTeam, onSave, onNavigate }) {
             <span className="settings-icon"><SettingsIcon size={20} /></span>
             <div><small>PREFERENCES</small><h2>Your app</h2></div>
           </div>
-          <label>
-            Favourite team
-            <select value={favoriteTeam} onChange={(event) => saveTeam(event.target.value)}>
-              {Object.entries(TEAM_NAMES).map(([code, name]) => <option key={code} value={code}>{name}</option>)}
-            </select>
-          </label>
-          <button className="primary settings-save-button" onClick={() => saveTeam(favoriteTeam)}>Save settings</button>
-          {saved && <p className="success">Settings saved</p>}
+          <div className="settings-team-row">
+            <span className="settings-team-logo">
+              {favoriteTeam ? <TeamLogo team={favoriteTeam} size={44} /> : <span className="settings-team-swatch" aria-hidden="true" />}
+            </span>
+            <span className="settings-team-copy">
+              <small>Favourite team</small>
+              <strong>{favoriteTeam ? TEAM_NAMES[favoriteTeam] : "No team · Fourth Down orange"}</strong>
+            </span>
+            <button type="button" className="secondary" onClick={() => { setSaved(false); setPicking(true); }}>
+              {favoriteTeam ? "Change" : "Choose"}
+            </button>
+          </div>
+          <p className="note settings-team-note">The app uses your team's colours. Your choice is saved to your account.</p>
+          {saved && <p className="success">Favourite team saved</p>}
           {saveError && <p role="alert">{saveError}</p>}
         </section>
 
@@ -68,6 +78,10 @@ export default function Settings({ favoriteTeam, onSave, onNavigate }) {
           <PatchNotesList notes={PATCH_NOTES} />
         </section>
       </div>
+      {picking && (
+        <TeamPicker mode="settings" initialTeam={favoriteTeam}
+          onConfirm={saveTeam} onSkip={() => saveTeam(null)} onClose={() => setPicking(false)} />
+      )}
     </section>
   );
 }

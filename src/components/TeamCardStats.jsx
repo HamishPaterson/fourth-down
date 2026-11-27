@@ -1,13 +1,7 @@
-import { getTeamRanks, rankBand } from "../services/teamRatings.js";
+import { getTeamRanks, ordinalRank as ordinal, rankBand } from "../services/teamRatings.js";
 
 // The stats on a team card: division and record, then where the team ranks in the league
 // overall, on offence and on defence (from ESPN's power ratings), with a plain-language label.
-function ordinal(rank) {
-  if (!Number.isFinite(rank)) return "—";
-  const tens = rank % 100, ones = rank % 10;
-  const suffix = tens >= 11 && tens <= 13 ? "th" : ones === 1 ? "st" : ones === 2 ? "nd" : ones === 3 ? "rd" : "th";
-  return `${rank}${suffix}`;
-}
 
 export default function TeamCardStats({ division, record, team }) {
   const ranks = getTeamRanks(team);

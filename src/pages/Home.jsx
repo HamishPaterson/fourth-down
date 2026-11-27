@@ -4,7 +4,8 @@ import { TEAM_NAMES } from "../data.js";
 import { getTeamTheme, normalizeTeamCode } from "../services/teamThemes.js";
 
 export default function Home({ favoriteTeam, onNavigate }) {
-  const teamCode = normalizeTeamCode(favoriteTeam || "SF");
+  if (!favoriteTeam) return <NoFavouriteTeam onNavigate={onNavigate} />;
+  const teamCode = normalizeTeamCode(favoriteTeam);
   const teamName = TEAM_NAMES[teamCode] || teamCode;
 
   return (
@@ -76,5 +77,26 @@ function HomeTile({ icon, title, detail, onClick }) {
       </div>
       <ArrowRight size={17} />
     </button>
+  );
+}
+function NoFavouriteTeam({ onNavigate }) {
+  return (
+    <section className="home-favourite-page">
+      <div className="card favourite-hero favourite-hero-empty">
+        <div className="favourite-hero-copy">
+          <span className="eyebrow">THIS WEEK</span>
+          <h1>Our picks</h1>
+          <p>Every game this week, predicted from real team and player data.</p>
+          <div className="actions">
+            <button type="button" className="primary favourite-primary" onClick={() => onNavigate("predictions")}>
+              See predictions <ArrowRight size={17} />
+            </button>
+            <button type="button" className="secondary" onClick={() => onNavigate("settings")}>
+              Pick your team
+            </button>
+          </div>
+        </div>
+      </div>
+    </section>
   );
 }

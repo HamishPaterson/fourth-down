@@ -13,7 +13,15 @@ import DataHealth from "./pages/DataHealth.jsx";
 import { getTeamTheme } from "./services/teamThemes.js";
 import { getTeams } from "./services/nflApi.js";
 import { TEAM_NAMES } from "./data.js";
-import { readFavoriteTeam, saveFavoriteTeamPreference } from "./services/favoriteTeamPreference.js";
+import {
+  accountFavoriteTeam,
+  readFavoriteTeamChoice,
+  saveFavoriteTeamPreference,
+  saveFavoriteTeamToAccount,
+} from "./services/favoriteTeamPreference.js";
+import { getAccentTheme } from "./services/teamAccent.js";
+import { getAuthClient } from "./services/supabaseAuth.js";
+import TeamPicker from "./components/TeamPicker.jsx";
 import { WhatsNewDialog } from "./components/PatchNotes.jsx";
 import { LATEST_PATCH_NOTES, markPatchNotesSeen, shouldShowPatchNotes } from "./patchNotes.js";
 
@@ -22,7 +30,8 @@ export default function App() {
   const [selectedGame, setSelectedGame] = useState(null);
   const predictionsScrollPosition = useRef(0);
   const [selectedTeam, setSelectedTeam] = useState(null);
-  const [favoriteTeam, setFavoriteTeam] = useState(readFavoriteTeam);
+  const [teamChoice, setTeamChoice] = useState(readFavoriteTeamChoice);
+  const favoriteTeam = teamChoice.team;
   const [updateAvailable, setUpdateAvailable] = useState(false);
   const [showWhatsNew, setShowWhatsNew] = useState(() => shouldShowPatchNotes());
 
@@ -36,6 +45,31 @@ export default function App() {
     navigateTo("settings");
     window.requestAnimationFrame(() => document.getElementById("patch-notes")?.scrollIntoView({ block: "start" }));
   }
+
+  // The account's saved team wins over this browser's; a browser answer the account lacks is uploaded.
+  useEffect(() => {
+    let active = true;
+    (async () => {
+      try {
+        const auth = getAuthClient();
+        const { data } = await auth.auth.getSession();
+        if (!active || !data?.session?.user) return;
+        const saved = accountFavoriteTeam(data.session.user);
+        const local = readFavoriteTeamChoice();
+        if (saved !== undefined) {
+          if (!local.decided || saved !== local.team) {
+            saveFavoriteTeamPreference(saved);
+            setTeamChoice({ team: saved, decided: true });
+          }
+        } else if (local.decided) {
+          await saveFavoriteTeamToAccount(auth, local.team);
+        }
+      } catch (error) {
+        console.warn("Favourite team could not be synced with your account", error);
+      }
+    })();
+    return () => { active = false; };
+  }, []);
 
   useEffect(() => {
     let active = true;
@@ -131,13 +165,29 @@ export default function App() {
     navigateTo(destination);
   }
 
+  // team: a team code, or null for no favourite team (Fourth Down orange).
   function saveFavoriteTeam(team) {
     saveFavoriteTeamPreference(team);
-    setFavoriteTeam(team);
+    setTeamChoice({ team, decided: true });
+    try {
+      saveFavoriteTeamToAccount(getAuthClient(), team)
+        .catch((error) => console.warn("Favourite team could not be saved to your account", error));
+    } catch (error) {
+      console.warn("Favourite team could not be saved to your account", error);
+    }
+  }
+
+  function answerTeamPicker(team) {
+    try {
+      saveFavoriteTeam(team);
+    } catch (error) {
+      console.warn("Favourite team preference could not be saved", error);
+      setTeamChoice({ team, decided: true });
+    }
   }
 
   return (
-    <div className="app-shell" style={getTeamTheme(favoriteTeam)}>
+    <div className="app-shell" style={{ ...getTeamTheme(favoriteTeam), ...getAccentTheme(favoriteTeam) }}>
       {updateAvailable && (
         <div
           role="status"
@@ -145,7 +195,7 @@ export default function App() {
           style={{
             position: "fixed",
             left: "50%",
-            bottom: "18px",
+            bottom: "calc(96px + env(safe-area-inset-bottom, 0px))",
             zIndex: 10000,
             width: "min(520px, calc(100vw - 28px))",
             transform: "translateX(-50%)",
@@ -154,9 +204,9 @@ export default function App() {
             justifyContent: "space-between",
             gap: "14px",
             padding: "13px 14px",
-            border: "1px solid rgba(185, 255, 85, 0.72)",
-            borderRadius: "12px",
-            background: "rgba(4, 13, 17, 0.97)",
+            border: "1px solid var(--accent)",
+            borderRadius: "20px",
+            background: "#1C1E25",
             boxShadow: "0 16px 42px rgba(0, 0, 0, 0.48)",
             color: "#ffffff",
           }}
@@ -173,10 +223,10 @@ export default function App() {
             style={{
               flex: "0 0 auto",
               border: 0,
-              borderRadius: "9px",
-              padding: "10px 13px",
-              background: "#b9ff55",
-              color: "#071006",
+              borderRadius: "999px",
+              padding: "10px 16px",
+              background: "var(--accent)",
+              color: "var(--accent-ink)",
               fontWeight: 900,
               cursor: "pointer",
             }}
@@ -185,7 +235,10 @@ export default function App() {
           </button>
         </div>
       )}
-      {showWhatsNew && <WhatsNewDialog note={LATEST_PATCH_NOTES} onClose={closeWhatsNew} onOpenAll={openAllPatchNotes} />}
+      {!teamChoice.decided && (
+        <TeamPicker onConfirm={answerTeamPicker} onSkip={() => answerTeamPicker(null)} />
+      )}
+      {teamChoice.decided && showWhatsNew && <WhatsNewDialog note={LATEST_PATCH_NOTES} onClose={closeWhatsNew} onOpenAll={openAllPatchNotes} />}
       <Header onHome={() => navigateTo("home")} />
       <Navigation page={page} onChange={navigateTo} />
       <main className="content">

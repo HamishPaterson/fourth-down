@@ -56,6 +56,14 @@ export function getTeamRanks(team, { snapshot = ESPN_FPI_RATINGS } = {}) {
   return { overall: found?.overall ?? null, offense: found?.offense ?? null, defense: found?.defense ?? null, total };
 }
 
+// 1 → "1st", 22 → "22nd"; a missing rank shows as a dash.
+export function ordinalRank(rank) {
+  if (!Number.isFinite(rank)) return "—";
+  const tens = rank % 100, ones = rank % 10;
+  const suffix = tens >= 11 && tens <= 13 ? "th" : ones === 1 ? "st" : ones === 2 ? "nd" : ones === 3 ? "rd" : "th";
+  return `${rank}${suffix}`;
+}
+
 // Plain-language band for a league rank out of 32.
 export function rankBand(rank) {
   if (!Number.isFinite(rank)) return null;

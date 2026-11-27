@@ -123,6 +123,7 @@ const components = Object.fromEntries(["Home", "Matchup", "Teams", "TeamDetail",
   "Settings", "Predictions", "Results", "DataHealth"].map(name =>
     [name, props => React.createElement(Screen, { name, ...props })]));
 components.Header = () => null;
+components.TeamPicker = () => null;
 components.Navigation = ({ onChange }) => React.createElement("nav", null,
   ...["predictions", "teams", "results", "schedule"].map(name =>
     React.createElement("button", { key: name, id: "nav-" + name, onClick: () => onChange(name) }, name)));

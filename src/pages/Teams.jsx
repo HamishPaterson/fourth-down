@@ -48,9 +48,9 @@ export default function Teams({ onOpenTeam, onOpenConference }) {
         style={{
           width: "100%",
           boxSizing: "border-box",
-          border: "1px solid rgba(163, 230, 53, 0.5)",
-          borderRadius: "18px",
-          background: "linear-gradient(135deg, rgba(9, 25, 37, 0.98), rgba(16, 48, 59, 0.96))",
+          border: 0,
+          borderRadius: "24px",
+          background: "var(--fd-surface)",
           color: "#ffffff",
           padding: "18px",
           margin: "0 0 22px",
@@ -72,9 +72,9 @@ export default function Teams({ onOpenTeam, onOpenConference }) {
             borderRadius: "14px",
             display: "grid",
             placeItems: "center",
-            color: "#a3e635",
-            background: "rgba(163, 230, 53, 0.11)",
-            border: "1px solid rgba(163, 230, 53, 0.3)",
+            color: "var(--accent)",
+            background: "color-mix(in srgb, var(--accent) 11%, transparent)",
+            border: "1px solid color-mix(in srgb, var(--accent) 30%, transparent)",
           }}
         >
           <Layers size={23} />
@@ -83,7 +83,7 @@ export default function Teams({ onOpenTeam, onOpenConference }) {
         <span style={{ minWidth: 0, display: "grid", rowGap: "4px" }}>
           <span
             style={{
-              color: "#a3e635",
+              color: "var(--accent)",
               fontSize: "0.7rem",
               fontWeight: 800,
               lineHeight: 1.2,
@@ -115,7 +115,7 @@ export default function Teams({ onOpenTeam, onOpenConference }) {
           </span>
         </span>
 
-        <ChevronRight aria-hidden="true" size={21} color="#a3e635" />
+        <ChevronRight aria-hidden="true" size={21} color="var(--accent)" />
       </button>
 
       <div className="team-grid">

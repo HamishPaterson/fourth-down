@@ -10,7 +10,8 @@ import {
 } from "lucide-react";
 import TeamLogo from "../components/TeamLogo.jsx";
 import { getTeamTheme } from "../services/teamThemes.js";
-import { getTeamRatings } from "../services/teamRatings.js";
+import { getTeamRanks, ordinalRank, rankBand } from "../services/teamRatings.js";
+import { getStandings, getTeamSeasonStats } from "../services/nflApi.js";
 import { getPlayerRating } from "../services/playerRatings.js";
 
 const OFFENSE_POSITIONS = new Set([
@@ -97,8 +98,23 @@ export default function TeamDetail({ team, onBack }) {
   const [view, setView] = useState("offense");
 
   const teamCode = normalizeTeamCode(team?.abbreviation);
-const ratings = getTeamRatings(teamCode);
-const teamInfo = getTeamInfo(teamCode);
+  const ranks = getTeamRanks(teamCode);
+  const teamInfo = getTeamInfo(teamCode);
+  const [standing, setStanding] = useState({ status: "loading", row: null });
+  const [seasonStats, setSeasonStats] = useState({ status: "loading", data: null });
+
+  // Live standings and season averages, both from ESPN (shared server caches).
+  useEffect(() => {
+    if (!teamCode) return undefined;
+    const controller = new AbortController();
+    getStandings(controller.signal)
+      .then((rows) => setStanding({ status: "ready", row: rows.find((row) => normalizeTeamCode(row.abbreviation) === teamCode) || null }))
+      .catch((error) => { if (!controller.signal.aborted) setStanding({ status: "error", row: null, error: error.message }); });
+    getTeamSeasonStats(teamCode, controller.signal)
+      .then((data) => setSeasonStats({ status: "ready", data }))
+      .catch((error) => { if (!controller.signal.aborted) setSeasonStats({ status: "error", data: null, error: error.message }); });
+    return () => controller.abort();
+  }, [teamCode]);
 
   async function loadRoster() {
     if (!teamCode) return;
@@ -266,31 +282,50 @@ const offense = deduplicatePlayers([
         <div className="card team-information-card">
           <span className="eyebrow">SEASON PERFORMANCE</span>
           <h2>Standings</h2>
-          <InfoRow label="Ladder position" value="Not connected" />
-          <InfoRow label="Record" value="Not connected" />
-          <InfoRow label="Win percentage" value="Not connected" />
-          <InfoRow label="Points for / against" value="Not connected" />
+          {standingRows(standing).map(([label, value]) => <InfoRow key={label} label={label} value={value} />)}
         </div>
       </div>
 
       <div className="card ratings-card">
         <div className="ratings-heading">
           <div>
-            <span className="eyebrow">ESPN FPI</span>
-            <h2>ESPN team components</h2>
+            <span className="eyebrow">LEAGUE RANKS</span>
+            <h2>How they rank</h2>
           </div>
-          <span className="ratings-note">{ratings.source}</span>
+          <span className="ratings-note">Against all {ranks.total} teams · ESPN power rating</span>
         </div>
 
-        <div className="ratings-grid">
-          <Rating label="FPI" value={ratings.overall} />
-<Rating label="OFF" value={ratings.offense} />
-<Rating label="DEF" value={ratings.defense} />
-
-          <Rating label="Avg passing yards" value={null} suffix=" yds" />
-          <Rating label="Avg rushing yards" value={null} suffix=" yds" />
-          <Rating label="Win percentage" value={null} suffix="%" />
+        <div className="team-rank-grid">
+          {[["Overall", ranks.overall], ["Offence", ranks.offense], ["Defence", ranks.defense]].map(([label, rank]) => (
+            <div key={label} className="rating-item team-rank-item">
+              <small>{label}</small>
+              <strong>{ordinalRank(rank)}</strong>
+              <span>{rankBand(rank) || "No rating"}</span>
+            </div>
+          ))}
         </div>
+      </div>
+
+      <div className="card ratings-card">
+        <div className="ratings-heading">
+          <div>
+            <span className="eyebrow">THIS SEASON</span>
+            <h2>Per game</h2>
+          </div>
+          <span className="ratings-note">ESPN team statistics · passing is net of sacks</span>
+        </div>
+        {seasonStats.status === "error" && <p className="team-stats-message">Season statistics are unavailable right now.</p>}
+        {[["Gained", seasonStats.data?.offense], ["Allowed", seasonStats.data?.defense]].map(([side, numbers]) => (
+          <div key={side} className="team-season-row">
+            <span className="team-season-side">{side}</span>
+            <div className="team-season-grid">
+              <Rating label="Points" value={numbers?.pointsPerGame} />
+              <Rating label="Total yards" value={numbers?.yardsPerGame} />
+              <Rating label="Passing yards" value={numbers?.passingYardsPerGame} />
+              <Rating label="Rushing yards" value={numbers?.rushingYardsPerGame} />
+            </div>
+          </div>
+        ))}
       </div>
 
       <div className="roster-heading">
@@ -602,4 +637,21 @@ function normalizeTeamCode(code) {
   const normalized = String(code || "").trim().toUpperCase();
   const aliases = { WAS: "WSH", LA: "LAR" };
   return aliases[normalized] || normalized;
+}
+
+// The standings card rows from the team's ESPN standings entry.
+function standingRows({ status, row }) {
+  if (status === "loading") return [["Standings", "Loading..."]];
+  if (!row) return [["Standings", "Unavailable right now"]];
+  const record = (r) => `${r.wins}–${r.losses}${r.ties ? `–${r.ties}` : ""}`;
+  const seed = row.playoffSeed ? `Seed ${row.playoffSeed} · in a playoff spot` : `${ordinalRank(row.conferenceRank)} · outside the playoff spots`;
+  const diff = Number(row.pointDifferential);
+  return [
+    ["Division", `${ordinalRank(row.divisionRank)} in the ${row.conference} ${row.division}`],
+    [`${row.conference} position`, seed],
+    ["Record", `${record(row)}${row.streak ? ` · streak ${row.streak}` : ""}`],
+    ["Win percentage", Number.isFinite(row.winPct) ? `${(row.winPct * 100).toFixed(1)}%` : null],
+    ["Points for / against", row.pointsFor != null ? `${row.pointsFor} / ${row.pointsAgainst} (${diff > 0 ? "+" : ""}${diff})` : null],
+    ["Home / away", row.home && row.road ? `${record(row.home)} home · ${record(row.road)} away` : null],
+  ];
 }
