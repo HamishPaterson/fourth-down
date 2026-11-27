@@ -279,7 +279,7 @@ export default function Matchup({ game, onBack }) {
         {game.savedPrediction && (
           <section className="matchup-section matchup-pick-detail" aria-label="Pick and best bets">
             <h2>Pick and best bets</h2>
-            <PredictionCard prediction={game.savedPrediction} />
+            <PredictionCard prediction={game.savedPrediction} oddsEvent={oddsEvent} />
           </section>
         )}
 

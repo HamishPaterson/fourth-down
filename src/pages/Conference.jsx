@@ -193,6 +193,7 @@ export default function Conference({ onSelectTeam }) {
           <StandingsTable
             showSeeds
             leaderLabel={standingsByCode[rankedCodes[0]]?.playoffSeed === 1 ? `${conference.name} top seed` : `${conference.name} leader`}
+            secondLabel={standingsByCode[rankedCodes[1]]?.playoffSeed === 2 ? `${conference.name} 2 seed` : null}
             onSelectTeam={onSelectTeam}
             teams={rankedCodes.map((code) => ({
               code,

@@ -43,7 +43,11 @@ test("stored Panthers @ Eagles moneyline spread and total attach through canonic
   const event = findOddsForGame([panthersEvent], { id: "1392302", away: "CAR", home: "PHI", sourceDate: "2026-10-18T17:00:00.000Z" });
   assert.equal(event, panthersEvent);
   assert.deepEqual(event.bookmakers[0].markets.map((m) => m.key), ["h2h", "spreads", "totals"]);
-  assert.deepEqual(getCoreMarket(event), { away: 21, home: 19.5, total: 40.5, homeSpread: 1.5, pick: "PHI" });
+  const { awayPrice, homePrice, ...core } = getCoreMarket(event);
+  assert.deepEqual(core, { away: 21, home: 19.5, total: 40.5, homeSpread: 1.5, pick: "PHI" });
+  // Head-to-head prices in decimal odds: -105 → $1.95, -115 → $1.87.
+  assert.equal(awayPrice.toFixed(2), "1.95");
+  assert.equal(homePrice.toFixed(2), "1.87");
 });
 
 test("a split spread consensus does not hide a real moneyline favourite", () => {

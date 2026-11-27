@@ -272,19 +272,28 @@
   padding: 16px 18px;
   border: 0;
   border-radius: 26px;
-  color: var(--accent-ink);
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  color: var(--fd-text);
   text-align: left;
-  background: var(--fd-chalk);
+  background:
+    radial-gradient(70% 160% at 0% 50%, color-mix(in srgb, var(--team-glow) 34%, transparent), transparent 72%),
+    radial-gradient(50% 140% at 100% 50%, color-mix(in srgb, var(--team-glow) 14%, transparent), transparent 70%),
+    var(--fd-surface);
+  cursor: pointer;
 }
-.standings-leader-logo { display: grid; place-items: center; width: 58px; height: 58px; border-radius: 50%; background: #E6E2D8; }
+.standings-leader-watermark { position: absolute; z-index: -1; top: 50%; right: -40px; opacity: .1; pointer-events: none; transform: translateY(-50%) rotate(-10deg); }
+.standings-leader-watermark img { width: 220px !important; height: 220px !important; object-fit: contain; }
+.standings-leader-logo { display: grid; place-items: center; width: 58px; height: 58px; border-radius: 50%; background: rgba(0,0,0,.28); }
 .standings-leader-logo img { width: 46px !important; height: 46px !important; object-fit: contain; }
 .standings-leader-copy { display: grid; gap: 2px; min-width: 0; }
-.standings-leader-copy small { color: #5A5650; font-size: 12px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
+.standings-leader-copy small { color: var(--fd-muted); font-size: 12px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
 .standings-leader-copy strong { font-family: var(--fd-display); font-size: 28px; font-weight: 800; line-height: 1; text-transform: uppercase; }
-.standings-leader-copy span { color: #3E3B36; font-size: 13px; font-weight: 500; }
+.standings-leader-copy span { color: color-mix(in srgb, var(--fd-text) 78%, transparent); font-size: 13px; font-weight: 500; }
 .standings-leader-record { display: grid; justify-items: end; gap: 4px; }
 .standings-leader-record strong { font-family: var(--fd-display); font-size: 40px; font-weight: 800; line-height: 1; }
-.standings-leader-record span { padding: 3px 8px; border-radius: 10px; color: var(--fd-chalk); background: var(--accent-ink); font-size: 12px; font-weight: 700; }
+.standings-leader-record span { padding: 3px 8px; border-radius: 10px; color: var(--fd-text); background: rgba(0,0,0,.35); font-size: 12px; font-weight: 700; }
 .standings-table { display: grid; padding: 6px 0; border-radius: 26px; background: var(--fd-surface); overflow: hidden; }
 .standings-row {
   display: grid;
@@ -312,7 +321,8 @@ button.standings-row:hover { background-color: var(--fd-raised); }
 .standings-record { font-weight: 600; }
 .standings-diff { color: #C9C7CF; }
 .standings-streak { color: var(--fd-muted); font-weight: 600; }
-.standings-streak.winning { color: var(--accent); font-weight: 700; }
+.standings-streak.winning { color: #43d17a; font-weight: 700; }
+.standings-streak.losing { color: #ff5d68; font-weight: 700; }
 .standings-chevron { color: var(--fd-subtle); }
 .standings-note { margin: 0 4px; color: var(--fd-subtle); font-size: 12px; }
 @media (max-width: 420px) {
@@ -539,3 +549,45 @@ button.standings-row:hover { background-color: var(--fd-raised); }
 .pick-score-facts span,
 .best-bet-metrics span,
 .best-bet-card p.best-bet-why { background: color-mix(in srgb, var(--fd-raised-2) 78%, transparent); }
+
+/* Betting lines on the matchup card */
+.predictions-lines-grid { position: relative; z-index: 2; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin-top: 10px; }
+.predictions-lines-grid strong { font-size: 17px; }
+@media (max-width: 700px) { .predictions-lines-grid { grid-template-columns: 1fr; } }
+
+/* Weekly Multi legs: the same bar as a pick row, so each leg's teams are recognisable at a glance. */
+.multi-leg {
+  --slant-width: clamp(96px, 22%, 220px);
+  position: relative;
+  display: grid;
+  grid-template-columns: 30px auto minmax(0, 1fr) auto;
+  grid-template-areas: "status badges copy price";
+  align-items: center;
+  gap: 12px;
+  min-height: 76px;
+  padding: 12px calc(var(--slant-width) + 10px) 12px 14px;
+  overflow: hidden;
+  border-radius: 22px;
+  background:
+    radial-gradient(60% 140% at 0% 50%, color-mix(in srgb, var(--away-glow, transparent) 26%, transparent), transparent 70%),
+    radial-gradient(60% 140% at 100% 50%, color-mix(in srgb, var(--home-glow, transparent) 20%, transparent), transparent 70%),
+    var(--fd-raised, var(--fd-surface));
+}
+.multi-leg-status { grid-area: status; display: grid; place-items: center; width: 30px; height: 30px; border-radius: 9px; background: rgba(0,0,0,.28); color: var(--accent); font-size: 13px; font-weight: 900; }
+.multi-leg.won .multi-leg-status { background: none; color: #43d17a; }
+.multi-leg.lost .multi-leg-status { background: none; color: #ff5d68; }
+.multi-leg-badges { grid-area: badges; }
+.multi-leg-copy { grid-area: copy; display: grid; gap: 3px; min-width: 0; }
+.multi-leg-copy strong { color: var(--fd-text); font-family: var(--fd-display); font-size: 22px; font-weight: 800; line-height: 1.05; overflow-wrap: anywhere; }
+.multi-leg-copy small { color: var(--fd-muted); font-size: 12px; line-height: 1.35; }
+.multi-leg-copy em { font-style: normal; font-size: 11px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; }
+.multi-leg.won .multi-leg-copy em { color: #6EE7A0; }
+.multi-leg.lost .multi-leg-copy em { color: #FF8A8A; }
+.multi-leg-price { grid-area: price; min-width: 66px; padding: 8px 10px; border-radius: 10px; background: rgba(0,0,0,.32); color: #fff; font-size: 15px; text-align: center; }
+.multi-leg-slant > strong { position: absolute; top: 50%; left: calc(50% + 10px); transform: translate(-50%, -50%); font-family: var(--fd-display); font-size: 20px; font-weight: 800; text-transform: uppercase; }
+@media (max-width: 560px) {
+  .multi-leg { --slant-width: 84px; grid-template-columns: 30px minmax(0, 1fr); grid-template-areas: "status copy" "status price"; row-gap: 8px; padding-left: 12px; }
+  .multi-leg-badges { display: none; }
+  .multi-leg-price { justify-self: start; padding: 5px 9px; font-size: 14px; }
+  .multi-leg-copy strong { font-size: 19px; }
+}

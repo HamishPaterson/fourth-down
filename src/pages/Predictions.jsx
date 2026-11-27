@@ -743,7 +743,7 @@ function buildMarketFallback(game, oddsEvents, error) {
   };
 }
 
-export function PredictionCard({ prediction, onOpen }) {
+export function PredictionCard({ prediction, onOpen, oddsEvent }) {
   const [activeTab, setActiveTab] = useState("prediction");
   const awayTheme = getTeamTheme(prediction.awayCode);
   const homeTheme = getTeamTheme(prediction.homeCode);
@@ -766,6 +766,7 @@ export function PredictionCard({ prediction, onOpen }) {
   const projectedTie =
     Number(prediction.fourthDownAwayScore) ===
       Number(prediction.fourthDownHomeScore);
+  const lines = bettingLines(prediction, oddsEvent);
   const currentWeek = getCalendarWeek();
   const bestBetsAvailable =
     isFinal ? Boolean(prediction.bestBets) : Number(prediction.week) === Number(currentWeek);
@@ -948,6 +949,28 @@ export function PredictionCard({ prediction, onOpen }) {
           </span>
         </div>
       </div>
+
+      {lines && (
+        <div className="predictions-lines-grid" aria-label="Betting lines">
+          <div className="predictions-pick-panel">
+            <small>Spread</small>
+            <strong>{lines.spread ?? "Not available"}</strong>
+            <span>{lines.spreadOther ?? "Odds makers line"}</span>
+          </div>
+          <div className="predictions-pick-panel">
+            <small>Total points</small>
+            <strong>{lines.total != null ? `O/U ${lines.total}` : "Not available"}</strong>
+            <span>{lines.total != null && Number.isFinite(Number(prediction.fourthDownAwayScore) + Number(prediction.fourthDownHomeScore))
+              ? `We project ${Number(prediction.fourthDownAwayScore) + Number(prediction.fourthDownHomeScore)}`
+              : "Odds makers line"}</span>
+          </div>
+          <div className="predictions-pick-panel">
+            <small>Head to head</small>
+            <strong>{lines.moneyline ?? "Not available"}</strong>
+            <span>{lines.moneyline ? "Win odds for each team" : "Odds makers line"}</span>
+          </div>
+        </div>
+      )}
 
         </>
       ) : (
@@ -1248,6 +1271,31 @@ function PredictionTeam({ code, score, picked, side }) {
   );
 }
 
+// The odds makers' spread, total and head-to-head prices: live when this game's
+// odds are loaded, otherwise the lines saved with the prediction.
+function bettingLines(prediction, oddsEvent) {
+  const event = oddsEvent || prediction.game?.oddsEvent;
+  const live = event ? getCoreMarket(event) : {};
+  const homeSpread = finiteNumberOrNull(live.homeSpread ?? prediction.marketSpread);
+  const total = finiteNumberOrNull(live.total ?? prediction.marketGameTotal);
+  const awayPrice = finiteNumberOrNull(live.awayPrice ?? prediction.marketAwayPrice);
+  const homePrice = finiteNumberOrNull(live.homePrice ?? prediction.marketHomePrice);
+  if (homeSpread === null && total === null && (awayPrice === null || homePrice === null)) return null;
+  const away = prediction.awayCode, home = prediction.homeCode;
+  let spread = null, spreadOther = null;
+  if (homeSpread === 0) spread = "Pick'em";
+  else if (homeSpread !== null) {
+    const points = Math.abs(homeSpread);
+    const [favourite, underdog] = homeSpread < 0 ? [home, away] : [away, home];
+    spread = `${favourite} -${points}`;
+    spreadOther = `${underdog} +${points}`;
+  }
+  const moneyline = awayPrice !== null && homePrice !== null
+    ? `${away} ${formatAustralianOdds(awayPrice)} · ${home} ${formatAustralianOdds(homePrice)}`
+    : null;
+  return { spread, spreadOther, total, moneyline };
+}
+
 function PickPanel({ label, code, detail, fallbackValue = "Not available" }) {
   return (
     <div className="predictions-pick-panel">
@@ -1413,6 +1461,14 @@ function resolveSelectedTeam(leg) {
   return null;
 }
 
+// Away and home team of a Multi leg; older locked legs only carry "SEA at SF".
+function multiLegTeams(bet) {
+  const [matchAway, matchHome] = String(bet?.matchup || "").split(/\s+at\s+/i);
+  const away = normalizeTeamCode(bet?.awayCode || matchAway);
+  const home = normalizeTeamCode(bet?.homeCode || matchHome);
+  return { away: TEAM_NAMES[away] ? away : null, home: TEAM_NAMES[home] ? home : null };
+}
+
 function getDecimalOddsValue(bet) {
   return usableDecimalOdds(bet?.decimalOdds, bet?.price);
 }
@@ -1503,74 +1559,44 @@ export function WeeklyParlay({ parlay, week }) {
         <div style={{ display: "grid", gap: "11px" }}>
           {legs.map((bet, index) => {
             const result = bet.result || "pending";
-            const resultColour = result === "won" ? "#43d17a" : result === "lost" ? "#ff5d68" : "var(--accent)";
+            const codes = multiLegTeams(bet);
+            const team = resolveBetTeamCode(bet, codes.away, codes.home);
             return (
             <article
               key={`${bet.market}:${bet.selection}:${bet.sportsbook}`}
-              style={{
-                ...getBetTeamStyle(bet, bet.awayCode, bet.homeCode),
-                display: "grid",
-                gridTemplateColumns: "44px minmax(0, 1fr) auto",
-                alignItems: "center",
-                gap: "14px",
-                minHeight: "72px",
-                padding: "12px 16px",
-                border: "1px solid rgba(255,255,255,.14)",
-                borderRadius: "12px",
-              }}
+              className={`multi-leg ${result}`}
+              style={teamCardStyle({ awayCode: codes.away, homeCode: codes.home })}
             >
-              <span
-                style={{
-                  display: "grid",
-                  width: "30px",
-                  height: "30px",
-                  placeItems: "center",
-                  borderRadius: "9px",
-                  background: "rgba(0,0,0,.24)",
-                  color: "var(--accent)",
-                  fontSize: "12px",
-                  fontWeight: 900,
-                }}
-              >
+              <span className="multi-leg-status">
                 {result === "won" ? (
-                  <CheckCircle2 size={30} color="#43d17a" strokeWidth={3} aria-label="Successful leg" />
+                  <CheckCircle2 size={28} strokeWidth={2.6} aria-label="Successful leg" />
                 ) : result === "lost" ? (
-                  <XCircle size={30} color="#ff5d68" strokeWidth={3} aria-label="Failed leg" />
+                  <XCircle size={28} strokeWidth={2.6} aria-label="Failed leg" />
                 ) : (
                   index + 1
                 )}
               </span>
-
-              <div style={{ minWidth: 0 }}>
-                <small style={{ display: "block", color: "rgba(255,255,255,.68)", fontSize: "10px", lineHeight: 1.35 }}>
-                  {bet.matchup} · {bet.market}
-                </small>
-                <strong style={{ display: "block", marginTop: "4px", color: "#fff", fontSize: "14px", lineHeight: 1.35 }}>
-                  {formatFullPlayerSelection(bet.selection)}
-                </strong>
-                <span style={{ display: "block", marginTop: "4px", color: "rgba(255,255,255,.48)", fontSize: "9px" }}>
-                  {bet.sportsbook || "No bookmaker price"}
+              {codes.away && codes.home && (
+                <span className="pick-row-badges multi-leg-badges" aria-hidden="true">
+                  <TeamBadge code={codes.away} />
+                  <TeamBadge code={codes.home} />
                 </span>
+              )}
+              <span className="multi-leg-copy">
+                <strong>{formatFullPlayerSelection(bet.selection)}</strong>
+                <small>
+                  {codes.away && codes.home ? `${nickname(codes.away)} at ${nickname(codes.home)}` : bet.matchup} · {bet.market}
+                  {bet.sportsbook ? ` · ${bet.sportsbook}` : ""}
+                </small>
                 {result !== "pending" && (
-                  <strong style={{ display: "block", marginTop: "6px", color: resultColour, fontSize: "11px", textTransform: "uppercase" }}>
-                    {result === "won" ? "Successful" : result === "lost" ? "Failed" : "Push"}
-                  </strong>
+                  <em>{result === "won" ? "Successful" : result === "lost" ? "Failed" : "Push"}</em>
                 )}
-              </div>
-
-              <strong
-                style={{
-                  minWidth: "66px",
-                  padding: "8px 10px",
-                  borderRadius: "9px",
-                  background: "rgba(0,0,0,.25)",
-                  color: "#fff",
-                  fontSize: "14px",
-                  textAlign: "center",
-                }}
-              >
-                {formatAustralianOdds(bet.decimalOdds, bet.price)}
-              </strong>
+              </span>
+              <strong className="multi-leg-price">{formatAustralianOdds(bet.decimalOdds, bet.price)}</strong>
+              <span className={`pick-row-slant multi-leg-slant${result === "won" ? " pick-row-winner correct" : result === "lost" ? " pick-row-winner missed" : ""}`} aria-hidden="true">
+                {team ? <TeamLogo team={team} size={96} />
+                  : /^(over|under)\b/i.test(String(bet.selection || "")) ? <strong>{/^over/i.test(bet.selection) ? "Over" : "Under"}</strong> : null}
+              </span>
             </article>
 );
 })}
@@ -1663,6 +1689,8 @@ function enrichSavedPredictionWithCurrentMarket(saved, game, oddsEvents, now = n
     marketHomeScore: hasMarket ? market.home : saved.marketHomeScore,
     marketGameTotal: market.total ?? saved.marketGameTotal,
     marketSpread: market.homeSpread ?? saved.marketSpread,
+    marketAwayPrice: market.awayPrice ?? saved.marketAwayPrice,
+    marketHomePrice: market.homePrice ?? saved.marketHomePrice,
     game: {
       ...game,
       weather: game.weather || storedWeather,

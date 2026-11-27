@@ -5,25 +5,14 @@ import { teamNickname } from "../services/teamAccent.js";
 
 // Standings as in the design prototype: the leader on a light card, then a compact table.
 // teams: [{ code, team, standing }] already in standings order. Rows open the team page.
-export default function StandingsTable({ teams, leaderLabel, onSelectTeam, showSeeds = false }) {
+export default function StandingsTable({ teams, leaderLabel, secondLabel, onSelectTeam, showSeeds = false }) {
   if (!teams.length) return null;
   const [leader] = teams;
 
   return (
     <div className="standings-block">
-      <button type="button" className="standings-leader" style={getTeamTheme(leader.code)}
-        onClick={() => onSelectTeam?.(leader.team)} aria-label={`${leader.team.full_name}, ${leaderLabel}. Open team page`}>
-        <span className="standings-leader-logo"><TeamLogo team={leader.code} size={48} /></span>
-        <span className="standings-leader-copy">
-          <small>{leaderLabel}</small>
-          <strong>{teamNickname(leader.code)}</strong>
-          <span>{leaderDetail(leader.standing)}</span>
-        </span>
-        <span className="standings-leader-record">
-          <strong>{record(leader.standing)}</strong>
-          {leader.standing?.playoffSeed && <span>Seed {leader.standing.playoffSeed}</span>}
-        </span>
-      </button>
+      <LeaderCard entry={leader} label={leaderLabel} onSelectTeam={onSelectTeam} />
+      {secondLabel && teams[1] && <LeaderCard entry={teams[1]} label={secondLabel} onSelectTeam={onSelectTeam} />}
 
       <div className="standings-table" role="table" aria-label="Standings">
         <div className="standings-row standings-head" role="row">
@@ -48,7 +37,7 @@ export default function StandingsTable({ teams, leaderLabel, onSelectTeam, showS
               </span>
               <span role="cell" className="standings-record">{record(standing)}</span>
               <span role="cell" className="standings-diff">{Number.isFinite(diff) ? `${diff > 0 ? "+" : diff < 0 ? "−" : ""}${Math.abs(diff)}` : "—"}</span>
-              <span role="cell" className={`standings-streak${streak.startsWith("W") ? " winning" : ""}`}>{streak || "—"}</span>
+              <span role="cell" className={`standings-streak${streak.startsWith("W") ? " winning" : streak.startsWith("L") ? " losing" : ""}`}>{streak || "—"}</span>
               <ChevronRight className="standings-chevron" size={16} aria-hidden="true" />
             </button>
           );
@@ -56,6 +45,28 @@ export default function StandingsTable({ teams, leaderLabel, onSelectTeam, showS
       </div>
       {showSeeds && <p className="standings-note">Numbers beside a team are playoff seeds (top 7 make the playoffs).</p>}
     </div>
+  );
+}
+
+// A highlighted team (top seed, 2 seed or division leader): dark card in the team's
+// colours with a big faded logo behind it.
+function LeaderCard({ entry, label, onSelectTeam }) {
+  const { code, team, standing } = entry;
+  return (
+    <button type="button" className="standings-leader" style={getTeamTheme(code)}
+      onClick={() => onSelectTeam?.(team)} aria-label={`${team.full_name}, ${label}. Open team page`}>
+      <span className="standings-leader-watermark" aria-hidden="true"><TeamLogo team={code} size={220} /></span>
+      <span className="standings-leader-logo"><TeamLogo team={code} size={48} /></span>
+      <span className="standings-leader-copy">
+        <small>{label}</small>
+        <strong>{teamNickname(code)}</strong>
+        <span>{leaderDetail(standing)}</span>
+      </span>
+      <span className="standings-leader-record">
+        <strong>{record(standing)}</strong>
+        {standing?.playoffSeed && <span>Seed {standing.playoffSeed}</span>}
+      </span>
+    </button>
   );
 }
 

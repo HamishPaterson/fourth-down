@@ -330,7 +330,7 @@ export function resolveTeamCode(value) {
 export function getCoreMarket(event) {
   const awayCode = resolveTeamCode(event?.away_team_code || event?.away_team);
   const homeCode = resolveTeamCode(event?.home_team_code || event?.home_team);
-  const spreads = [], totals = [], awayPrices = [], homePrices = [];
+  const spreads = [], totals = [], awayPrices = [], homePrices = [], awayDecimal = [], homeDecimal = [];
   const finite = (value) => value !== null && value !== undefined && value !== "" && Number.isFinite(Number(value));
   const median = (values) => {
     if (!values.length) return null;
@@ -343,11 +343,12 @@ export function getCoreMarket(event) {
     const total = market("totals").find((outcome) => /^(over|under)$/i.test(outcome.name))?.point;
     if (finite(homeSpread)) spreads.push(Number(homeSpread));
     if (finite(total)) totals.push(Number(total));
-    for (const [code, prices] of [[awayCode, awayPrices], [homeCode, homePrices]]) {
+    for (const [code, prices, decimals] of [[awayCode, awayPrices, awayDecimal], [homeCode, homePrices, homeDecimal]]) {
       const price = market("h2h").find((outcome) => resolveTeamCode(outcome.name) === code)?.price;
       if (finite(price) && Number(price) !== 0) {
         const american = Number(price);
         prices.push(american > 0 ? 100 / (american + 100) : -american / (-american + 100));
+        decimals.push(american > 0 ? 1 + american / 100 : 1 + 100 / -american);
       }
     }
   }
@@ -357,6 +358,8 @@ export function getCoreMarket(event) {
     away: homeSpread !== null && total !== null ? (total + homeSpread) / 2 : null,
     home: homeSpread !== null && total !== null ? (total - homeSpread) / 2 : null,
     total, homeSpread,
+    // Median head-to-head price per team, in decimal odds (e.g. 1.55).
+    awayPrice: median(awayDecimal), homePrice: median(homeDecimal),
     pick: awayProbability !== null && homeProbability !== null && awayProbability !== homeProbability
       ? awayProbability > homeProbability ? awayCode : homeCode : null,
   };
