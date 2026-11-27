@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { buildWeeklyMultiSelection, createWeeklyMultiCurrentHandler, createWeeklyMultiLockHandler, fetchScheduleGamesForWindow, getDisplayLockCycle, getLockCycle, resolveDisplayWeekContext, resolveLockWeekContext, WEEKLY_MULTI_TIME_ZONE } from "./weeklyMulti.js";
-import { createScheduleHandler } from "../api/nfl/schedule.js";
+import { createScheduleHandler, lockRequiresApproval } from "../api/nfl/schedule.js";
 import { CURRENT_MODEL_VERSION, CURRENT_MODEL_KEY } from "../src/services/modelIdentity.js";
 
 const THURSDAY = Date.UTC(2026, 9, 8, 0, 0, 0);
@@ -968,4 +968,54 @@ test("historical dry run returns the preservation reason without inserting a row
     if (originalSecret === undefined) delete process.env.CRON_SECRET;
     else process.env.CRON_SECRET = originalSecret;
   }
+});
+
+test("only the scheduled lock route locks without approval; prepare never locks", () => {
+  assert.equal(lockRequiresApproval({ weeklyMultiMode: "lock" }), false);
+  assert.equal(lockRequiresApproval({ weeklyMultiMode: "prepare" }), true);
+  assert.equal(lockRequiresApproval({}), true);
+  assert.equal(lockRequiresApproval(undefined), true);
+});
+
+test("read route returns the locked Multi for a requested week, or none when that week has no legs", async () => {
+  const rows = [
+    { season: 2026, week: 6, lock_at: "2026-10-15T00:00:00.000Z", legs: [], partial: true },
+    { season: 2026, week: 11, lock_at: "2026-11-19T00:00:00.000Z", legs: [{ market: "Moneyline", selection: "SF", kickoff: "2026-11-20T01:15:00.000Z" }] },
+  ];
+  const filters = [];
+  const handler = createCurrentEntry({
+    getNow: () => new Date("2026-11-27T00:00:00Z"),
+    fetchGames: async () => assert.fail("a past week must not call the schedule provider"),
+    createClient: () => ({
+      from: (table) => {
+        assert.equal(table, "weekly_best_multis");
+        const applied = {};
+        return {
+          select() { return this; },
+          eq(column, value) { applied[column] = value; filters.push([column, value]); return this; },
+          then(resolve, reject) {
+            return Promise.resolve({ data: rows.filter((row) => row.season === applied.season && row.week === applied.week), error: null })
+              .then(resolve, reject);
+          },
+        };
+      },
+    }),
+  });
+  const found = response();
+  await handler({ method: "GET", query: { weeklyMultiMode: "current", season: "2026", week: "11" } }, found);
+  assert.equal(found.statusCode, 200);
+  assert.equal(found.body.week, 11);
+  assert.equal(found.body.record, rows[1]);
+
+  for (const week of ["6", "3"]) {
+    const none = response();
+    await handler({ method: "GET", query: { weeklyMultiMode: "current", season: "2026", week } }, none);
+    assert.equal(none.statusCode, 200);
+    assert.deepEqual(none.body, { status: "none", locked: false, season: 2026, week: Number(week) });
+  }
+
+  const invalid = response();
+  await handler({ method: "GET", query: { weeklyMultiMode: "current", season: "2026", week: "x" } }, invalid);
+  assert.equal(invalid.statusCode, 400);
+  assert.ok(filters.every(([column]) => ["season", "week"].includes(column)));
 });

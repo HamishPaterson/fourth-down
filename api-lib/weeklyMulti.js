@@ -695,6 +695,28 @@ export function createWeeklyMultiCurrentHandler(overrides = {}) {
         if (error) throw error;
         return data;
       };
+      // A specific week (Picks page week picker): that week's locked Multi, or none.
+      const requestedWeek = Number(req.query?.week);
+      if (req.query?.week !== undefined) {
+        const requestedSeason = Number(req.query?.season);
+        if (!Number.isInteger(requestedWeek) || requestedWeek < 1 || requestedWeek > 22 ||
+            !Number.isInteger(requestedSeason) || requestedSeason < 2002) {
+          return res.status(400).json({ error: "Invalid season or week" });
+        }
+        const { data: weekRecords, error: weekError } = await createClient()
+          .from("weekly_best_multis").select("*")
+          .eq("season", requestedSeason).eq("week", requestedWeek);
+        if (weekError) throw weekError;
+        const weekRecord = [...(weekRecords || [])].sort((x, y) => Date.parse(y.lock_at) - Date.parse(x.lock_at))
+          .find((row) => row.legs?.length);
+        if (!weekRecord) {
+          setWeeklyMultiReadCache(res, 180);
+          return res.status(200).json({ status: "none", locked: false, season: requestedSeason, week: requestedWeek });
+        }
+        const weekStarted = (weekRecord.legs || []).some((leg) => new Date(leg.kickoff || 0).getTime() <= now.getTime());
+        const weekSettlement = (weekRecord.legs || []).some(isPlayerLeg) && weekStarted ? await settle(weekRecord) : null;
+        return savedBody(weekRecord, weekSettlement?.legResults, weekSettlement?.unresolved);
+      }
       const savedRecord = await readRecord(cycle.lockAt);
       if (savedRecord) {
         const hasPlayerLegs = (savedRecord.legs || []).some(isPlayerLeg);

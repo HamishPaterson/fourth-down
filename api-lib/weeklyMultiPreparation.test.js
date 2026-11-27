@@ -370,7 +370,7 @@ test("availability polling never fabricates a lock without a persisted authorita
   assert.equal(db.tables.weekly_best_multis.length, 0);
 });
 
-test("production locks only the exact legs a person approved; schedulers never lock", async () => {
+test("the approval mode (prepare route) locks only the exact legs a person approved", async () => {
   const attempt = async (method, body, mutate) => {
     const fixture = lockFixture(), db = lockDatabase(fixture), res = lockResponse(), previous = process.env.CRON_SECRET;
     process.env.CRON_SECRET = "fixture-only-secret";

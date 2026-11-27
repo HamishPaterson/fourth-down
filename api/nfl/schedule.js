@@ -36,6 +36,13 @@ const TEAM_DIVISION = Object.fromEntries(
   )
 );
 
+// The owner chose automatic locking (2026-11-27): the scheduled /api/weekly-multi/lock
+// runs lock the Multi themselves once every readiness gate passes. /prepare stays a
+// preview that never locks, so the earlier daily run cannot lock ahead of the lock crons.
+export function lockRequiresApproval(query) {
+  return query?.weeklyMultiMode !== "lock";
+}
+
 export function createScheduleHandler({
   currentHandler = createWeeklyMultiCurrentHandler({
     ensureCurrent: async (req, res) => {
@@ -56,7 +63,7 @@ export function createScheduleHandler({
   }),
   lockHandler = async (req, res) => {
     const { createWeeklyMultiPreparationHandler } = await import("../../api-lib/weeklyMultiPreparation.js");
-    return createWeeklyMultiPreparationHandler({ requireApproval: true })(req, res);
+    return createWeeklyMultiPreparationHandler({ requireApproval: lockRequiresApproval(req.query) })(req, res);
   },
   scheduleHandler = handleScheduleRequest,
 } = {}) {

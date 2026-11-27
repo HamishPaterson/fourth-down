@@ -316,7 +316,7 @@ export default function Predictions({ onOpen, favoriteTeam, onOpenTeam }) {
   }, [week]);
 
   const predictions = useMemo(() => rows, [rows]);
-  const weeklyParlay = useWeeklyParlay(predictions);
+  const weeklyParlay = useWeeklyParlay(predictions, week);
 
   const filtered = filterPredictions(predictions, filter);
   const showInitialLoader = shouldShowBlockingLoader({
@@ -418,7 +418,7 @@ export default function Predictions({ onOpen, favoriteTeam, onOpenTeam }) {
         ))
       )}
 
-      <WeeklyParlay parlay={weeklyParlay} week={weeklyParlay?.week} />
+      {weeklyParlay?.status !== "none" && <WeeklyParlay parlay={weeklyParlay} week={weeklyParlay?.week} />}
 
       <section className="picks-glance" aria-label="This week at a glance">
         <h2>At a glance</h2>
@@ -1350,23 +1350,35 @@ function formatPredictionWind(weather) {
     .join(" · ");
 }
 
-function useWeeklyParlay(predictions) {
+// The Multi for the week being viewed: the live one for the current week, otherwise
+// that week's locked Multi, or { status: "none" } when that week never had one.
+function useWeeklyParlay(predictions, week) {
   const [response, setResponse] = useState(null);
   useEffect(() => {
     let active = true;
     let controller;
+    setResponse(null);
+    const get = async (url) => {
+      const result = await fetch(url, {
+        method: "GET",
+        cache: "no-store",
+        signal: controller.signal,
+        headers: { Accept: "application/json" },
+      });
+      if (!result.ok) throw new Error(`Weekly Best Multi request failed (${result.status})`);
+      return result.json();
+    };
     const load = async () => {
       controller?.abort();
       controller = new AbortController();
       try {
-        const result = await fetch("/api/weekly-multi/current", {
-          method: "GET",
-          cache: "no-store",
-          signal: controller.signal,
-          headers: { Accept: "application/json" },
-        });
-        if (!result.ok) throw new Error(`Weekly Best Multi request failed (${result.status})`);
-        const payload = await result.json();
+        const current = await get("/api/weekly-multi/current");
+        let payload = current;
+        if (Number(current?.week) !== Number(week)) {
+          const forWeek = await get(`/api/weekly-multi/current?season=${SEASON}&week=${week}`);
+          payload = forWeek?.record || current?.week != null || Number(week) !== getCalendarWeek()
+            ? forWeek : current;
+        }
         if (active) setResponse(payload);
       } catch (error) {
         if (error?.name !== "AbortError" && active) setResponse({ status: "unavailable", error: error.message });
@@ -1379,7 +1391,7 @@ function useWeeklyParlay(predictions) {
       controller?.abort();
       window.clearInterval(timer);
     };
-  }, []);
+  }, [week]);
 
   return useMemo(() => {
     const record = response?.record;
